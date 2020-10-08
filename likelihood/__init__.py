@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
 """ Authors: J. A. Moreno-Guerra & J. I. Ávalos-López
 Company: MLearning Consultants
 Library version: 1.0.0
