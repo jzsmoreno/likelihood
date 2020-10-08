@@ -12,7 +12,7 @@ setuptools.setup(
     py_modules=["likelihood"],
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/jzsmoreno/MLearningColabs/",
+    url="https://github.com/jzsmoreno/MLearning/",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
