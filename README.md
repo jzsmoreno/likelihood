@@ -1,4 +1,4 @@
-![likelihood](likelihood.png)
+![likelihood](https://raw.githubusercontent.com/RodolfoFerro/likelihood/main/likelihood.png)
 
 ![GitHub last commit](https://img.shields.io/github/last-commit/jzsmoreno/likelihood?style=for-the-badge)
 ![GitHub repo size](https://img.shields.io/github/repo-size/jzsmoreno/likelihood?style=for-the-badge)
@@ -17,6 +17,6 @@ pip install likelihood
 
 ## Examples
 
-You can check the [examples](/examples) folder.
+You can check the [examples](https://github.com/jzsmoreno/likelihood/tree/main/examples) folder.
 
 More examples will be added soon.
