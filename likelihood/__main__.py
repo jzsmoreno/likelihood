@@ -4,15 +4,23 @@ import numpy as np
 import corner
 
 
-""" Función que realiza el cálculo del prior
-
-    Argumentos:
-            theta (numpy_array): arreglo de parámetros del modelo
-            conditions (list): lista de 2n condiciones para el rango mín. y máx. de los n parámetros
-    Return:
-           lp (float): la probabilidad a priori"""
-
 def lnprior(theta, conditions):
+    """Computes the prior probability.
+
+    Parameters
+    ----------
+    theta : np.ndarray
+        An array containing the parameters of the model.
+    conditions : list
+        A list containing $2n$-conditions for the (min, max) range of the 
+        $n$ parameters.
+    
+    Returns
+    -------
+    lp : float
+        The a priori probability.
+    """
+
     try: 
         if(len(conditions) != 2*len(theta)):
             print('IndexError : Length of conditions must be twice the length of theta')
@@ -29,21 +37,33 @@ def lnprior(theta, conditions):
     except:
         return 0.0
     
-""" Función que realiza el cálculo del likelihood
-
-    Argumentos:
-            x (numpy_array): arreglo de m columnas y n filas, donde m es el número de dimensiones, 
-                             n el datos por columna
-            y (numpy_array): arreglo de n datos que se comparará con la salida del modelo
-            model (python function): función definida a priori por el usuario que recibe dos argumentos
-                                     x, theta
-            theta (numpy_array): arreglo de parámetros del modelo
-            conditions (list): lista de 2n condiciones para el rango mín. y máx. de los n parámetros
-            var2 (float): determina el ancho del paso que dará el caminador, default = 1.0
-    Return:
-           lp + lhood (float): regresa el likelihood"""
 
 def funLike(x, y, model, theta, conditions = None, var2 = 1.0):
+    """Computes the likelihood.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        An $(m, n)$ dimensional array for (cols, rows).
+    y : np.ndarray
+        An $n$ dimensional array that will be compared with model's output.
+    model : function
+        A Python function defined by the user. This function should recieve
+        two arguments $(x, theta)$.
+    theta : np.ndarray
+        The array containing the model's parameters.
+    conditions : list
+        A list containing $2n$-conditions for the (min, max) range of the 
+        $n$ parameters.
+    var2 : float
+        Determines the step size of the walker. By default it is set to `1.0`.
+
+    Returns
+    -------
+    lhood : float
+        The computed likelihood.
+    """
+
     lp = lnprior(theta, conditions)
     inv_sigma2 = 1.0/(var2)
     y_hat = model(x, theta)
@@ -53,45 +73,75 @@ def funLike(x, y, model, theta, conditions = None, var2 = 1.0):
         y_hat = y_hat[np.newaxis,...].T
     lhood = 0.5*(np.sum((y-y_hat)**2*inv_sigma2 - np.log(inv_sigma2)))
     if not np.isfinite(lp):
-        return np.inf
+        lhood = np.inf
     else:
-        return lp + lhood
+        lhood += lp
     
-""" Función que realiza la actualización de los parámetros theta
+    return lhood
 
-    Argumentos:
-            theta (numpy_array): arreglo de parámetros del modelo
-            d (float): ancho del paso Gaussiano del caminador 
-    Return:
-           theta_new (numpy_array): regresa el arreglo theta actualizado"""
     
 def update_theta(theta, d):
+    """Updates the theta parameters.
+
+    Parameters
+    ----------
+    theta : np.ndarray
+        The ndarray containing the model's parameters.
+    d : float
+        Size of the Gaussian step for the walker.
+
+    Returns
+    -------
+    theta_new : np.array
+        An ndarray with the updated theta values.
+    """
+
     theta_new = []
     for k in range(len(theta)):
         theta_new.append(np.random.normal(theta[k], d/2.))
     return(theta_new)
 
-""" Función que realiza la implementación del algoritmo del caminador
-
-    Argumentos:
-            x (numpy_array): arreglo de m columnas y n filas, donde m es el número de dimensiones, 
-                             n el datos por columna
-            y (numpy_array): arreglo de n datos que se comparará con la salida del modelo
-            model (python function): función definida a priori por el usuario que recibe dos argumentos
-                                     x, theta
-            theta (numpy_array): arreglo de parámetros del modelo
-            conditions (list): lista de 2n condiciones para el rango mín. y máx. de los n parámetros
-            var2 (float): determina el ancho del paso que dará el caminador, default 0.01
-            mov (int): número de movimientos que relizará el caminador, default 100
-            d (float): ancho del paso Gaussiano del caminador, default 1
-            tol (float): criterio de convergencia del log del likelihood, default 1.*10**-3
-            mode (Bool): default True 
-    Return:
-           theta (numpy_array): regresa el arreglo theta actualizado
-           nwalk (numpy_array): actualizaciones del arreglo de theta para cada uno de los movimientos efectuados por el caminador
-           y0 (float): valor del logaritmo del likelihood"""
     
 def walk(x, y, model, theta, conditions = None, var2 = 0.01, mov = 100, d = 1, tol = 1.*10**-3, mode = True):
+    """Executes the walker implementation.
+    
+    Parameters
+    ----------
+    x : np.ndarray
+        An $(m, n)$ dimensional array for (cols, rows).
+    y : np.ndarray
+        An $n$ dimensional array that will be compared with model's output.
+    model : function
+        A Python function defined by the user. This function should recieve
+        two arguments $(x, theta)$.
+    theta : np.ndarray
+        The array containing the model's parameters.
+    conditions : list
+        A list containing $2n$-conditions for the (min, max) range of the 
+        $n$ parameters.
+    var2 : float
+        Determines the step size of the walker. By default it is set to `1.0`.
+    mov : int
+        Number of movements that walker will perform. By default it is set
+        to `100`.
+    d : float
+        Size of the Gaussian step for the walker.
+    tol : float
+        Convergence criteria for the log-likelihhod. By default it is set
+        to `1e-3`.
+    mode : bool
+        By default it is set to `True`.
+    
+    Returns
+    -------
+    theta : np.array
+        An ndarray with the updated theta values.
+    nwalk : np.array
+        Updates of theta for each movement performed by the walker.
+    y0 : float
+        The log-likelihood value.
+    """
+
     greach = False
     nwalk = []
     for i in range(mov):
@@ -132,27 +182,48 @@ def walk(x, y, model, theta, conditions = None, var2 = 0.01, mov = 100, d = 1, t
         #clear_output(wait = True)
     return theta, nwalk, y0
 
-""" Función que realiza la implementación del algoritmo de múltiples caminadores
-
-    Argumentos:
-            
-            x (numpy_array): arreglo de m columnas y n filas, donde m es el número de dimensiones, 
-                             n el datos por columna
-            y (numpy_array): arreglo de n datos que se comparará con la salida del modelo
-            model (python function): función definida a priori por el usuario que recibe dos argumentos
-                                     x, theta
-            theta (numpy_array): arreglo de parámetros del modelo
-            conditions (list): lista de 2n condiciones para el rango mín. y máx. de los n parámetros
-            var2 (float): determina el ancho del paso que dará el caminador, default 0.01
-            mov (int): número de movimientos que relizará el caminador, default 100
-            d (float): ancho del paso Gaussiano del caminador, default 1
-            tol (float): criterio de convergencia del log del likelihood, default 1.*10**-3
-            mode (Bool): default False, parámetro que indica que estaremos trabajando con más de un caminador 
-    Return:
-           par (numpy_array): regresa el arreglo theta que encontró cada uno de los nwalkers caminadores,
-           error (numpy_array): es el logaritmo del likelihood"""
 
 def walkers(nwalkers, x, y, model, theta, conditions = None, var2 = 0.01, mov = 100, d = 1, tol = 1.*10**-3, mode = False):
+    """Executes multiple walkers.
+    
+    Parameters
+    ----------
+    nwalkers : int
+        The number of walkers to be executed.
+    x : np.ndarray
+        An $(m, n)$ dimensional array for (cols, rows).
+    y : np.ndarray
+        An $n$ dimensional array that will be compared with model's output.
+    model : function
+        A Python function defined by the user. This function should recieve
+        two arguments $(x, theta)$.
+    theta : np.ndarray
+        The array containing the model's parameters.
+    conditions : list
+        A list containing $2n$-conditions for the (min, max) range of the 
+        $n$ parameters.
+    var2 : float
+        Determines the step size of the walker. By default it is set to `1.0`.
+    mov : int
+        Number of movements that walker will perform. By default it is set
+        to `100`.
+    d : float
+        Size of the Gaussian step for the walker.
+    tol : float
+        Convergence criteria for the log-likelihhod. By default it is set
+        to `1e-3`.
+    mode : bool
+        Specifies that we will be working with more than one walker. By
+        default it is set to `False`.
+    
+    Returns
+    -------
+    par : np.array
+        The theta found by each of the walkers.
+    error : np.array
+        The log-likelihood array.
+    """
+
     result = []
     error = []
     par = []
