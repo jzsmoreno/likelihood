@@ -1,4 +1,3 @@
-from IPython.display import clear_output
 import matplotlib.pyplot as plt
 import numpy as np
 import corner
@@ -22,14 +21,14 @@ def lnprior(theta, conditions):
     """
 
     try: 
-        if(len(conditions) != 2*len(theta)):
-            print('IndexError : Length of conditions must be twice the length of theta')
+        if len(conditions) != 2 * len(theta):
+            error_type = 'IndexError'
+            msg = 'Length of conditions must be twice the length of theta.'
+            print(f'{error_type}: {msg}')
         else:
-            #print(len(theta))
             cond = np.array(conditions).reshape((len(theta), 2))
-            #print(cond)
             for i in range(len(theta)):
-                if(cond[i, 0] < theta[i] < cond[i, 1]):
+                if cond[i, 0] < theta[i] < cond[i, 1]:
                     lp =  0.0
                 else:
                     return np.inf
@@ -38,7 +37,7 @@ def lnprior(theta, conditions):
         return 0.0
     
 
-def funLike(x, y, model, theta, conditions = None, var2 = 1.0):
+def fun_like(x, y, model, theta, conditions=None, var2=1.0):
     """Computes the likelihood.
 
     Parameters
@@ -65,13 +64,17 @@ def funLike(x, y, model, theta, conditions = None, var2 = 1.0):
     """
 
     lp = lnprior(theta, conditions)
-    inv_sigma2 = 1.0/(var2)
+    inv_sigma2 = 1.0 / (var2)
     y_hat = model(x, theta)
+
     try:
         y_hat.shape[1]
     except:
-        y_hat = y_hat[np.newaxis,...].T
-    lhood = 0.5*(np.sum((y-y_hat)**2*inv_sigma2 - np.log(inv_sigma2)))
+        y_hat = y_hat[np.newaxis, ...].T
+
+    y_sum = np.sum((y - y_hat) ** 2 * inv_sigma2 - np.log(inv_sigma2))
+    lhood = 0.5 * y_sum
+
     if not np.isfinite(lp):
         lhood = np.inf
     else:
@@ -97,12 +100,15 @@ def update_theta(theta, d):
     """
 
     theta_new = []
+
     for k in range(len(theta)):
-        theta_new.append(np.random.normal(theta[k], d/2.))
-    return(theta_new)
+        theta_new.append(np.random.normal(theta[k], d / 2.))
+
+    return theta_new
 
     
-def walk(x, y, model, theta, conditions = None, var2 = 0.01, mov = 100, d = 1, tol = 1.*10**-3, mode = True):
+def walk(x, y, model, theta, conditions=None, var2=0.01, mov=100,
+         d=1, tol=1e-3, mode=True):
     """Executes the walker implementation.
     
     Parameters
@@ -144,46 +150,49 @@ def walk(x, y, model, theta, conditions = None, var2 = 0.01, mov = 100, d = 1, t
 
     greach = False
     nwalk = []
+
     for i in range(mov):
         nwalk.append(theta)
         theta_new = update_theta(theta, d)
-        if not (greach):
-            y0=funLike(x, y, model, theta, conditions, var2)
-            y1=funLike(x, y, model, theta_new, conditions, var2)
-            if(y0 <= tol):
-                if(mode):
-                    print('Goal Reached')
-                    greach = True
-                    return(theta, nwalk, y0)
+
+        if not greach:
+            y0 = fun_like(x, y, model, theta, conditions, var2)
+            y1 = fun_like(x, y, model, theta_new, conditions, var2)
+            
+            if y0 <= tol and mode:
+                print('Goal reached!')
+                greach = True
+                
+                return theta, nwalk, y0
             else:
-                if(y1 <= tol):
-                    if(mode):
-                        print('Goal Reached')
-                        greach = True
-                        return(theta_new, nwalk, y1)
+                if y1 <= tol and mode:
+                    print('Goal reached!')
+                    greach = True
+
+                    return theta_new, nwalk, y1
                 else:
-                    ratio=y0/y1
+                    ratio = y0 / y1
                     boltz = np.random.rand(1)
                     prob = np.exp(-ratio)
-                    if(y1<y0):
-                        #print('Accepted')
+
+                    if y1 < y0:
                         theta = theta_new
                         theta_new = update_theta(theta, d)
                     else:
-                        if(prob>boltz):
-                            #print('Accepted')
+                        if prob > boltz:
                             theta = theta_new
                             theta_new = update_theta(theta, d)
                         else:
-                            #print('Non-Accepted')
                             theta_new = update_theta(theta, d)
-    if(mode):  
-        print('Max. number of iterations have been reached! ,', 'The log likelihood is :', y0)
-        #clear_output(wait = True)
+    if mode:
+        print('Maximum number of iterations reached!')
+        print(f'The log-likelihood is: {y0}')
+
     return theta, nwalk, y0
 
 
-def walkers(nwalkers, x, y, model, theta, conditions = None, var2 = 0.01, mov = 100, d = 1, tol = 1.*10**-3, mode = False):
+def walkers(nwalkers, x, y, model, theta, conditions=None, var2=0.01,
+            mov=100, d=1, tol=1e-3, mode=False, figname='fig_out.png'):
     """Executes multiple walkers.
     
     Parameters
@@ -215,6 +224,9 @@ def walkers(nwalkers, x, y, model, theta, conditions = None, var2 = 0.01, mov = 
     mode : bool
         Specifies that we will be working with more than one walker. By
         default it is set to `False`.
+    figname : str
+        The name of the output file for the figure. By default it is set
+        to `fig_out.png`.
     
     Returns
     -------
@@ -224,27 +236,31 @@ def walkers(nwalkers, x, y, model, theta, conditions = None, var2 = 0.01, mov = 
         The log-likelihood array.
     """
 
-    result = []
     error = []
     par = []
+
     for i in range(nwalkers):
-        theta, nwalk, y0 = walk(x, y, model, theta, conditions, var2, mov, d, tol, mode)
+        theta, nwalk, y0 = walk(x, y, model, theta, conditions,
+                                var2, mov, d, tol, mode)
         par.append(theta)
         nwalk = np.array(nwalk).reshape((len(nwalk), len(nwalk[i])))
         error.append(y0)
+
         for k in range(nwalk.shape[1]):
-            sub = '$\\theta _{'+str(k)+'}$'
-            plt.plot(range(len(nwalk[:, k])), nwalk[:, k], '-', label = sub)
+            sub = '$\\theta _{' + str(k) + '}$'
+            plt.plot(range(len(nwalk[:, k])), nwalk[:, k], '-', label=sub)
             plt.ylabel('$\\theta$')
             plt.xlabel('iterations')
-            #plt.legend()
+
     plt.show()
-    if(nwalk.shape[1] == 2):
-        fig = corner.hist2d(nwalk[:, 0],nwalk[:, 1], range=None, bins=18, 
-                    smooth=True,plot_datapoints=True,
-                    plot_density=True)
+
+    if nwalk.shape[1] == 2:
+        fig = corner.hist2d(nwalk[:, 0], nwalk[:, 1], range=None, bins=18, 
+                            smooth=True, plot_datapoints=True,
+                            plot_density=True)
         plt.ylabel('$\\theta_{1}$')
         plt.xlabel('$\\theta_{0}$')
-        plt.savefig("1401.png")
-    return(par, error)
+        plt.savefig(figname)
+
+    return par, error
 
