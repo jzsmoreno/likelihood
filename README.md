@@ -17,6 +17,6 @@ pip install likelihood
 
 ## Examples
 
-You can check the [examples](/examples) folder.
+You can check the [examples](https://github.com/jzsmoreno/likelihood/tree/main/examples) folder.
 
 More examples will be added soon.
