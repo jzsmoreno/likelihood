@@ -5,14 +5,14 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="likelihood", # Replace with your own username
-    version="0.0.3",
+    version="1.0.1",
     author="J. A. Moreno-Guerra",
     author_email="jzs.gm27@gmail.com",
-    description="A package that perform the maximum likelihood algorithm",
+    description="A package that performs the maximum likelihood algorithm.",
     py_modules=["likelihood"],
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/jzsmoreno/MLearning/",
+    url="https://github.com/jzsmoreno/likelihood/",
     packages=setuptools.find_packages(),
     install_requires=[
         "numpy",
