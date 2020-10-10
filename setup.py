@@ -17,8 +17,7 @@ setuptools.setup(
     install_requires=[
         "numpy",
         "matplotlib",
-        "corner",
-        "ipython"
+        "corner"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
