@@ -1,6 +1,6 @@
 """
 Authors: J. A. Moreno-Guerra & J. I. Ávalos-López
-Library version: 1.0.6
+Library version: 1.0.8
 Last modification: 11/17/2020
 Corresponding author: jzs.gm27@gmail.com 
 Auxiliary email: avaloslj2014@licifug.ugto.mx

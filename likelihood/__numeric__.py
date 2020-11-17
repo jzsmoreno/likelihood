@@ -1,8 +1,32 @@
-#!/usr/bin/env python
-# coding: utf-8
+import numpy as np
 
-# In[ ]:
+def subs(a, b):
+    """Function that subtracts lists element by element
+    """
+    for i, val in enumerate(a):
+        val = val - b[i]
+        a[i]=val
+    return a
 
+def ecprint(A):
+    """Function that prints the augmented matrix
+    
+    Parameters
+    ----------
+    A : np.array
+        The augmented matrix.
+    
+    """
+    n = len(A)
+    for i in range(0, n):
+        line = ""
+    for j in range(0, n+1):
+        line += str(format(round(A[i][j],2))) + "\t"
+        if j == n-1:
+            line += "| "
+        print(line)
+    print("")
+    
 
 def sor_elimination(A,b,n,nmax,w):
     """Computes the successive over-relaxation algorithm
@@ -104,10 +128,3 @@ def gauss_elimination(A,pr=2):
         for i in range(n):
             print('X%i' % i,' = ',round(X[i],pr))
         return X
-
-
-# In[ ]:
-
-
-
-
