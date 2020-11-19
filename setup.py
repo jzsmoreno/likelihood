@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="likelihood", # Replace with your own username
-    version="1.0.9",
+    version="1.1.0",
     author="J. A. Moreno-Guerra",
     author_email="jzs.gm27@gmail.com",
     description="A package that performs the maximum likelihood algorithm.",

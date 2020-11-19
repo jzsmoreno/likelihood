@@ -255,12 +255,13 @@ def walkers(nwalkers, x, y, model, theta, conditions=None, var2=0.01,
     plt.show()
 
     if nwalk.shape[1] == 2:
-        fig = corner.hist2d(nwalk[:, 0], nwalk[:, 1], range=None, bins=18, 
-                            smooth=True, plot_datapoints=True,
-                            plot_density=True)
-        plt.ylabel('$\\theta_{1}$')
-        plt.xlabel('$\\theta_{0}$')
-        plt.savefig(figname)
+        if figname != None:
+            fig = corner.hist2d(nwalk[:, 0], nwalk[:, 1], range=None, bins=18, 
+                                smooth=True, plot_datapoints=True,
+                                plot_density=True)
+            plt.ylabel('$\\theta_{1}$')
+            plt.xlabel('$\\theta_{0}$')
+            plt.savefig(figname)
 
     return par, error
 
