@@ -82,11 +82,14 @@ def rescale(dataset, n = 1):
         print(f'{error_type}: {msg}')
         return None
     for i in range(dataset.shape[0]):
-        fit = np.polyfit(xaxis, dataset[i, :, 0], n)
-        weights = np.poly1d(fit)
-        poly = weights(xaxis)
-        fitting.append(poly)
-        dataset[i, :, 0] += -fitting[i]
+        if n != None:
+            fit = np.polyfit(xaxis, dataset[i, :, 0], n)
+            f = np.poly1d(fit)
+            poly = f(xaxis)
+            fitting.append(f)
+        else:
+            fitting.append(0.0)
+        dataset[i, :, 0] += -poly
         mu.append(np.min(dataset[i, :, 0]))
         if np.std(dataset[i, :, 0]) != 0: 
             sigma.append(np.std(dataset[i, :, 0]))
@@ -114,7 +117,7 @@ def scale(dataset, values):
     for i in range(dataset.shape[0]):
         dataset[i, :, 0] = dataset[i, :, 0]*values[1][i]
         dataset[i, :, 0] += values[0][i]
-        dataset[i, :, 0] += values[2][i]
+        dataset[i, :, 0] += values[2][i](range(dataset.shape[1]))
     
     return dataset
 
@@ -256,4 +259,4 @@ class regression:
             y_pred.append(y_new)
             y_pred = np.array(y_pred)
             
-        return np.array(y_pred)+np.min(datapoints)
+        return np.array(y_pred)
