@@ -251,9 +251,9 @@ class regression:
             self.datapoints = y_pred[i:]
 
             y_new = regression_model(datapoints, theta_trained, mode = False)
-            y_new += np.mean(datapoints)
+            #y_new += np.mean(datapoints)
             y_pred = y_pred.tolist()
             y_pred.append(y_new)
             y_pred = np.array(y_pred)
             
-        return np.array(y_pred)
+        return np.array(y_pred)+np.min(datapoints)

@@ -245,14 +245,15 @@ def walkers(nwalkers, x, y, model, theta, conditions=None, var2=0.01,
         par.append(theta)
         nwalk = np.array(nwalk).reshape((len(nwalk), len(nwalk[i])))
         error.append(y0)
+    
+        if figname != None:
+            for k in range(nwalk.shape[1]):
+                sub = '$\\theta _{' + str(k) + '}$'
+                plt.plot(range(len(nwalk[:, k])), nwalk[:, k], '-', label=sub)
+                plt.ylabel('$\\theta$')
+                plt.xlabel('iterations')
 
-        for k in range(nwalk.shape[1]):
-            sub = '$\\theta _{' + str(k) + '}$'
-            plt.plot(range(len(nwalk[:, k])), nwalk[:, k], '-', label=sub)
-            plt.ylabel('$\\theta$')
-            plt.xlabel('iterations')
-
-    plt.show()
+    if figname != None: plt.show()
 
     if nwalk.shape[1] == 2:
         if figname != None:
