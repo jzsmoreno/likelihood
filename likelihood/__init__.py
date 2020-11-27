@@ -7,6 +7,6 @@ Auxiliary email: avaloslj2014@licifug.ugto.mx
 """
 
 
-from likelihood.__main__ import *
-from likelihood.__tools__ import *
-from likelihood.__numeric__ import *
+from likelihood.main import *
+from likelihood import __tools__
+from likelihood import numeric_tools

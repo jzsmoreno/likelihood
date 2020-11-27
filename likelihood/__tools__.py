@@ -8,7 +8,7 @@ Data Science from Scratch, Second Edition, by Joel Grus (O'Reilly).Copyright 201
 
 T = TypeVar('V')
 
-def minibatches(dataset: List[T],
+def minibatches(dataset: List[T], # type hinting
                 batch_size: int,
                 shuffle: bool = True) -> Iterator[List[T]]:
     """Generates 'batch_size'-sized minibatches from the dataset"""
@@ -26,7 +26,7 @@ Vector = List[float]
 def difference_quotient(f: Callable[[float], float],
                         x: float,
                         h: float) -> float:
-    return(f(x + h) - f(x)) / h
+    return (f(x + h) - f(x)) / h
 
 def partial_difference_quotient(f: Callable[[Vector], float],
                                 v: Vector,
@@ -45,7 +45,7 @@ def estimate_gradient(f: Callable[[Vector], float],
 
 #-------------------------------------------------------------------------
 
-def rescale(dataset, n = 1):
+def rescale(dataset, n=1):
     """Perform a standard rescaling of the data
     
     Parameters
@@ -67,7 +67,6 @@ def rescale(dataset, n = 1):
     sigma : np.array
         An array containing the standard 
         deviation of the original data.
-    
     """
     
     mu = []
@@ -140,7 +139,7 @@ def generate_series(n, n_steps, incline = True):
     series = series
     return series[..., np.newaxis].astype(np.float32)
 
-from likelihood.__main__ import *
+from likelihood.main import *
 
 #-------------------------------------------------------------------------
 
@@ -173,14 +172,14 @@ class regression:
         It is the number of predicted points. It is necessary 
         to apply predict(n_steps) followed by train()
     """
-    def __init__(self, datapoints, n_steps = 0, theta_trained = 0, 
-                 nwalkers = 100, noise = 0.0):
+    def __init__(self, datapoints, n_steps=0, theta_trained=0, 
+                 nwalkers=100, noise=0.0):
         self.datapoints = datapoints
         self.n_steps = n_steps
         self.nwalkers = nwalkers
         self.noise = noise 
 
-    def regression_model(self, datapoints, theta, mode = True, noise = 0.0):
+    def regression_model(self, datapoints, theta, mode=True, noise=0.0):
         datapoints = self.datapoints
         noise = self.noise
 
@@ -231,8 +230,8 @@ class regression:
         
         x_vec = xvec(datapoints)
 
-        par, error = walkers(nwalkers, x_vec, datapoints, regression_model
-                                , theta, mov = 200, figname = None)
+        par, error = walkers(nwalkers, x_vec, datapoints, regression_model,
+                             theta, mov = 200, figname = None)
 
         index = np.where(error == np.min(error))[0][0]
         trained = np.array(par[index])
