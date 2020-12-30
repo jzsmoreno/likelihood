@@ -79,7 +79,7 @@ class arima:
         self.nwalkers = nwalkers
         self.noise = noise
 
-        regression_model = self.regression_model
+        arima_model = self.arima_model
 
         n = datapoints.shape[0]
 
@@ -87,7 +87,7 @@ class arima:
         
         x_vec = xvec(datapoints)
 
-        par, error = walkers(nwalkers, x_vec, datapoints, regression_model,
+        par, error = walkers(nwalkers, x_vec, datapoints, arima_model,
                              theta, mov = 200, figname = None)
 
         index = np.where(error == np.min(error))[0][0]
@@ -101,15 +101,15 @@ class arima:
 
         datapoints = self.datapoints
         xvec = self.xvec
-        regression_model = self.regression_model
+        arima_model = self.arima_model
         theta_trained = self.theta_trained
 
-        y_pred = regression_model(datapoints, theta_trained)
+        y_pred = arima_model(datapoints, theta_trained)
 
         for i in range(n_steps):
             self.datapoints = y_pred[i:]
 
-            y_new = regression_model(datapoints, theta_trained, mode = False)
+            y_new = arima_model(datapoints, theta_trained, mode = False)
             #y_new += np.mean(datapoints)
             y_pred = y_pred.tolist()
             y_pred.append(y_new)
