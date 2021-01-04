@@ -2,7 +2,8 @@ import numpy as np
 from likelihood.main import *
 
 #-------------------------------------------------------------------------
-
+class holamundo:
+    print("que onda que onda")
 
 class arima: 
     """A class that implements the arima model
