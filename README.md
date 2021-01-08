@@ -4,8 +4,8 @@
 ![GitHub repo size](https://img.shields.io/github/repo-size/jzsmoreno/likelihood?style=for-the-badge)
 ![License](https://img.shields.io/github/license/jzsmoreno/likelihood?style=for-the-badge)
 
-
-Code generated from the Machine Learning course taught by Ivan Avalos Lopez and his server J. A. Moreno-Guerra.
+<!-- Project description -->
+This repository contains the code to build the package from the Machine Learning course taught by Ivan Avalos Lopez and his server J. A. Moreno-Guerra.
 
 ## Prerequisities
 
