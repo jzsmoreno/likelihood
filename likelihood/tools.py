@@ -127,7 +127,7 @@ def rescale(dataset, n=1):
         else:
             fitting.append(0.0)
         dataset[i, :, 0] += -poly
-        mu.append(np.min(dataset[i, :, 0]))
+        mu.append(np.mean(dataset[i, :, 0]))
         if np.std(dataset[i, :, 0]) != 0: 
             sigma.append(np.std(dataset[i, :, 0]))
         else:
