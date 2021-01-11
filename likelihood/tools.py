@@ -100,11 +100,11 @@ def rescale(dataset, n=1):
         An array containing the scaled data.
         
     mu : np.array
-        An array containing the mean of the 
+        An array containing the min of the 
         original data.
     sigma : np.array
-        An array containing the standard 
-        deviation of the original data.
+        An array containing the (max - min) 
+        of the original data.
     """
     
     mu = []
@@ -127,13 +127,13 @@ def rescale(dataset, n=1):
         else:
             fitting.append(0.0)
         dataset[i, :, 0] += -poly
-        mu.append(np.mean(dataset[i, :, 0]))
-        if np.std(dataset[i, :, 0]) != 0: 
-            sigma.append(np.std(dataset[i, :, 0]))
+        mu.append(np.min(dataset[i, :, 0]))
+        if np.max(dataset[i, :, 0]) != 0: 
+            sigma.append(np.max(dataset[i, :, 0])-mu[i])
         else:
             sigma.append(1)
             
-        dataset[i, :, 0] = (dataset[i, :, 0] - mu[i]) / sigma[i]
+        dataset[i, :, 0] = 2*((dataset[i, :, 0] - mu[i]) / sigma[i])-1
          
     values = [mu, sigma, fitting]
     
@@ -152,6 +152,8 @@ def scale(dataset, values):
     """
     
     for i in range(dataset.shape[0]):
+        dataset[i, :, 0] += 1
+        dataset[i, :, 0] /= 2
         dataset[i, :, 0] = dataset[i, :, 0]*values[1][i]
         dataset[i, :, 0] += values[0][i]
         dataset[i, :, 0] += values[2][i](range(dataset.shape[1]))
