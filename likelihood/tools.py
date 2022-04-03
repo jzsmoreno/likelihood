@@ -1,5 +1,5 @@
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 """
 Data Science from Scratch, Second Edition, by Joel Grus (O'Reilly).Copyright 2019 Joel Grus, 978-1-492-04113-9
@@ -47,7 +47,7 @@ def difference_quotient(f, x, h):
     return (f(x + h) - f(x)) / h
 
 
-def partial_difference_quotient(f, v, h):
+def partial_difference_quotient(f, v, i, h):
     
     """Calculates the partial difference quotient of 'f'
     
@@ -82,6 +82,94 @@ def estimate_gradient(f, v, h = 0.0001):
             for i in range(len(v))]
 
 #-------------------------------------------------------------------------
+
+def fft_denoise(dataset, sigma = 0, mode = True):
+    """Performs the noise removal using the Fast Fourier Transform
+    
+    Parameters
+    ----------
+    dataset : np.array
+        An array containing the noised data.
+    sigma : float
+        A float between 0 and 1. By default it is set to `0`.
+    mode : bool
+        A boolean value. By default it is set to `True`.
+    
+    Returns
+    -------
+    dataset : np.array
+        An array containing the denoised data.
+    
+    """
+
+    for i in range(dataset.shape[0]):
+        n = dataset.shape[1]
+        fhat = np.fft.fft(dataset[i, :], n)
+        freq = (1/n) * np.arange(n)         
+        L = np.arange(1,np.floor(n/2),dtype='int')
+        PSD = fhat * np.conj(fhat) / n
+        indices = PSD > np.mean(PSD) + sigma * np.std(PSD)
+        PSDclean = PSD * indices  # Zero out all others
+        fhat = indices * fhat   
+        ffilt = np.fft.ifft(fhat) # Inverse FFT for filtered time signal
+        dataset[i, :] = ffilt.real
+        # Calculate the period of the signal
+        period = 1 / freq[L][np.argmax(fhat[L])]
+        if mode:
+            print(f'The {i+1}-th row of the dataset has been denoised.')
+            print(f'The period is {period}')
+    return dataset
+
+
+def feature_importance(dataset, values):
+    """Calculates the importance of each feature
+    
+    Parameters
+    ----------
+    dataset : np.array
+        An array containing the scaled data.
+    values : np.ndarray
+        A set of values returned by the linear function.
+    
+    Returns
+    -------
+    importance : np.array
+        An array containing the importance of each feature.
+    
+    """
+    
+    importance = []
+    print('\nFeature importance:')
+    U, S, VT = np.linalg.svd(dataset, full_matrices=False)
+    w = (VT.T@np.linalg.inv(np.diag(S))@U.T).T@values
+
+    for i in range(dataset.shape[0]):
+        a = np.around(w[i], decimals=4)
+        importance.append(a)
+        print(f'The importance of the {i+1} feature is {a}')
+    return np.array(importance)
+
+def cal_average(y, alpha = 1):
+    """Calculates the moving average of the data
+    
+    Parameters
+    ----------
+    y : np.array
+        An array containing the data.
+    alpha : float
+        A float between 0 and 1. By default it is set to `1`.
+    
+    Returns
+    -------
+    average : float
+        The average of the data.
+    
+    """
+    
+    n = int(alpha * len(y))
+    w = np.ones(n) / n
+    average = np.convolve(y, w, mode='same') / np.convolve(np.ones_like(y), w, mode='same')
+    return average
 
 def rescale(dataset, n=1):
     """Perform a standard rescaling of the data
@@ -120,20 +208,20 @@ def rescale(dataset, n=1):
         return None
     for i in range(dataset.shape[0]):
         if n != None:
-            fit = np.polyfit(xaxis, dataset[i, :, 0], n)
+            fit = np.polyfit(xaxis, dataset[i, :], n)
             f = np.poly1d(fit)
             poly = f(xaxis)
             fitting.append(f)
         else:
             fitting.append(0.0)
-        dataset[i, :, 0] += -poly
-        mu.append(np.min(dataset[i, :, 0]))
-        if np.max(dataset[i, :, 0]) != 0: 
-            sigma.append(np.max(dataset[i, :, 0])-mu[i])
+        dataset[i, :] += -poly
+        mu.append(np.min(dataset[i, :]))
+        if np.max(dataset[i, :]) != 0: 
+            sigma.append(np.max(dataset[i, :])-mu[i])
         else:
             sigma.append(1)
             
-        dataset[i, :, 0] = 2*((dataset[i, :, 0] - mu[i]) / sigma[i])-1
+        dataset[i, :] = 2*((dataset[i, :] - mu[i]) / sigma[i])-1
          
     values = [mu, sigma, fitting]
     
@@ -152,11 +240,11 @@ def scale(dataset, values):
     """
     
     for i in range(dataset.shape[0]):
-        dataset[i, :, 0] += 1
-        dataset[i, :, 0] /= 2
-        dataset[i, :, 0] = dataset[i, :, 0]*values[1][i]
-        dataset[i, :, 0] += values[0][i]
-        dataset[i, :, 0] += values[2][i](range(dataset.shape[1]))
+        dataset[i, :] += 1
+        dataset[i, :] /= 2
+        dataset[i, :] = dataset[i, :]*values[1][i]
+        dataset[i, :] += values[0][i]
+        dataset[i, :] += values[2][i](range(dataset.shape[1]))
     
     return dataset
 
@@ -177,7 +265,28 @@ def generate_series(n, n_steps, incline = True):
     series += 0.7 * (np.random.rand(n, n_steps) - 0.5) # + noise
     series += 5 * slope * time + 2 * (offsets2-offsets1) * time ** (1-offsets2)
     series = series
-    return series[..., np.newaxis].astype(np.float32)
+    return series.astype(np.float32)
 
 
 #-------------------------------------------------------------------------
+if __name__ == '__main__':
+    # Generate data
+    x = np.random.rand(3, 100)
+    y = 0.1*x[0, :] + 0.4*x[1, :] + 0.5*x[2, :]
+    importance = feature_importance(x, y)
+
+    a = generate_series(1, 40, incline=False)
+    # Graph the data for visualization
+    plt.plot(range(len(a[0, :])), a[0, :], label = 'Original Data')
+    plt.legend()
+    plt.xlabel('Time periods')
+    plt.ylabel('$y(t)$')
+    plt.show()
+
+    a_denoise = fft_denoise(a)
+    
+    plt.plot(range(len(a_denoise[0, :])), a_denoise[0, :], label = 'Denoise Data')
+    plt.legend()
+    plt.xlabel('Time periods')
+    plt.ylabel('$y(t)$')
+    plt.show()
