@@ -61,6 +61,8 @@ class fourier_regression:
     def load_predict(self, name = 'fourier_model', n_steps = 0, n_walkers = 1):
         self.n_steps = n_steps
         self.n_walkers = n_walkers
+        self.name = name
+        
         new_datapoints = []
         for i in range(self.datapoints.shape[0]):
             model = arima(self.datapoints[i, :])
