@@ -82,6 +82,25 @@ def estimate_gradient(f, v, h = 0.0001):
             for i in range(len(v))]
 
 #-------------------------------------------------------------------------
+def autocorr(x):
+    """Calculates the autocorrelation of the data
+    
+    Parameters
+    ----------
+    x : np.array
+        An array containing the data.
+    
+    Returns
+    -------
+    autocorr : np.array
+        An array containing the autocorrelation of the data.
+    
+    """
+    
+    result = np.correlate(x, x, mode='full')
+    z = result[result.size//2:]
+    z = z/float(z.max())
+    return z
 
 def fft_denoise(dataset, sigma = 0, mode = True):
     """Performs the noise removal using the Fast Fourier Transform
@@ -289,4 +308,9 @@ if __name__ == '__main__':
     plt.legend()
     plt.xlabel('Time periods')
     plt.ylabel('$y(t)$')
+    plt.show()
+
+    z = autocorr(a[0, :])
+    plt.plot(range(len(z)), z, label = 'Autocorrelation')
+    plt.legend()
     plt.show()

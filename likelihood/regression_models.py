@@ -39,17 +39,19 @@ class fourier_regression:
         datapoints = self.datapoints
         self.datapoints = fft_denoise(self.datapoints, sigma, mode)
 
-    def predict_save(self, n_steps = 0, n_walkers = 1, mov = 200, name = 'fourier_model'):
+    def predict(self, n_steps = 0, n_walkers = 1, name = 'fourier_model', save = True):
 
         self.n_steps = n_steps
         self.n_walkers = n_walkers
         self.name = name
+        mov = self.mov
 
         new_datapoints = []
         for i in range(self.datapoints.shape[0]):
             model = arima(self.datapoints[i, :])
-            model.train(n_walkers, 0, self.mov)
-            model.save_model(name)
+            model.train(n_walkers, 0, mov)
+            if save:
+                model.save_model(str(i)+'_'+name)
             y_pred = model.predict(n_steps)
             new_datapoints.append(y_pred)
         
@@ -58,15 +60,14 @@ class fourier_regression:
             
         return new_datapoints
 
-    def load_predict(self, name = 'fourier_model', n_steps = 0, n_walkers = 1):
-        self.n_steps = n_steps
-        self.n_walkers = n_walkers
-        self.name = name
-        
+    def load_predict(self, name = 'fourier_model'):
+        n_steps = self.n_steps
+
         new_datapoints = []
+    
         for i in range(self.datapoints.shape[0]):
             model = arima(self.datapoints[i, :])
-            model.load_model(self.name)
+            model.load_model(str(i)+'_'+name)
             y_pred = model.predict(n_steps)
             new_datapoints.append(y_pred)
         
@@ -200,16 +201,10 @@ class arima:
             
         return np.array(y_pred)
     
-    def save_model(self, name):
+    def save_model(self, name = 'model'):
         np.savetxt(name+'.txt', self.theta_trained)
-
-    def serialize(self, name):
-        np.save(name, self.theta_trained)
-
-    def load_serialized(self, name):
-        self.theta_trained = np.load(name)
     
-    def load_model(self, name):
+    def load_model(self, name = 'model'):
         self.theta_trained = np.loadtxt(name+'.txt')
 
     def eval(self, y_val, y_pred):
