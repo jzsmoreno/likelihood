@@ -1,8 +1,106 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from likelihood.main import *
+from likelihood.tools import *
 
 #-------------------------------------------------------------------------
 
+class fourier_regression:
+    """A class that implements the arima model with FFT noise filtering
+
+    Parameters
+    ----------
+    
+    datapoints : np.array
+        A set of points to train the arima model.
+        
+    n_steps : int
+        Is the number of points that in predict(n_steps) 
+        stage will estimate foward. By default it is set to `0`.
+        
+    Returns
+    -------
+    
+    new_datapoints : np.array
+        It is the number of predicted points. It is necessary 
+        to apply predict(n_steps) followed by fit()
+
+    """
+
+    def __init__(self, datapoints, n_steps=0):
+        self.datapoints_ = datapoints
+        self.n_steps = n_steps
+
+    def fit(self, sigma = 0, mov = 200, mode = False):
+        self.sigma = sigma
+        self.mode = mode
+        self.mov = mov
+
+        datapoints = self.datapoints_
+        self.datapoints_ = fft_denoise(datapoints, sigma, mode)
+
+    def predict(self, n_steps = 0, n_walkers = 1, name = 'fourier_model', save = True):
+
+        self.n_steps = n_steps
+        self.n_walkers = n_walkers
+        self.name = name
+        mov = self.mov
+
+        assert self.n_walkers <= mov, 'n_walkers must be less or equal than mov'
+
+        new_datapoints = []
+        for i in range(self.datapoints_.shape[0]):
+            model_ = arima(self.datapoints_[i, :])
+            model_.train(n_walkers, mov)
+            if save:
+                model_.save_model(str(i)+'_'+name)
+            y_pred_ = model_.predict(n_steps)
+            new_datapoints.append(y_pred_)
+        
+        new_datapoints = np.array(new_datapoints)
+        new_datapoints = np.reshape(new_datapoints, (len(new_datapoints), -1))
+            
+        return new_datapoints
+
+    def load_predict(self, name = 'fourier_model'):
+        n_steps = self.n_steps
+
+        new_datapoints = []
+    
+        for i in range(self.datapoints_.shape[0]):
+            model_ = arima(self.datapoints_[i, :])
+            model_.load_model(str(i)+'_'+name)
+            y_pred_ = model_.predict(n_steps)
+            new_datapoints.append(y_pred_)
+        
+        new_datapoints = np.array(new_datapoints)
+        new_datapoints = np.reshape(new_datapoints, (len(new_datapoints), -1))
+            
+        return new_datapoints
+
+    def plot_pred(self, y_real, y_pred, ci = 0.90, mode = True):
+        plt.figure()
+        n = self.n_steps
+        y_mean = np.mean(y_pred, axis=0)
+        y_std = np.std(y_pred, axis=0)
+        ci = ci - 0.68
+        if ci < 0.95:
+            Z = (ci/0.90)*1.64
+        else:
+            Z = (ci/0.95)*1.96
+
+        plt.plot(y_pred, label = 'Predicted')
+        plt.plot(y_real, '.--', label = 'Real', alpha = 0.5)
+        plt.fill_between((range(y_pred.shape[0]))[-n:]
+        , (y_pred - Z*y_std)[-n:]
+        , (y_pred + Z*y_std)[-n:], alpha=0.2)
+        plt.xlabel('Time steps')
+        plt.ylabel('y')
+        plt.legend()
+        print('Confidence Interval: {:.4f}'.format(Z*y_std))
+        if mode:
+            plt.savefig('pred_'+str(n)+'.png', dpi=300)
+        plt.show()
 
 class arima: 
     """A class that implements the arima model
@@ -17,12 +115,6 @@ class arima:
         Is the number of points that in predict(n_steps) 
         stage will estimate foward. By default it is set to `0`.
         
-    nwalkers : int
-        The number of walkers to be executed.
-        
-    noise : float
-        The amount of noise to add. By default it is set to `0.0`.
-        
     Returns
     -------
     
@@ -30,14 +122,15 @@ class arima:
         It is the number of predicted points. It is necessary 
         to apply predict(n_steps) followed by train()
     """
-    def __init__(self, datapoints, n_steps=0, theta_trained=0, 
-                 nwalkers=100, noise=0.0):
+    def __init__(self, datapoints, n_steps=0, noise=0):
         self.datapoints = datapoints
-        self.n_steps = n_steps 
+        self.n_steps = n_steps
+        self.noise = noise
 
-    def arima_model(self, datapoints, theta, mode=True, noise=0.0):
+    def arima_model(self, datapoints, theta, mode=True):
         datapoints = self.datapoints
         noise = self.noise
+        self.theta_trained = theta
 
         if mode:
             y_vec = []
@@ -71,24 +164,30 @@ class arima:
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers = 1, noise = 0):
+    def train(self, nwalkers = 1, mov = 200, weights = False):
 
         datapoints = self.datapoints
         xvec = self.xvec
         
         self.nwalkers = nwalkers
-        self.noise = noise
+        self.mov = mov
+
+        assert self.nwalkers <= self.mov, 'n_walkers must be less or equal than mov' 
 
         arima_model = self.arima_model
 
         n = datapoints.shape[0]
 
-        theta = np.ones(shape = n)
+        theta = np.random.rand(n)
         
         x_vec = xvec(datapoints)
-
-        par, error = walkers(nwalkers, x_vec, datapoints, arima_model,
-                             theta, mov = 200, figname = None)
+        
+        if weights: 
+            par, error = walkers(nwalkers, x_vec, datapoints, arima_model,
+                             theta = self.theta_trained, mov = mov, tol = 1e-4, figname = None)
+        else:
+            par, error = walkers(nwalkers, x_vec, datapoints, arima_model,
+                             theta, mov = mov, tol = 1e-4, figname = None)
 
         index = np.where(error == np.min(error))[0][0]
         trained = np.array(par[index])
@@ -100,7 +199,6 @@ class arima:
         self.n_steps = n_steps
 
         datapoints = self.datapoints
-        xvec = self.xvec
         arima_model = self.arima_model
         theta_trained = self.theta_trained
 
@@ -110,9 +208,52 @@ class arima:
             self.datapoints = y_pred[i:]
 
             y_new = arima_model(datapoints, theta_trained, mode = False)
-            #y_new += np.mean(datapoints)
             y_pred = y_pred.tolist()
             y_pred.append(y_new)
             y_pred = np.array(y_pred)
             
         return np.array(y_pred)
+    
+    def save_model(self, name = 'model'):
+        np.savetxt(name+'.txt', self.theta_trained)
+    
+    def load_model(self, name = 'model'):
+        self.theta_trained = np.loadtxt(name+'.txt')
+
+    def eval(self, y_val, y_pred):
+        rmse = np.sqrt(np.mean((y_pred - y_val)**2))
+        square_error = np.sqrt((y_pred - y_val)**2)
+        accuracy = np.sum(square_error[np.where(square_error < rmse)])
+        accuracy /= np.sum(square_error)
+        print("Accuracy: {:.4f}".format(accuracy))
+        print("RMSE: {:.4f}".format(rmse))
+
+    def plot_pred(self, y_real, y_pred, ci = 0.90, mode = True):
+        plt.figure()
+        n = self.n_steps
+        y_mean = np.mean(y_pred, axis=0)
+        y_std = np.std(y_pred, axis=0)
+        if ci < 0.95:
+            Z = (ci/0.90)*1.64
+        else:
+            Z = (ci/0.95)*1.96
+    
+        plt.plot(y_pred, label = 'Predicted')
+        plt.plot(y_real, '.--', label = 'Real', alpha = 0.5)
+        plt.fill_between((range(y_pred.shape[0]))[-n:]
+        , (y_pred - Z*y_std)[-n:]
+        , (y_pred + Z*y_std)[-n:], alpha=0.2)
+        plt.xlabel('Time steps')
+        plt.ylabel('y')
+        plt.legend()
+        print('Confidence Interval: {:.4f}'.format(Z*y_std))
+        if mode:
+            plt.savefig('pred_'+str(n)+'.png', dpi=300)
+        plt.show()
+
+    def summary(self):
+        print('\nSummary:')
+        print('--------')
+        print('\nLenght of theta: {}'.format(len(self.theta_trained)))
+        print('\nMean of theta: {:.4f}'.format(np.mean(self.theta_trained)))
+        print('------------------------------------------------------------------')
