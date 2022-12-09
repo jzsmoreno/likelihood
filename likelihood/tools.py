@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+#-------------------------------------------------------------------------
+
 """
 Data Science from Scratch, Second Edition, by Joel Grus (O'Reilly).Copyright 2019 Joel Grus, 978-1-492-04113-9
 """
@@ -82,6 +84,14 @@ def estimate_gradient(f, v, h = 0.0001):
             for i in range(len(v))]
 
 #-------------------------------------------------------------------------
+
+# a function that calculates the percentage of missing values per column is defined
+def cal_missing_values(df):
+    col = df.columns
+    print('Total size : ', "{:,}".format(len(df)))
+    for i in col:
+        print(str(i)+' : 'f"{(df.isnull().sum()[i]/(df.isnull().sum()[i]+df[i].count()))*100:.2f}%")
+
 def calculate_probability(x, points = 1, cond = True):
     """Calculates the probability of the data
     
@@ -125,7 +135,7 @@ def calculate_probability(x, points = 1, cond = True):
                 print('The model has a probability of {:.2f}% of being correct'.format(np.sum(p[-points])*100))
     return p
 
-def cdf(x, poly = 9, inv = False, plot = False):
+def cdf(x, poly = 9, inv = False, plot = False, savename = None):
     """Calculates the cumulative distribution function of the data
 
     Parameters
@@ -167,6 +177,8 @@ def cdf(x, poly = 9, inv = False, plot = False):
             plt.xlabel("Probability")
             plt.ylabel("Value")
             plt.legend()
+            if savename != None:
+                plt.savefig(savename, dpi = 300)
             plt.show()
         else:
             plt.plot(ox, cdf_, 'o', label = 'cdf')
@@ -175,12 +187,14 @@ def cdf(x, poly = 9, inv = False, plot = False):
             plt.xlabel("Value")
             plt.ylabel("Probability")
             plt.legend()
+            if savename != None:
+                plt.savefig(savename, dpi = 300)
             plt.show()
 
     return f, cdf_, ox
 
 class corr():
-    """Calculates the autocorrelation of the data
+    """Calculates the correlation of the data
     
     Parameters
     ----------

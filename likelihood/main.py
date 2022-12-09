@@ -252,6 +252,7 @@ def walkers(nwalkers, x, y, model, theta, conditions=None, var2=0.01,
                 plt.plot(range(len(nwalk[:, k])), nwalk[:, k], '-', label=sub)
                 plt.ylabel('$\\theta$')
                 plt.xlabel('iterations')
+                plt.savefig('walkers_'+figname, dpi = 300, transparent = True)
 
     if figname != None: plt.show()
 
@@ -262,7 +263,7 @@ def walkers(nwalkers, x, y, model, theta, conditions=None, var2=0.01,
                                 plot_density=True)
             plt.ylabel('$\\theta_{1}$')
             plt.xlabel('$\\theta_{0}$')
-            plt.savefig(figname)
+            plt.savefig('theta_'+figname, dpi = 300, transparent = True)
 
     return par, error
 
