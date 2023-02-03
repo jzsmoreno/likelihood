@@ -459,6 +459,89 @@ def RMSE(y_true, y_pred):
 
     return np.sqrt(np.mean((y_true - y_pred)**2))
 
+def to_codes_transformation(x, dict_type):
+    """Auxiliary function to perform data transformation using a dictionary
+
+    Parameters
+    ----------
+    x : str 
+        A character data type.
+    dict_type : dict
+        An object of dictionary type.
+
+    Returns
+    -------
+    dict_type[x] or np.nan if dict_type[x] doesn't exist.
+    """
+    try:
+        return dict_type[x]
+    except:
+        return np.nan
+
+def data_codification(data):
+    """Function that allows us to perform the encoding and obtain the dictionaries.
+
+    Parameters
+    ----------
+    data : pd.DataFrame()
+        An object of type pandas dataframe.
+
+    Returns
+    -------
+    df : pd.DataFrame()
+        The encoded input dataframe.
+
+    decode_dicts : dict
+        An object of dictionary type to decodes.
+
+    code_dicts : dict
+        An object of dictionary type to encodes.
+    """
+    df = data.copy()
+    names = data.columns
+    code_dicts = []
+    decode_dicts = []
+    for i in names:
+        if df[i].dtype == 'object':
+            index_of_name = range(len(df[i].unique()))
+            keys_of_name = df[i].unique()
+            code_dict = dict(zip(keys_of_name, index_of_name))
+            decode_dict = dict(zip(index_of_name, keys_of_name))
+            df[i] = df[i].apply(to_codes_transformation, dict_type=code_dict)
+            decode_dicts.append(decode_dict)
+            code_dicts.append(code_dict)
+    return df, decode_dicts, code_dicts
+
+def data_codeOrdecode(data, dict_types, d_type = 'decode'):
+    """Function that encodes or decodes according to a dictionary
+
+    Parameters
+    ----------
+    data : pd.DataFrame()
+        An object of type pandas dataframe.
+
+    dict_types : dict
+        An object of dictionary type to decodes or encodes.
+
+    Returns
+    -------
+    
+    df : pd.DataFrame()
+        The encoded or decoded input dataframe.
+    """
+    j = 0
+    df = data.copy()
+    names = df.columns
+    for i in names:
+        if d_type == 'decode':
+            if df[i].dtype == 'int64':
+                df[i] = df[i].apply(to_codes_transformation, dict_type=dict_types[j])
+                j += 1
+        else:
+            if df[i].dtype == 'object':
+                df[i] = df[i].apply(to_codes_transformation, dict_type=dict_types[j])
+                j += 1
+    return df
 
 #-------------------------------------------------------------------------
 if __name__ == '__main__':
