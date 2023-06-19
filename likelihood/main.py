@@ -1,6 +1,6 @@
+import corner
 import matplotlib.pyplot as plt
 import numpy as np
-import corner
 
 
 def lnprior(theta, conditions):
@@ -11,31 +11,31 @@ def lnprior(theta, conditions):
     theta : np.ndarray
         An array containing the parameters of the model.
     conditions : list
-        A list containing $2n$-conditions for the (min, max) range of the 
+        A list containing $2n$-conditions for the (min, max) range of the
         $n$ parameters.
-    
+
     Returns
     -------
     lp : float
         The a priori probability.
     """
 
-    try: 
+    try:
         if len(conditions) != 2 * len(theta):
-            error_type = 'IndexError'
-            msg = 'Length of conditions must be twice the length of theta.'
-            print(f'{error_type}: {msg}')
+            error_type = "IndexError"
+            msg = "Length of conditions must be twice the length of theta."
+            print(f"{error_type}: {msg}")
         else:
             cond = np.array(conditions).reshape((len(theta), 2))
             for i in range(len(theta)):
                 if cond[i, 0] < theta[i] < cond[i, 1]:
-                    lp =  0.0
+                    lp = 0.0
                 else:
                     return np.inf
             return lp
     except:
         return 0.0
-    
+
 
 def fun_like(x, y, model, theta, conditions=None, var2=1.0):
     """Computes the likelihood.
@@ -52,7 +52,7 @@ def fun_like(x, y, model, theta, conditions=None, var2=1.0):
     theta : np.ndarray
         The array containing the model's parameters.
     conditions : list
-        A list containing $2n$-conditions for the (min, max) range of the 
+        A list containing $2n$-conditions for the (min, max) range of the
         $n$ parameters.
     var2 : float
         Determines the step size of the walker. By default it is set to `1.0`.
@@ -79,10 +79,10 @@ def fun_like(x, y, model, theta, conditions=None, var2=1.0):
         lhood = np.inf
     else:
         lhood += lp
-    
+
     return lhood
 
-    
+
 def update_theta(theta, d):
     """Updates the theta parameters.
 
@@ -102,15 +102,14 @@ def update_theta(theta, d):
     theta_new = []
 
     for k in range(len(theta)):
-        theta_new.append(np.random.normal(theta[k], d / 2.))
+        theta_new.append(np.random.normal(theta[k], d / 2.0))
 
     return theta_new
 
-    
-def walk(x, y, model, theta, conditions=None, var2=0.01, mov=100,
-         d=1, tol=1e-3, mode=True):
+
+def walk(x, y, model, theta, conditions=None, var2=0.01, mov=100, d=1, tol=1e-3, mode=True):
     """Executes the walker implementation.
-    
+
     Parameters
     ----------
     x : np.ndarray
@@ -123,7 +122,7 @@ def walk(x, y, model, theta, conditions=None, var2=0.01, mov=100,
     theta : np.ndarray
         The array containing the model's parameters.
     conditions : list
-        A list containing $2n$-conditions for the (min, max) range of the 
+        A list containing $2n$-conditions for the (min, max) range of the
         $n$ parameters.
     var2 : float
         Determines the step size of the walker. By default it is set to `1.0`.
@@ -137,7 +136,7 @@ def walk(x, y, model, theta, conditions=None, var2=0.01, mov=100,
         to `1e-3`.
     mode : bool
         By default it is set to `True`.
-    
+
     Returns
     -------
     theta : np.array
@@ -158,15 +157,15 @@ def walk(x, y, model, theta, conditions=None, var2=0.01, mov=100,
         if not greach:
             y0 = fun_like(x, y, model, theta, conditions, var2)
             y1 = fun_like(x, y, model, theta_new, conditions, var2)
-            
+
             if y0 <= tol and mode:
-                print('Goal reached!')
+                print("Goal reached!")
                 greach = True
-                
+
                 return theta, nwalk, y0
             else:
                 if y1 <= tol and mode:
-                    print('Goal reached!')
+                    print("Goal reached!")
                     greach = True
 
                     return theta_new, nwalk, y1
@@ -185,16 +184,28 @@ def walk(x, y, model, theta, conditions=None, var2=0.01, mov=100,
                         else:
                             theta_new = update_theta(theta, d)
     if mode:
-        print('Maximum number of iterations reached!')
-        print(f'The log-likelihood is: {y0}')
+        print("Maximum number of iterations reached!")
+        print(f"The log-likelihood is: {y0}")
 
     return theta, nwalk, y0
 
 
-def walkers(nwalkers, x, y, model, theta, conditions=None, var2=0.01,
-            mov=100, d=1, tol=1e-3, mode=False, figname='fig_out.png'):
+def walkers(
+    nwalkers,
+    x,
+    y,
+    model,
+    theta,
+    conditions=None,
+    var2=0.01,
+    mov=100,
+    d=1,
+    tol=1e-3,
+    mode=False,
+    figname="fig_out.png",
+):
     """Executes multiple walkers.
-    
+
     Parameters
     ----------
     nwalkers : int
@@ -209,7 +220,7 @@ def walkers(nwalkers, x, y, model, theta, conditions=None, var2=0.01,
     theta : np.ndarray
         The array containing the model's parameters.
     conditions : list
-        A list containing $2n$-conditions for the (min, max) range of the 
+        A list containing $2n$-conditions for the (min, max) range of the
         $n$ parameters.
     var2 : float
         Determines the step size of the walker. By default it is set to `1.0`.
@@ -227,7 +238,7 @@ def walkers(nwalkers, x, y, model, theta, conditions=None, var2=0.01,
     figname : str
         The name of the output file for the figure. By default it is set
         to `fig_out.png`.
-    
+
     Returns
     -------
     par : np.array
@@ -240,30 +251,35 @@ def walkers(nwalkers, x, y, model, theta, conditions=None, var2=0.01,
     par = []
 
     for i in range(nwalkers):
-        theta, nwalk, y0 = walk(x, y, model, theta, conditions,
-                                var2, mov, d, tol, mode)
+        theta, nwalk, y0 = walk(x, y, model, theta, conditions, var2, mov, d, tol, mode)
         par.append(theta)
         nwalk = np.array(nwalk).reshape((len(nwalk), len(nwalk[i])))
         error.append(y0)
-    
+
         if figname != None:
             for k in range(nwalk.shape[1]):
-                sub = '$\\theta _{' + str(k) + '}$'
-                plt.plot(range(len(nwalk[:, k])), nwalk[:, k], '-', label=sub)
-                plt.ylabel('$\\theta$')
-                plt.xlabel('iterations')
-                plt.savefig('walkers_'+figname, dpi = 300, transparent = True)
+                sub = "$\\theta _{" + str(k) + "}$"
+                plt.plot(range(len(nwalk[:, k])), nwalk[:, k], "-", label=sub)
+                plt.ylabel("$\\theta$")
+                plt.xlabel("iterations")
+                plt.savefig("walkers_" + figname, dpi=300, transparent=True)
 
-    if figname != None: plt.show()
+    if figname != None:
+        plt.show()
 
     if nwalk.shape[1] == 2:
         if figname != None:
-            fig = corner.hist2d(nwalk[:, 0], nwalk[:, 1], range=None, bins=18, 
-                                smooth=True, plot_datapoints=True,
-                                plot_density=True)
-            plt.ylabel('$\\theta_{1}$')
-            plt.xlabel('$\\theta_{0}$')
-            plt.savefig('theta_'+figname, dpi = 300, transparent = True)
+            fig = corner.hist2d(
+                nwalk[:, 0],
+                nwalk[:, 1],
+                range=None,
+                bins=18,
+                smooth=True,
+                plot_datapoints=True,
+                plot_density=True,
+            )
+            plt.ylabel("$\\theta_{1}$")
+            plt.xlabel("$\\theta_{0}$")
+            plt.savefig("theta_" + figname, dpi=300, transparent=True)
 
     return par, error
-
