@@ -1,5 +1,8 @@
+from typing import List, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
+from pandas.core.frame import DataFrame
 
 # -------------------------------------------------------------------------
 
@@ -359,83 +362,72 @@ def cal_average(y, alpha=1):
     return average
 
 
-def rescale(dataset, n=1):
-    """Perform a standard rescaling of the data
+class DataScaler:
+    """numpy array scaler and rescaler"""
 
-    Parameters
-    ----------
-    dataset : np.array
-        An array containing the model data.
-    n : int
-        Is the degree of the polynomial to subtract
-        the slope. By default it is set to `1`.
+    def __init__(self, dataset: np.ndarray, n: int = 1) -> None:
+        """Initializes the parameters required for scaling the data"""
+        self.dataset_ = dataset.copy()
+        self._n = n
 
-    Returns
-    -------
-    data_scaled : np.array
-        An array containing the scaled data.
+    def rescale(self) -> np.ndarray:
+        """Perform a standard rescaling of the data
 
-    mu : np.array
-        An array containing the min of the
-        original data.
-    sigma : np.array
-        An array containing the (max - min)
-        of the original data.
-    """
+        Returns
+        -------
+        data_scaled : np.array
+            An array containing the scaled data.
+        """
 
-    mu = []
-    sigma = []
-    fitting = []
-    dataset_ = dataset.copy()
-    try:
-        xaxis = range(dataset.shape[1])
-    except:
-        error_type = "IndexError"
-        msg = "Trying to access an item at an invalid index."
-        print(f"{error_type}: {msg}")
-        return None
-    for i in range(dataset.shape[0]):
-        if n != None:
-            fit = np.polyfit(xaxis, dataset[i, :], n)
-            f = np.poly1d(fit)
-            poly = f(xaxis)
-            fitting.append(f)
-        else:
-            fitting.append(0.0)
-        dataset_[i, :] += -poly
-        mu.append(np.min(dataset_[i, :]))
-        if np.max(dataset_[i, :]) != 0:
-            sigma.append(np.max(dataset_[i, :]) - mu[i])
-        else:
-            sigma.append(1)
+        mu = []
+        sigma = []
+        fitting = []
+        self.data_scaled = np.copy(self.dataset_)
+        try:
+            xaxis = range(self.dataset_.shape[1])
+        except:
+            error_type = "IndexError"
+            msg = "Trying to access an item at an invalid index."
+            print(f"{error_type}: {msg}")
+            return None
+        for i in range(self.dataset_.shape[0]):
+            if self._n != None:
+                fit = np.polyfit(xaxis, self.dataset_[i, :], self._n)
+                f = np.poly1d(fit)
+                poly = f(xaxis)
+                fitting.append(f)
+            else:
+                fitting.append(0.0)
+            self.data_scaled[i, :] += -poly
+            mu.append(np.min(self.data_scaled[i, :]))
+            if np.max(self.data_scaled[i, :]) != 0:
+                sigma.append(np.max(self.data_scaled[i, :]) - mu[i])
+            else:
+                sigma.append(1)
 
-        dataset_[i, :] = 2 * ((dataset_[i, :] - mu[i]) / sigma[i]) - 1
+            self.data_scaled[i, :] = 2 * ((self.data_scaled[i, :] - mu[i]) / sigma[i]) - 1
 
-    values = [mu, sigma, fitting]
+        self.values = [mu, sigma, fitting]
 
-    return dataset_, values
+        return self.data_scaled
 
+    def scale(self) -> np.ndarray:
+        """Performs the inverse operation to the rescale function
 
-def scale(dataset, values):
-    """Performs the inverse operation to the rescale function
+        Returns
+        -------
+        dataset_ : np.array
+            An array containing the rescaled data.
+        """
+        dataset_ = np.copy(self.data_scaled)
+        for i in range(self.dataset_.shape[0]):
+            dataset_[i, :] += 1
+            dataset_[i, :] /= 2
+            dataset_[i, :] = dataset_[i, :] * self.values[1][i]
+            dataset_[i, :] += self.values[0][i]
+            dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
 
-    Parameters
-    ----------
-    dataset : np.array
-        An array containing the scaled data.
-    values : np.ndarray
-        A set of values returned by the rescale function.
-
-    """
-    dataset_ = dataset.copy()
-    for i in range(dataset.shape[0]):
-        dataset_[i, :] += 1
-        dataset_[i, :] /= 2
-        dataset_[i, :] = dataset_[i, :] * values[1][i]
-        dataset_[i, :] += values[0][i]
-        dataset_[i, :] += values[2][i](range(dataset_.shape[1]))
-
-    return dataset_
+        return dataset_
 
 
 def generate_series(n, n_steps, incline=True):
@@ -479,91 +471,78 @@ def RMSE(y_true, y_pred):
     return np.sqrt(np.mean((y_true - y_pred) ** 2))
 
 
-def to_codes_transformation(x, dict_type):
-    """Auxiliary function to perform data transformation using a dictionary
+class DataFrameEncoderDecoder:
+    """Allows encoding and decoding Dataframes"""
 
-    Parameters
-    ----------
-    x : str
-        A character data type.
-    dict_type : dict
-        An object of dictionary type.
+    def __init__(self, data: DataFrame) -> None:
+        """Sets the columns of the dataframe"""
+        self._df = data.copy()
+        self._names = data.columns
+        self.encoding_list = []
 
-    Returns
-    -------
-    dict_type[x] or np.nan if dict_type[x] doesn't exist.
-    """
-    try:
-        return dict_type[x]
-    except:
-        return np.nan
+    def encode(self) -> DataFrame:
+        """Encodes the object type columns of the dataframe"""
+        self.decoding_list = []
+        for i in self._names:
+            if self._df[i].dtype == "object":
+                column_index = range(len(self._df[i].unique()))
+                column_keys = self._df[i].unique()
+                encode_dict = dict(zip(column_keys, column_index))
+                decode_dict = dict(zip(column_index, column_keys))
+                self._df[i] = self._df[i].apply(
+                    self._code_transformation_to, dictionary_list=encode_dict
+                )
+                self.encoding_list.append(encode_dict)
+                self.decoding_list.append(decode_dict)
+        return self._df
 
+    def decode(self) -> DataFrame:
+        """Decodes the int type columns of the dataframe"""
+        j = 0
+        df_decoded = self._df.copy()
+        try:
+            number_of_columns = len(self.decoding_list[j])
+            for i in self._names:
+                if df_decoded[i].dtype == "int64":
+                    df_decoded[i] = df_decoded[i].apply(
+                        self._code_transformation_to, dictionary_list=self.decoding_list[j]
+                    )
+                    j += 1
+            return df_decoded
+        except AttributeError as e:
+            warning_type = "UserWarning"
+            msg = "It is not possible to decode the dataframe, since it has not been encoded"
+            msg += "Error: {%s}" % e
+            print(f"{warning_type}: {msg}")
 
-def data_codification(data):
-    """Function that allows us to perform the encoding and obtain the dictionaries.
+    def get_dictionaries(self) -> Tuple[List[dict], List[dict]]:
+        """Allows to return the list of dictionaries for encoding and decoding"""
+        try:
+            return self.encoding_list, self.decoding_list
+        except ValueError as e:
+            warning_type = "UserWarning"
+            msg = "It is not possible to return the list of dictionaries as they have not been created."
+            msg += "Error: {%s}" % e
+            print(f"{warning_type}: {msg}")
 
-    Parameters
-    ----------
-    data : pd.DataFrame()
-        An object of type pandas dataframe.
+    def _code_transformation_to(self, character: str, dictionary_list: List[dict]) -> int:
+        """Auxiliary function to perform data transformation using a dictionary
 
-    Returns
-    -------
-    df : pd.DataFrame()
-        The encoded input dataframe.
+        Parameters
+        ----------
+        character : str
+            A character data type.
+        dictionary_list : List[dict]
+            An object of dictionary type.
 
-    decode_dicts : dict
-        An object of dictionary type to decodes.
-
-    code_dicts : dict
-        An object of dictionary type to encodes.
-    """
-    df = data.copy()
-    names = data.columns
-    code_dicts = []
-    decode_dicts = []
-    for i in names:
-        if df[i].dtype == "object":
-            index_of_name = range(len(df[i].unique()))
-            keys_of_name = df[i].unique()
-            code_dict = dict(zip(keys_of_name, index_of_name))
-            decode_dict = dict(zip(index_of_name, keys_of_name))
-            df[i] = df[i].apply(to_codes_transformation, dict_type=code_dict)
-            decode_dicts.append(decode_dict)
-            code_dicts.append(code_dict)
-    return df, decode_dicts, code_dicts
-
-
-def data_codeOrdecode(data, dict_types, d_type="decode"):
-    """Function that encodes or decodes according to a dictionary
-
-    Parameters
-    ----------
-    data : pd.DataFrame()
-        An object of type pandas dataframe.
-
-    dict_types : dict
-        An object of dictionary type to decodes or encodes.
-
-    Returns
-    -------
-
-    df : pd.DataFrame()
-        The encoded or decoded input dataframe.
-    """
-    j = 0
-    df = data.copy()
-    names = df.columns
-    for i in names:
-        if d_type == "decode":
-            if df[i].dtype == "int64":
-                df[i] = df[i].apply(to_codes_transformation, dict_type=dict_types[j])
-                j += 1
-        else:
-            if df[i].dtype == "object":
-                df[i] = df[i].apply(to_codes_transformation, dict_type=dict_types[j])
-                j += 1
-    return df
+        Returns
+        -------
+        dict_type[character] or np.nan if dict_type[character] doesn't exist.
+        """
+        try:
+            return dictionary_list[character]
+        except:
+            return np.nan
 
 
 # -------------------------------------------------------------------------

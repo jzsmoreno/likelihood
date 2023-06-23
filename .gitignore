@@ -123,3 +123,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Ignore test_<files>.py for testing
+/test_tools.py
