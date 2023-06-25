@@ -310,33 +310,81 @@ def fft_denoise(dataset, sigma=0, mode=True):
     return dataset_
 
 
-def feature_importance(dataset, values):
-    """Calculates the importance of each feature
+class linear_regression:
 
-    Parameters
-    ----------
-    dataset : np.array
-        An array containing the scaled data.
-    values : np.ndarray
-        A set of values returned by the linear function.
+    """class implementing multiple linear regression"""
 
-    Returns
-    -------
-    importance : np.array
-        An array containing the importance of each feature.
+    def __init__(self) -> None:
+        """
+        The class initializer
 
-    """
+        """
+        self.importance = []
 
-    importance = []
-    print("\nFeature importance:")
-    U, S, VT = np.linalg.svd(dataset, full_matrices=False)
-    w = (VT.T @ np.linalg.inv(np.diag(S)) @ U.T).T @ values
+    def fit(self, dataset: np.ndarray, values: np.ndarray) -> None:
+        """Performs linear multiple model training
 
-    for i in range(dataset.shape[0]):
-        a = np.around(w[i], decimals=4)
-        importance.append(a)
-        print(f"The importance of the {i+1} feature is {a}")
-    return np.array(importance)
+        Parameters
+        ----------
+        dataset : np.array
+            An array containing the scaled data.
+        values : np.ndarray
+            A set of values returned by the linear function.
+
+        Returns
+        -------
+        importance : np.array
+            An array containing the importance of each feature.
+
+        """
+
+        self.X = dataset
+        self.y = values
+
+        U, S, VT = np.linalg.svd(self.X, full_matrices=False)
+        w = (VT.T @ np.linalg.inv(np.diag(S)) @ U.T).T @ self.y
+
+        for i in range(self.X.shape[0]):
+            a = np.around(w[i], decimals=8)
+            self.importance.append(a)
+
+        print("\nSummary:")
+        print("--------")
+        print("\nParameters:", np.array(self.importance).shape)
+        print("RMSE: {:.4f}".format(mean_square_error(self.y, self.predict(self.X))))
+
+    def predict(self, datapoints) -> np.ndarray:
+        """
+        Performs predictions for a set of points
+
+        Parameters
+        ----------
+        datapoints : np.array
+            An array containing the values of the independent variable.
+
+        """
+        return np.array(self.importance) @ datapoints
+
+    def get_importances(self, print_important_features: bool = False) -> np.ndarray:
+        """
+        Returns the important features
+
+        Parameters
+        ----------
+        print_important_features : bool
+            determines whether or not are printed on the screen. By default it is set to `False`.
+
+        Returns
+        -------
+        importance : np.array
+            An array containing the importance of each feature.
+
+
+        """
+        if print_important_features:
+            for i, a in enumerate(self.importance):
+                print(f"The importance of the {i+1} feature is {a}")
+        return np.array(self.importance)
 
 
 def cal_average(y, alpha=1):
@@ -449,7 +497,7 @@ def generate_series(n, n_steps, incline=True):
     return series.astype(np.float32)
 
 
-def RMSE(y_true, y_pred):
+def mean_square_error(y_true, y_pred, print_error=False):
     """Calculates the Root Mean Squared Error
 
     Parameters
@@ -465,13 +513,13 @@ def RMSE(y_true, y_pred):
         The Root Mean Squared Error.
 
     """
-
-    print(f"The RMSE is {np.sqrt(np.mean((y_true - y_pred)**2))}")
+    if print_error:
+        print(f"The RMSE is {np.sqrt(np.mean((y_true - y_pred)**2))}")
 
     return np.sqrt(np.mean((y_true - y_pred) ** 2))
 
 
-class DataFrameEncoderDecoder:
+class DataFrameEncoder:
     """Allows encoding and decoding Dataframes"""
 
     def __init__(self, data: DataFrame) -> None:
@@ -549,8 +597,19 @@ class DataFrameEncoderDecoder:
 if __name__ == "__main__":
     # Generate data
     x = np.random.rand(3, 100)
-    y = 0.1 * x[0, :] + 0.4 * x[1, :] + 0.5 * x[2, :]
-    importance = feature_importance(x, y)
+    y = 0.1 * x[0, :] + 0.4 * x[1, :] + 0.5 * x[2, :] + 0.1
+    linear_model = linear_regression()
+    linear_model.fit(x, y)
+    importance = linear_model.get_importances()
+    y_hat = linear_model.predict(x)
+
+    # Graph the data for visualization
+    plt.plot(x[0, :], y, "o", label="Original Data")
+    plt.plot(x[0, :], y_hat, "x", label="$\hat{y}$")
+    plt.legend()
+    plt.xlabel("$x$")
+    plt.ylabel("$y, $\hat{y}$")
+    plt.show()
 
     a = generate_series(1, 40, incline=False)
     # Graph the data for visualization
