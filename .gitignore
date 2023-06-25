@@ -126,3 +126,9 @@ dmypy.json
 
 # Ignore test_<files>.py for testing
 /test_tools.py
+
+# Ignore <files>.txt for testing
+examples/*.txt
+
+# Ignore <files>.png for testing
+examples/*.png

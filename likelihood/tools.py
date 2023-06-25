@@ -459,16 +459,20 @@ class DataScaler:
 
         return self.data_scaled
 
-    def scale(self) -> np.ndarray:
+    def scale(self, dataset_) -> np.ndarray:
         """Performs the inverse operation to the rescale function
+
+        Parameters
+        ----------
+        dataset_ : np.array
+            An array containing the scaled values.
 
         Returns
         -------
         dataset_ : np.array
             An array containing the rescaled data.
         """
-        dataset_ = np.copy(self.data_scaled)
-        for i in range(self.dataset_.shape[0]):
+        for i in range(dataset_.shape[0]):
             dataset_[i, :] += 1
             dataset_[i, :] /= 2
             dataset_[i, :] = dataset_[i, :] * self.values[1][i]
