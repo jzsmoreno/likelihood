@@ -1,5 +1,5 @@
 # Code quality
-"black[jupyter]"
+black[jupyter]
 flake8==6.0.0
 mypy==1.4.1
 pydocstyle==6.3.0
