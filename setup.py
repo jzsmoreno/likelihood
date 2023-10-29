@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="likelihood", # Replace with your own username
+    name="likelihood",  # Replace with your own username
     version="1.1.12",
     author="J. A. Moreno-Guerra",
     author_email="jzs.gm27@gmail.com",
@@ -24,5 +24,5 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.6',
+    python_requires=">=3.6",
 )
