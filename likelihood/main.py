@@ -1,9 +1,13 @@
+from typing import Callable, List, Tuple
+
 import corner
 import matplotlib.pyplot as plt
+import numba
 import numpy as np
+from numpy import ndarray
 
 
-def lnprior(theta, conditions):
+def lnprior(theta: ndarray, conditions: List[Tuple[float, float]]) -> float:
     """Computes the prior probability.
 
     Parameters
@@ -37,7 +41,14 @@ def lnprior(theta, conditions):
         return 0.0
 
 
-def fun_like(x, y, model, theta, conditions=None, var2=1.0):
+def fun_like(
+    x: ndarray,
+    y: ndarray,
+    model: Callable,
+    theta: ndarray,
+    conditions: List[Tuple[float, float]] = None,
+    var2: float = 1.0,
+) -> float:
     """Computes the likelihood.
 
     Parameters
@@ -83,7 +94,8 @@ def fun_like(x, y, model, theta, conditions=None, var2=1.0):
     return lhood
 
 
-def update_theta(theta, d):
+@numba.jit(nopython=True)
+def update_theta(theta: ndarray, d: float) -> ndarray:
     """Updates the theta parameters.
 
     Parameters
@@ -99,15 +111,23 @@ def update_theta(theta, d):
         An ndarray with the updated theta values.
     """
 
-    theta_new = []
-
-    for k in range(len(theta)):
-        theta_new.append(np.random.normal(theta[k], d / 2.0))
+    theta_new = [np.random.normal(theta[k], d / 2.0) for k in range(len(theta))]
 
     return theta_new
 
 
-def walk(x, y, model, theta, conditions=None, var2=0.01, mov=100, d=1, tol=1e-3, mode=True):
+def walk(
+    x: ndarray,
+    y: ndarray,
+    model: Callable,
+    theta: ndarray,
+    conditions: List[Tuple[float, float]] = None,
+    var2: float = 0.01,
+    mov: int = 100,
+    d: int = 1,
+    tol: float = 1e-4,
+    mode: bool = True,
+):
     """Executes the walker implementation.
 
     Parameters
@@ -191,18 +211,18 @@ def walk(x, y, model, theta, conditions=None, var2=0.01, mov=100, d=1, tol=1e-3,
 
 
 def walkers(
-    nwalkers,
-    x,
-    y,
-    model,
-    theta,
-    conditions=None,
-    var2=0.01,
-    mov=100,
-    d=1,
-    tol=1e-3,
-    mode=False,
-    figname="fig_out.png",
+    nwalkers: int,
+    x: ndarray,
+    y: ndarray,
+    model: Callable,
+    theta: ndarray,
+    conditions: bool = None,
+    var2: float = 0.01,
+    mov: int = 100,
+    d: int = 1,
+    tol: float = 1e-4,
+    mode: bool = False,
+    figname: str = "fig_out.png",
 ):
     """Executes multiple walkers.
 

@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="likelihood",  # Replace with your own username
-    version="1.1.12",
+    version="1.2.0",
     author="J. A. Moreno-Guerra",
     author_email="jzs.gm27@gmail.com",
     description="A package that performs the maximum likelihood algorithm.",
@@ -18,6 +18,8 @@ setuptools.setup(
         "numpy",
         "matplotlib",
         "corner",
+        "numba",
+        "scipy",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

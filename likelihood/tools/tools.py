@@ -1,7 +1,8 @@
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy import ndarray
 from pandas.core.frame import DataFrame
 
 # -------------------------------------------------------------------------
@@ -11,7 +12,7 @@ Data Science from Scratch, Second Edition, by Joel Grus (O'Reilly).Copyright 201
 """
 
 
-def minibatches(dataset, batch_size, shuffle=True):
+def minibatches(dataset: List, batch_size: int, shuffle: bool = True):
     """Generates 'batch_size'-sized minibatches from the dataset
 
     Parameters
@@ -33,7 +34,7 @@ def minibatches(dataset, batch_size, shuffle=True):
         yield dataset[start:end]
 
 
-def difference_quotient(f, x, h):
+def difference_quotient(f: Callable, x: float, h: float) -> Callable:
     """Calculates the difference quotient of 'f' evaluated at x and x + h
 
     Parameters
@@ -51,7 +52,7 @@ def difference_quotient(f, x, h):
     return (f(x + h) - f(x)) / h
 
 
-def partial_difference_quotient(f, v, i, h):
+def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float):
     """Calculates the partial difference quotient of 'f'
 
     Parameters
@@ -72,7 +73,7 @@ def partial_difference_quotient(f, v, i, h):
     return (f(w) - f(v)) / h
 
 
-def estimate_gradient(f, v, h=0.0001):
+def estimate_gradient(f: Callable, v: ndarray, h: float = 0.0001):
     """Calculates the gradient of 'f' at v
 
     Parameters
@@ -89,7 +90,7 @@ def estimate_gradient(f, v, h=0.0001):
 
 
 # a function that calculates the percentage of missing values per column is defined
-def cal_missing_values(df):
+def cal_missing_values(df: DataFrame) -> None:
     col = df.columns
     print("Total size : ", "{:,}".format(len(df)))
     for i in col:
@@ -98,7 +99,7 @@ def cal_missing_values(df):
         )
 
 
-def calculate_probability(x, points=1, cond=True):
+def calculate_probability(x: ndarray, points: int = 1, cond: bool = True) -> ndarray:
     """Calculates the probability of the data
 
     Parameters
@@ -150,7 +151,9 @@ def calculate_probability(x, points=1, cond=True):
     return p
 
 
-def cdf(x, poly=9, inv=False, plot=False, savename=None):
+def cdf(
+    x: ndarray, poly: int = 9, inv: bool = False, plot: bool = False, savename: str = None
+) -> ndarray:
     """Calculates the cumulative distribution function of the data
 
     Parameters
@@ -226,7 +229,7 @@ class corr:
 
     """
 
-    def __init__(self, x, y):
+    def __init__(self, x: ndarray, y: ndarray):
         self.x = x
         self.y = y
         self.result = np.correlate(x, y, mode="full")
@@ -257,7 +260,7 @@ class autocorr:
 
     """
 
-    def __init__(self, x):
+    def __init__(self, x: ndarray):
         self.x = x
         self.result = np.correlate(x, x, mode="full")
         self.z = self.result[self.result.size // 2 :]
@@ -272,7 +275,7 @@ class autocorr:
         return self.z
 
 
-def fft_denoise(dataset, sigma=0, mode=True):
+def fft_denoise(dataset: ndarray, sigma: float = 0, mode: bool = True) -> Tuple[ndarray, float]:
     """Performs the noise removal using the Fast Fourier Transform
 
     Parameters
@@ -288,6 +291,8 @@ def fft_denoise(dataset, sigma=0, mode=True):
     -------
     dataset : np.array
         An array containing the denoised data.
+    period : float
+        period of the function described by the dataset
 
     """
     dataset_ = dataset.copy()
@@ -303,11 +308,31 @@ def fft_denoise(dataset, sigma=0, mode=True):
         ffilt = np.fft.ifft(fhat)  # Inverse FFT for filtered time signal
         dataset_[i, :] = ffilt.real
         # Calculate the period of the signal
-        period = 1 / freq[L][np.argmax(fhat[L])]
+        period = 1 / (2 * freq[L][np.argmax(fhat[L])])
         if mode:
             print(f"The {i+1}-th row of the dataset has been denoised.")
             print(f"The period is {round(period, 4)}")
-    return dataset_
+    return dataset_, period
+
+
+def get_period(dataset: ndarray) -> float:
+    """Calculates the periodicity of a `dataset`
+
+    Args:
+        dataset (`ndarray`): the `dataset` describing the function over which the period is calculated
+
+    Returns:
+        `float`: period of the function described by the `dataset`
+    """
+    n = dataset.size
+    fhat = np.fft.fft(dataset, n)
+    freq = (1 / n) * np.arange(n)
+    L = np.arange(1, np.floor(n / 2), dtype="int")
+    PSD = fhat * np.conj(fhat) / n
+    indices = PSD > np.mean(PSD) + np.std(PSD)
+    fhat = indices * fhat
+    period = 1 / (2 * freq[L][np.argmax(fhat[L])])
+    return period
 
 
 class linear_regression:
@@ -321,7 +346,7 @@ class linear_regression:
         """
         self.importance = []
 
-    def fit(self, dataset: np.ndarray, values: np.ndarray) -> None:
+    def fit(self, dataset: ndarray, values: ndarray) -> None:
         """Performs linear multiple model training
 
         Parameters
@@ -353,7 +378,7 @@ class linear_regression:
         print("\nParameters:", np.array(self.importance).shape)
         print("RMSE: {:.4f}".format(mean_square_error(self.y, self.predict(self.X))))
 
-    def predict(self, datapoints) -> np.ndarray:
+    def predict(self, datapoints: ndarray) -> ndarray:
         """
         Performs predictions for a set of points
 
@@ -365,7 +390,7 @@ class linear_regression:
         """
         return np.array(self.importance) @ datapoints
 
-    def get_importances(self, print_important_features: bool = False) -> np.ndarray:
+    def get_importances(self, print_important_features: bool = False) -> ndarray:
         """
         Returns the important features
 
@@ -387,7 +412,7 @@ class linear_regression:
         return np.array(self.importance)
 
 
-def cal_average(y, alpha=1):
+def cal_average(y, alpha: float = 1):
     """Calculates the moving average of the data
 
     Parameters
@@ -413,12 +438,12 @@ def cal_average(y, alpha=1):
 class DataScaler:
     """numpy array scaler and rescaler"""
 
-    def __init__(self, dataset: np.ndarray, n: int = 1) -> None:
+    def __init__(self, dataset: ndarray, n: int = 1) -> None:
         """Initializes the parameters required for scaling the data"""
         self.dataset_ = dataset.copy()
         self._n = n
 
-    def rescale(self) -> np.ndarray:
+    def rescale(self) -> ndarray:
         """Perform a standard rescaling of the data
 
         Returns
@@ -459,7 +484,7 @@ class DataScaler:
 
         return self.data_scaled
 
-    def scale(self, dataset_) -> np.ndarray:
+    def scale(self, dataset_: ndarray) -> ndarray:
         """Performs the inverse operation to the rescale function
 
         Parameters
@@ -482,8 +507,8 @@ class DataScaler:
         return dataset_
 
 
-def generate_series(n, n_steps, incline=True):
-    """Function that generates $n$ series of length $n_steps$"""
+def generate_series(n, n_steps: int, incline: bool = True):
+    """Function that generates `n` series of length `n_steps`"""
     freq1, freq2, offsets1, offsets2 = np.random.rand(4, n, 1)
 
     if incline:
@@ -501,7 +526,7 @@ def generate_series(n, n_steps, incline=True):
     return series.astype(np.float32)
 
 
-def mean_square_error(y_true, y_pred, print_error=False):
+def mean_square_error(y_true: ndarray, y_pred: ndarray, print_error: bool = False):
     """Calculates the Root Mean Squared Error
 
     Parameters
@@ -623,7 +648,7 @@ if __name__ == "__main__":
     plt.ylabel("$y(t)$")
     plt.show()
 
-    a_denoise = fft_denoise(a)
+    a_denoise, _ = fft_denoise(a)
 
     plt.plot(range(len(a_denoise[0, :])), a_denoise[0, :], label="Denoise Data")
     plt.legend()
