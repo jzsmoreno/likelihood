@@ -1,3 +1,5 @@
+import os
+import pickle
 from typing import Callable, List, Tuple
 
 import matplotlib.pyplot as plt
@@ -555,13 +557,24 @@ class DataFrameEncoder:
         """Sets the columns of the dataframe"""
         self._df = data.copy()
         self._names = data.columns
+        self._encode_columns = []
         self.encoding_list = []
-
-    def encode(self) -> DataFrame:
-        """Encodes the object type columns of the dataframe"""
         self.decoding_list = []
+
+    def load_config(self, path_to_dictionaries: str = "./") -> None:
+        """Loads dictionaries from a given directory"""
+        with open(os.path.join(path_to_dictionaries, "labelencoder_dictionary.pkl"), "rb") as file:
+            labelencoder = pickle.load(file)
+        self.encoding_list = labelencoder[0]
+        self.decoding_list = labelencoder[1]
+        self._encode_columns = labelencoder[2]
+        print("Configuration successfully uploaded")
+
+    def train(self, save_mode: bool = True) -> None:
+        """Trains the encoders and decoders using the dataframe"""
         for i in self._names:
             if self._df[i].dtype == "object":
+                self._encode_columns.append(i)
                 column_index = range(len(self._df[i].unique()))
                 column_keys = self._df[i].unique()
                 encode_dict = dict(zip(column_keys, column_index))
@@ -571,7 +584,24 @@ class DataFrameEncoder:
                 )
                 self.encoding_list.append(encode_dict)
                 self.decoding_list.append(decode_dict)
-        return self._df
+        if save_mode:
+            self._save_encoder()
+
+    def encode(self) -> DataFrame:
+        """Encodes the object type columns of the dataframe"""
+        if len(self.encoding_list) == 0:
+            self.train()
+            return self._df
+
+        else:
+            print("Configuration detected")
+            for num, colname in enumerate(self._encode_columns):
+                if self._df[colname].dtype == "object":
+                    encode_dict = self.encoding_list[num]
+                    self._df[colname] = self._df[colname].apply(
+                        self._code_transformation_to, dictionary_list=encode_dict
+                    )
+            return self._df
 
     def decode(self) -> DataFrame:
         """Decodes the int type columns of the dataframe"""
@@ -579,7 +609,7 @@ class DataFrameEncoder:
         df_decoded = self._df.copy()
         try:
             number_of_columns = len(self.decoding_list[j])
-            for i in self._names:
+            for i in self._encode_columns:
                 if df_decoded[i].dtype == "int64":
                     df_decoded[i] = df_decoded[i].apply(
                         self._code_transformation_to, dictionary_list=self.decoding_list[j]
@@ -601,6 +631,11 @@ class DataFrameEncoder:
             msg = "It is not possible to return the list of dictionaries as they have not been created."
             msg += "Error: {%s}" % e
             print(f"{warning_type}: {msg}")
+
+    def _save_encoder(self, path_to_save: str = "./") -> None:
+        """Method to serialize the encoding_list, decoding_list and _encode_columns list"""
+        with open(path_to_save + "labelencoder_dictionary.pkl", "wb") as f:
+            pickle.dump([self.encoding_list, self.decoding_list, self._encode_columns], f)
 
     def _code_transformation_to(self, character: str, dictionary_list: List[dict]) -> int:
         """Auxiliary function to perform data transformation using a dictionary
@@ -624,6 +659,32 @@ class DataFrameEncoder:
 
 # -------------------------------------------------------------------------
 if __name__ == "__main__":
+    # Use DataFrameEncoder
+    # Create a DataFrame
+    data = {"Name": ["John", "Alice", "Bob"], "Age": [25, 30, 35]}
+    import pandas as pd
+
+    df = pd.DataFrame(data)
+    # Instantiate DataFrameEncoder
+    dfe = DataFrameEncoder(df)
+    # Encode the dataframe
+    encoded_df = dfe.encode()
+    # Decode the dataframe
+    decoded_df = dfe.decode()
+
+    # Instantiate DataFrameEncoder
+    # Use load_config method
+    dfe2 = DataFrameEncoder(df)
+    dfe2.load_config()
+
+    encoded_df2 = dfe2.encode()
+    # Decode the dataframe
+    decoded_df2 = dfe2.decode()
+    # Check if the loaded dictionaries match the original ones
+    assert dfe.encoding_list == dfe2.encoding_list
+    assert dfe.decoding_list == dfe2.decoding_list
+
+    breakpoint()
     # Generate data
     x = np.random.rand(3, 100)
     y = 0.1 * x[0, :] + 0.4 * x[1, :] + 0.5 * x[2, :] + 0.1
