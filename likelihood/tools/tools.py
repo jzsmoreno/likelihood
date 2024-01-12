@@ -657,8 +657,111 @@ class DataFrameEncoder:
             return np.nan
 
 
+class PerformanceMeasures:
+    """Class with methods to measure performance"""
+
+    def __init__(self) -> None:
+        pass
+
+    # Performance measure Res_T
+    def f_mean(self, y_true: ndarray, y_pred: ndarray, labels: list) -> None:
+        n = len(labels)
+
+        F_vec = self._f1_score(y_true, y_pred, labels=labels)
+        a = np.sum(F_vec)
+
+        for i in range(len(F_vec)):
+            print("F-measure of label ", labels[i], " -> ", F_vec[i])
+
+        print("Mean of F-measure -> ", a / n)
+
+    # Performance measure Res_P
+    def resp(self, y_true: ndarray, y_pred: ndarray, labels: list) -> None:
+        # We initialize sum counters
+        sum1 = 0
+        sum2 = 0
+
+        # Calculamos T_C
+        T_C = len(y_true)
+        for i in range(len(labels)):
+            # We calculate instances of the classes and their F-measures
+            sum1 += (1 - ((y_true == labels[i]).sum() / T_C)) * self._fi_measure(
+                y_true, y_pred, labels, i
+            )
+            sum2 += 1 - ((y_true == labels[i]).sum()) / T_C
+
+        # Print the metric corresponding to the prediction vector
+        print("Metric Res_p ->", sum1 / sum2)
+
+    def _fi_measure(self, y_true: ndarray, y_pred: ndarray, labels: list, i: int) -> int:
+        F_vec = self._f1_score(y_true, y_pred, labels=labels)
+
+        return F_vec[i]  # We return the position of the f1-score corresponding to the label
+
+    # Summary of the labels predicted
+    def _summary_pred(self, y_true: ndarray, y_pred: ndarray, labels: list) -> None:
+        count_mat = self._confu_mat(y_true, y_pred, labels)
+        print("        ", end="")
+        for i in range(len(labels)):
+            print("|--", labels[i], "--", end="")
+            if i + 1 == len(labels):
+                print("|", end="")
+        for i in range(len(labels)):
+            print("")
+            print("|--", labels[i], "--|", end="")
+            for j in range(len(labels)):
+                if j != 0:
+                    print(" ", end="")
+                print("  ", int(count_mat[i, j]), "  ", end="")
+
+    def _f1_score(self, y_true: ndarray, y_pred: ndarray, labels: list) -> ndarray:
+        f1_vec = np.zeros(len(labels))
+
+        # Calculate confusion mat
+        count_mat = self._confu_mat(y_true, y_pred, labels)
+
+        # sums over columns
+        sum1 = np.sum(count_mat, axis=0)
+        # sums over rows
+        sum2 = np.sum(count_mat, axis=1)
+        # Iterate over labels to calculate f1 scores of each one
+        for i in range(len(labels)):
+            precision = count_mat[i, i] / (sum1[i])
+            recall = count_mat[i, i] / (sum2[i])
+
+            f1_vec[i] = 2 * ((precision * recall) / (precision + recall))
+
+        return f1_vec
+
+    # Returns confusion matrix of predictions
+    def _confu_mat(self, y_true: ndarray, y_pred: ndarray, labels: list) -> ndarray:
+        labels = np.array(labels)
+        count_mat = np.zeros((len(labels), len(labels)))
+
+        for i in range(len(labels)):
+            for j in range(len(y_pred)):
+                if y_pred[j] == labels[i]:
+                    if y_pred[j] == y_true[j]:
+                        count_mat[i, i] += 1
+                    else:
+                        x = np.where(labels == y_true[j])
+                        count_mat[i, x[0]] += 1
+
+        return count_mat
+
+
 # -------------------------------------------------------------------------
 if __name__ == "__main__":
+    y_true = np.array([1, 2, 2, 1, 1])
+    y_pred = np.array([1, 1, 2, 2, 1])
+
+    labels = [1, 2]
+    helper = PerformanceMeasures()
+    helper._summary_pred(y_true, y_pred, labels)
+    print(helper._f1_score(y_true, y_pred, labels))
+
+    breakpoint()
+
     # Use DataFrameEncoder
     # Create a DataFrame
     data = {"Name": ["John", "Alice", "Bob"], "Age": [25, 30, 35]}
