@@ -337,15 +337,12 @@ def get_period(dataset: ndarray) -> float:
     return period
 
 
-class linear_regression:
-
+class LinearRegression:
     """class implementing multiple linear regression"""
 
     def __init__(self) -> None:
-        """
-        The class initializer
+        """The class initializer"""
 
-        """
         self.importance = []
 
     def fit(self, dataset: ndarray, values: ndarray) -> None:
@@ -791,7 +788,7 @@ if __name__ == "__main__":
     # Generate data
     x = np.random.rand(3, 100)
     y = 0.1 * x[0, :] + 0.4 * x[1, :] + 0.5 * x[2, :] + 0.1
-    linear_model = linear_regression()
+    linear_model = LinearRegression()
     linear_model.fit(x, y)
     importance = linear_model.get_importances()
     y_hat = linear_model.predict(x)
