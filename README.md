@@ -5,13 +5,13 @@
 ![License](https://img.shields.io/github/license/jzsmoreno/likelihood?style=for-the-badge)
 
 <!-- Project description -->
-This repository contains the code to build the likelihood package from the ML course taught by Ivan Avalos Lopez and J. A. Moreno-Guerra.
+This repository contains the code to build the [likelihood package](./likelihood/) which contains tools for typical tasks in [`MLOps`](https://en.wikipedia.org/wiki/MLOps) and training of custom models.
 
 ## Prerequisities
 
 Before you begin, ensure you have met the following requirements:
 
-* You have a _Windows/Linux/Mac_ machine running [Python 3.6+](https://www.python.org/).
+* You have a _Windows/Linux/Mac_ machine running [Python 3.10+](https://www.python.org/).
 * You have installed the latest versions of [`pip`](https://pip.pypa.io/en/stable/installing/) and [`virtualenv`](https://virtualenv.pypa.io/en/stable/installation/) or `conda` ([Anaconda](https://www.anaconda.com/distribution/)).
 
 ## Installation
