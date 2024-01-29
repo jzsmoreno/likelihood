@@ -551,24 +551,36 @@ class DataFrameEncoder:
     """Allows encoding and decoding Dataframes"""
 
     def __init__(self, data: DataFrame) -> None:
-        """Sets the columns of the dataframe"""
+        """Sets the columns of the `DataFrame`"""
         self._df = data.copy()
         self._names = data.columns
         self._encode_columns = []
         self.encoding_list = []
         self.decoding_list = []
 
-    def load_config(self, path_to_dictionaries: str = "./") -> None:
-        """Loads dictionaries from a given directory"""
-        with open(os.path.join(path_to_dictionaries, "labelencoder_dictionary.pkl"), "rb") as file:
+    def load_config(self, path_to_dictionaries: str = "./", **kwargs) -> None:
+        """Loads dictionaries from a given directory
+
+        Keyword Arguments:
+        ----------
+        - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
+        """
+        dictionary_name = (
+            kwargs["dictionary_name"] if "dictionary_name" in kwargs else "labelencoder_dictionary"
+        )
+        with open(os.path.join(path_to_dictionaries, dictionary_name + ".pkl"), "rb") as file:
             labelencoder = pickle.load(file)
         self.encoding_list = labelencoder[0]
         self.decoding_list = labelencoder[1]
         self._encode_columns = labelencoder[2]
         print("Configuration successfully uploaded")
 
-    def train(self, save_mode: bool = True) -> None:
-        """Trains the encoders and decoders using the dataframe"""
+    def train(self, path_to_save: str, **kwargs) -> None:
+        """Trains the encoders and decoders using the `DataFrame`"""
+        save_mode = kwargs["save_mode"] if "save_mode" in kwargs else True
+        dictionary_name = (
+            kwargs["dictionary_name"] if "dictionary_name" in kwargs else "labelencoder_dictionary"
+        )
         for i in self._names:
             if self._df[i].dtype == "object":
                 self._encode_columns.append(i)
@@ -582,12 +594,18 @@ class DataFrameEncoder:
                 self.encoding_list.append(encode_dict)
                 self.decoding_list.append(decode_dict)
         if save_mode:
-            self._save_encoder()
+            self._save_encoder(path_to_save, dictionary_name)
 
-    def encode(self) -> DataFrame:
-        """Encodes the object type columns of the dataframe"""
+    def encode(self, path_to_save: str = "./", **kwargs) -> DataFrame:
+        """Encodes the `object` type columns of the dataframe
+
+        Keyword Arguments:
+        ----------
+        - save_mode (`bool`): An optional integer parameter. By default it is set to `True`
+        - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
+        """
         if len(self.encoding_list) == 0:
-            self.train()
+            self.train(path_to_save, **kwargs)
             return self._df
 
         else:
@@ -601,7 +619,7 @@ class DataFrameEncoder:
             return self._df
 
     def decode(self) -> DataFrame:
-        """Decodes the int type columns of the dataframe"""
+        """Decodes the `int` type columns of the `DataFrame`"""
         j = 0
         df_decoded = self._df.copy()
         try:
@@ -620,7 +638,7 @@ class DataFrameEncoder:
             print(f"{warning_type}: {msg}")
 
     def get_dictionaries(self) -> Tuple[List[dict], List[dict]]:
-        """Allows to return the list of dictionaries for encoding and decoding"""
+        """Allows to return the `list` of dictionaries for `encoding` and `decoding`"""
         try:
             return self.encoding_list, self.decoding_list
         except ValueError as e:
@@ -629,9 +647,9 @@ class DataFrameEncoder:
             msg += "Error: {%s}" % e
             print(f"{warning_type}: {msg}")
 
-    def _save_encoder(self, path_to_save: str = "./") -> None:
-        """Method to serialize the encoding_list, decoding_list and _encode_columns list"""
-        with open(path_to_save + "labelencoder_dictionary.pkl", "wb") as f:
+    def _save_encoder(self, path_to_save: str, dictionary_name: str) -> None:
+        """Method to serialize the `encoding_list`, `decoding_list` and `_encode_columns` list"""
+        with open(path_to_save + dictionary_name + ".pkl", "wb") as f:
             pickle.dump([self.encoding_list, self.decoding_list, self._encode_columns], f)
 
     def _code_transformation_to(self, character: str, dictionary_list: List[dict]) -> int:
@@ -639,14 +657,14 @@ class DataFrameEncoder:
 
         Parameters
         ----------
-        character : str
+        character : `str`
             A character data type.
-        dictionary_list : List[dict]
+        dictionary_list : List[`dict`]
             An object of dictionary type.
 
         Returns
         -------
-        dict_type[character] or np.nan if dict_type[character] doesn't exist.
+        dict_type[`character`] or `np.nan` if dict_type[`character`] doesn't exist.
         """
         try:
             return dictionary_list[character]
@@ -756,8 +774,6 @@ if __name__ == "__main__":
     helper = PerformanceMeasures()
     helper._summary_pred(y_true, y_pred, labels)
     print(helper._f1_score(y_true, y_pred, labels))
-
-    breakpoint()
 
     # Use DataFrameEncoder
     # Create a DataFrame
