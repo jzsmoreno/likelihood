@@ -2,7 +2,6 @@ from typing import Callable, List, Tuple
 
 import corner
 import matplotlib.pyplot as plt
-import numba
 import numpy as np
 from numpy import ndarray
 
@@ -12,15 +11,15 @@ def lnprior(theta: ndarray, conditions: List[Tuple[float, float]]) -> float:
 
     Parameters
     ----------
-    theta : np.ndarray
+    theta : `np.ndarray`
         An array containing the parameters of the model.
-    conditions : list
+    conditions : `list`
         A list containing $2n$-conditions for the (min, max) range of the
         $n$ parameters.
 
     Returns
     -------
-    lp : float
+    lp : `float`
         The a priori probability.
     """
 
@@ -53,24 +52,24 @@ def fun_like(
 
     Parameters
     ----------
-    x : np.ndarray
+    x : `np.ndarray`
         An $(m, n)$ dimensional array for (cols, rows).
-    y : np.ndarray
+    y : `np.ndarray`
         An $n$ dimensional array that will be compared with model's output.
-    model : function
+    model : `Callable`
         A Python function defined by the user. This function should recieve
-        two arguments $(x, theta)$.
-    theta : np.ndarray
+        two arguments $(`x`, `theta`)$.
+    theta : `np.ndarray`
         The array containing the model's parameters.
-    conditions : list
+    conditions : `list`
         A list containing $2n$-conditions for the (min, max) range of the
         $n$ parameters.
-    var2 : float
+    var2 : `float`
         Determines the step size of the walker. By default it is set to `1.0`.
 
     Returns
     -------
-    lhood : float
+    lhood : `float`
         The computed likelihood.
     """
 
@@ -94,20 +93,19 @@ def fun_like(
     return lhood
 
 
-@numba.jit(nopython=True)
 def update_theta(theta: ndarray, d: float) -> ndarray:
     """Updates the theta parameters.
 
     Parameters
     ----------
-    theta : np.ndarray
+    theta : `np.ndarray`
         The ndarray containing the model's parameters.
-    d : float
+    d : `float`
         Size of the Gaussian step for the walker.
 
     Returns
     -------
-    theta_new : np.array
+    theta_new : `np.array`
         An ndarray with the updated theta values.
     """
 
@@ -132,38 +130,38 @@ def walk(
 
     Parameters
     ----------
-    x : np.ndarray
+    x : `np.ndarray`
         An $(m, n)$ dimensional array for (cols, rows).
     y : np.ndarray
         An $n$ dimensional array that will be compared with model's output.
-    model : function
+    model : `Callable`
         A Python function defined by the user. This function should recieve
         two arguments $(x, theta)$.
-    theta : np.ndarray
+    theta : `np.ndarray`
         The array containing the model's parameters.
-    conditions : list
+    conditions : `list`
         A list containing $2n$-conditions for the (min, max) range of the
         $n$ parameters.
-    var2 : float
+    var2 : `float`
         Determines the step size of the walker. By default it is set to `1.0`.
-    mov : int
+    mov : `int`
         Number of movements that walker will perform. By default it is set
         to `100`.
-    d : float
+    d : `float`
         Size of the Gaussian step for the walker.
-    tol : float
-        Convergence criteria for the log-likelihhod. By default it is set
+    tol : `float`
+        Convergence criteria for the log-likelihood. By default it is set
         to `1e-3`.
-    mode : bool
+    mode : `bool`
         By default it is set to `True`.
 
     Returns
     -------
-    theta : np.array
+    theta : `np.array`
         An ndarray with the updated theta values.
-    nwalk : np.array
+    nwalk : `np.array`
         Updates of theta for each movement performed by the walker.
-    y0 : float
+    y0 : `float`
         The log-likelihood value.
     """
 
@@ -228,42 +226,42 @@ def walkers(
 
     Parameters
     ----------
-    nwalkers : int
+    nwalkers : `int`
         The number of walkers to be executed.
-    x : np.ndarray
+    x : `np.ndarray`
         An $(m, n)$ dimensional array for (cols, rows).
-    y : np.ndarray
+    y : `np.ndarray`
         An $n$ dimensional array that will be compared with model's output.
-    model : function
+    model : `Callable`
         A Python function defined by the user. This function should recieve
         two arguments $(x, theta)$.
-    theta : np.ndarray
+    theta : `np.ndarray`
         The array containing the model's parameters.
-    conditions : list
+    conditions : `list`
         A list containing $2n$-conditions for the (min, max) range of the
         $n$ parameters.
-    var2 : float
+    var2 : `float`
         Determines the step size of the walker. By default it is set to `1.0`.
-    mov : int
+    mov : `int`
         Number of movements that walker will perform. By default it is set
         to `100`.
-    d : float
+    d : `float`
         Size of the Gaussian step for the walker.
-    tol : float
+    tol : `float`
         Convergence criteria for the log-likelihhod. By default it is set
         to `1e-3`.
-    mode : bool
+    mode : `bool`
         Specifies that we will be working with more than one walker. By
         default it is set to `False`.
-    figname : str
+    figname : `str`
         The name of the output file for the figure. By default it is set
         to `fig_out.png`.
 
     Returns
     -------
-    par : np.array
+    par : `np.array`
         The theta found by each of the walkers.
-    error : np.array
+    error : `np.array`
         The log-likelihood array.
     """
 

@@ -42,20 +42,20 @@ def sor_elimination(A, b, n, nmax, w):
 
     Parameters
     ----------
-    A : np.array
+    A : `np.array`
         An array containing the parameters of the $n$ equations.
-    b : np.array
+    b : `np.array`
         An array containing the equalities of the $n$ equations.
-    n : int
+    n : `int`
         Is the dimension of the system of equations.
-    nmax : int
+    nmax : `int`
         Is the maximum number of iterations.
-    w : float
+    w : `float`
         Is a parameter of the SOR method
 
     Returns
     -------
-    xi : np.array
+    xi : `np.array`
         The solution of the system of $n$ equations
     """
 
@@ -86,16 +86,16 @@ def gauss_elimination(A, pr=2):
 
     Parameters
     ----------
-    A : np.array or list
+    A : `np.array` or `list`
         An array containing the parameters of the $n$ equations
         with the equalities.
 
-    pr : int
+    pr : `int`
         significant numbers of decimals.
 
     Returns
     -------
-    X : np.array
+    X : `np.array`
         The solution of the system of $n$ equations
 
     """

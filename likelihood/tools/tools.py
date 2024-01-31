@@ -14,14 +14,14 @@ Data Science from Scratch, Second Edition, by Joel Grus (O'Reilly).Copyright 201
 """
 
 
-def minibatches(dataset: List, batch_size: int, shuffle: bool = True):
+def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -> List:
     """Generates 'batch_size'-sized minibatches from the dataset
 
     Parameters
     ----------
-    dataset : List
-    batch_size : int
-    shuffle : bool
+    dataset : `List`
+    batch_size : `int`
+    shuffle : `bool`
 
     """
 
@@ -41,13 +41,13 @@ def difference_quotient(f: Callable, x: float, h: float) -> Callable:
 
     Parameters
     ----------
-    f(x) : Callable function
-    x : float
-    h : float
+    f(x) : `Callable` function
+    x : `float`
+    h : `float`
 
     Returns
     -------
-    '(f(x + h) - f(x)) / h'
+    `(f(x + h) - f(x)) / h`
 
     """
 
@@ -55,17 +55,17 @@ def difference_quotient(f: Callable, x: float, h: float) -> Callable:
 
 
 def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float):
-    """Calculates the partial difference quotient of 'f'
+    """Calculates the partial difference quotient of `f`
 
     Parameters
     ----------
-    f(x0,...,xi-th) : Callable function
-    v : Vector or np.array
-    h : float
+    `f(x0,...,xi-th)` : `Callable` function
+    v : `Vector` or `np.array`
+    h : `float`
 
     Returns
     -------
-    the i-th partial difference quotient of f at v
+    the `i-th` partial difference quotient of `f` at `v`
 
     """
 
@@ -75,14 +75,14 @@ def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float):
     return (f(w) - f(v)) / h
 
 
-def estimate_gradient(f: Callable, v: ndarray, h: float = 0.0001):
-    """Calculates the gradient of 'f' at v
+def estimate_gradient(f: Callable, v: ndarray, h: float = 1e-4):
+    """Calculates the gradient of `f` at `v`
 
     Parameters
     ----------
-    f(x0,...,xi-th) : Callable function
-    v : Vector or np.array
-    h : float. By default it is set to 0.0001
+    `f(x0,...,xi-th)` : `Callable` function
+    v : `Vector` or `np.array`
+    h : `float`. By default it is set to `1e-4`
 
     """
     return [partial_difference_quotient(f, v, i, h) for i in range(len(v))]
@@ -106,16 +106,16 @@ def calculate_probability(x: ndarray, points: int = 1, cond: bool = True) -> nda
 
     Parameters
     ----------
-    x : np.array
+    x : `np.array`
         An array containing the data.
-    points : int
+    points : `int`
         An integer value. By default it is set to `1`.
-    cond : bool
+    cond : `bool`
         A boolean value. By default it is set to `True`.
 
     Returns
     -------
-    p : np.array
+    p : `np.array`
         An array containing the probability of the data.
 
     """
@@ -160,16 +160,16 @@ def cdf(
 
     Parameters
     ----------
-    x : np.array
+    x : `np.array`
         An array containing the data.
-    poly : int
+    poly : `int`
         An integer value. By default it is set to `9`.
-    inv : bool
+    inv : `bool`
         A boolean value. By default it is set to `False`.
 
     Returns
     -------
-    cdf_ : np.array
+    cdf_ : `np.array`
         An array containing the cumulative distribution function.
 
     """
@@ -219,15 +219,15 @@ class corr:
 
     Parameters
     ----------
-    x : np.array
+    x : `np.array`
         An array containing the data.
-    y : np.array
+    y : `np.array`
         An array containing the data.
 
     Returns
     -------
-    z : np.array
-        An array containing the correlation of x and y.
+    z : `np.array`
+        An array containing the correlation of `x` and `y`.
 
     """
 
@@ -252,12 +252,12 @@ class autocorr:
 
     Parameters
     ----------
-    x : np.array
+    x : `np.array`
         An array containing the data.
 
     Returns
     -------
-    z : np.array
+    z : `np.array`
         An array containing the autocorrelation of the data.
 
     """
@@ -282,18 +282,18 @@ def fft_denoise(dataset: ndarray, sigma: float = 0, mode: bool = True) -> Tuple[
 
     Parameters
     ----------
-    dataset : np.array
+    dataset : `np.array`
         An array containing the noised data.
-    sigma : float
-        A float between 0 and 1. By default it is set to `0`.
-    mode : bool
+    sigma : `float`
+        A `float` between `0` and `1`. By default it is set to `0`.
+    mode : `bool`
         A boolean value. By default it is set to `True`.
 
     Returns
     -------
-    dataset : np.array
+    dataset : `np.array`
         An array containing the denoised data.
-    period : float
+    period : `float`
         period of the function described by the dataset
 
     """
@@ -350,14 +350,14 @@ class LinearRegression:
 
         Parameters
         ----------
-        dataset : np.array
+        dataset : `np.array`
             An array containing the scaled data.
-        values : np.ndarray
+        values : `np.ndarray`
             A set of values returned by the linear function.
 
         Returns
         -------
-        importance : np.array
+        importance : `np.array`
             An array containing the importance of each feature.
 
         """
@@ -383,7 +383,7 @@ class LinearRegression:
 
         Parameters
         ----------
-        datapoints : np.array
+        datapoints : `np.array`
             An array containing the values of the independent variable.
 
         """
@@ -395,12 +395,12 @@ class LinearRegression:
 
         Parameters
         ----------
-        print_important_features : bool
+        print_important_features : `bool`
             determines whether or not are printed on the screen. By default it is set to `False`.
 
         Returns
         -------
-        importance : np.array
+        importance : `np.array`
             An array containing the importance of each feature.
 
 
@@ -416,14 +416,14 @@ def cal_average(y, alpha: float = 1):
 
     Parameters
     ----------
-    y : np.array
+    y : `np.array`
         An array containing the data.
-    alpha : float
-        A float between 0 and 1. By default it is set to `1`.
+    alpha : `float`
+        A `float` between `0` and `1`. By default it is set to `1`.
 
     Returns
     -------
-    average : float
+    average : `float`
         The average of the data.
 
     """
@@ -435,7 +435,7 @@ def cal_average(y, alpha: float = 1):
 
 
 class DataScaler:
-    """numpy array scaler and rescaler"""
+    """numpy array `scaler` and `rescaler`"""
 
     def __init__(self, dataset: ndarray, n: int = 1) -> None:
         """Initializes the parameters required for scaling the data"""
@@ -447,7 +447,7 @@ class DataScaler:
 
         Returns
         -------
-        data_scaled : np.array
+        data_scaled : `np.array`
             An array containing the scaled data.
         """
 
@@ -488,12 +488,12 @@ class DataScaler:
 
         Parameters
         ----------
-        dataset_ : np.array
+        dataset_ : `np.array`
             An array containing the scaled values.
 
         Returns
         -------
-        dataset_ : np.array
+        dataset_ : `np.array`
             An array containing the rescaled data.
         """
         for i in range(dataset_.shape[0]):
@@ -530,14 +530,14 @@ def mean_square_error(y_true: ndarray, y_pred: ndarray, print_error: bool = Fals
 
     Parameters
     ----------
-    y_true : np.array
+    y_true : `np.array`
         An array containing the true values.
-    y_pred : np.array
+    y_pred : `np.array`
         An array containing the predicted values.
 
     Returns
     -------
-    RMSE : float
+    RMSE : `float`
         The Root Mean Squared Error.
 
     """
