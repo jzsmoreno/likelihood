@@ -14,6 +14,8 @@ from likelihood.tools import *
 class AbstractArima(FeaturesArima):
     """A class that implements the auto-regressive arima (1, 0, 0) model"""
 
+    __slots__ = ["datapoints", "n_steps", "noise", "p", "q", "tol"]
+
     def __init__(self, datapoints: ndarray, n_steps: int = 0, noise: float = 0, tol: float = 1e-4):
         self.datapoints = datapoints
         self.n_steps = n_steps
@@ -163,6 +165,8 @@ class FourierRegression(AbstractArima):
 
     """
 
+    __slots__ = ["datapoints", "n_steps"]
+
     def __init__(self, datapoints: ndarray, n_steps: int = 0):
         self.datapoints_ = datapoints
         self.n_steps = n_steps
@@ -241,6 +245,8 @@ class Arima(AbstractArima):
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by train()
     """
+
+    __slots__ = ["datapoints", "n_steps", "noise", "p", "d", "q", "tol"]
 
     def __init__(
         self,
