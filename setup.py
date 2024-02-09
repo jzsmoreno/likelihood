@@ -1,11 +1,20 @@
+from pathlib import Path
+
 import setuptools
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+about = {}
+ROOT_DIR = Path(__file__).resolve().parent
+PACKAGE_DIR = ROOT_DIR / "likelihood"
+with open(PACKAGE_DIR / "VERSION") as f:
+    _version = f.read().strip()
+    about["__version__"] = _version
+
 setuptools.setup(
     name="likelihood",  # Replace with your own username
-    version="1.2.5",
+    version=about["__version__"],
     author="J. A. Moreno-Guerra",
     author_email="jzs.gm27@gmail.com",
     description="A package that performs the maximum likelihood algorithm.",

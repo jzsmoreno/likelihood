@@ -16,12 +16,14 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: "3.10"
+
     - name: Install pypa/build
       run: >-
         python3 -m
         pip install
         build
         --user
+
     - name: Build a binary wheel and a source tarball
       run: >-
         python -m
@@ -30,7 +32,25 @@ jobs:
         --wheel
         --outdir dist/
         .
+
     - name: Publish Python distribution to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         password: ${{ secrets.PYPI_API_TOKEN }}
+
+    - name: Get package version
+      id: get_version
+      run: |
+        version=$(python setup.py --version)
+        echo "::set-output name=version::$version"
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
+      with:
+        tag_name: ${{ steps.get_version.outputs.version }}
+        release_name: Release ${{ steps.get_version.outputs.version }}
+        draft: false
+        prerelease: false

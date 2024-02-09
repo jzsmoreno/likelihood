@@ -344,7 +344,7 @@ def get_period(dataset: ndarray) -> float:
 class LinearRegression:
     """class implementing multiple linear regression"""
 
-    __slots__ = ["importance"]
+    __slots__ = ["importance", "X", "y"]
 
     def __init__(self) -> None:
         """The class initializer"""
@@ -443,7 +443,7 @@ def cal_average(y, alpha: float = 1):
 class DataScaler:
     """numpy array `scaler` and `rescaler`"""
 
-    __slots__ = ["dataset", "_n"]
+    __slots__ = ["dataset_", "_n", "data_scaled", "values"]
 
     def __init__(self, dataset: ndarray, n: int = 1) -> None:
         """Initializes the parameters required for scaling the data"""
@@ -810,7 +810,6 @@ if __name__ == "__main__":
     assert dfe.encoding_list == dfe2.encoding_list
     assert dfe.decoding_list == dfe2.decoding_list
 
-    breakpoint()
     # Generate data
     x = np.random.rand(3, 100)
     y = 0.1 * x[0, :] + 0.4 * x[1, :] + 0.5 * x[2, :] + 0.1
