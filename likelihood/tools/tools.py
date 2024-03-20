@@ -6,7 +6,6 @@ from typing import Callable, List, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from numpy import ndarray
 from pandas.core.frame import DataFrame
 
@@ -883,6 +882,32 @@ class PerformanceMeasures:
         return count_mat
 
 
+
+def one_hot_encoding(x:ndarray | list) -> ndarray:
+    """ 
+    Calculates the one-hot encoding on a numpy array. Only accepts array of intergers as labels 
+    
+    Parameters
+    ----------
+    x : `np.array`
+        An array containing the data.
+    
+    Returns
+    -------
+    y : `ndarray`
+        The one hot encodig matrix of x.
+    """
+    if not isinstance(x, ndarray):
+        x = np.array(x) #If not numpy array then convert it 
+    
+    y = np.zeros((x.size, x.max() + 1)) #Build matrix of (size num of entries) x (max value + 1)
+    
+    y[np.arange(x.size), x] = 1 #Label with ones 
+
+    return y
+
+
+
 class FeatureSelection:
     """
     Class with method to obtain feature selection of a dataset. Returns string
@@ -943,7 +968,7 @@ class FeatureSelection:
                 quick_encoder = DataFrameEncoder(Y.to_frame())
                 encoded_Y = quick_encoder.encode(save_mode=False)
                 # Mapeamos a one-hot
-                train_y = (tf.one_hot(encoded_Y[column], num_unique_entries)).numpy()
+                train_y = one_hot_encoding(encoded_Y[column]) 
                 # PASAMOS 0 -> 0.5 y 1 -> 0.73105
                 for i in range(len(train_y)):
                     for j in range(num_unique_entries):
