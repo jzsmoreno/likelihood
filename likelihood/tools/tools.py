@@ -517,7 +517,7 @@ class LinearRegression:
         return np.array(self.importance)
 
 
-def cal_average(y, alpha: float = 1):
+def cal_average(y: ndarray, alpha: float = 1):
     """Calculates the moving average of the data
 
     Parameters
@@ -621,7 +621,7 @@ class DataScaler:
         return dataset_
 
 
-def generate_series(n, n_steps: int, incline: bool = True):
+def generate_series(n: int, n_steps: int, incline: bool = True):
     """Function that generates `n` series of length `n_steps`"""
     freq1, freq2, offsets1, offsets2 = np.random.rand(4, n, 1)
 
@@ -884,7 +884,7 @@ class PerformanceMeasures:
 
 def one_hot_encoding(x: ndarray | list) -> ndarray:
     """
-    Calculates the one-hot encoding on a numpy array. Only accepts array of intergers as labels
+    Calculates the one-hot encoding on a `numpy`/`list` array. Only accepts arrays of numbers as labels.
 
     Parameters
     ----------
@@ -894,7 +894,7 @@ def one_hot_encoding(x: ndarray | list) -> ndarray:
     Returns
     -------
     y : `ndarray`
-        The one hot encodig matrix of x.
+        The one-hot encodig matrix of `x`.
     """
     if not isinstance(x, ndarray):
         x = np.array(x)  # If not numpy array then convert it
@@ -908,24 +908,36 @@ def one_hot_encoding(x: ndarray | list) -> ndarray:
 
 class FeatureSelection:
     """
-    Class with method to obtain feature selection of a dataset. Returns string
+    Generate the data graph using a variation of the feature selection algorithm..
+
+    - The method `get_digraph` returns the network based on the feature selection method.
     """
 
-    __slots__ = ["not_features", "X"]
+    __slots__ = ["not_features", "X", "all_features_imp_graph"]
 
-    def __init__(self, not_features: list = []) -> None:
-        """The class initializer. The initial parameter is a string with variables"""
-        self.not_features = not_features
+    def __init__(self, not_features: list[str] = []) -> None:
+        """The initializer of the class. The initial parameter is a list of strings with variables to discard."""
+        self.not_features: List[str] = not_features
+        self.all_features_imp_graph: List[Tuple] = []
 
-    def feature_selection(self, dataset: DataFrame, n_importances: int) -> str:
+    def get_digraph(self, dataset: DataFrame, n_importances: int) -> str:
+        """
+        Get directed graph showing importance of features.
 
-        # Asignar y limpiar dataset
-        self.load_data(dataset)
+        Args:
+            dataset (`DataFrame`): Dataset to be used for generating the graph.
+            n_importances (`int`): Number of top importances to show in the graph.
+
+        Returns:
+            A string representation of the directed graph.
+        """
+        # Assign and clean dataset
+        self._load_data(dataset)
 
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
-        # Construimos string de causal_graph
+        # We construct string from causal_graph
         feature_string = " digraph { "
         for column in columns:
             feature_string += column + "; "
@@ -936,28 +948,28 @@ class FeatureSelection:
         numeric_df = pd.DataFrame(numeric_scaled, columns=numeric_df.columns)
         curr_dataset[numeric_df.columns] = numeric_df
 
-        # Iteramos sobre todas las columnas para obtener sus importances
-        for column in columns:
+        # Iterate over all the columns to obtain their importances.
+        for index_column, column in enumerate(columns):
 
-            # Variable a predecir
+            # Variable to predict
             Y = curr_dataset[column]
 
-            # Verificamos si es numerica o es categorica
+            # We check whether it is numerical or categorical.
             column_type = Y.dtype
             if column_type != "object":
-                # Modelo de regresion lineal
+                # Linear regression model
                 Model = LinearRegression()
 
-                # Dataset auxiliar sin la columna en cuestion
+                # Auxiliary dataset without the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
 
-                # Codificamos
+                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-                # Entrenamos
+                # We train
 
                 Model.fit(encoded_df.to_numpy().T, Y.to_numpy().T)
-                # Obtenemos importance
+                # We obtain importance
                 importance = Model.get_importances()
             else:
                 Model = LogisticRegression()
@@ -965,9 +977,10 @@ class FeatureSelection:
 
                 quick_encoder = DataFrameEncoder(Y.to_frame())
                 encoded_Y = quick_encoder.encode(save_mode=False)
-                # Mapeamos a one-hot
+
+                # Mapping to one-hot
                 train_y = one_hot_encoding(encoded_Y[column])
-                # PASAMOS 0 -> 0.5 y 1 -> 0.73105
+                # PASSING 0 -> 0.5 and 1 -> 0.73105
                 for i in range(len(train_y)):
                     for j in range(num_unique_entries):
                         if train_y[i][j] == 1.0:
@@ -975,28 +988,33 @@ class FeatureSelection:
                         else:
                             train_y[i][j] = 0.5
 
-                # Eliminamos la columna en cuestión
+                # Delete the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
 
-                # Codificamos
+                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
 
-                # Entrenamos
+                # We train
                 Model.fit(encoded_df.to_numpy().T, train_y)
 
-                # Obtenemos importancias
+                # We obtain importance
                 importance = Model.get_importances()
 
-            # Obtenemos las n más importantes
+            # We obtain the $n$ most important ones
             top_n_indexes = sorted(
                 range(len(importance)), key=lambda i: importance[i], reverse=True
             )[:n_importances]
 
-            # Construimos el string de la columna en cuestión
+            # We build the string for the column in question
             names_cols = list(X_aux.columns)
-
-            # Lo formateamos
+            # We store the indices, values and column names in a list of tuples.
+            features_imp_node = [
+                (names_cols[i], importance[top_n_indexes[i]]) for i in range(n_importances)
+            ]
+            # Add to general list
+            self.all_features_imp_graph.append((column, features_imp_node))
+            # We format it
             for i in top_n_indexes:
                 feature_string += names_cols[i] + " -> "
 
@@ -1004,12 +1022,12 @@ class FeatureSelection:
 
         return feature_string + "} "
 
-    def load_data(self, dataset: DataFrame):
-        # Asignamos datos y limpiamos dataset de columnas no requeridas
+    def _load_data(self, dataset: DataFrame):
+        # Assign data and clean dataset of unneeded columns
 
         if len(self.not_features) > 0:
-            # Quitamos columnas innecesarias
-            self.X = dataset.drop(self.not_features, axis=1)
+            # We remove unnecessary columns
+            self.X = dataset.drop(columns=self.not_features)
 
         else:
             self.X = dataset

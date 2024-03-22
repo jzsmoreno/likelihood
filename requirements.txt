@@ -10,3 +10,4 @@ isort==5.12.0
 numpy<2.0.0
 matplotlib
 corner
+pyvis
