@@ -1010,7 +1010,8 @@ class FeatureSelection:
             names_cols = list(X_aux.columns)
             # We store the indices, values and column names in a list of tuples.
             features_imp_node = [
-                (names_cols[i], importance[top_n_indexes[i]]) for i in range(n_importances)
+                (names_cols[top_n_indexes[i]], importance[top_n_indexes[i]])
+                for i in range(n_importances)
             ]
             # Add to general list
             self.all_features_imp_graph.append((column, features_imp_node))

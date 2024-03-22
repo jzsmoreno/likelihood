@@ -27,6 +27,7 @@ setuptools.setup(
         "numpy<2.0.0",
         "matplotlib",
         "corner",
+        "pyvis",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
