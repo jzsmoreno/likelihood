@@ -20,22 +20,22 @@ class SimulationEngine(FeatureSelection):
 
     def predict(self, df: DataFrame, column: str, n: int = None) -> ndarray | list:
 
-        # We clean dataset
+        # We clean the data set
         df = self._clean_data(df)
 
-        # We assing the entries of the dictionary corresponding to the column
+        # Let us assign the dictionary entries corresponding to the column
         w, quick_encoder, names_cols, dfe, numeric_dict = self.w_dict[column]
 
         try:
             df = df[names_cols].copy()
-            # Rescale the dataframe
+            # Change the scale of the dataframe
             numeric_df = df.select_dtypes(include="number")
             scaler = DataScaler(numeric_df.copy().to_numpy().T, n=None)
             numeric_scaled = scaler.rescale()
             numeric_df = pd.DataFrame(numeric_scaled.T, columns=numeric_df.columns)
             df[numeric_df.columns] = numeric_df
 
-            # Encode the datadrame
+            # Encoding the datadrame
             for num, colname in enumerate(dfe._encode_columns):
                 if df[colname].dtype == "object":
                     encode_dict = dfe.encoding_list[num]
@@ -44,15 +44,15 @@ class SimulationEngine(FeatureSelection):
                     )
 
         except:
-            print("The dataframe provided doesnt have the same columns as in fit method")
+            print("The dataframe provided does not have the same columns as in the fit method.")
 
-        # Assing value to n if n is None
+        # Assign value to n if n is None
         n = n if n != None else len(df)
 
-        # Raise error
-        assert n > 0 and n <= len(df), '"n" must be interger or "<= len(df)"'
+        # Generation of assertion
+        assert n > 0 and n <= len(df), '"n" must be interger or "<= len(df)".'
 
-        # Sample of dataframe
+        # Sample dataframe
         df_aux = df.sample(n)
 
         # PREDICTION
@@ -65,7 +65,7 @@ class SimulationEngine(FeatureSelection):
             y = one_hot.decode(y)
             encoding_dic = quick_encoder.decoding_list[0]
             y = [encoding_dic[item] for item in y]
-        # Numeric Column
+        # Numeric column
         else:
             # scale output
             i = numeric_dict[column]

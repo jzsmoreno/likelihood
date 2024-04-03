@@ -1061,14 +1061,14 @@ class FeatureSelection:
 
 
 def check_nan_inf(df: DataFrame) -> DataFrame:
-    """Check for NaN and Inf values in the dataframe. If any are found, raise an error."""
+    """Check for `NaN` and `Inf` values in the `DataFrame`. If any are found, raise an error."""
     nan_values = df.isnull().values.any()
     count = np.isinf(df.select_dtypes(include="number")).values.sum()
     print("There are null values : ", nan_values)
     print("It contains " + str(count) + " infinite values")
     if nan_values:
         warning_type = "UserWarning"
-        msg = "Its possible that some rows were dropped because of existing nan values"
+        msg = "Some rows may have been deleted due to the existence of nan values."
         print(f"{warning_type}: {msg}")
         print("Missing values correctly removed : ", "{:,}".format(df.isnull().values.sum()))
         df = df.dropna()
