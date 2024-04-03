@@ -364,7 +364,7 @@ def sigmoide(x: float) -> float:
 class LogisticRegression:
     """class implementing multiple logistic regression"""
 
-    __slots__ = ["importance", "X", "y"]
+    __slots__ = ["importance", "X", "y", "w"]
 
     def __init__(self) -> None:
         """The class initializer"""
@@ -394,14 +394,14 @@ class LogisticRegression:
         U, S, VT = np.linalg.svd(self.X, full_matrices=False)
 
         inverse_sig = np.vectorize(sigmoide_inv)
-        w = (VT.T @ np.linalg.inv(np.diag(S)) @ U.T).T @ inverse_sig(self.y)
+        self.w = (VT.T @ np.linalg.inv(np.diag(S)) @ U.T).T @ inverse_sig(self.y)
 
         if self.y.shape[1] > 1:
-            for row in w:
+            for row in self.w:
                 self.importance.append(np.around(np.max(row), decimals=8))
         else:
             for i in range(self.X.shape[0]):
-                a = np.around(w[i], decimals=8)
+                a = np.around(self.w[i], decimals=8)
                 self.importance.append(a)
 
     def predict(self, datapoints: ndarray) -> ndarray:
@@ -443,7 +443,7 @@ class LogisticRegression:
 class LinearRegression:
     """class implementing multiple linear regression"""
 
-    __slots__ = ["importance", "X", "y"]
+    __slots__ = ["importance", "X", "y", "w"]
 
     def __init__(self) -> None:
         """The class initializer"""
@@ -471,10 +471,10 @@ class LinearRegression:
         self.y = values
 
         U, S, VT = np.linalg.svd(self.X, full_matrices=False)
-        w = (VT.T @ np.linalg.inv(np.diag(S)) @ U.T).T @ self.y
+        self.w = (VT.T @ np.linalg.inv(np.diag(S)) @ U.T).T @ self.y
 
         for i in range(self.X.shape[0]):
-            a = np.around(w[i], decimals=8)
+            a = np.around(self.w[i], decimals=8)
             self.importance.append(a)
 
         if verbose:
@@ -882,28 +882,35 @@ class PerformanceMeasures:
         return count_mat
 
 
-def one_hot_encoding(x: ndarray | list) -> ndarray:
-    """
-    Calculates the one-hot encoding on a `numpy`/`list` array. Only accepts arrays of numbers as labels.
+class OneHotEncoder:
 
-    Parameters
-    ----------
-    x : `np.array`
-        An array containing the data.
+    __slots__ = ["x"]
 
-    Returns
-    -------
-    y : `ndarray`
-        The one-hot encodig matrix of `x`.
-    """
-    if not isinstance(x, ndarray):
-        x = np.array(x)  # If not numpy array then convert it
+    def __init__(self) -> None:
+        pass
 
-    y = np.zeros((x.size, x.max() + 1))  # Build matrix of (size num of entries) x (max value + 1)
+    def encode(self, x: ndarray | list):
+        self.x = x
 
-    y[np.arange(x.size), x] = 1  # Label with ones
+        if not isinstance(self.x, ndarray):
+            self.x = np.array(self.x)  # If not numpy array then convert it
 
-    return y
+        y = np.zeros(
+            (self.x.size, self.x.max() + 1)
+        )  # Build matrix of (size num of entries) x (max value + 1)
+
+        y[np.arange(self.x.size), self.x] = 1  # Label with ones
+
+        return y
+
+    def decode(self, x: ndarray | list) -> ndarray:
+        if not isinstance(x, ndarray):
+            x = np.array(x)  # If not numpy array then convert it
+
+        # Regresamos los valores max de cada renglon
+        y = np.argmax(x, axis=1)
+
+        return y
 
 
 class FeatureSelection:
@@ -913,12 +920,13 @@ class FeatureSelection:
     - The method `get_digraph` returns the network based on the feature selection method.
     """
 
-    __slots__ = ["not_features", "X", "all_features_imp_graph"]
+    __slots__ = ["not_features", "X", "all_features_imp_graph", "w_dict", "scaler"]
 
     def __init__(self, not_features: list[str] = []) -> None:
         """The initializer of the class. The initial parameter is a list of strings with variables to discard."""
         self.not_features: List[str] = not_features
         self.all_features_imp_graph: List[Tuple] = []
+        self.w_dict = dict()
 
     def get_digraph(self, dataset: DataFrame, n_importances: int) -> str:
         """
@@ -943,8 +951,8 @@ class FeatureSelection:
             feature_string += column + "; "
 
         numeric_df = curr_dataset.select_dtypes(include="number")
-        scaler = DataScaler(numeric_df.copy().to_numpy(), n=None)
-        numeric_scaled = scaler.rescale()
+        self.scaler = DataScaler(numeric_df.copy().to_numpy(), n=None)
+        numeric_scaled = self.scaler.rescale()
         numeric_df = pd.DataFrame(numeric_scaled, columns=numeric_df.columns)
         curr_dataset[numeric_df.columns] = numeric_df
 
@@ -971,6 +979,7 @@ class FeatureSelection:
                 Model.fit(encoded_df.to_numpy().T, Y.to_numpy().T)
                 # We obtain importance
                 importance = Model.get_importances()
+                w = Model.w
             else:
                 Model = LogisticRegression()
                 num_unique_entries = curr_dataset[column].nunique()
@@ -979,7 +988,8 @@ class FeatureSelection:
                 encoded_Y = quick_encoder.encode(save_mode=False)
 
                 # Mapping to one-hot
-                train_y = one_hot_encoding(encoded_Y[column])
+                one_hot = OneHotEncoder()
+                train_y = one_hot.encode(encoded_Y[column])
                 # PASSING 0 -> 0.5 and 1 -> 0.73105
                 for i in range(len(train_y)):
                     for j in range(num_unique_entries):
@@ -1000,6 +1010,7 @@ class FeatureSelection:
 
                 # We obtain importance
                 importance = Model.get_importances()
+                w = Model.w
 
             # We obtain the $n$ most important ones
             top_n_indexes = sorted(
@@ -1013,6 +1024,12 @@ class FeatureSelection:
                 (names_cols[top_n_indexes[i]], importance[top_n_indexes[i]])
                 for i in range(n_importances)
             ]
+            # We store w's for predictions
+
+            if column_type != "object":
+                self.w_dict[column] = (w, None, names_cols, dfe)
+            else:
+                self.w_dict[column] = (w, quick_encoder, names_cols, dfe)
             # Add to general list
             self.all_features_imp_graph.append((column, features_imp_node))
             # We format it
