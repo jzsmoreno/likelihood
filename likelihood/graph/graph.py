@@ -8,13 +8,13 @@ from likelihood.tools import FeatureSelection
 class DynamicGraph(FeatureSelection):
     """A class to represent a dynamic graph"""
 
-    def __init__(self, df: DataFrame, n_importances: int):
+    def __init__(self, df: DataFrame, n_importances: int, **kwargs):
         self.G = Network(
             notebook=True, cdn_resources="remote", directed=True
         )  # enable interactive visualization in Jupyter Notebooks
         self.df = df
         self.n_importances = n_importances
-        super().__init__()
+        super().__init__(**kwargs)
 
     def fit(self, **kwargs) -> None:
         """Fit the model according to the given data and parameters."""
