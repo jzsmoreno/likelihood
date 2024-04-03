@@ -951,10 +951,13 @@ class FeatureSelection:
             feature_string += column + "; "
 
         numeric_df = curr_dataset.select_dtypes(include="number")
-        self.scaler = DataScaler(numeric_df.copy().to_numpy(), n=None)
+        self.scaler = DataScaler(numeric_df.copy().to_numpy().T, n=None)
         numeric_scaled = self.scaler.rescale()
-        numeric_df = pd.DataFrame(numeric_scaled, columns=numeric_df.columns)
+        numeric_df = pd.DataFrame(numeric_scaled.T, columns=numeric_df.columns)
         curr_dataset[numeric_df.columns] = numeric_df
+
+        # We construct dictionary to save index for scaling
+        numeric_dict = dict(zip(list(numeric_df.columns), range(len(list(numeric_df.columns)))))
 
         # Iterate over all the columns to obtain their importances.
         for index_column, column in enumerate(columns):
@@ -1027,9 +1030,9 @@ class FeatureSelection:
             # We store w's for predictions
 
             if column_type != "object":
-                self.w_dict[column] = (w, None, names_cols, dfe)
+                self.w_dict[column] = (w, None, names_cols, dfe, numeric_dict)
             else:
-                self.w_dict[column] = (w, quick_encoder, names_cols, dfe)
+                self.w_dict[column] = (w, quick_encoder, names_cols, dfe, numeric_dict)
             # Add to general list
             self.all_features_imp_graph.append((column, features_imp_node))
             # We format it
@@ -1055,6 +1058,22 @@ class FeatureSelection:
         self.X.dropna(inplace=True)
         self.X = self.X.reset_index()
         self.X = self.X.drop(columns=["index"])
+
+
+def check_nan_inf(df: DataFrame) -> DataFrame:
+    """Check for NaN and Inf values in the dataframe. If any are found, raise an error."""
+    nan_values = df.isnull().values.any()
+    count = np.isinf(df.select_dtypes(include="number")).values.sum()
+    print("There are null values : ", nan_values)
+    print("It contains " + str(count) + " infinite values")
+    if nan_values:
+        warning_type = "UserWarning"
+        msg = "Its possible that some rows were dropped because of existing nan values"
+        print(f"{warning_type}: {msg}")
+        print("Missing values correctly removed : ", "{:,}".format(df.isnull().values.sum()))
+        df = df.dropna()
+
+    return df
 
 
 # -------------------------------------------------------------------------
