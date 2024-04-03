@@ -11,3 +11,4 @@ numpy<2.0.0
 matplotlib
 corner
 pyvis
+pandas 
