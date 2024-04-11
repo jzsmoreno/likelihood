@@ -1,3 +1,4 @@
+import networkx as nx
 from IPython.display import HTML, display
 from pandas.core.frame import DataFrame
 from pyvis.network import Network
@@ -48,3 +49,21 @@ class DynamicGraph(FeatureSelection):
 
         html_file_content = open(name, "r").read()
         display(HTML(html_file_content))
+
+    def pyvis_to_networkx(self):
+        nx_graph = nx.Graph()
+
+        # Añadimos nodos
+        for node_dic in self.G.nodes:
+            id = node_dic["id"]
+            del node_dic["id"]
+            nx_graph.add_nodes_from([(id, node_dic)])
+
+        # Añadimos aristas
+        for edge in self.G.edges:
+            source, target = edge["from"], edge["to"]
+            del edge["from"]
+            del edge["to"]
+            nx_graph.add_edges_from([(source, target, edge)])
+
+        return nx_graph
