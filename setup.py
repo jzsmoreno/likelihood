@@ -2,6 +2,10 @@ from pathlib import Path
 
 import setuptools
 
+# Parse the requirements.txt file
+with open("requirements.txt", "r") as f:
+    install_requires = f.read().splitlines()
+
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
@@ -23,12 +27,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/jzsmoreno/likelihood/",
     packages=setuptools.find_packages(),
-    install_requires=[
-        "numpy<2.0.0",
-        "matplotlib",
-        "corner",
-        "pyvis",
-    ],
+    install_requires=install_requires,
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

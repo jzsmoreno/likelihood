@@ -1,3 +1,5 @@
+from typing import List
+
 import networkx as nx
 from IPython.display import HTML, display
 from pandas.core.frame import DataFrame
@@ -16,6 +18,7 @@ class DynamicGraph(FeatureSelection):
         self.df = df
         self.n_importances = n_importances
         super().__init__(**kwargs)
+        self.labels: List[str] = []
 
     def fit(self, **kwargs) -> None:
         """Fit the model according to the given data and parameters."""
@@ -37,6 +40,7 @@ class DynamicGraph(FeatureSelection):
     def _add_nodes(self) -> None:
         for i in range(len(self.all_features_imp_graph)):
             node = self.all_features_imp_graph[i][0]
+            self.labels.append(node)
             self.G.add_node(n_id=i, label=node)
 
     def draw(self, name="graph.html", **kwargs) -> None:
@@ -53,13 +57,13 @@ class DynamicGraph(FeatureSelection):
     def pyvis_to_networkx(self):
         nx_graph = nx.Graph()
 
-        # Añadimos nodos
+        # Adding nodes
         for node_dic in self.G.nodes:
             id = node_dic["id"]
             del node_dic["id"]
             nx_graph.add_nodes_from([(id, node_dic)])
 
-        # Añadimos aristas
+        # Adding edges
         for edge in self.G.edges:
             source, target = edge["from"], edge["to"]
             del edge["from"]

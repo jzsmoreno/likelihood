@@ -1,14 +1,13 @@
-# Code quality
 black[jupyter]==24.1.1
-flake8==6.0.0
-mypy==1.4.1
-pydocstyle==6.3.0
 mypy-extensions==1.0.0
 types-openpyxl==3.1.0.15
+pydocstyle==6.3.0
+flake8==6.0.0
 isort==5.12.0
-
+mypy==1.4.1
 numpy<2.0.0
 matplotlib
+networkx
+pandas 
 corner
 pyvis
-pandas 
