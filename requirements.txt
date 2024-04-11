@@ -8,6 +8,7 @@ mypy==1.4.1
 numpy<2.0.0
 matplotlib
 networkx
+pyyaml
 pandas 
 corner
 pyvis

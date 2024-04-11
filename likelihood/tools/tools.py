@@ -1,11 +1,12 @@
 import math
 import os
 import pickle
-from typing import Callable, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import yaml
 from numpy import ndarray
 from pandas.core.frame import DataFrame
 
@@ -91,6 +92,53 @@ def estimate_gradient(f: Callable, v: ndarray, h: float = 1e-4):
 
 
 # -------------------------------------------------------------------------
+
+
+def generate_feature_yaml(
+    df: DataFrame, ignore_features: List[str] = None, yaml_string: bool = False
+) -> Dict | str:
+    """
+    Generate a YAML string containing information about ordinal, numeric, and categorical features
+    based on the given DataFrame.
+
+    Args:
+        df (`pd.DataFrame`): The DataFrame containing the data.
+        ignore_features (List[`str`]): A list of features to ignore.
+        yaml_string (`bool`): If `True`, return the result as a YAML formatted string. Otherwise, return it as a dictionary. Default is `False`.
+
+    Returns:
+        `Dict` | `str`: A dictionary with four keys ('ordinal_features', 'numeric_features', 'categorical_features', 'ignore_features')
+        mapping to lists of feature names. Or a YAML formatted string if `yaml_string` is `True`.
+    """
+    feature_info = {
+        "ordinal_features": [],
+        "numeric_features": [],
+        "categorical_features": [],
+        "ignore_features": [],
+    }
+
+    for col in df.columns:
+        if ignore_features and col in ignore_features:
+            continue
+
+        if pd.api.types.is_numeric_dtype(df[col]):
+            feature_info["numeric_features"].append(col)
+        elif pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_categorical_dtype(df[col]):
+            feature_info["categorical_features"].append(col)
+        elif pd.api.types.is_integer_dtype(df[col]):
+            feature_info["ordinal_features"].append(col)
+        elif pd.api.types.is_float_dtype(df[col]):
+            feature_info["ordinal_features"].append(col)
+        elif pd.api.types.is_bool_dtype(df[col]):
+            feature_info["ordinal_features"].append(col)
+        else:
+            print(f"Unknown type for feature {col}")
+        feature_info["ignore_features"] = ignore_features
+
+    if yaml_string:
+        return yaml.dump(feature_info, default_flow_style=False)
+    else:
+        return feature_info
 
 
 # a function that calculates the percentage of missing values per column is defined
@@ -883,6 +931,10 @@ class PerformanceMeasures:
 
 
 class OneHotEncoder:
+    """
+    Class used to encode categorical variables.
+    It receives an array of integers and returns a binary array using the one-hot encoding method.
+    """
 
     __slots__ = ["x"]
 
