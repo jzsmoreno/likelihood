@@ -58,14 +58,17 @@ class DynamicGraph(FeatureSelection):
         nx_graph = nx.Graph()
 
         # Adding nodes
+        nodes = [d["id"] for d in self.G.nodes]
         for node_dic in self.G.nodes:
-            id = node_dic["id"]
-            del node_dic["id"]
+            id = node_dic["label"]
+            del node_dic["label"]
             nx_graph.add_nodes_from([(id, node_dic)])
+        self.node_edge_dict = dict(zip(nodes, self.labels))
+        del nodes
 
         # Adding edges
         for edge in self.G.edges:
-            source, target = edge["from"], edge["to"]
+            source, target = self.node_edge_dict[edge["from"]], self.node_edge_dict[edge["to"]]
             del edge["from"]
             del edge["to"]
             nx_graph.add_edges_from([(source, target, edge)])
