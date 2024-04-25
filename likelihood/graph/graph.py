@@ -24,7 +24,7 @@ class DynamicGraph(FeatureSelection):
         """Fit the model according to the given data and parameters."""
         self.get_digraph(self.df, self.n_importances)
         # create a dictionary with the indexes and names of the dataframe
-        self.get_index = dict(zip(self.df.columns, range(len(self.df.columns))))
+        self.get_index = dict(zip(self.X.columns, range(len(self.X.columns))))
         self._make_network()
 
     def _make_network(self) -> None:
@@ -35,7 +35,7 @@ class DynamicGraph(FeatureSelection):
             edges = self.all_features_imp_graph[i][1]
 
             for label, weight in edges:
-                self.G.add_edge(i, self.get_index[label], weight=weight)
+                self.G.add_edge(self.get_index[node], self.get_index[label], weight=weight)
 
     def _add_nodes(self) -> None:
         for i in range(len(self.all_features_imp_graph)):
