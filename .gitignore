@@ -127,7 +127,7 @@ dmypy.json
 # Ignore test_<files>.py for testing
 *test*.py
 *.sql
-*.html
+/*.html
 
 # Ignore <files>.txt for testing
 /examples/*.txt
