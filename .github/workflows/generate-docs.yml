@@ -1,0 +1,60 @@
+name: Auto-documentation Generation
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  generate-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+
+    - name: Install pdoc3
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install pdoc3
+
+    - name: Remove existing documentation files
+      run: rm -rf docs/*
+
+    - name: Retrieve package name
+      id: get_package_name
+      run: |
+       name=$(python setup.py --name)
+       echo "::set-output name=name::$name"
+
+    - name: Generate documentation
+      run: |
+        pdoc --html . --output-dir docs
+
+    - name: Copy documentation files
+      run: |
+        cp -r docs/${{ steps.get_package_name.outputs.name }}/* docs/
+        rm -rf docs/${{ steps.get_package_name.outputs.name }}
+
+    - name: Commit documentation changes
+      env:
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        GITHUB_ACTOR: ${{ github.actor }}
+        GITHUB_EMAIL: action@github.com
+      run: |
+        git config user.email "${GITHUB_EMAIL}"
+        git config user.name "${GITHUB_ACTOR}"
+        if git status --porcelain | grep .; then
+          echo "Changes detected, proceeding with workflow steps..."
+          git add docs/
+          git commit -m "Auto-generated documentation"
+          git push origin main
+        else
+          echo "No changes detected, skipping workflow steps."
+        fi

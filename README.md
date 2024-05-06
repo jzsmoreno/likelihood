@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/github/license/jzsmoreno/likelihood?style=for-the-badge)
 
 <!-- Project description -->
-This repository contains the code to build the [likelihood package](./likelihood/) which contains tools for typical tasks in [`MLOps`](https://en.wikipedia.org/wiki/MLOps) and training of custom models.
+This repository contains the code to build the [likelihood package](./likelihood/) which contains tools for typical tasks in [`MLOps`](https://en.wikipedia.org/wiki/MLOps) and training of custom models, for more information review our [`documentation`](https://jzsmoreno.github.io/likelihood/).
 
 ## Prerequisities
 
