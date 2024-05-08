@@ -3,7 +3,9 @@ name: Auto-documentation Generation
 on:
   push:
     branches:
-      - main
+      - 'main'
+    paths:
+      - 'likelihood/**'
 
 jobs:
   generate-docs:
@@ -24,6 +26,17 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         pip install pdoc3
 
+    - name: Set up Git
+      env:
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        GITHUB_NAME: ${{ secrets.NAME }}
+        GITHUB_EMAIL: ${{ secrets.EMAIL }}
+      run: |
+        git config user.email "${GITHUB_EMAIL}"
+        git config user.name "${GITHUB_NAME}"
+        git config credential.helper "store --file=.git/credentials"
+        echo "https://${{ secrets.TOKEN }}@github.com/${{ github.repository }}" > .git/credentials
+
     - name: Remove existing documentation files
       run: rm -rf docs/*
 
@@ -43,13 +56,7 @@ jobs:
         rm -rf docs/${{ steps.get_package_name.outputs.name }}
 
     - name: Commit documentation changes
-      env:
-        GITHUB_TOKEN: ${{ secrets.TOKEN }}
-        GITHUB_ACTOR: ${{ github.actor }}
-        GITHUB_EMAIL: action@github.com
       run: |
-        git config user.email "${GITHUB_EMAIL}"
-        git config user.name "${GITHUB_ACTOR}"
         if git status --porcelain | grep .; then
           echo "Changes detected, proceeding with workflow steps..."
           git add docs/
