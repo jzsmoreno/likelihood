@@ -142,7 +142,7 @@ def sor_elimination(
 
         difference = np.max(np.abs(xi - xin))
         print(xi)
-        print(f"solution error : {error}")
+        print(f"solution error : {difference}")
         if difference <= error:
             print(f"iterations : {k}")
             return xi
@@ -208,18 +208,27 @@ def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
         print("the solution is:")
 
         for i in range(n):
-            print(f"X{i} = {round(X[i], pr)}")
+            print(f"\tX{i} = {round(X[i], pr)}")
 
         return X
 
 
 # Example usage:
 if __name__ == "__main__":
-    # Define the coefficient matrix A and the number of variables x
+    print("Using the SOR relaxation method : ")
+    # Define the coefficient matrix A and the number of variables b
     A = np.array([[3, 2, 7], [4, 6, 5], [1, 8, 9]])
+    Ag = A.copy()
     # Generate a random b
-    b = np.random.randint(-100, 100, size=len(A[:, 0]))
+    b = np.random.randint(-10, 10, size=len(A[:, 0]))
+    print("b : ", b)
     # Solve Ax=b
     x = solve(A, b)
-    x_hat = sor_elimination(A, b, 3, 100, 0.1)
+    x_hat_sor = sor_elimination(A, b, 3, 100, 0.1)
+    # assert np.allclose(x, x_hat_sor), f"Expected:\n{x}\ngot\n{x_hat_sor}"
+
+    print("Using Gaussian elimination : ")
+    Ag = np.insert(Ag, len(Ag), b, axis=1)
+    print(Ag)
+    x_hat_gaus = gauss_elimination(Ag)
     breakpoint()
