@@ -1,13 +1,73 @@
-import numpy as np
+from numpy import arange, array, ndarray, random
+
+# -------------------------------------------------------------------------
+"""
+@article{Chatterjee2019ANC,
+  title={A New Coefficient of Correlation},
+  author={Sourav Chatterjee},
+  journal={Journal of the American Statistical Association},
+  year={2019},
+  volume={116},
+  pages={2009 - 2022},
+  url={https://api.semanticscholar.org/CorpusID:202719281}
+} 
+"""
 
 
-def subs(a, b):
+def xicor(X: ndarray, Y: ndarray, ties: bool = True) -> float:
+    """Calculate a new coefficient of correlation between two variables.
+
+    The new coefficient of correlation is a generalization of Pearson's correlation.
+
+    Parameters
+    ----------
+    X : `np.ndarray`
+        The first variable to be correlated. Must have at least one dimension.
+    Y : `np.ndarray`
+        The second variable to be correlated. Must have at least one dimension.
+
+    Returns
+    -------
+    xi : `float`
+        The estimated value of the new coefficient of correlation.
+    """
+    random.seed(42)
+    n = len(X)
+    order = array([i[0] for i in sorted(enumerate(X), key=lambda x: x[1])])
+    if ties:
+        l = array([sum(y >= Y[order]) for y in Y[order]])
+        r = l.copy()
+        for j in range(n):
+            if sum([r[j] == r[i] for i in range(n)]) > 1:
+                tie_index = array([r[j] == r[i] for i in range(n)])
+                r[tie_index] = random.choice(
+                    r[tie_index] - arange(0, sum([r[j] == r[i] for i in range(n)])),
+                    sum(tie_index),
+                    replace=False,
+                )
+        return 1 - n * sum(abs(r[1:] - r[: n - 1])) / (2 * sum(l * (n - l)))
+    else:
+        r = array([sum(y >= Y[order]) for y in Y[order]])
+        return 1 - 3 * sum(abs(r[1:] - r[: n - 1])) / (n**2 - 1)
+
+
+# -------------------------------------------------------------------------
+
+
+def subs(a: ndarray, b: ndarray) -> ndarray:
     """Function that subtracts lists element by element.
 
     Parameters
     ----------
-    a
-    b
+    a : `np.array`
+        1D Numpy Array.
+    b : `np.array`
+        1D Numpy Array.
+
+    Returns
+    -------
+    a : `np.array`
+        1D Numpy Array with elements from input arrays subtracted.
     """
 
     for i, val in enumerate(a):
@@ -16,14 +76,18 @@ def subs(a, b):
     return a
 
 
-def ecprint(A):
+def ecprint(A: ndarray) -> None:
     """Function that prints the augmented matrix.
 
     Parameters
     ----------
-    A : np.array
+    A : `np.array`
         The augmented matrix.
 
+    Returns
+    -------
+    `None`
+        Prints the matrix to console.
     """
 
     n = len(A)
@@ -37,7 +101,7 @@ def ecprint(A):
     print()
 
 
-def sor_elimination(A, b, n, nmax, w):
+def sor_elimination(A: ndarray, b: ndarray, n: int, nmax: int, w: float) -> ndarray:
     """Computes the successive over-relaxation algorithm.
 
     Parameters
@@ -81,7 +145,7 @@ def sor_elimination(A, b, n, nmax, w):
     return "number of iterations exceeded"
 
 
-def gauss_elimination(A, pr=2):
+def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
     """Computes the Gauss elimination algorithm.
 
     Parameters

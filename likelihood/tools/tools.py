@@ -23,9 +23,16 @@ def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -> List:
     Parameters
     ----------
     dataset : `List`
+        The data to be divided into mini-batch.
     batch_size : `int`
+        Specifies the size of each mini-batch.
     shuffle : `bool`
+        If set `True`, the data will be shuffled before dividing it into mini-batches.
 
+    Returns
+    -------
+    `List[List]`
+        A list of lists containing the mini-batches. Each sublist is a separate mini-batch with length `batch_size`.
     """
 
     # start indexes 0, batch_size, 2 * batch_size, ...
@@ -40,35 +47,43 @@ def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -> List:
 
 
 def difference_quotient(f: Callable, x: float, h: float) -> Callable:
-    """Calculates the difference quotient of 'f' evaluated at x and x + h
+    """Calculates the difference quotient of `f` evaluated at `x` and `x + h`
 
     Parameters
     ----------
-    f(x) : `Callable` function
+    `f(x)` : `Callable`
+        function.
     x : `float`
+        Independent term.
     h : `float`
+        Step size.
 
     Returns
     -------
-    `(f(x + h) - f(x)) / h`
+    `(f(x + h) - f(x)) / h` : `float`
+        Difference quotient of `f` evaluated at `x`.
 
     """
 
     return (f(x + h) - f(x)) / h
 
 
-def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float):
+def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float) -> ndarray:
     """Calculates the partial difference quotient of `f`
 
     Parameters
     ----------
     `f(x0,...,xi-th)` : `Callable` function
-    v : `Vector` or `np.array`
+        Function to differentiate.
+    v : `Vector` | `np.array`
+        1D array representing vector `v=(x0,...,xi)`.
     h : `float`
+        Step size.
 
     Returns
     -------
-    the `i-th` partial difference quotient of `f` at `v`
+    `(f(w) - f(v)) / h` : `np.array`
+        the `i-th` partial difference quotient of `f` at `v`
 
     """
 
@@ -78,15 +93,22 @@ def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float):
     return (f(w) - f(v)) / h
 
 
-def estimate_gradient(f: Callable, v: ndarray, h: float = 1e-4):
+def estimate_gradient(f: Callable, v: ndarray, h: float = 1e-4) -> List[ndarray]:
     """Calculates the gradient of `f` at `v`
 
     Parameters
     ----------
     `f(x0,...,xi-th)` : `Callable` function
-    v : `Vector` or `np.array`
+        Function to differentiate.
+    v : `Vector` | `np.array`
+        1D array representing vector `v=(x0,...,xi)`.
     h : `float`. By default it is set to `1e-4`
+        The step size used to approximate the derivative.
 
+    Returns
+    -------
+    grad_f : `List[np.array]`
+        A list containing the estimated gradients of each component of `f` evaluated at `v`.
     """
     return [partial_difference_quotient(f, v, i, h) for i in range(len(v))]
 
@@ -101,13 +123,19 @@ def generate_feature_yaml(
     Generate a YAML string containing information about ordinal, numeric, and categorical features
     based on the given DataFrame.
 
-    Args:
-        df (`pd.DataFrame`): The DataFrame containing the data.
-        ignore_features (List[`str`]): A list of features to ignore.
-        yaml_string (`bool`): If `True`, return the result as a YAML formatted string. Otherwise, return it as a dictionary. Default is `False`.
+    Parameters
+    ----------
+    df : `pd.DataFrame`
+        The DataFrame containing the data.
+    ignore_features : `List[`str`]`
+        A list of features to ignore.
+    yaml_string : `bool`
+        If `True`, return the result as a YAML formatted string. Otherwise, return it as a dictionary. Default is `False`.
 
-    Returns:
-        `Dict` | `str`: A dictionary with four keys ('ordinal_features', 'numeric_features', 'categorical_features', 'ignore_features')
+    Returns
+    -------
+    feature_info : `Dict` | `str`
+        A dictionary with four keys ('ordinal_features', 'numeric_features', 'categorical_features', 'ignore_features')
         mapping to lists of feature names. Or a YAML formatted string if `yaml_string` is `True`.
     """
     feature_info = {
@@ -143,6 +171,19 @@ def generate_feature_yaml(
 
 # a function that calculates the percentage of missing values per column is defined
 def cal_missing_values(df: DataFrame) -> None:
+    """Calculate the percentage of missing (`NaN`/`NaT`) values per column in a dataframe.
+
+    Parameters
+    ----------
+    df : `DataFrame`
+        The input dataframe.
+
+    Returns
+    -------
+    `None`
+        Prints out a table with columns as index and percentages of missing values as data.
+    """
+
     col = df.columns
     print("Total size : ", "{:,}".format(len(df)))
     for i in col:
@@ -152,7 +193,7 @@ def cal_missing_values(df: DataFrame) -> None:
 
 
 def calculate_probability(x: ndarray, points: int = 1, cond: bool = True) -> ndarray:
-    """Calculates the probability of the data
+    """Calculates the probability of the data.
 
     Parameters
     ----------
@@ -206,7 +247,7 @@ def calculate_probability(x: ndarray, points: int = 1, cond: bool = True) -> nda
 def cdf(
     x: ndarray, poly: int = 9, inv: bool = False, plot: bool = False, savename: str = None
 ) -> ndarray:
-    """Calculates the cumulative distribution function of the data
+    """Calculates the cumulative distribution function of the data.
 
     Parameters
     ----------
@@ -265,7 +306,7 @@ def cdf(
 
 
 class corr:
-    """Calculates the correlation of the data
+    """Calculates the correlation of the data.
 
     Parameters
     ----------
@@ -300,7 +341,7 @@ class corr:
 
 
 class autocorr:
-    """Calculates the autocorrelation of the data
+    """Calculates the autocorrelation of the data.
 
     Parameters
     ----------
@@ -332,7 +373,7 @@ class autocorr:
 
 
 def fft_denoise(dataset: ndarray, sigma: float = 0, mode: bool = True) -> Tuple[ndarray, float]:
-    """Performs the noise removal using the Fast Fourier Transform
+    """Performs the noise removal using the Fast Fourier Transform.
 
     Parameters
     ----------
@@ -372,13 +413,17 @@ def fft_denoise(dataset: ndarray, sigma: float = 0, mode: bool = True) -> Tuple[
 
 
 def get_period(dataset: ndarray) -> float:
-    """Calculates the periodicity of a `dataset`
+    """Calculates the periodicity of a `dataset`.
 
-    Args:
-        dataset (`ndarray`): the `dataset` describing the function over which the period is calculated
+    Parameters
+    ----------
+    dataset : `ndarray`
+        the `dataset` describing the function over which the period is calculated
 
-    Returns:
-        `float`: period of the function described by the `dataset`
+    Returns
+    -------
+    period : `float`
+        period of the function described by the `dataset`
     """
     n = dataset.size
     fhat = np.fft.fft(dataset, n)
@@ -394,18 +439,22 @@ def get_period(dataset: ndarray) -> float:
 def sigmoide_inv(y: float) -> float:
     """Calculates the inverse of the sigmoid function
 
-    Args:
-        y (`float`): the number to evaluate the function
+    Parameters
+    ----------
+    y : `float`
+        the number to evaluate the function
 
-    Returns:
-        `float`: value of evaluated function
+    Returns
+    -------
+    `float`
+        value of evaluated function
     """
 
     return math.log(y / (1 - y))
 
 
 def sigmoide(x: float) -> float:
-
+    """The sigmoid function"""
     return 1 / (1 + math.exp(-x))
 
 
@@ -984,11 +1033,16 @@ class FeatureSelection:
         """
         Get directed graph showing importance of features.
 
-        Args:
-            dataset (`DataFrame`): Dataset to be used for generating the graph.
-            n_importances (`int`): Number of top importances to show in the graph.
+        Parameters
+        ----------
+        dataset : `DataFrame`
+            Dataset to be used for generating the graph.
+        n_importances : `int`
+            Number of top importances to show in the graph.
 
-        Returns:
+        Returns
+        -------
+        `str`
             A string representation of the directed graph.
         """
         # Assign and clean dataset
@@ -1113,7 +1167,7 @@ class FeatureSelection:
 
 
 def check_nan_inf(df: DataFrame) -> DataFrame:
-    """Check for `NaN` and `Inf` values in the `DataFrame`. If any are found, raise an error."""
+    """Check for `NaN` and `Inf` values in the `DataFrame`. If any are found removes them."""
     nan_values = df.isnull().values.any()
     count = np.isinf(df.select_dtypes(include="number")).values.sum()
     print("There are null values : ", nan_values)
