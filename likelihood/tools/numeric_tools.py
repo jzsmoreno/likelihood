@@ -1,4 +1,6 @@
 from numpy import arange, array, ndarray, random
+from numpy.linalg import solve
+import numpy as np
 
 # -------------------------------------------------------------------------
 """
@@ -101,7 +103,9 @@ def ecprint(A: ndarray) -> None:
     print()
 
 
-def sor_elimination(A: ndarray, b: ndarray, n: int, nmax: int, w: float) -> ndarray:
+def sor_elimination(
+    A: ndarray, b: ndarray, n: int, nmax: int, w: float, error: float = 1e-9
+) -> ndarray:
     """Computes the successive over-relaxation algorithm.
 
     Parameters
@@ -115,7 +119,9 @@ def sor_elimination(A: ndarray, b: ndarray, n: int, nmax: int, w: float) -> ndar
     nmax : `int`
         Is the maximum number of iterations.
     w : `float`
-        Is a parameter of the SOR method
+        Is a parameter of the SOR method.
+    error : `float`
+        It is an optional parameter that represents the desired level of accuracy. If not specified, it will be set to `1e-9`.
 
     Returns
     -------
@@ -134,10 +140,10 @@ def sor_elimination(A: ndarray, b: ndarray, n: int, nmax: int, w: float) -> ndar
                 s2 = s2 + (A[i, j] * xin[j])
             xi[i] = (w / A[i, i]) * (b[i] - s1 - s2) + (1.0 / A[i, i]) * (b[i] - s1) * (1 - w)
 
-        error = np.max(np.abs(xi - xin))
+        difference = np.max(np.abs(xi - xin))
         print(xi)
         print(f"solution error : {error}")
-        if error <= 0.00001:
+        if difference <= error:
             print(f"iterations : {k}")
             return xi
         else:
@@ -205,3 +211,15 @@ def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
             print(f"X{i} = {round(X[i], pr)}")
 
         return X
+
+
+# Example usage:
+if __name__ == "__main__":
+    # Define the coefficient matrix A and the number of variables x
+    A = np.array([[3, 2, 7], [4, 6, 5], [1, 8, 9]])
+    # Generate a random b
+    b = np.random.randint(-100, 100, size=len(A[:, 0]))
+    # Solve Ax=b
+    x = solve(A, b)
+    x_hat = sor_elimination(A, b, 3, 100, 0.1)
+    breakpoint()
