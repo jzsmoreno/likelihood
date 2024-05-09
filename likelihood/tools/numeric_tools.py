@@ -47,35 +47,13 @@ def xicor(X: ndarray, Y: ndarray, ties: bool = True) -> float:
                     sum(tie_index),
                     replace=False,
                 )
-        return 1 - n * sum(abs(r[1:] - r[: n - 1])) / (2 * sum(l * (n - l)))
+        return round((1 - n * sum(abs(r[1:] - r[: n - 1])) / (2 * sum(l * (n - l))))[0], 8)
     else:
         r = array([sum(y >= Y[order]) for y in Y[order]])
-        return 1 - 3 * sum(abs(r[1:] - r[: n - 1])) / (n**2 - 1)
+        return round((1 - 3 * sum(abs(r[1:] - r[: n - 1])) / (n**2 - 1))[0], 8)
 
 
 # -------------------------------------------------------------------------
-
-
-def subs(a: ndarray, b: ndarray) -> ndarray:
-    """Function that subtracts lists element by element.
-
-    Parameters
-    ----------
-    a : `np.array`
-        1D Numpy Array.
-    b : `np.array`
-        1D Numpy Array.
-
-    Returns
-    -------
-    a : `np.array`
-        1D Numpy Array with elements from input arrays subtracted.
-    """
-
-    for i, val in enumerate(a):
-        val = val - b[i]
-        a[i] = val
-    return a
 
 
 def ecprint(A: ndarray) -> None:
@@ -104,51 +82,56 @@ def ecprint(A: ndarray) -> None:
 
 
 def sor_elimination(
-    A: ndarray, b: ndarray, n: int, nmax: int, w: float, error: float = 1e-9
+    A: ndarray,
+    b: ndarray,
+    n: int,
+    max_iterations: int,
+    w: float,
+    error: float = 1e-3,
+    verbose: bool = True,
 ) -> ndarray:
-    """Computes the successive over-relaxation algorithm.
+    """Computes the Successive Over-Relaxation algorithm.
 
     Parameters
     ----------
     A : `np.array`
-        An array containing the parameters of the $n$ equations.
+        Coefficient matrix of the system of equations.
     b : `np.array`
-        An array containing the equalities of the $n$ equations.
+        Right-hand side vector of the system of equations.
     n : `int`
-        Is the dimension of the system of equations.
-    nmax : `int`
-        Is the maximum number of iterations.
+        Dimension of the system of equations.
+    max_iterations : `int`
+        Maximum number of iterations allowed.
     w : `float`
-        Is a parameter of the SOR method.
-    error : `float`
-        It is an optional parameter that represents the desired level of accuracy. If not specified, it will be set to `1e-9`.
+        Relaxation parameter.
+    error : `float`, optional
+        Desired level of accuracy, default is 1e-3.
+    verbose : `bool`, optional
+        Whether to print intermediate results, default is False.
 
     Returns
     -------
     xi : `np.array`
-        The solution of the system of $n$ equations
+        The solution of the system of equations.
     """
-
     xin = np.zeros(n)
-    for k in range(nmax):
+    for k in range(max_iterations):
         xi = np.zeros(n)
         for i in range(n):
-            s1, s2 = 0, 0
-            for j in range(i):
-                s1 = s1 + (A[i, j] * xin[j])
-            for j in range(i + 1, n):
-                s2 = s2 + (A[i, j] * xin[j])
-            xi[i] = (w / A[i, i]) * (b[i] - s1 - s2) + (1.0 / A[i, i]) * (b[i] - s1) * (1 - w)
+            s1 = np.dot(A[i, :i], xin[:i])
+            s2 = np.dot(A[i, i + 1 :], xin[i + 1 :])
+            xi[i] = (w / A[i, i]) * (b[i] - s1 - s2) + (1.0 - w) * xin[i]
 
         difference = np.max(np.abs(xi - xin))
-        print(xi)
-        print(f"solution error : {difference}")
+        if verbose:
+            print(f"Iteration {k + 1}: xi = {xi}, error = {difference}")
         if difference <= error:
-            print(f"iterations : {k}")
+            if verbose:
+                print(f"Converged after {k + 1} iterations.")
             return xi
-        else:
-            xin = np.copy(xi)
-    return "number of iterations exceeded"
+        xin = np.copy(xi)
+
+    raise RuntimeError("Convergence not achieved within the maximum number of iterations.")
 
 
 def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
@@ -171,8 +154,7 @@ def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
     """
 
     n = len(A)
-    M = [[0 for x in range(n + 1)] for x in range(n)]
-    X = [0 for x in range(n)]
+    X = [0 for _ in range(n)]
 
     for i in range(n - 1):
         for p in range(i, n):
@@ -181,7 +163,7 @@ def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
                     A[p], A[i] = A[i], A[p]
                 break
             elif p == (n - 1):
-                print("there is no single solution")
+                print("There is no single solution")
                 return None
 
         for j in range(i + 1, n):
@@ -191,44 +173,49 @@ def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
                 break
 
         for j in range(i + 1, n):
-            M[j][i] = A[j][i] / A[i][i]
-            A[j] = subs(A[j], np.multiply(M[j][i], A[i]))
+            if A[i][i] == 0:
+                print("There is no single solution")
+                return None
+            factor = A[j][i] / A[i][i]
+            A[j] = [A[j][k] - factor * A[i][k] for k in range(n + 1)]
 
-        if A[n - 1][n - 1] == 0:
-            print("there is no single solution")
-            return None
-        ecprint(A)
+    if A[n - 1][n - 1] == 0:
+        print("There is no single solution")
+        return None
 
-        X[n - 1] = A[n - 1][n] / A[n - 1][n - 1]
-        for i in list(reversed(range(n - 1))):
-            s = 0
-            for j in range(i + 1, n):
-                s += A[i][j] * X[j]
-            X[i] = (A[i][n] - s) / A[i][i]
-        print("the solution is:")
+    X[n - 1] = A[n - 1][n] / A[n - 1][n - 1]
+    for i in range(n - 2, -1, -1):
+        s = sum(A[i][j] * X[j] for j in range(i + 1, n))
+        X[i] = (A[i][n] - s) / A[i][i]
 
-        for i in range(n):
-            print(f"\tX{i} = {round(X[i], pr)}")
+    ecprint(A)
+    print("The solution is:")
+    for i in range(n):
+        print(f"\tX{i} = {round(X[i], pr)}")
 
-        return X
+    return X
 
 
 # Example usage:
 if __name__ == "__main__":
     print("Using the SOR relaxation method : ")
     # Define the coefficient matrix A and the number of variables b
-    A = np.array([[3, 2, 7], [4, 6, 5], [1, 8, 9]])
+    A = np.array([[1, 1, 1], [1, -1, 2], [1, -1, -3]])
     Ag = A.copy()
-    # Generate a random b
-    b = np.random.randint(-10, 10, size=len(A[:, 0]))
+    b = np.array([6, 5, -10])
     print("b : ", b)
-    # Solve Ax=b
+    # Solve Ax=b, x = [1, 2, 3]
     x = solve(A, b)
-    x_hat_sor = sor_elimination(A, b, 3, 100, 0.1)
+    x_hat_sor = sor_elimination(A, b, 3, 200, 0.05)
     # assert np.allclose(x, x_hat_sor), f"Expected:\n{x}\ngot\n{x_hat_sor}"
 
     print("Using Gaussian elimination : ")
     Ag = np.insert(Ag, len(Ag), b, axis=1)
     print(Ag)
     x_hat_gaus = gauss_elimination(Ag)
+
+    print("New correlation coefficient test")
+    X = np.random.rand(100, 1)
+    Y = X * X
+    print("coefficient for Y = X * X : ", xicor(X, Y))
     breakpoint()
