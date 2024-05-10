@@ -17,7 +17,7 @@ with open(PACKAGE_DIR / "VERSION") as f:
     about["__version__"] = _version
 
 setuptools.setup(
-    name="likelihood",  # Replace with your own username
+    name="likelihood",
     version=about["__version__"],
     author="J. A. Moreno-Guerra",
     author_email="jzs.gm27@gmail.com",
@@ -28,6 +28,9 @@ setuptools.setup(
     url="https://github.com/jzsmoreno/likelihood/",
     packages=setuptools.find_packages(),
     install_requires=install_requires,
+    extras_require={
+        "full": ["networkx", "pyvis"],
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

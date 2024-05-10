@@ -1,0 +1,5 @@
+# This is a CODEOWNERS file
+# Each line specifies a file pattern followed by one or more GitHub usernames or team names
+
+# Owners for the entire repository
+*       @jzsmoreno

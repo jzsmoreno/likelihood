@@ -1,29 +1,107 @@
+from typing import Dict
+
 import numpy as np
+from numpy import arange, array, ndarray, random
+from numpy.linalg import solve
+from pandas.core.frame import DataFrame
+
+# -------------------------------------------------------------------------
 
 
-def subs(a, b):
-    """Function that subtracts lists element by element.
+def xi_corr(df: DataFrame) -> Dict:
+    """Calculate new coefficient of correlation for all pairs of columns in a `DataFrame`.
 
     Parameters
     ----------
-    a
-    b
+    df : `DataFrame`
+        Input data containing the variables to be correlated.
+
+    Returns
+    -------
+    `dict`
+        A dictionary with variable names as keys and their corresponding
+        correlation coefficients as values.
     """
+    correlations = {}
+    columns = df.columns
 
-    for i, val in enumerate(a):
-        val = val - b[i]
-        a[i] = val
-    return a
+    for i, col1 in enumerate(columns):
+        for j, col2 in enumerate(columns):
+            if i < j:
+                x = df[col1].values
+                y = df[col2].values
+
+                correlation = xicor(x, y)
+                correlations[(col1, col2)] = round(correlation, 8)
+
+    return correlations
 
 
-def ecprint(A):
+"""
+@article{Chatterjee2019ANC,
+  title={A New Coefficient of Correlation},
+  author={Sourav Chatterjee},
+  journal={Journal of the American Statistical Association},
+  year={2019},
+  volume={116},
+  pages={2009 - 2022},
+  url={https://api.semanticscholar.org/CorpusID:202719281}
+} 
+"""
+
+
+def xicor(X: ndarray, Y: ndarray, ties: bool = True) -> float:
+    """Calculate a new coefficient of correlation between two variables.
+
+    The new coefficient of correlation is a generalization of Pearson's correlation.
+
+    Parameters
+    ----------
+    X : `np.ndarray`
+        The first variable to be correlated. Must have at least one dimension.
+    Y : `np.ndarray`
+        The second variable to be correlated. Must have at least one dimension.
+
+    Returns
+    -------
+    xi : `float`
+        The estimated value of the new coefficient of correlation.
+    """
+    random.seed(42)
+    n = len(X)
+    order = array([i[0] for i in sorted(enumerate(X), key=lambda x: x[1])])
+    if ties:
+        l = array([sum(y >= Y[order]) for y in Y[order]])
+        r = l.copy()
+        for j in range(n):
+            if sum([r[j] == r[i] for i in range(n)]) > 1:
+                tie_index = array([r[j] == r[i] for i in range(n)])
+                r[tie_index] = random.choice(
+                    r[tie_index] - arange(0, sum([r[j] == r[i] for i in range(n)])),
+                    sum(tie_index),
+                    replace=False,
+                )
+        return 1 - n * sum(abs(r[1:] - r[: n - 1])) / (2 * sum(l * (n - l)))
+    else:
+        r = array([sum(y >= Y[order]) for y in Y[order]])
+        return 1 - 3 * sum(abs(r[1:] - r[: n - 1])) / (n**2 - 1)
+
+
+# -------------------------------------------------------------------------
+
+
+def ecprint(A: ndarray) -> None:
     """Function that prints the augmented matrix.
 
     Parameters
     ----------
-    A : np.array
+    A : `np.array`
         The augmented matrix.
 
+    Returns
+    -------
+    `None`
+        Prints the matrix to console.
     """
 
     n = len(A)
@@ -37,51 +115,60 @@ def ecprint(A):
     print()
 
 
-def sor_elimination(A, b, n, nmax, w):
-    """Computes the successive over-relaxation algorithm.
+def sor_elimination(
+    A: ndarray,
+    b: ndarray,
+    n: int,
+    max_iterations: int,
+    w: float,
+    error: float = 1e-3,
+    verbose: bool = True,
+) -> ndarray:
+    """Computes the Successive Over-Relaxation algorithm.
 
     Parameters
     ----------
     A : `np.array`
-        An array containing the parameters of the $n$ equations.
+        Coefficient matrix of the system of equations.
     b : `np.array`
-        An array containing the equalities of the $n$ equations.
+        Right-hand side vector of the system of equations.
     n : `int`
-        Is the dimension of the system of equations.
-    nmax : `int`
-        Is the maximum number of iterations.
+        Dimension of the system of equations.
+    max_iterations : `int`
+        Maximum number of iterations allowed.
     w : `float`
-        Is a parameter of the SOR method
+        Relaxation parameter.
+    error : `float`, optional
+        Desired level of accuracy, default is 1e-3.
+    verbose : `bool`, optional
+        Whether to print intermediate results, default is False.
 
     Returns
     -------
     xi : `np.array`
-        The solution of the system of $n$ equations
+        The solution of the system of equations.
     """
-
     xin = np.zeros(n)
-    for k in range(nmax):
+    for k in range(max_iterations):
         xi = np.zeros(n)
         for i in range(n):
-            s1, s2 = 0, 0
-            for j in range(i):
-                s1 = s1 + (A[i, j] * xin[j])
-            for j in range(i + 1, n):
-                s2 = s2 + (A[i, j] * xin[j])
-            xi[i] = (w / A[i, i]) * (b[i] - s1 - s2) + (1.0 / A[i, i]) * (b[i] - s1) * (1 - w)
+            s1 = np.dot(A[i, :i], xin[:i])
+            s2 = np.dot(A[i, i + 1 :], xin[i + 1 :])
+            xi[i] = (w / A[i, i]) * (b[i] - s1 - s2) + (1.0 - w) * xin[i]
 
-        error = np.max(np.abs(xi - xin))
-        print(xi)
-        print(f"solution error : {error}")
-        if error <= 0.00001:
-            print(f"iterations : {k}")
+        difference = np.max(np.abs(xi - xin))
+        if verbose:
+            print(f"Iteration {k + 1}: xi = {xi}, error = {difference}")
+        if difference <= error:
+            if verbose:
+                print(f"Converged after {k + 1} iterations.")
             return xi
-        else:
-            xin = np.copy(xi)
-    return "number of iterations exceeded"
+        xin = np.copy(xi)
+
+    raise RuntimeError("Convergence not achieved within the maximum number of iterations.")
 
 
-def gauss_elimination(A, pr=2):
+def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
     """Computes the Gauss elimination algorithm.
 
     Parameters
@@ -101,8 +188,7 @@ def gauss_elimination(A, pr=2):
     """
 
     n = len(A)
-    M = [[0 for x in range(n + 1)] for x in range(n)]
-    X = [0 for x in range(n)]
+    X = [0 for _ in range(n)]
 
     for i in range(n - 1):
         for p in range(i, n):
@@ -111,7 +197,7 @@ def gauss_elimination(A, pr=2):
                     A[p], A[i] = A[i], A[p]
                 break
             elif p == (n - 1):
-                print("there is no single solution")
+                print("There is no single solution")
                 return None
 
         for j in range(i + 1, n):
@@ -121,23 +207,57 @@ def gauss_elimination(A, pr=2):
                 break
 
         for j in range(i + 1, n):
-            M[j][i] = A[j][i] / A[i][i]
-            A[j] = subs(A[j], np.multiply(M[j][i], A[i]))
+            if A[i][i] == 0:
+                print("There is no single solution")
+                return None
+            factor = A[j][i] / A[i][i]
+            A[j] = [A[j][k] - factor * A[i][k] for k in range(n + 1)]
 
-        if A[n - 1][n - 1] == 0:
-            print("there is no single solution")
-            return None
-        ecprint(A)
+    if A[n - 1][n - 1] == 0:
+        print("There is no single solution")
+        return None
 
-        X[n - 1] = A[n - 1][n] / A[n - 1][n - 1]
-        for i in list(reversed(range(n - 1))):
-            s = 0
-            for j in range(i + 1, n):
-                s += A[i][j] * X[j]
-            X[i] = (A[i][n] - s) / A[i][i]
-        print("the solution is:")
+    X[n - 1] = A[n - 1][n] / A[n - 1][n - 1]
+    for i in range(n - 2, -1, -1):
+        s = sum(A[i][j] * X[j] for j in range(i + 1, n))
+        X[i] = (A[i][n] - s) / A[i][i]
 
-        for i in range(n):
-            print(f"X{i} = {round(X[i], pr)}")
+    ecprint(A)
+    print("The solution is:")
+    for i in range(n):
+        print(f"\tX{i} = {round(X[i], pr)}")
 
-        return X
+    return X
+
+
+# Example usage:
+if __name__ == "__main__":
+    import pandas as pd
+
+    # Create a sample dataframe with some random
+    data = {"x": [3, 5, 7, 9], "y": [4, 6, 8, 2], "z": [1, 2, 1, 3]}
+    df = pd.DataFrame(data)
+    print("Using the SOR relaxation method : ")
+    # Define the coefficient matrix A and the number of variables b
+    A = np.array([[1, 1, 1], [1, -1, 2], [1, -1, -3]])
+    Ag = A.copy()
+    b = np.array([6, 5, -10])
+    print("b : ", b)
+    # Solve Ax=b, x = [1, 2, 3]
+    x = solve(A, b)
+    x_hat_sor = sor_elimination(A, b, 3, 200, 0.05)
+    # assert np.allclose(x, x_hat_sor), f"Expected:\n{x}\ngot\n{x_hat_sor}"
+
+    print("Using Gaussian elimination : ")
+    Ag = np.insert(Ag, len(Ag), b, axis=1)
+    print(Ag)
+    x_hat_gaus = gauss_elimination(Ag)
+
+    print("New correlation coefficient test")
+    X = np.random.rand(100, 1)
+    Y = X * X
+    print("coefficient for Y = X * X : ", xicor(X, Y))
+
+    print("New correlation coefficient test for pandas DataFrame")
+    values = xi_corr(df)
+    breakpoint()
