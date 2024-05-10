@@ -51,9 +51,16 @@ def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -&gt; List
     Parameters
     ----------
     dataset : `List`
+        The data to be divided into mini-batch.
     batch_size : `int`
+        Specifies the size of each mini-batch.
     shuffle : `bool`
+        If set `True`, the data will be shuffled before dividing it into mini-batches.
 
+    Returns
+    -------
+    `List[List]`
+        A list of lists containing the mini-batches. Each sublist is a separate mini-batch with length `batch_size`.
     &#34;&#34;&#34;
 
     # start indexes 0, batch_size, 2 * batch_size, ...
@@ -68,35 +75,43 @@ def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -&gt; List
 
 
 def difference_quotient(f: Callable, x: float, h: float) -&gt; Callable:
-    &#34;&#34;&#34;Calculates the difference quotient of &#39;f&#39; evaluated at x and x + h
+    &#34;&#34;&#34;Calculates the difference quotient of `f` evaluated at `x` and `x + h`
 
     Parameters
     ----------
-    f(x) : `Callable` function
+    `f(x)` : `Callable`
+        function.
     x : `float`
+        Independent term.
     h : `float`
+        Step size.
 
     Returns
     -------
-    `(f(x + h) - f(x)) / h`
+    `(f(x + h) - f(x)) / h` : `float`
+        Difference quotient of `f` evaluated at `x`.
 
     &#34;&#34;&#34;
 
     return (f(x + h) - f(x)) / h
 
 
-def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float):
+def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float) -&gt; ndarray:
     &#34;&#34;&#34;Calculates the partial difference quotient of `f`
 
     Parameters
     ----------
     `f(x0,...,xi-th)` : `Callable` function
-    v : `Vector` or `np.array`
+        Function to differentiate.
+    v : `Vector` | `np.array`
+        1D array representing vector `v=(x0,...,xi)`.
     h : `float`
+        Step size.
 
     Returns
     -------
-    the `i-th` partial difference quotient of `f` at `v`
+    `(f(w) - f(v)) / h` : `np.array`
+        the `i-th` partial difference quotient of `f` at `v`
 
     &#34;&#34;&#34;
 
@@ -106,15 +121,22 @@ def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float):
     return (f(w) - f(v)) / h
 
 
-def estimate_gradient(f: Callable, v: ndarray, h: float = 1e-4):
+def estimate_gradient(f: Callable, v: ndarray, h: float = 1e-4) -&gt; List[ndarray]:
     &#34;&#34;&#34;Calculates the gradient of `f` at `v`
 
     Parameters
     ----------
     `f(x0,...,xi-th)` : `Callable` function
-    v : `Vector` or `np.array`
+        Function to differentiate.
+    v : `Vector` | `np.array`
+        1D array representing vector `v=(x0,...,xi)`.
     h : `float`. By default it is set to `1e-4`
+        The step size used to approximate the derivative.
 
+    Returns
+    -------
+    grad_f : `List[np.array]`
+        A list containing the estimated gradients of each component of `f` evaluated at `v`.
     &#34;&#34;&#34;
     return [partial_difference_quotient(f, v, i, h) for i in range(len(v))]
 
@@ -129,13 +151,19 @@ def generate_feature_yaml(
     Generate a YAML string containing information about ordinal, numeric, and categorical features
     based on the given DataFrame.
 
-    Args:
-        df (`pd.DataFrame`): The DataFrame containing the data.
-        ignore_features (List[`str`]): A list of features to ignore.
-        yaml_string (`bool`): If `True`, return the result as a YAML formatted string. Otherwise, return it as a dictionary. Default is `False`.
+    Parameters
+    ----------
+    df : `pd.DataFrame`
+        The DataFrame containing the data.
+    ignore_features : `List[`str`]`
+        A list of features to ignore.
+    yaml_string : `bool`
+        If `True`, return the result as a YAML formatted string. Otherwise, return it as a dictionary. Default is `False`.
 
-    Returns:
-        `Dict` | `str`: A dictionary with four keys (&#39;ordinal_features&#39;, &#39;numeric_features&#39;, &#39;categorical_features&#39;, &#39;ignore_features&#39;)
+    Returns
+    -------
+    feature_info : `Dict` | `str`
+        A dictionary with four keys (&#39;ordinal_features&#39;, &#39;numeric_features&#39;, &#39;categorical_features&#39;, &#39;ignore_features&#39;)
         mapping to lists of feature names. Or a YAML formatted string if `yaml_string` is `True`.
     &#34;&#34;&#34;
     feature_info = {
@@ -171,6 +199,19 @@ def generate_feature_yaml(
 
 # a function that calculates the percentage of missing values per column is defined
 def cal_missing_values(df: DataFrame) -&gt; None:
+    &#34;&#34;&#34;Calculate the percentage of missing (`NaN`/`NaT`) values per column in a dataframe.
+
+    Parameters
+    ----------
+    df : `DataFrame`
+        The input dataframe.
+
+    Returns
+    -------
+    `None`
+        Prints out a table with columns as index and percentages of missing values as data.
+    &#34;&#34;&#34;
+
     col = df.columns
     print(&#34;Total size : &#34;, &#34;{:,}&#34;.format(len(df)))
     for i in col:
@@ -180,7 +221,7 @@ def cal_missing_values(df: DataFrame) -&gt; None:
 
 
 def calculate_probability(x: ndarray, points: int = 1, cond: bool = True) -&gt; ndarray:
-    &#34;&#34;&#34;Calculates the probability of the data
+    &#34;&#34;&#34;Calculates the probability of the data.
 
     Parameters
     ----------
@@ -234,7 +275,7 @@ def calculate_probability(x: ndarray, points: int = 1, cond: bool = True) -&gt; 
 def cdf(
     x: ndarray, poly: int = 9, inv: bool = False, plot: bool = False, savename: str = None
 ) -&gt; ndarray:
-    &#34;&#34;&#34;Calculates the cumulative distribution function of the data
+    &#34;&#34;&#34;Calculates the cumulative distribution function of the data.
 
     Parameters
     ----------
@@ -293,7 +334,7 @@ def cdf(
 
 
 class corr:
-    &#34;&#34;&#34;Calculates the correlation of the data
+    &#34;&#34;&#34;Calculates the correlation of the data.
 
     Parameters
     ----------
@@ -328,7 +369,7 @@ class corr:
 
 
 class autocorr:
-    &#34;&#34;&#34;Calculates the autocorrelation of the data
+    &#34;&#34;&#34;Calculates the autocorrelation of the data.
 
     Parameters
     ----------
@@ -360,7 +401,7 @@ class autocorr:
 
 
 def fft_denoise(dataset: ndarray, sigma: float = 0, mode: bool = True) -&gt; Tuple[ndarray, float]:
-    &#34;&#34;&#34;Performs the noise removal using the Fast Fourier Transform
+    &#34;&#34;&#34;Performs the noise removal using the Fast Fourier Transform.
 
     Parameters
     ----------
@@ -400,13 +441,17 @@ def fft_denoise(dataset: ndarray, sigma: float = 0, mode: bool = True) -&gt; Tup
 
 
 def get_period(dataset: ndarray) -&gt; float:
-    &#34;&#34;&#34;Calculates the periodicity of a `dataset`
+    &#34;&#34;&#34;Calculates the periodicity of a `dataset`.
 
-    Args:
-        dataset (`ndarray`): the `dataset` describing the function over which the period is calculated
+    Parameters
+    ----------
+    dataset : `ndarray`
+        the `dataset` describing the function over which the period is calculated
 
-    Returns:
-        `float`: period of the function described by the `dataset`
+    Returns
+    -------
+    period : `float`
+        period of the function described by the `dataset`
     &#34;&#34;&#34;
     n = dataset.size
     fhat = np.fft.fft(dataset, n)
@@ -422,18 +467,22 @@ def get_period(dataset: ndarray) -&gt; float:
 def sigmoide_inv(y: float) -&gt; float:
     &#34;&#34;&#34;Calculates the inverse of the sigmoid function
 
-    Args:
-        y (`float`): the number to evaluate the function
+    Parameters
+    ----------
+    y : `float`
+        the number to evaluate the function
 
-    Returns:
-        `float`: value of evaluated function
+    Returns
+    -------
+    `float`
+        value of evaluated function
     &#34;&#34;&#34;
 
     return math.log(y / (1 - y))
 
 
 def sigmoide(x: float) -&gt; float:
-
+    &#34;&#34;&#34;The sigmoid function&#34;&#34;&#34;
     return 1 / (1 + math.exp(-x))
 
 
@@ -1012,11 +1061,16 @@ class FeatureSelection:
         &#34;&#34;&#34;
         Get directed graph showing importance of features.
 
-        Args:
-            dataset (`DataFrame`): Dataset to be used for generating the graph.
-            n_importances (`int`): Number of top importances to show in the graph.
+        Parameters
+        ----------
+        dataset : `DataFrame`
+            Dataset to be used for generating the graph.
+        n_importances : `int`
+            Number of top importances to show in the graph.
 
-        Returns:
+        Returns
+        -------
+        `str`
             A string representation of the directed graph.
         &#34;&#34;&#34;
         # Assign and clean dataset
@@ -1141,7 +1195,7 @@ class FeatureSelection:
 
 
 def check_nan_inf(df: DataFrame) -&gt; DataFrame:
-    &#34;&#34;&#34;Check for `NaN` and `Inf` values in the `DataFrame`. If any are found, raise an error.&#34;&#34;&#34;
+    &#34;&#34;&#34;Check for `NaN` and `Inf` values in the `DataFrame`. If any are found removes them.&#34;&#34;&#34;
     nan_values = df.isnull().values.any()
     count = np.isinf(df.select_dtypes(include=&#34;number&#34;)).values.sum()
     print(&#34;There are null values : &#34;, nan_values)
@@ -1291,12 +1345,33 @@ if __name__ == &#34;__main__&#34;:
 <span>def <span class="ident">cal_missing_values</span></span>(<span>df: pandas.core.frame.DataFrame) ‑> None</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Calculate the percentage of missing (<code>NaN</code>/<code>NaT</code>) values per column in a dataframe.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dd>The input dataframe.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>None</code>
+Prints out a table with columns as index and percentages of missing values as data.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def cal_missing_values(df: DataFrame) -&gt; None:
+    &#34;&#34;&#34;Calculate the percentage of missing (`NaN`/`NaT`) values per column in a dataframe.
+
+    Parameters
+    ----------
+    df : `DataFrame`
+        The input dataframe.
+
+    Returns
+    -------
+    `None`
+        Prints out a table with columns as index and percentages of missing values as data.
+    &#34;&#34;&#34;
+
     col = df.columns
     print(&#34;Total size : &#34;, &#34;{:,}&#34;.format(len(df)))
     for i in col:
@@ -1309,7 +1384,7 @@ if __name__ == &#34;__main__&#34;:
 <span>def <span class="ident">calculate_probability</span></span>(<span>x: numpy.ndarray, points: int = 1, cond: bool = True) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Calculates the probability of the data</p>
+<div class="desc"><p>Calculates the probability of the data.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>x</code></strong> :&ensp;<code>np.array</code></dt>
@@ -1329,7 +1404,7 @@ if __name__ == &#34;__main__&#34;:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def calculate_probability(x: ndarray, points: int = 1, cond: bool = True) -&gt; ndarray:
-    &#34;&#34;&#34;Calculates the probability of the data
+    &#34;&#34;&#34;Calculates the probability of the data.
 
     Parameters
     ----------
@@ -1384,7 +1459,7 @@ if __name__ == &#34;__main__&#34;:
 <span>def <span class="ident">cdf</span></span>(<span>x: numpy.ndarray, poly: int = 9, inv: bool = False, plot: bool = False, savename: str = None) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Calculates the cumulative distribution function of the data</p>
+<div class="desc"><p>Calculates the cumulative distribution function of the data.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>x</code></strong> :&ensp;<code>np.array</code></dt>
@@ -1406,7 +1481,7 @@ if __name__ == &#34;__main__&#34;:
 <pre><code class="python">def cdf(
     x: ndarray, poly: int = 9, inv: bool = False, plot: bool = False, savename: str = None
 ) -&gt; ndarray:
-    &#34;&#34;&#34;Calculates the cumulative distribution function of the data
+    &#34;&#34;&#34;Calculates the cumulative distribution function of the data.
 
     Parameters
     ----------
@@ -1468,13 +1543,13 @@ if __name__ == &#34;__main__&#34;:
 <span>def <span class="ident">check_nan_inf</span></span>(<span>df: pandas.core.frame.DataFrame) ‑> pandas.core.frame.DataFrame</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Check for <code>NaN</code> and <code>Inf</code> values in the <code>DataFrame</code>. If any are found, raise an error.</p></div>
+<div class="desc"><p>Check for <code>NaN</code> and <code>Inf</code> values in the <code>DataFrame</code>. If any are found removes them.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def check_nan_inf(df: DataFrame) -&gt; DataFrame:
-    &#34;&#34;&#34;Check for `NaN` and `Inf` values in the `DataFrame`. If any are found, raise an error.&#34;&#34;&#34;
+    &#34;&#34;&#34;Check for `NaN` and `Inf` values in the `DataFrame`. If any are found removes them.&#34;&#34;&#34;
     nan_values = df.isnull().values.any()
     count = np.isinf(df.select_dtypes(include=&#34;number&#34;)).values.sum()
     print(&#34;There are null values : &#34;, nan_values)
@@ -1493,33 +1568,39 @@ if __name__ == &#34;__main__&#34;:
 <span>def <span class="ident">difference_quotient</span></span>(<span>f: Callable, x: float, h: float) ‑> Callable</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Calculates the difference quotient of 'f' evaluated at x and x + h</p>
+<div class="desc"><p>Calculates the difference quotient of <code>f</code> evaluated at <code>x</code> and <code>x + h</code></p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt>f(x) : <code>Callable</code> function</dt>
+<dt><code>f(x)</code> : <code>Callable</code></dt>
+<dt>function.</dt>
 <dt><strong><code>x</code></strong> :&ensp;<code>float</code></dt>
-<dd>&nbsp;</dd>
+<dd>Independent term.</dd>
 <dt><strong><code>h</code></strong> :&ensp;<code>float</code></dt>
-<dd>&nbsp;</dd>
+<dd>Step size.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p><code>(f(x + h) - f(x)) / h</code></p></div>
+<p><code>(f(x + h) - f(x)) / h</code> : <code>float</code>
+Difference quotient of <code>f</code> evaluated at <code>x</code>.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def difference_quotient(f: Callable, x: float, h: float) -&gt; Callable:
-    &#34;&#34;&#34;Calculates the difference quotient of &#39;f&#39; evaluated at x and x + h
+    &#34;&#34;&#34;Calculates the difference quotient of `f` evaluated at `x` and `x + h`
 
     Parameters
     ----------
-    f(x) : `Callable` function
+    `f(x)` : `Callable`
+        function.
     x : `float`
+        Independent term.
     h : `float`
+        Step size.
 
     Returns
     -------
-    `(f(x + h) - f(x)) / h`
+    `(f(x + h) - f(x)) / h` : `float`
+        Difference quotient of `f` evaluated at `x`.
 
     &#34;&#34;&#34;
 
@@ -1527,31 +1608,44 @@ if __name__ == &#34;__main__&#34;:
 </details>
 </dd>
 <dt id="likelihood.tools.tools.estimate_gradient"><code class="name flex">
-<span>def <span class="ident">estimate_gradient</span></span>(<span>f: Callable, v: numpy.ndarray, h: float = 0.0001)</span>
+<span>def <span class="ident">estimate_gradient</span></span>(<span>f: Callable, v: numpy.ndarray, h: float = 0.0001) ‑> List[numpy.ndarray]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Calculates the gradient of <code>f</code> at <code>v</code></p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><code>f(x0,...,xi-th)</code> : <code>Callable</code> function</dt>
-<dt><strong><code>v</code></strong> :&ensp;<code>Vector</code> or <code>np.array</code></dt>
-<dd>&nbsp;</dd>
+<dt>Function to differentiate.</dt>
+<dt><strong><code>v</code></strong> :&ensp;<code>Vector` | `np.array</code></dt>
+<dd>1D array representing vector <code>v=(x0,...,xi)</code>.</dd>
 <dt><strong><code>h</code></strong> :&ensp;<code>float`. By default it is set to `1e-4</code></dt>
-<dd>&nbsp;</dd>
+<dd>The step size used to approximate the derivative.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>grad_f</code></strong> :&ensp;<code>List[np.array]</code></dt>
+<dd>A list containing the estimated gradients of each component of <code>f</code> evaluated at <code>v</code>.</dd>
 </dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def estimate_gradient(f: Callable, v: ndarray, h: float = 1e-4):
+<pre><code class="python">def estimate_gradient(f: Callable, v: ndarray, h: float = 1e-4) -&gt; List[ndarray]:
     &#34;&#34;&#34;Calculates the gradient of `f` at `v`
 
     Parameters
     ----------
     `f(x0,...,xi-th)` : `Callable` function
-    v : `Vector` or `np.array`
+        Function to differentiate.
+    v : `Vector` | `np.array`
+        1D array representing vector `v=(x0,...,xi)`.
     h : `float`. By default it is set to `1e-4`
+        The step size used to approximate the derivative.
 
+    Returns
+    -------
+    grad_f : `List[np.array]`
+        A list containing the estimated gradients of each component of `f` evaluated at `v`.
     &#34;&#34;&#34;
     return [partial_difference_quotient(f, v, i, h) for i in range(len(v))]</code></pre>
 </details>
@@ -1560,7 +1654,7 @@ if __name__ == &#34;__main__&#34;:
 <span>def <span class="ident">fft_denoise</span></span>(<span>dataset: numpy.ndarray, sigma: float = 0, mode: bool = True) ‑> Tuple[numpy.ndarray, float]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Performs the noise removal using the Fast Fourier Transform</p>
+<div class="desc"><p>Performs the noise removal using the Fast Fourier Transform.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>dataset</code></strong> :&ensp;<code>np.array</code></dt>
@@ -1582,7 +1676,7 @@ if __name__ == &#34;__main__&#34;:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def fft_denoise(dataset: ndarray, sigma: float = 0, mode: bool = True) -&gt; Tuple[ndarray, float]:
-    &#34;&#34;&#34;Performs the noise removal using the Fast Fourier Transform
+    &#34;&#34;&#34;Performs the noise removal using the Fast Fourier Transform.
 
     Parameters
     ----------
@@ -1627,13 +1721,21 @@ if __name__ == &#34;__main__&#34;:
 <dd>
 <div class="desc"><p>Generate a YAML string containing information about ordinal, numeric, and categorical features
 based on the given DataFrame.</p>
-<h2 id="args">Args</h2>
-<p>df (<code>pd.DataFrame</code>): The DataFrame containing the data.
-ignore_features (List[<code>str</code>]): A list of features to ignore.
-yaml_string (<code>bool</code>): If <code>True</code>, return the result as a YAML formatted string. Otherwise, return it as a dictionary. Default is <code>False</code>.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>The DataFrame containing the data.</dd>
+<dt><strong><code>ignore_features</code></strong> :&ensp;<code>List[<code>str</code>]</code></dt>
+<dd>A list of features to ignore.</dd>
+<dt><strong><code>yaml_string</code></strong> :&ensp;<code>bool</code></dt>
+<dd>If <code>True</code>, return the result as a YAML formatted string. Otherwise, return it as a dictionary. Default is <code>False</code>.</dd>
+</dl>
 <h2 id="returns">Returns</h2>
-<p><code>Dict</code> | <code>str</code>: A dictionary with four keys ('ordinal_features', 'numeric_features', 'categorical_features', 'ignore_features')
-mapping to lists of feature names. Or a YAML formatted string if <code>yaml_string</code> is <code>True</code>.</p></div>
+<dl>
+<dt><strong><code>feature_info</code></strong> :&ensp;<code>Dict` | `str</code></dt>
+<dd>A dictionary with four keys ('ordinal_features', 'numeric_features', 'categorical_features', 'ignore_features')
+mapping to lists of feature names. Or a YAML formatted string if <code>yaml_string</code> is <code>True</code>.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1645,13 +1747,19 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
     Generate a YAML string containing information about ordinal, numeric, and categorical features
     based on the given DataFrame.
 
-    Args:
-        df (`pd.DataFrame`): The DataFrame containing the data.
-        ignore_features (List[`str`]): A list of features to ignore.
-        yaml_string (`bool`): If `True`, return the result as a YAML formatted string. Otherwise, return it as a dictionary. Default is `False`.
+    Parameters
+    ----------
+    df : `pd.DataFrame`
+        The DataFrame containing the data.
+    ignore_features : `List[`str`]`
+        A list of features to ignore.
+    yaml_string : `bool`
+        If `True`, return the result as a YAML formatted string. Otherwise, return it as a dictionary. Default is `False`.
 
-    Returns:
-        `Dict` | `str`: A dictionary with four keys (&#39;ordinal_features&#39;, &#39;numeric_features&#39;, &#39;categorical_features&#39;, &#39;ignore_features&#39;)
+    Returns
+    -------
+    feature_info : `Dict` | `str`
+        A dictionary with four keys (&#39;ordinal_features&#39;, &#39;numeric_features&#39;, &#39;categorical_features&#39;, &#39;ignore_features&#39;)
         mapping to lists of feature names. Or a YAML formatted string if `yaml_string` is `True`.
     &#34;&#34;&#34;
     feature_info = {
@@ -1717,23 +1825,33 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 <span>def <span class="ident">get_period</span></span>(<span>dataset: numpy.ndarray) ‑> float</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Calculates the periodicity of a <code>dataset</code></p>
-<h2 id="args">Args</h2>
-<p>dataset (<code>ndarray</code>): the <code>dataset</code> describing the function over which the period is calculated</p>
+<div class="desc"><p>Calculates the periodicity of a <code>dataset</code>.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>dataset</code></strong> :&ensp;<code>ndarray</code></dt>
+<dd>the <code>dataset</code> describing the function over which the period is calculated</dd>
+</dl>
 <h2 id="returns">Returns</h2>
-<p><code>float</code>: period of the function described by the <code>dataset</code></p></div>
+<dl>
+<dt><strong><code>period</code></strong> :&ensp;<code>float</code></dt>
+<dd>period of the function described by the <code>dataset</code></dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_period(dataset: ndarray) -&gt; float:
-    &#34;&#34;&#34;Calculates the periodicity of a `dataset`
+    &#34;&#34;&#34;Calculates the periodicity of a `dataset`.
 
-    Args:
-        dataset (`ndarray`): the `dataset` describing the function over which the period is calculated
+    Parameters
+    ----------
+    dataset : `ndarray`
+        the `dataset` describing the function over which the period is calculated
 
-    Returns:
-        `float`: period of the function described by the `dataset`
+    Returns
+    -------
+    period : `float`
+        period of the function described by the `dataset`
     &#34;&#34;&#34;
     n = dataset.size
     fhat = np.fft.fft(dataset, n)
@@ -1797,12 +1915,15 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>dataset</code></strong> :&ensp;<code>List</code></dt>
-<dd>&nbsp;</dd>
+<dd>The data to be divided into mini-batch.</dd>
 <dt><strong><code>batch_size</code></strong> :&ensp;<code>int</code></dt>
-<dd>&nbsp;</dd>
+<dd>Specifies the size of each mini-batch.</dd>
 <dt><strong><code>shuffle</code></strong> :&ensp;<code>bool</code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
+<dd>If set <code>True</code>, the data will be shuffled before dividing it into mini-batches.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>List[List]</code>
+A list of lists containing the mini-batches. Each sublist is a separate mini-batch with length <code>batch_size</code>.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1813,9 +1934,16 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
     Parameters
     ----------
     dataset : `List`
+        The data to be divided into mini-batch.
     batch_size : `int`
+        Specifies the size of each mini-batch.
     shuffle : `bool`
+        If set `True`, the data will be shuffled before dividing it into mini-batches.
 
+    Returns
+    -------
+    `List[List]`
+        A list of lists containing the mini-batches. Each sublist is a separate mini-batch with length `batch_size`.
     &#34;&#34;&#34;
 
     # start indexes 0, batch_size, 2 * batch_size, ...
@@ -1830,36 +1958,42 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 </details>
 </dd>
 <dt id="likelihood.tools.tools.partial_difference_quotient"><code class="name flex">
-<span>def <span class="ident">partial_difference_quotient</span></span>(<span>f: Callable, v: numpy.ndarray, i: int, h: float)</span>
+<span>def <span class="ident">partial_difference_quotient</span></span>(<span>f: Callable, v: numpy.ndarray, i: int, h: float) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Calculates the partial difference quotient of <code>f</code></p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><code>f(x0,...,xi-th)</code> : <code>Callable</code> function</dt>
-<dt><strong><code>v</code></strong> :&ensp;<code>Vector</code> or <code>np.array</code></dt>
-<dd>&nbsp;</dd>
+<dt>Function to differentiate.</dt>
+<dt><strong><code>v</code></strong> :&ensp;<code>Vector` | `np.array</code></dt>
+<dd>1D array representing vector <code>v=(x0,...,xi)</code>.</dd>
 <dt><strong><code>h</code></strong> :&ensp;<code>float</code></dt>
-<dd>&nbsp;</dd>
+<dd>Step size.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p>the <code>i-th</code> partial difference quotient of <code>f</code> at <code>v</code></p></div>
+<p><code>(f(w) - f(v)) / h</code> : <code>np.array</code>
+the <code>i-th</code> partial difference quotient of <code>f</code> at <code>v</code></p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float):
+<pre><code class="python">def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float) -&gt; ndarray:
     &#34;&#34;&#34;Calculates the partial difference quotient of `f`
 
     Parameters
     ----------
     `f(x0,...,xi-th)` : `Callable` function
-    v : `Vector` or `np.array`
+        Function to differentiate.
+    v : `Vector` | `np.array`
+        1D array representing vector `v=(x0,...,xi)`.
     h : `float`
+        Step size.
 
     Returns
     -------
-    the `i-th` partial difference quotient of `f` at `v`
+    `(f(w) - f(v)) / h` : `np.array`
+        the `i-th` partial difference quotient of `f` at `v`
 
     &#34;&#34;&#34;
 
@@ -1873,13 +2007,13 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 <span>def <span class="ident">sigmoide</span></span>(<span>x: float) ‑> float</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>The sigmoid function</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def sigmoide(x: float) -&gt; float:
-
+    &#34;&#34;&#34;The sigmoid function&#34;&#34;&#34;
     return 1 / (1 + math.exp(-x))</code></pre>
 </details>
 </dd>
@@ -1888,10 +2022,14 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 </code></dt>
 <dd>
 <div class="desc"><p>Calculates the inverse of the sigmoid function</p>
-<h2 id="args">Args</h2>
-<p>y (<code>float</code>): the number to evaluate the function</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>y</code></strong> :&ensp;<code>float</code></dt>
+<dd>the number to evaluate the function</dd>
+</dl>
 <h2 id="returns">Returns</h2>
-<p><code>float</code>: value of evaluated function</p></div>
+<p><code>float</code>
+value of evaluated function</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1899,11 +2037,15 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 <pre><code class="python">def sigmoide_inv(y: float) -&gt; float:
     &#34;&#34;&#34;Calculates the inverse of the sigmoid function
 
-    Args:
-        y (`float`): the number to evaluate the function
+    Parameters
+    ----------
+    y : `float`
+        the number to evaluate the function
 
-    Returns:
-        `float`: value of evaluated function
+    Returns
+    -------
+    `float`
+        value of evaluated function
     &#34;&#34;&#34;
 
     return math.log(y / (1 - y))</code></pre>
@@ -2466,11 +2608,16 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
         &#34;&#34;&#34;
         Get directed graph showing importance of features.
 
-        Args:
-            dataset (`DataFrame`): Dataset to be used for generating the graph.
-            n_importances (`int`): Number of top importances to show in the graph.
+        Parameters
+        ----------
+        dataset : `DataFrame`
+            Dataset to be used for generating the graph.
+        n_importances : `int`
+            Number of top importances to show in the graph.
 
-        Returns:
+        Returns
+        -------
+        `str`
             A string representation of the directed graph.
         &#34;&#34;&#34;
         # Assign and clean dataset
@@ -2628,11 +2775,16 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 </code></dt>
 <dd>
 <div class="desc"><p>Get directed graph showing importance of features.</p>
-<h2 id="args">Args</h2>
-<p>dataset (<code>DataFrame</code>): Dataset to be used for generating the graph.
-n_importances (<code>int</code>): Number of top importances to show in the graph.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>dataset</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dd>Dataset to be used for generating the graph.</dd>
+<dt><strong><code>n_importances</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of top importances to show in the graph.</dd>
+</dl>
 <h2 id="returns">Returns</h2>
-<p>A string representation of the directed graph.</p></div>
+<p><code>str</code>
+A string representation of the directed graph.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -2641,11 +2793,16 @@ n_importances (<code>int</code>): Number of top importances to show in the graph
     &#34;&#34;&#34;
     Get directed graph showing importance of features.
 
-    Args:
-        dataset (`DataFrame`): Dataset to be used for generating the graph.
-        n_importances (`int`): Number of top importances to show in the graph.
+    Parameters
+    ----------
+    dataset : `DataFrame`
+        Dataset to be used for generating the graph.
+    n_importances : `int`
+        Number of top importances to show in the graph.
 
-    Returns:
+    Returns
+    -------
+    `str`
         A string representation of the directed graph.
     &#34;&#34;&#34;
     # Assign and clean dataset
@@ -3479,7 +3636,7 @@ It receives an array of integers and returns a binary array using the one-hot en
 <span>(</span><span>x: numpy.ndarray)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Calculates the autocorrelation of the data</p>
+<div class="desc"><p>Calculates the autocorrelation of the data.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>x</code></strong> :&ensp;<code>np.array</code></dt>
@@ -3495,7 +3652,7 @@ It receives an array of integers and returns a binary array using the one-hot en
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class autocorr:
-    &#34;&#34;&#34;Calculates the autocorrelation of the data
+    &#34;&#34;&#34;Calculates the autocorrelation of the data.
 
     Parameters
     ----------
@@ -3564,7 +3721,7 @@ It receives an array of integers and returns a binary array using the one-hot en
 <span>(</span><span>x: numpy.ndarray, y: numpy.ndarray)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Calculates the correlation of the data</p>
+<div class="desc"><p>Calculates the correlation of the data.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>x</code></strong> :&ensp;<code>np.array</code></dt>
@@ -3582,7 +3739,7 @@ It receives an array of integers and returns a binary array using the one-hot en
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class corr:
-    &#34;&#34;&#34;Calculates the correlation of the data
+    &#34;&#34;&#34;Calculates the correlation of the data.
 
     Parameters
     ----------

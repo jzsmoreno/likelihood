@@ -26,32 +26,110 @@
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">import numpy as np
+<pre><code class="python">from typing import Dict
+
+import numpy as np
+from numpy import arange, array, ndarray, random
+from numpy.linalg import solve
+from pandas.core.frame import DataFrame
+
+# -------------------------------------------------------------------------
 
 
-def subs(a, b):
-    &#34;&#34;&#34;Function that subtracts lists element by element.
+def xi_corr(df: DataFrame) -&gt; Dict:
+    &#34;&#34;&#34;Calculate new coefficient of correlation for all pairs of columns in a `DataFrame`.
 
     Parameters
     ----------
-    a
-    b
+    df : `DataFrame`
+        Input data containing the variables to be correlated.
+
+    Returns
+    -------
+    `dict`
+        A dictionary with variable names as keys and their corresponding
+        correlation coefficients as values.
     &#34;&#34;&#34;
+    correlations = {}
+    columns = df.columns
 
-    for i, val in enumerate(a):
-        val = val - b[i]
-        a[i] = val
-    return a
+    for i, col1 in enumerate(columns):
+        for j, col2 in enumerate(columns):
+            if i &lt; j:
+                x = df[col1].values
+                y = df[col2].values
+
+                correlation = xicor(x, y)
+                correlations[(col1, col2)] = round(correlation, 8)
+
+    return correlations
 
 
-def ecprint(A):
+&#34;&#34;&#34;
+@article{Chatterjee2019ANC,
+  title={A New Coefficient of Correlation},
+  author={Sourav Chatterjee},
+  journal={Journal of the American Statistical Association},
+  year={2019},
+  volume={116},
+  pages={2009 - 2022},
+  url={https://api.semanticscholar.org/CorpusID:202719281}
+} 
+&#34;&#34;&#34;
+
+
+def xicor(X: ndarray, Y: ndarray, ties: bool = True) -&gt; float:
+    &#34;&#34;&#34;Calculate a new coefficient of correlation between two variables.
+
+    The new coefficient of correlation is a generalization of Pearson&#39;s correlation.
+
+    Parameters
+    ----------
+    X : `np.ndarray`
+        The first variable to be correlated. Must have at least one dimension.
+    Y : `np.ndarray`
+        The second variable to be correlated. Must have at least one dimension.
+
+    Returns
+    -------
+    xi : `float`
+        The estimated value of the new coefficient of correlation.
+    &#34;&#34;&#34;
+    random.seed(42)
+    n = len(X)
+    order = array([i[0] for i in sorted(enumerate(X), key=lambda x: x[1])])
+    if ties:
+        l = array([sum(y &gt;= Y[order]) for y in Y[order]])
+        r = l.copy()
+        for j in range(n):
+            if sum([r[j] == r[i] for i in range(n)]) &gt; 1:
+                tie_index = array([r[j] == r[i] for i in range(n)])
+                r[tie_index] = random.choice(
+                    r[tie_index] - arange(0, sum([r[j] == r[i] for i in range(n)])),
+                    sum(tie_index),
+                    replace=False,
+                )
+        return 1 - n * sum(abs(r[1:] - r[: n - 1])) / (2 * sum(l * (n - l)))
+    else:
+        r = array([sum(y &gt;= Y[order]) for y in Y[order]])
+        return 1 - 3 * sum(abs(r[1:] - r[: n - 1])) / (n**2 - 1)
+
+
+# -------------------------------------------------------------------------
+
+
+def ecprint(A: ndarray) -&gt; None:
     &#34;&#34;&#34;Function that prints the augmented matrix.
 
     Parameters
     ----------
-    A : np.array
+    A : `np.array`
         The augmented matrix.
 
+    Returns
+    -------
+    `None`
+        Prints the matrix to console.
     &#34;&#34;&#34;
 
     n = len(A)
@@ -65,51 +143,60 @@ def ecprint(A):
     print()
 
 
-def sor_elimination(A, b, n, nmax, w):
-    &#34;&#34;&#34;Computes the successive over-relaxation algorithm.
+def sor_elimination(
+    A: ndarray,
+    b: ndarray,
+    n: int,
+    max_iterations: int,
+    w: float,
+    error: float = 1e-3,
+    verbose: bool = True,
+) -&gt; ndarray:
+    &#34;&#34;&#34;Computes the Successive Over-Relaxation algorithm.
 
     Parameters
     ----------
     A : `np.array`
-        An array containing the parameters of the $n$ equations.
+        Coefficient matrix of the system of equations.
     b : `np.array`
-        An array containing the equalities of the $n$ equations.
+        Right-hand side vector of the system of equations.
     n : `int`
-        Is the dimension of the system of equations.
-    nmax : `int`
-        Is the maximum number of iterations.
+        Dimension of the system of equations.
+    max_iterations : `int`
+        Maximum number of iterations allowed.
     w : `float`
-        Is a parameter of the SOR method
+        Relaxation parameter.
+    error : `float`, optional
+        Desired level of accuracy, default is 1e-3.
+    verbose : `bool`, optional
+        Whether to print intermediate results, default is False.
 
     Returns
     -------
     xi : `np.array`
-        The solution of the system of $n$ equations
+        The solution of the system of equations.
     &#34;&#34;&#34;
-
     xin = np.zeros(n)
-    for k in range(nmax):
+    for k in range(max_iterations):
         xi = np.zeros(n)
         for i in range(n):
-            s1, s2 = 0, 0
-            for j in range(i):
-                s1 = s1 + (A[i, j] * xin[j])
-            for j in range(i + 1, n):
-                s2 = s2 + (A[i, j] * xin[j])
-            xi[i] = (w / A[i, i]) * (b[i] - s1 - s2) + (1.0 / A[i, i]) * (b[i] - s1) * (1 - w)
+            s1 = np.dot(A[i, :i], xin[:i])
+            s2 = np.dot(A[i, i + 1 :], xin[i + 1 :])
+            xi[i] = (w / A[i, i]) * (b[i] - s1 - s2) + (1.0 - w) * xin[i]
 
-        error = np.max(np.abs(xi - xin))
-        print(xi)
-        print(f&#34;solution error : {error}&#34;)
-        if error &lt;= 0.00001:
-            print(f&#34;iterations : {k}&#34;)
+        difference = np.max(np.abs(xi - xin))
+        if verbose:
+            print(f&#34;Iteration {k + 1}: xi = {xi}, error = {difference}&#34;)
+        if difference &lt;= error:
+            if verbose:
+                print(f&#34;Converged after {k + 1} iterations.&#34;)
             return xi
-        else:
-            xin = np.copy(xi)
-    return &#34;number of iterations exceeded&#34;
+        xin = np.copy(xi)
+
+    raise RuntimeError(&#34;Convergence not achieved within the maximum number of iterations.&#34;)
 
 
-def gauss_elimination(A, pr=2):
+def gauss_elimination(A: ndarray | list, pr: int = 2) -&gt; ndarray:
     &#34;&#34;&#34;Computes the Gauss elimination algorithm.
 
     Parameters
@@ -129,8 +216,7 @@ def gauss_elimination(A, pr=2):
     &#34;&#34;&#34;
 
     n = len(A)
-    M = [[0 for x in range(n + 1)] for x in range(n)]
-    X = [0 for x in range(n)]
+    X = [0 for _ in range(n)]
 
     for i in range(n - 1):
         for p in range(i, n):
@@ -139,7 +225,7 @@ def gauss_elimination(A, pr=2):
                     A[p], A[i] = A[i], A[p]
                 break
             elif p == (n - 1):
-                print(&#34;there is no single solution&#34;)
+                print(&#34;There is no single solution&#34;)
                 return None
 
         for j in range(i + 1, n):
@@ -149,26 +235,60 @@ def gauss_elimination(A, pr=2):
                 break
 
         for j in range(i + 1, n):
-            M[j][i] = A[j][i] / A[i][i]
-            A[j] = subs(A[j], np.multiply(M[j][i], A[i]))
+            if A[i][i] == 0:
+                print(&#34;There is no single solution&#34;)
+                return None
+            factor = A[j][i] / A[i][i]
+            A[j] = [A[j][k] - factor * A[i][k] for k in range(n + 1)]
 
-        if A[n - 1][n - 1] == 0:
-            print(&#34;there is no single solution&#34;)
-            return None
-        ecprint(A)
+    if A[n - 1][n - 1] == 0:
+        print(&#34;There is no single solution&#34;)
+        return None
 
-        X[n - 1] = A[n - 1][n] / A[n - 1][n - 1]
-        for i in list(reversed(range(n - 1))):
-            s = 0
-            for j in range(i + 1, n):
-                s += A[i][j] * X[j]
-            X[i] = (A[i][n] - s) / A[i][i]
-        print(&#34;the solution is:&#34;)
+    X[n - 1] = A[n - 1][n] / A[n - 1][n - 1]
+    for i in range(n - 2, -1, -1):
+        s = sum(A[i][j] * X[j] for j in range(i + 1, n))
+        X[i] = (A[i][n] - s) / A[i][i]
 
-        for i in range(n):
-            print(f&#34;X{i} = {round(X[i], pr)}&#34;)
+    ecprint(A)
+    print(&#34;The solution is:&#34;)
+    for i in range(n):
+        print(f&#34;\tX{i} = {round(X[i], pr)}&#34;)
 
-        return X</code></pre>
+    return X
+
+
+# Example usage:
+if __name__ == &#34;__main__&#34;:
+    import pandas as pd
+
+    # Create a sample dataframe with some random
+    data = {&#34;x&#34;: [3, 5, 7, 9], &#34;y&#34;: [4, 6, 8, 2], &#34;z&#34;: [1, 2, 1, 3]}
+    df = pd.DataFrame(data)
+    print(&#34;Using the SOR relaxation method : &#34;)
+    # Define the coefficient matrix A and the number of variables b
+    A = np.array([[1, 1, 1], [1, -1, 2], [1, -1, -3]])
+    Ag = A.copy()
+    b = np.array([6, 5, -10])
+    print(&#34;b : &#34;, b)
+    # Solve Ax=b, x = [1, 2, 3]
+    x = solve(A, b)
+    x_hat_sor = sor_elimination(A, b, 3, 200, 0.05)
+    # assert np.allclose(x, x_hat_sor), f&#34;Expected:\n{x}\ngot\n{x_hat_sor}&#34;
+
+    print(&#34;Using Gaussian elimination : &#34;)
+    Ag = np.insert(Ag, len(Ag), b, axis=1)
+    print(Ag)
+    x_hat_gaus = gauss_elimination(Ag)
+
+    print(&#34;New correlation coefficient test&#34;)
+    X = np.random.rand(100, 1)
+    Y = X * X
+    print(&#34;coefficient for Y = X * X : &#34;, xicor(X, Y))
+
+    print(&#34;New correlation coefficient test for pandas DataFrame&#34;)
+    values = xi_corr(df)
+    breakpoint()</code></pre>
 </details>
 </section>
 <section>
@@ -179,7 +299,7 @@ def gauss_elimination(A, pr=2):
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.tools.numeric_tools.ecprint"><code class="name flex">
-<span>def <span class="ident">ecprint</span></span>(<span>A)</span>
+<span>def <span class="ident">ecprint</span></span>(<span>A: numpy.ndarray) ‑> None</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Function that prints the augmented matrix.</p>
@@ -187,19 +307,26 @@ def gauss_elimination(A, pr=2):
 <dl>
 <dt><strong><code>A</code></strong> :&ensp;<code>np.array</code></dt>
 <dd>The augmented matrix.</dd>
-</dl></div>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>None</code>
+Prints the matrix to console.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def ecprint(A):
+<pre><code class="python">def ecprint(A: ndarray) -&gt; None:
     &#34;&#34;&#34;Function that prints the augmented matrix.
 
     Parameters
     ----------
-    A : np.array
+    A : `np.array`
         The augmented matrix.
 
+    Returns
+    -------
+    `None`
+        Prints the matrix to console.
     &#34;&#34;&#34;
 
     n = len(A)
@@ -214,7 +341,7 @@ def gauss_elimination(A, pr=2):
 </details>
 </dd>
 <dt id="likelihood.tools.numeric_tools.gauss_elimination"><code class="name flex">
-<span>def <span class="ident">gauss_elimination</span></span>(<span>A, pr=2)</span>
+<span>def <span class="ident">gauss_elimination</span></span>(<span>A: numpy.ndarray | list, pr: int = 2) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Computes the Gauss elimination algorithm.</p>
@@ -235,7 +362,7 @@ with the equalities.</dd>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def gauss_elimination(A, pr=2):
+<pre><code class="python">def gauss_elimination(A: ndarray | list, pr: int = 2) -&gt; ndarray:
     &#34;&#34;&#34;Computes the Gauss elimination algorithm.
 
     Parameters
@@ -255,8 +382,7 @@ with the equalities.</dd>
     &#34;&#34;&#34;
 
     n = len(A)
-    M = [[0 for x in range(n + 1)] for x in range(n)]
-    X = [0 for x in range(n)]
+    X = [0 for _ in range(n)]
 
     for i in range(n - 1):
         for p in range(i, n):
@@ -265,7 +391,7 @@ with the equalities.</dd>
                     A[p], A[i] = A[i], A[p]
                 break
             elif p == (n - 1):
-                print(&#34;there is no single solution&#34;)
+                print(&#34;There is no single solution&#34;)
                 return None
 
         for j in range(i + 1, n):
@@ -275,128 +401,217 @@ with the equalities.</dd>
                 break
 
         for j in range(i + 1, n):
-            M[j][i] = A[j][i] / A[i][i]
-            A[j] = subs(A[j], np.multiply(M[j][i], A[i]))
+            if A[i][i] == 0:
+                print(&#34;There is no single solution&#34;)
+                return None
+            factor = A[j][i] / A[i][i]
+            A[j] = [A[j][k] - factor * A[i][k] for k in range(n + 1)]
 
-        if A[n - 1][n - 1] == 0:
-            print(&#34;there is no single solution&#34;)
-            return None
-        ecprint(A)
+    if A[n - 1][n - 1] == 0:
+        print(&#34;There is no single solution&#34;)
+        return None
 
-        X[n - 1] = A[n - 1][n] / A[n - 1][n - 1]
-        for i in list(reversed(range(n - 1))):
-            s = 0
-            for j in range(i + 1, n):
-                s += A[i][j] * X[j]
-            X[i] = (A[i][n] - s) / A[i][i]
-        print(&#34;the solution is:&#34;)
+    X[n - 1] = A[n - 1][n] / A[n - 1][n - 1]
+    for i in range(n - 2, -1, -1):
+        s = sum(A[i][j] * X[j] for j in range(i + 1, n))
+        X[i] = (A[i][n] - s) / A[i][i]
 
-        for i in range(n):
-            print(f&#34;X{i} = {round(X[i], pr)}&#34;)
+    ecprint(A)
+    print(&#34;The solution is:&#34;)
+    for i in range(n):
+        print(f&#34;\tX{i} = {round(X[i], pr)}&#34;)
 
-        return X</code></pre>
+    return X</code></pre>
 </details>
 </dd>
 <dt id="likelihood.tools.numeric_tools.sor_elimination"><code class="name flex">
-<span>def <span class="ident">sor_elimination</span></span>(<span>A, b, n, nmax, w)</span>
+<span>def <span class="ident">sor_elimination</span></span>(<span>A: numpy.ndarray, b: numpy.ndarray, n: int, max_iterations: int, w: float, error: float = 0.001, verbose: bool = True) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Computes the successive over-relaxation algorithm.</p>
+<div class="desc"><p>Computes the Successive Over-Relaxation algorithm.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>A</code></strong> :&ensp;<code>np.array</code></dt>
-<dd>An array containing the parameters of the $n$ equations.</dd>
+<dd>Coefficient matrix of the system of equations.</dd>
 <dt><strong><code>b</code></strong> :&ensp;<code>np.array</code></dt>
-<dd>An array containing the equalities of the $n$ equations.</dd>
+<dd>Right-hand side vector of the system of equations.</dd>
 <dt><strong><code>n</code></strong> :&ensp;<code>int</code></dt>
-<dd>Is the dimension of the system of equations.</dd>
-<dt><strong><code>nmax</code></strong> :&ensp;<code>int</code></dt>
-<dd>Is the maximum number of iterations.</dd>
+<dd>Dimension of the system of equations.</dd>
+<dt><strong><code>max_iterations</code></strong> :&ensp;<code>int</code></dt>
+<dd>Maximum number of iterations allowed.</dd>
 <dt><strong><code>w</code></strong> :&ensp;<code>float</code></dt>
-<dd>Is a parameter of the SOR method</dd>
+<dd>Relaxation parameter.</dd>
+<dt><strong><code>error</code></strong> :&ensp;<code>float</code>, optional</dt>
+<dd>Desired level of accuracy, default is 1e-3.</dd>
+<dt><strong><code>verbose</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Whether to print intermediate results, default is False.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><strong><code>xi</code></strong> :&ensp;<code>np.array</code></dt>
-<dd>The solution of the system of $n$ equations</dd>
+<dd>The solution of the system of equations.</dd>
 </dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def sor_elimination(A, b, n, nmax, w):
-    &#34;&#34;&#34;Computes the successive over-relaxation algorithm.
+<pre><code class="python">def sor_elimination(
+    A: ndarray,
+    b: ndarray,
+    n: int,
+    max_iterations: int,
+    w: float,
+    error: float = 1e-3,
+    verbose: bool = True,
+) -&gt; ndarray:
+    &#34;&#34;&#34;Computes the Successive Over-Relaxation algorithm.
 
     Parameters
     ----------
     A : `np.array`
-        An array containing the parameters of the $n$ equations.
+        Coefficient matrix of the system of equations.
     b : `np.array`
-        An array containing the equalities of the $n$ equations.
+        Right-hand side vector of the system of equations.
     n : `int`
-        Is the dimension of the system of equations.
-    nmax : `int`
-        Is the maximum number of iterations.
+        Dimension of the system of equations.
+    max_iterations : `int`
+        Maximum number of iterations allowed.
     w : `float`
-        Is a parameter of the SOR method
+        Relaxation parameter.
+    error : `float`, optional
+        Desired level of accuracy, default is 1e-3.
+    verbose : `bool`, optional
+        Whether to print intermediate results, default is False.
 
     Returns
     -------
     xi : `np.array`
-        The solution of the system of $n$ equations
+        The solution of the system of equations.
     &#34;&#34;&#34;
-
     xin = np.zeros(n)
-    for k in range(nmax):
+    for k in range(max_iterations):
         xi = np.zeros(n)
         for i in range(n):
-            s1, s2 = 0, 0
-            for j in range(i):
-                s1 = s1 + (A[i, j] * xin[j])
-            for j in range(i + 1, n):
-                s2 = s2 + (A[i, j] * xin[j])
-            xi[i] = (w / A[i, i]) * (b[i] - s1 - s2) + (1.0 / A[i, i]) * (b[i] - s1) * (1 - w)
+            s1 = np.dot(A[i, :i], xin[:i])
+            s2 = np.dot(A[i, i + 1 :], xin[i + 1 :])
+            xi[i] = (w / A[i, i]) * (b[i] - s1 - s2) + (1.0 - w) * xin[i]
 
-        error = np.max(np.abs(xi - xin))
-        print(xi)
-        print(f&#34;solution error : {error}&#34;)
-        if error &lt;= 0.00001:
-            print(f&#34;iterations : {k}&#34;)
+        difference = np.max(np.abs(xi - xin))
+        if verbose:
+            print(f&#34;Iteration {k + 1}: xi = {xi}, error = {difference}&#34;)
+        if difference &lt;= error:
+            if verbose:
+                print(f&#34;Converged after {k + 1} iterations.&#34;)
             return xi
-        else:
-            xin = np.copy(xi)
-    return &#34;number of iterations exceeded&#34;</code></pre>
+        xin = np.copy(xi)
+
+    raise RuntimeError(&#34;Convergence not achieved within the maximum number of iterations.&#34;)</code></pre>
 </details>
 </dd>
-<dt id="likelihood.tools.numeric_tools.subs"><code class="name flex">
-<span>def <span class="ident">subs</span></span>(<span>a, b)</span>
+<dt id="likelihood.tools.numeric_tools.xi_corr"><code class="name flex">
+<span>def <span class="ident">xi_corr</span></span>(<span>df: pandas.core.frame.DataFrame) ‑> Dict</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Function that subtracts lists element by element.</p>
+<div class="desc"><p>Calculate new coefficient of correlation for all pairs of columns in a <code>DataFrame</code>.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>a</code></strong></dt>
-<dd>&nbsp;</dd>
-<dt><strong><code>b</code></strong></dt>
-<dd>&nbsp;</dd>
+<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dd>Input data containing the variables to be correlated.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>dict</code>
+A dictionary with variable names as keys and their corresponding
+correlation coefficients as values.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def xi_corr(df: DataFrame) -&gt; Dict:
+    &#34;&#34;&#34;Calculate new coefficient of correlation for all pairs of columns in a `DataFrame`.
+
+    Parameters
+    ----------
+    df : `DataFrame`
+        Input data containing the variables to be correlated.
+
+    Returns
+    -------
+    `dict`
+        A dictionary with variable names as keys and their corresponding
+        correlation coefficients as values.
+    &#34;&#34;&#34;
+    correlations = {}
+    columns = df.columns
+
+    for i, col1 in enumerate(columns):
+        for j, col2 in enumerate(columns):
+            if i &lt; j:
+                x = df[col1].values
+                y = df[col2].values
+
+                correlation = xicor(x, y)
+                correlations[(col1, col2)] = round(correlation, 8)
+
+    return correlations</code></pre>
+</details>
+</dd>
+<dt id="likelihood.tools.numeric_tools.xicor"><code class="name flex">
+<span>def <span class="ident">xicor</span></span>(<span>X: numpy.ndarray, Y: numpy.ndarray, ties: bool = True) ‑> float</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Calculate a new coefficient of correlation between two variables.</p>
+<p>The new coefficient of correlation is a generalization of Pearson's correlation.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>X</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The first variable to be correlated. Must have at least one dimension.</dd>
+<dt><strong><code>Y</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The second variable to be correlated. Must have at least one dimension.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>xi</code></strong> :&ensp;<code>float</code></dt>
+<dd>The estimated value of the new coefficient of correlation.</dd>
 </dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def subs(a, b):
-    &#34;&#34;&#34;Function that subtracts lists element by element.
+<pre><code class="python">def xicor(X: ndarray, Y: ndarray, ties: bool = True) -&gt; float:
+    &#34;&#34;&#34;Calculate a new coefficient of correlation between two variables.
+
+    The new coefficient of correlation is a generalization of Pearson&#39;s correlation.
 
     Parameters
     ----------
-    a
-    b
-    &#34;&#34;&#34;
+    X : `np.ndarray`
+        The first variable to be correlated. Must have at least one dimension.
+    Y : `np.ndarray`
+        The second variable to be correlated. Must have at least one dimension.
 
-    for i, val in enumerate(a):
-        val = val - b[i]
-        a[i] = val
-    return a</code></pre>
+    Returns
+    -------
+    xi : `float`
+        The estimated value of the new coefficient of correlation.
+    &#34;&#34;&#34;
+    random.seed(42)
+    n = len(X)
+    order = array([i[0] for i in sorted(enumerate(X), key=lambda x: x[1])])
+    if ties:
+        l = array([sum(y &gt;= Y[order]) for y in Y[order]])
+        r = l.copy()
+        for j in range(n):
+            if sum([r[j] == r[i] for i in range(n)]) &gt; 1:
+                tie_index = array([r[j] == r[i] for i in range(n)])
+                r[tie_index] = random.choice(
+                    r[tie_index] - arange(0, sum([r[j] == r[i] for i in range(n)])),
+                    sum(tie_index),
+                    replace=False,
+                )
+        return 1 - n * sum(abs(r[1:] - r[: n - 1])) / (2 * sum(l * (n - l)))
+    else:
+        r = array([sum(y &gt;= Y[order]) for y in Y[order]])
+        return 1 - 3 * sum(abs(r[1:] - r[: n - 1])) / (n**2 - 1)</code></pre>
 </details>
 </dd>
 </dl>
@@ -420,7 +635,8 @@ with the equalities.</dd>
 <li><code><a title="likelihood.tools.numeric_tools.ecprint" href="#likelihood.tools.numeric_tools.ecprint">ecprint</a></code></li>
 <li><code><a title="likelihood.tools.numeric_tools.gauss_elimination" href="#likelihood.tools.numeric_tools.gauss_elimination">gauss_elimination</a></code></li>
 <li><code><a title="likelihood.tools.numeric_tools.sor_elimination" href="#likelihood.tools.numeric_tools.sor_elimination">sor_elimination</a></code></li>
-<li><code><a title="likelihood.tools.numeric_tools.subs" href="#likelihood.tools.numeric_tools.subs">subs</a></code></li>
+<li><code><a title="likelihood.tools.numeric_tools.xi_corr" href="#likelihood.tools.numeric_tools.xi_corr">xi_corr</a></code></li>
+<li><code><a title="likelihood.tools.numeric_tools.xicor" href="#likelihood.tools.numeric_tools.xicor">xicor</a></code></li>
 </ul>
 </li>
 </ul>
