@@ -1,8 +1,42 @@
+from typing import Dict
+
+import numpy as np
 from numpy import arange, array, ndarray, random
 from numpy.linalg import solve
-import numpy as np
+from pandas.core.frame import DataFrame
 
 # -------------------------------------------------------------------------
+
+
+def xi_corr(df: DataFrame) -> Dict:
+    """Calculate new coefficient of correlation for all pairs of columns in a `DataFrame`.
+
+    Parameters
+    ----------
+    df : `DataFrame`
+        Input data containing the variables to be correlated.
+
+    Returns
+    -------
+    `dict`
+        A dictionary with variable names as keys and their corresponding
+        correlation coefficients as values.
+    """
+    correlations = {}
+    columns = df.columns
+
+    for i, col1 in enumerate(columns):
+        for j, col2 in enumerate(columns):
+            if i < j:
+                x = df[col1].values
+                y = df[col2].values
+
+                correlation = xicor(x, y)
+                correlations[(col1, col2)] = round(correlation, 8)
+
+    return correlations
+
+
 """
 @article{Chatterjee2019ANC,
   title={A New Coefficient of Correlation},
@@ -47,10 +81,10 @@ def xicor(X: ndarray, Y: ndarray, ties: bool = True) -> float:
                     sum(tie_index),
                     replace=False,
                 )
-        return round((1 - n * sum(abs(r[1:] - r[: n - 1])) / (2 * sum(l * (n - l))))[0], 8)
+        return 1 - n * sum(abs(r[1:] - r[: n - 1])) / (2 * sum(l * (n - l)))
     else:
         r = array([sum(y >= Y[order]) for y in Y[order]])
-        return round((1 - 3 * sum(abs(r[1:] - r[: n - 1])) / (n**2 - 1))[0], 8)
+        return 1 - 3 * sum(abs(r[1:] - r[: n - 1])) / (n**2 - 1)
 
 
 # -------------------------------------------------------------------------
@@ -198,6 +232,11 @@ def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
 
 # Example usage:
 if __name__ == "__main__":
+    import pandas as pd
+
+    # Create a sample dataframe with some random
+    data = {"x": [3, 5, 7, 9], "y": [4, 6, 8, 2], "z": [1, 2, 1, 3]}
+    df = pd.DataFrame(data)
     print("Using the SOR relaxation method : ")
     # Define the coefficient matrix A and the number of variables b
     A = np.array([[1, 1, 1], [1, -1, 2], [1, -1, -3]])
@@ -218,4 +257,7 @@ if __name__ == "__main__":
     X = np.random.rand(100, 1)
     Y = X * X
     print("coefficient for Y = X * X : ", xicor(X, Y))
+
+    print("New correlation coefficient test for pandas DataFrame")
+    values = xi_corr(df)
     breakpoint()
