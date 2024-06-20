@@ -36,7 +36,7 @@ class AutoClassifier(Model):
         decoded = self.decoder(encoded)
         combined = concatenate([tf.reshape(decoded, [-1]), encoded])
         classifier = self.classifier(combined)
-        return classifier
+        return concatenate(decoded, classifier)
 
 
 if __name__ == "__main__":
