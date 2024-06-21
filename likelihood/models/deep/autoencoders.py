@@ -2,9 +2,6 @@ from typing import List
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import losses
-from tensorflow.keras.datasets import fashion_mnist
-from tensorflow.keras.layers import Input, concatenate
 from tensorflow.keras.models import Model
 
 
@@ -15,16 +12,11 @@ class AutoClassifier(Model):
         self.shape = input_shape
 
         self.encoder = tf.keras.Sequential(
-            [tf.keras.layers.Flatten(), tf.keras.layers.Dense(latent_dim, activation="sigmoid")]
+            [tf.keras.layers.Dense(latent_dim, activation="sigmoid")]
         )
 
         self.decoder = tf.keras.Sequential(
-            [
-                tf.keras.layers.Dense(
-                    tf.math.reduce_prod(input_shape).numpy(), activation="sigmoid"
-                ),
-                tf.keras.layers.Reshape(input_shape),
-            ]
+            [tf.keras.layers.Dense(input_shape[1], activation="sigmoid")]
         )
 
         self.classifier = tf.keras.Sequential(
@@ -34,20 +26,6 @@ class AutoClassifier(Model):
     def call(self, x):
         encoded = self.encoder(x)
         decoded = self.decoder(encoded)
-        combined = concatenate([tf.reshape(decoded, [-1]), encoded])
+        combined = tf.concat([decoded, encoded], axis=1)
         classifier = self.classifier(combined)
-        return concatenate(decoded, classifier)
-
-
-if __name__ == "__main__":
-
-    (x_train, _), (x_test, _) = fashion_mnist.load_data()
-
-    x_train = x_train.astype("float32") / 255.0
-    x_test = x_test.astype("float32") / 255.0
-
-    shape = x_test.shape[1:]
-    latent_dim = 64
-    num_classes = 10
-    model = AutoClassifier(shape, latent_dim, num_classes)
-    model.compile(optimizer="adam", loss=losses.MeanSquaredError())
+        return classifier
