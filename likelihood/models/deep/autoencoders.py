@@ -88,7 +88,7 @@ def setup_model(
     y = data[target]
     # Verify if there are categorical columns in the dataframe
     assert (
-        X.select_dtypes(include=["object"]).empty == False
+        X.select_dtypes(include=["object"]).empty == True
     ), "Categorical variables within the DataFrame must be encoded, this is done by using the DataFrameEncoder from likelihood."
     validation_split = 1.0 - train_size
     # Create my_dir path if it does not exist
@@ -99,12 +99,15 @@ def setup_model(
         y_encoder = OneHotEncoder()
         y = y_encoder.encode(y.to_list())
         X = X.to_numpy()
+        X = np.asarray(X).astype(np.float32)
+
         y = pd.DataFrame(y, columns=["class_0", "class_1"])
         y = y.to_numpy()
+        y = np.asarray(y).astype(np.float32)
 
         input_shape = X.shape[1]
         num_classes = y.shape[1]
-
+        global build_model
         build_model = partial(build_model, input_shape=input_shape, num_classes=num_classes)
 
         # Create the AutoKeras model
