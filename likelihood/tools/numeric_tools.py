@@ -8,7 +8,7 @@ from pandas.core.frame import DataFrame
 # -------------------------------------------------------------------------
 
 
-def xi_corr(df: DataFrame) -> Dict:
+def xi_corr(df: DataFrame) -> DataFrame:
     """Calculate new coefficient of correlation for all pairs of columns in a `DataFrame`.
 
     Parameters
@@ -18,8 +18,8 @@ def xi_corr(df: DataFrame) -> Dict:
 
     Returns
     -------
-    `dict`
-        A dictionary with variable names as keys and their corresponding
+    `DataFrame`
+        A dataframe with variable names as keys and their corresponding
         correlation coefficients as values.
     """
     correlations = {}
@@ -33,7 +33,8 @@ def xi_corr(df: DataFrame) -> Dict:
 
                 correlation = xicor(x, y)
                 correlations[(col1, col2)] = round(correlation, 8)
-
+    # dictionary to dataframe
+    correlations = DataFrame(list(correlations.items()), columns=["Variables", "Xi Correlation"])
     return correlations
 
 
@@ -259,5 +260,5 @@ if __name__ == "__main__":
     print("coefficient for Y = X * X : ", xicor(X, Y))
 
     print("New correlation coefficient test for pandas DataFrame")
-    values = xi_corr(df)
+    values_df = xi_corr(df)
     breakpoint()

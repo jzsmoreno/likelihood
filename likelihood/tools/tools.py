@@ -1036,7 +1036,7 @@ class OneHotEncoder:
         if not isinstance(x, ndarray):
             x = np.array(x)  # If not numpy array then convert it
 
-        # Regresamos los valores max de cada renglon
+        # We return the max values of each row
         y = np.argmax(x, axis=1)
 
         return y
@@ -1044,7 +1044,7 @@ class OneHotEncoder:
 
 class FeatureSelection:
     """
-    Generate the data graph using a variation of the feature selection algorithm..
+    Generate the data graph using a variation of the feature selection algorithm.
 
     - The method `get_digraph` returns the network based on the feature selection method.
     """
