@@ -30,6 +30,8 @@ jobs:
         pip install networkx
         pip install pyvis
         pip install pdoc3
+        pip install tensorflow
+        pip install keras-tuner
 
     - name: Set up Git
       env:
