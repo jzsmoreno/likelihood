@@ -762,7 +762,14 @@ def mean_square_error(y_true: ndarray, y_pred: ndarray, print_error: bool = Fals
 class DataFrameEncoder:
     """Allows encoding and decoding Dataframes"""
 
-    __slots__ = ["_df", "_names", "_encode_columns", "encoding_list", "decoding_list"]
+    __slots__ = [
+        "_df",
+        "_names",
+        "_encode_columns",
+        "encoding_list",
+        "decoding_list",
+        "median_list",
+    ]
 
     def __init__(self, data: DataFrame) -> None:
         """Sets the columns of the `DataFrame`"""
@@ -771,6 +778,7 @@ class DataFrameEncoder:
         self._encode_columns = []
         self.encoding_list = []
         self.decoding_list = []
+        self.median_list = []
 
     def load_config(self, path_to_dictionaries: str = "./", **kwargs) -> None:
         """Loads dictionaries from a given directory
@@ -787,6 +795,7 @@ class DataFrameEncoder:
         self.encoding_list = labelencoder[0]
         self.decoding_list = labelencoder[1]
         self._encode_columns = labelencoder[2]
+        self.median_list = labelencoder[3]
         print("Configuration successfully uploaded")
 
     def train(self, path_to_save: str, **kwargs) -> None:
@@ -795,6 +804,7 @@ class DataFrameEncoder:
         dictionary_name = (
             kwargs["dictionary_name"] if "dictionary_name" in kwargs else "labelencoder_dictionary"
         )
+        norm_method = kwargs["norm_method"] if "norm_method" in kwargs else "None"
         for i in self._names:
             if self._df[i].dtype == "object":
                 self._encode_columns.append(i)
@@ -805,6 +815,11 @@ class DataFrameEncoder:
                 self._df[i] = self._df[i].apply(
                     self._code_transformation_to, dictionary_list=encode_dict
                 )
+                median_value = len(self._df[i].unique()) // 2
+                if norm_method == "median":
+                    self._df[i] = self._df[i].astype("float64")
+                    self._df[i] = self._df[i] / median_value
+                    self.median_list.append(median_value)
                 self.encoding_list.append(encode_dict)
                 self.decoding_list.append(decode_dict)
         if save_mode:
@@ -817,6 +832,7 @@ class DataFrameEncoder:
         ----------
         - save_mode (`bool`): An optional integer parameter. By default it is set to `True`
         - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
+        - norm_method (`str`): An optional string parameter to perform normalization. By default it is set to `None`
         """
         if len(self.encoding_list) == 0:
             self.train(path_to_save, **kwargs)
@@ -824,22 +840,32 @@ class DataFrameEncoder:
 
         else:
             print("Configuration detected")
+            if len(self.median_list) == len(self._encode_columns):
+                median_mode = True
             for num, colname in enumerate(self._encode_columns):
                 if self._df[colname].dtype == "object":
                     encode_dict = self.encoding_list[num]
                     self._df[colname] = self._df[colname].apply(
                         self._code_transformation_to, dictionary_list=encode_dict
                     )
+                    if median_mode:
+                        self._df[colname] = self._df[colname].astype("float64")
+                        self._df[colname] = self._df[colname] / self.median_list[num]
             return self._df
 
     def decode(self) -> DataFrame:
         """Decodes the `int` type columns of the `DataFrame`"""
         j = 0
         df_decoded = self._df.copy()
+        if len(self.median_list) == len(self._encode_columns):
+            median_mode = True
         try:
             number_of_columns = len(self.decoding_list[j])
             for i in self._encode_columns:
-                if df_decoded[i].dtype == "int64":
+                if df_decoded[i].dtype == "int64" or df_decoded[i].dtype == "float64":
+                    if median_mode:
+                        df_decoded[i] = df_decoded[i] * self.median_list[j]
+                        df_decoded[i] = df_decoded[i].astype("int64")
                     df_decoded[i] = df_decoded[i].apply(
                         self._code_transformation_to, dictionary_list=self.decoding_list[j]
                     )
@@ -864,7 +890,9 @@ class DataFrameEncoder:
     def _save_encoder(self, path_to_save: str, dictionary_name: str) -> None:
         """Method to serialize the `encoding_list`, `decoding_list` and `_encode_columns` list"""
         with open(path_to_save + dictionary_name + ".pkl", "wb") as f:
-            pickle.dump([self.encoding_list, self.decoding_list, self._encode_columns], f)
+            pickle.dump(
+                [self.encoding_list, self.decoding_list, self._encode_columns, self.median_list], f
+            )
 
     def _code_transformation_to(self, character: str, dictionary_list: List[dict]) -> int:
         """Auxiliary function to perform data transformation using a dictionary
@@ -1008,7 +1036,7 @@ class OneHotEncoder:
         if not isinstance(x, ndarray):
             x = np.array(x)  # If not numpy array then convert it
 
-        # Regresamos los valores max de cada renglon
+        # We return the max values of each row
         y = np.argmax(x, axis=1)
 
         return y
@@ -1016,7 +1044,7 @@ class OneHotEncoder:
 
 class FeatureSelection:
     """
-    Generate the data graph using a variation of the feature selection algorithm..
+    Generate the data graph using a variation of the feature selection algorithm.
 
     - The method `get_digraph` returns the network based on the feature selection method.
     """
@@ -1194,14 +1222,14 @@ if __name__ == "__main__":
 
     # Use DataFrameEncoder
     # Create a DataFrame
-    data = {"Name": ["John", "Alice", "Bob"], "Age": [25, 30, 35]}
+    data = {"Name": ["John", "Alice", "Bob", "Jafet", "Beto"], "Age": [25, 30, 35, 21, 28]}
     import pandas as pd
 
     df = pd.DataFrame(data)
     # Instantiate DataFrameEncoder
     dfe = DataFrameEncoder(df)
     # Encode the dataframe
-    encoded_df = dfe.encode()
+    encoded_df = dfe.encode(norm_method="median")
     # Decode the dataframe
     decoded_df = dfe.decode()
 
