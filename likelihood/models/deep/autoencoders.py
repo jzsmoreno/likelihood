@@ -42,7 +42,7 @@ class AutoClassifier(Model):
 
         Returns
         -------
-            `None`
+            None
         """
         super(AutoClassifier, self).__init__()
         self.units = units
