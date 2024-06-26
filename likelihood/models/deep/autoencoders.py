@@ -1,6 +1,5 @@
 import os
 from functools import partial
-from typing import List
 
 import keras_tuner
 import numpy as np
@@ -13,7 +12,38 @@ from likelihood.tools import OneHotEncoder
 
 
 class AutoClassifier(Model):
+    """
+    An auto-classifier model that automatically determines the best classification strategy based on the input data.
+
+    Attributes:
+        - input_shape: The shape of the input data.
+        - num_classes: The number of classes in the dataset.
+        - units: The number of neurons in each hidden layer.
+        - activation: The type of activation function to use for the neural network layers.
+
+    Methods:
+        __init__(self, input_shape, num_classes, units, activation): Initializes an AutoClassifier instance with the given parameters.
+    """
+
     def __init__(self, input_shape, num_classes, units, activation):
+        """
+        Initializes an AutoClassifier instance with the given parameters.
+
+        Parameters
+        ----------
+        input_shape : `int`
+            The shape of the input data.
+        num_classes : `int`
+            The number of classes in the dataset.
+        units : `int`
+            The number of neurons in each hidden layer.
+        activation : `str`
+            The type of activation function to use for the neural network layers.
+
+        Returns
+        -------
+            `None`
+        """
         super(AutoClassifier, self).__init__()
         self.units = units
         self.shape = input_shape
@@ -44,7 +74,37 @@ class AutoClassifier(Model):
         return classifier
 
 
-def call_existing_code(units, activation, threshold, optimizer, input_shape=None, num_classes=None):
+def call_existing_code(
+    units: int,
+    activation: str,
+    threshold: float,
+    optimizer: str,
+    input_shape: None | int = None,
+    num_classes: None | int = None,
+) -> AutoClassifier:
+    """
+    Calls an existing AutoClassifier instance.
+
+    Parameters
+    ----------
+    units : `int`
+        The number of neurons in each hidden layer.
+    activation : `str`
+        The type of activation function to use for the neural network layers.
+    threshold : `float`
+        The threshold for the classifier.
+    optimizer : `str`
+        The type of optimizer to use for the neural network layers.
+    input_shape : `None` | `int`
+        The shape of the input data.
+    num_classes : `int`
+        The number of classes in the dataset.
+
+    Returns
+    -------
+    `AutoClassifier`
+        The AutoClassifier instance.
+    """
     model = AutoClassifier(
         input_shape=input_shape, num_classes=num_classes, units=units, activation=activation
     )
@@ -56,7 +116,23 @@ def call_existing_code(units, activation, threshold, optimizer, input_shape=None
     return model
 
 
-def build_model(hp, input_shape: None | int, num_classes: None | int):
+def build_model(hp, input_shape: None | int, num_classes: None | int) -> AutoClassifier:
+    """Builds a neural network model using Keras Tuner's search algorithm.
+
+    Parameters
+    ----------
+    hp : `keras_tuner.HyperParameters`
+        The hyperparameters to tune.
+    input_shape : `None` | `int`
+        The shape of the input data.
+    num_classes : `int`
+        The number of classes in the dataset.
+
+    Returns
+    -------
+    `keras.Model`
+        The neural network model.
+    """
     units = hp.Int("units", min_value=int(input_shape * 0.2), max_value=input_shape, step=2)
     activation = hp.Choice("activation", ["sigmoid", "relu", "tanh", "selu", "softplus"])
     optimizer = hp.Choice("optimizer", ["sgd", "adam", "adadelta"])
@@ -76,8 +152,41 @@ def build_model(hp, input_shape: None | int, num_classes: None | int):
 def setup_model(
     data: DataFrame, target: str, epochs: int, train_size: float = 0.7, seed=None, **kwargs
 ) -> AutoClassifier:
-    """Setup model for training and tuning."""
+    """Setup model for training and tuning.
 
+    Parameters
+    ----------
+    data : `DataFrame`
+        The dataset to train the model on.
+    target : `str`
+        The name of the target column.
+    epochs : `int`
+        The number of epochs to train the model for.
+    train_size : `float`
+        The proportion of the dataset to use for training.
+    seed : `Any` | `int`
+        The random seed to use for reproducibility.
+
+    Keyword Arguments:
+    ----------
+    Additional keyword arguments to pass to the model.
+
+    max_trials : `int`
+        The maximum number of trials to perform.
+    directory : `str`
+        The directory to save the model to.
+    project_name : `str`
+        The name of the project.
+    objective : `str`
+        The objective to optimize.
+    verbose : `bool`
+        Whether to print verbose output.
+
+    Returns
+    -------
+    model : `AutoClassifier`
+        The trained model.
+    """
     max_trials = kwargs["max_trials"] if "max_trials" in kwargs else 10
     directory = kwargs["directory"] if "directory" in kwargs else "./my_dir"
     project_name = kwargs["project_name"] if "project_name" in kwargs else "get_best"
@@ -134,3 +243,6 @@ def setup_model(
         best_model = tf.keras.models.load_model("./my_dir/best_model.keras")
 
     return best_model
+
+
+########################################################################################
