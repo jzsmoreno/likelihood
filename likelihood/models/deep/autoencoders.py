@@ -39,10 +39,6 @@ class AutoClassifier(Model):
             The number of neurons in each hidden layer.
         activation : `str`
             The type of activation function to use for the neural network layers.
-
-        Returns
-        -------
-            None
         """
         super(AutoClassifier, self).__init__()
         self.units = units
@@ -210,8 +206,6 @@ def setup_model(
         X = X.to_numpy()
         X = np.asarray(X).astype(np.float32)
 
-        y = pd.DataFrame(y, columns=["class_0", "class_1"])
-        y = y.to_numpy()
         y = np.asarray(y).astype(np.float32)
 
         input_shape = X.shape[1]

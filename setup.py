@@ -21,6 +21,8 @@ setuptools.setup(
     version=about["__version__"],
     author="J. A. Moreno-Guerra",
     author_email="jzs.gm27@gmail.com",
+    maintainer="Jafet Castañeda",
+    maintainer_email="jafetcc17@gmail.com",
     description="A package that performs the maximum likelihood algorithm.",
     py_modules=["likelihood"],
     long_description=long_description,
