@@ -130,7 +130,11 @@ Whether to print verbose output.</p>
 <li>activation: The type of activation function to use for the neural network layers.</li>
 </ul>
 <h2 id="methods">Methods</h2>
-<p><strong>init</strong>(self, input_shape, num_classes, units, activation): Initializes an AutoClassifier instance with the given parameters.</p>
+<p><strong>init</strong>(self, input_shape, num_classes, units, activation): Initializes an AutoClassifier instance with the given parameters.
+build(self, input_shape): Builds the model architecture based on input_shape.
+call(self, x): Defines the forward pass of the model.
+get_config(self): Returns the configuration of the model.
+from_config(cls, config): Recreates an instance of AutoClassifier from its configuration.</p>
 <p>Initializes an AutoClassifier instance with the given parameters.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
@@ -147,7 +151,7 @@ Whether to print verbose output.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">class AutoClassifier(Model):
+<pre><code class="python">class AutoClassifier(tf.keras.Model):
     &#34;&#34;&#34;
     An auto-classifier model that automatically determines the best classification strategy based on the input data.
 
@@ -159,6 +163,10 @@ Whether to print verbose output.</p>
 
     Methods:
         __init__(self, input_shape, num_classes, units, activation): Initializes an AutoClassifier instance with the given parameters.
+        build(self, input_shape): Builds the model architecture based on input_shape.
+        call(self, x): Defines the forward pass of the model.
+        get_config(self): Returns the configuration of the model.
+        from_config(cls, config): Recreates an instance of AutoClassifier from its configuration.
     &#34;&#34;&#34;
 
     def __init__(self, input_shape, num_classes, units, activation):
@@ -177,33 +185,59 @@ Whether to print verbose output.</p>
             The type of activation function to use for the neural network layers.
         &#34;&#34;&#34;
         super(AutoClassifier, self).__init__()
+        self.input_shape = input_shape
+        self.num_classes = num_classes
         self.units = units
-        self.shape = input_shape
+        self.activation = activation
 
+        self.encoder = None
+        self.decoder = None
+        self.classifier = None
+
+    def build(self, input_shape):
         self.encoder = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(units=units, activation=activation),
-                tf.keras.layers.Dense(units=int(units / 2), activation=activation),
+                tf.keras.layers.Dense(units=self.units, activation=self.activation),
+                tf.keras.layers.Dense(units=int(self.units / 2), activation=self.activation),
             ]
         )
 
         self.decoder = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(units=units, activation=activation),
-                tf.keras.layers.Dense(units=input_shape, activation=activation),
+                tf.keras.layers.Dense(units=self.units, activation=self.activation),
+                tf.keras.layers.Dense(units=self.input_shape, activation=self.activation),
             ]
         )
 
         self.classifier = tf.keras.Sequential(
-            [tf.keras.layers.Dense(num_classes, activation=&#34;softmax&#34;)]
+            [tf.keras.layers.Dense(self.num_classes, activation=&#34;softmax&#34;)]
         )
 
     def call(self, x):
         encoded = self.encoder(x)
         decoded = self.decoder(encoded)
         combined = tf.concat([decoded, encoded], axis=1)
-        classifier = self.classifier(combined)
-        return classifier</code></pre>
+        classification = self.classifier(combined)
+        return classification
+
+    def get_config(self):
+        config = {
+            &#34;input_shape&#34;: self.input_shape,
+            &#34;num_classes&#34;: self.num_classes,
+            &#34;units&#34;: self.units,
+            &#34;activation&#34;: self.activation,
+        }
+        base_config = super(AutoClassifier, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(
+            input_shape=config[&#34;input_shape&#34;],
+            num_classes=config[&#34;num_classes&#34;],
+            units=config[&#34;units&#34;],
+            activation=config[&#34;activation&#34;],
+        )</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -218,13 +252,50 @@ Whether to print verbose output.</p>
 <li>keras.src.ops.operation.Operation</li>
 <li>keras.src.saving.keras_saveable.KerasSaveable</li>
 </ul>
+<h3>Static methods</h3>
+<dl>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.from_config"><code class="name flex">
+<span>def <span class="ident">from_config</span></span>(<span>config)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Creates an operation from its config.</p>
+<p>This method is the reverse of <code>get_config</code>, capable of instantiating the
+same operation from the config dictionary.</p>
+<p>Note: If you override this method, you might receive a serialized dtype
+config, which is a <code>dict</code>. You can deserialize it as follows:</p>
+<pre><code class="language-python">if &quot;dtype&quot; in config and isinstance(config[&quot;dtype&quot;], dict):
+    policy = dtype_policies.deserialize(config[&quot;dtype&quot;])
+</code></pre>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>config</code></strong></dt>
+<dd>A Python dictionary, typically the output of <code>get_config</code>.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>An operation instance.</p></div>
+</dd>
+</dl>
 <h3>Methods</h3>
 <dl>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.build"><code class="name flex">
+<span>def <span class="ident">build</span></span>(<span>self, input_shape)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier.call"><code class="name flex">
 <span>def <span class="ident">call</span></span>(<span>self, x)</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.get_config"><code class="name flex">
+<span>def <span class="ident">get_config</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Returns the config of the object.</p>
+<p>An object config is a Python dictionary (serializable)
+containing the information needed to re-instantiate it.</p></div>
 </dd>
 </dl>
 </dd>
@@ -253,7 +324,10 @@ Whether to print verbose output.</p>
 <li>
 <h4><code><a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></code></h4>
 <ul class="">
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.build" href="#likelihood.models.deep.autoencoders.AutoClassifier.build">build</a></code></li>
 <li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.call" href="#likelihood.models.deep.autoencoders.AutoClassifier.call">call</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.from_config" href="#likelihood.models.deep.autoencoders.AutoClassifier.from_config">from_config</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.get_config" href="#likelihood.models.deep.autoencoders.AutoClassifier.get_config">get_config</a></code></li>
 </ul>
 </li>
 </ul>

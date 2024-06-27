@@ -361,7 +361,10 @@ value of evaluated function</p></div>
                 self._df[i] = self._df[i].apply(
                     self._code_transformation_to, dictionary_list=encode_dict
                 )
-                median_value = len(self._df[i].unique()) // 2
+                if len(self._df[i].unique()) &gt; 1:
+                    median_value = len(self._df[i].unique()) // 2
+                else:
+                    median_value = 1.0
                 if norm_method == &#34;median&#34;:
                     self._df[i] = self._df[i].astype(&#34;float64&#34;)
                     self._df[i] = self._df[i] / median_value
@@ -388,6 +391,8 @@ value of evaluated function</p></div>
             print(&#34;Configuration detected&#34;)
             if len(self.median_list) == len(self._encode_columns):
                 median_mode = True
+            else:
+                median_mode = False
             for num, colname in enumerate(self._encode_columns):
                 if self._df[colname].dtype == &#34;object&#34;:
                     encode_dict = self.encoding_list[num]
@@ -405,6 +410,8 @@ value of evaluated function</p></div>
         df_decoded = self._df.copy()
         if len(self.median_list) == len(self._encode_columns):
             median_mode = True
+        else:
+            median_mode = False
         try:
             number_of_columns = len(self.decoding_list[j])
             for i in self._encode_columns:
