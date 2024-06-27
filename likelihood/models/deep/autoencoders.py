@@ -6,12 +6,11 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from pandas.core.frame import DataFrame
-from tensorflow.keras.models import Model
 
 from likelihood.tools import OneHotEncoder
 
 
-class AutoClassifier(Model):
+class AutoClassifier(tf.keras.Model):
     """
     An auto-classifier model that automatically determines the best classification strategy based on the input data.
 
@@ -23,6 +22,10 @@ class AutoClassifier(Model):
 
     Methods:
         __init__(self, input_shape, num_classes, units, activation): Initializes an AutoClassifier instance with the given parameters.
+        build(self, input_shape): Builds the model architecture based on input_shape.
+        call(self, x): Defines the forward pass of the model.
+        get_config(self): Returns the configuration of the model.
+        from_config(cls, config): Recreates an instance of AutoClassifier from its configuration.
     """
 
     def __init__(self, input_shape, num_classes, units, activation):
@@ -41,33 +44,59 @@ class AutoClassifier(Model):
             The type of activation function to use for the neural network layers.
         """
         super(AutoClassifier, self).__init__()
+        self.input_shape = input_shape
+        self.num_classes = num_classes
         self.units = units
-        self.shape = input_shape
+        self.activation = activation
 
+        self.encoder = None
+        self.decoder = None
+        self.classifier = None
+
+    def build(self, input_shape):
         self.encoder = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(units=units, activation=activation),
-                tf.keras.layers.Dense(units=int(units / 2), activation=activation),
+                tf.keras.layers.Dense(units=self.units, activation=self.activation),
+                tf.keras.layers.Dense(units=int(self.units / 2), activation=self.activation),
             ]
         )
 
         self.decoder = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(units=units, activation=activation),
-                tf.keras.layers.Dense(units=input_shape, activation=activation),
+                tf.keras.layers.Dense(units=self.units, activation=self.activation),
+                tf.keras.layers.Dense(units=self.input_shape, activation=self.activation),
             ]
         )
 
         self.classifier = tf.keras.Sequential(
-            [tf.keras.layers.Dense(num_classes, activation="softmax")]
+            [tf.keras.layers.Dense(self.num_classes, activation="softmax")]
         )
 
     def call(self, x):
         encoded = self.encoder(x)
         decoded = self.decoder(encoded)
         combined = tf.concat([decoded, encoded], axis=1)
-        classifier = self.classifier(combined)
-        return classifier
+        classification = self.classifier(combined)
+        return classification
+
+    def get_config(self):
+        config = {
+            "input_shape": self.input_shape,
+            "num_classes": self.num_classes,
+            "units": self.units,
+            "activation": self.activation,
+        }
+        base_config = super(AutoClassifier, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(
+            input_shape=config["input_shape"],
+            num_classes=config["num_classes"],
+            units=config["units"],
+            activation=config["activation"],
+        )
 
 
 def call_existing_code(

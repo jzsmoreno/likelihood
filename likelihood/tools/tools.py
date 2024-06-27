@@ -815,7 +815,10 @@ class DataFrameEncoder:
                 self._df[i] = self._df[i].apply(
                     self._code_transformation_to, dictionary_list=encode_dict
                 )
-                median_value = len(self._df[i].unique()) // 2
+                if len(self._df[i].unique()) > 1:
+                    median_value = len(self._df[i].unique()) // 2
+                else:
+                    median_value = 1.0
                 if norm_method == "median":
                     self._df[i] = self._df[i].astype("float64")
                     self._df[i] = self._df[i] / median_value
@@ -842,6 +845,8 @@ class DataFrameEncoder:
             print("Configuration detected")
             if len(self.median_list) == len(self._encode_columns):
                 median_mode = True
+            else:
+                median_mode = False
             for num, colname in enumerate(self._encode_columns):
                 if self._df[colname].dtype == "object":
                     encode_dict = self.encoding_list[num]
@@ -859,6 +864,8 @@ class DataFrameEncoder:
         df_decoded = self._df.copy()
         if len(self.median_list) == len(self._encode_columns):
             median_mode = True
+        else:
+            median_mode = False
         try:
             number_of_columns = len(self.decoding_list[j])
             for i in self._encode_columns:
