@@ -135,11 +135,16 @@ class Data:
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="VanillaGNNLayer")
 class VanillaGNNLayer(tf.keras.layers.Layer):
-    def __init__(self, dim_in, dim_out, **kwargs):
+    def __init__(self, dim_in, dim_out, kernel_initializer="glorot_uniform", **kwargs):
         super(VanillaGNNLayer, self).__init__(**kwargs)
-        self.linear = tf.keras.layers.Dense(dim_out, use_bias=False)
+        self.dim_out = dim_out
+        self.kernel_initializer = kernel_initializer
+        self.linear = None
 
     def build(self, input_shape):
+        self.linear = tf.keras.layers.Dense(
+            self.dim_out, use_bias=False, kernel_initializer=self.kernel_initializer
+        )
         super(VanillaGNNLayer, self).build(input_shape)
 
     def call(self, x, adjacency):
@@ -149,12 +154,15 @@ class VanillaGNNLayer(tf.keras.layers.Layer):
 
     def get_config(self):
         config = super(VanillaGNNLayer, self).get_config()
-        config.update({"dim_in": self.dim_in, "dim_out": self.dim_out})
+        config.update(
+            {
+                "dim_out": self.dim_out,
+                "kernel_initializer": tf.keras.initializers.serialize(
+                    self.linear.kernel_initializer
+                ),
+            }
+        )
         return config
-
-    @classmethod
-    def from_config(cls, config):
-        return cls(**config)
 
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="VanillaGNN")
@@ -164,8 +172,16 @@ class VanillaGNN(tf.keras.Model):
         self.dim_in = dim_in
         self.dim_h = dim_h
         self.dim_out = dim_out
-        self.gnn1 = VanillaGNNLayer(dim_in, dim_h)
-        self.gnn2 = VanillaGNNLayer(dim_h, dim_out)
+        self.gnn1 = VanillaGNNLayer(self.dim_in, self.dim_h)
+        self.gnn2 = VanillaGNNLayer(self.dim_h, self.dim_out)
+
+    def build(self, input_shape):
+        super(VanillaGNN, self).build(input_shape)
+        dummy_input = tf.keras.Input(shape=input_shape[1:])
+        dummy_adjacency = tf.sparse.SparseTensor(
+            indices=[[0, 0]], values=[1.0], dense_shape=[input_shape[0], input_shape[0]]
+        )
+        _ = self(dummy_input, dummy_adjacency)
 
     def call(self, x, adjacency):
         h = self.gnn1(x, adjacency)
