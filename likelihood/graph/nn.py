@@ -125,7 +125,10 @@ class Data:
         exclude_subset: List[str] = [],
     ):
         _, adjacency = cal_adjency_matrix(df, exclude_subset=exclude_subset, sparse=True)
-        X = df.drop(columns=[target] + exclude_subset)
+        if target is not None:
+            X = df.drop(columns=[target] + exclude_subset)
+        else:
+            X = df.drop(columns=exclude_subset)
         self.columns = X.columns
         X = X.to_numpy()
         self.x = np.asarray(X).astype(np.float32)
@@ -330,6 +333,11 @@ if __name__ == "__main__":
 
     print("After loading F1:", best_model.test(data))
     df_results = pd.DataFrame()
+
+    # Suppose we have a new dataset without the target variable
+    iris_df = iris_df.drop(columns=["species"])
+    data_new = Data(iris_df)
+    print("Predictions:", best_model.predict(data_new))
     df_results["predicted"] = list(model.predict(data))
     df_results["actual"] = list(data.y)
     # df_results.to_csv("results.csv", index=False)
