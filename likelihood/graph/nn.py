@@ -1,3 +1,4 @@
+import warnings
 from typing import List, Tuple
 
 import numpy as np
@@ -173,7 +174,8 @@ class VanillaGNN(tf.keras.Model):
         self.dim_h = dim_h
         self.dim_out = dim_out
         self.gnn1 = VanillaGNNLayer(self.dim_in, self.dim_h)
-        self.gnn2 = VanillaGNNLayer(self.dim_h, self.dim_out)
+        self.gnn2 = VanillaGNNLayer(self.dim_h, self.dim_h)
+        self.gnn3 = VanillaGNNLayer(self.dim_h, self.dim_out)
 
     def build(self, input_shape):
         super(VanillaGNN, self).build(input_shape)
@@ -187,6 +189,7 @@ class VanillaGNN(tf.keras.Model):
         h = self.gnn1(x, adjacency)
         h = tf.nn.tanh(h)
         h = self.gnn2(h, adjacency)
+        h = self.gnn3(h, adjacency)
         return tf.nn.softmax(h, axis=1)
 
     def f1_macro(self, y_true, y_pred):
@@ -241,8 +244,19 @@ class VanillaGNN(tf.keras.Model):
         optimizer.apply_gradients(zip(gradients, self.trainable_variables))
         return loss
 
-    def fit(self, data, epochs, batch_size, test_size=0.2):
-        optimizer = tf.keras.optimizers.Adam()
+    def fit(self, data, epochs, batch_size, test_size=0.2, optimizer="adam"):
+        warnings.warn(
+            "It is normal for validation metrics to underperform. Use the test method to validate after training.",
+            UserWarning,
+        )
+        optimizers = {
+            "sgd": tf.keras.optimizers.SGD(),
+            "adam": tf.keras.optimizers.Adam(),
+            "adamw": tf.keras.optimizers.AdamW(),
+            "adadelta": tf.keras.optimizers.Adadelta(),
+            "rmsprop": tf.keras.optimizers.RMSprop(),
+        }
+        optimizer = optimizers[optimizer]
         train_losses = []
         train_f1_scores = []
         val_losses = []
@@ -281,3 +295,42 @@ class VanillaGNN(tf.keras.Model):
                 )
 
         return train_losses, train_f1_scores, val_losses, val_f1_scores
+
+
+if __name__ == "__main__":
+    # Example usage
+    import pandas as pd
+    from sklearn.datasets import load_iris
+
+    # Load the dataset
+    iris = load_iris()
+
+    # Convert to a DataFrame for easy exploration
+    iris_df = pd.DataFrame(data=iris.data, columns=iris.feature_names)
+    iris_df["species"] = iris.target
+
+    iris_df["sepal length (cm)"] = iris_df["sepal length (cm)"].astype("category")
+    iris_df["sepal width (cm)"] = iris_df["sepal width (cm)"].astype("category")
+    iris_df["petal length (cm)"] = iris_df["petal length (cm)"].astype("category")
+    iris_df["petal width (cm)"] = iris_df["petal width (cm)"].astype("category")
+
+    # Display the first few rows of the dataset
+    print(iris_df.head())
+
+    iris_df = iris_df.sample(frac=1, replace=False).reset_index(drop=True)
+
+    data = Data(iris_df, "species")
+
+    model = VanillaGNN(dim_in=data.x.shape[1], dim_h=8, dim_out=len(iris_df["species"].unique()))
+    print("Before training F1:", model.test(data))
+    model.fit(data, epochs=200, batch_size=32, test_size=0.5)
+    model.save("./best_model.keras")
+    print("After training F1:", model.test(data))
+    best_model = tf.keras.models.load_model("./best_model.keras")
+
+    print("After loading F1:", best_model.test(data))
+    df_results = pd.DataFrame()
+    df_results["predicted"] = list(model.predict(data))
+    df_results["actual"] = list(data.y)
+    # df_results.to_csv("results.csv", index=False)
+    breakpoint()
