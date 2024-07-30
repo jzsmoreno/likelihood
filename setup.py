@@ -31,7 +31,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=install_requires,
     extras_require={
-        "full": ["networkx", "pyvis", "tensorflow", "keras-tuner"],
+        "full": ["networkx", "pyvis", "tensorflow", "keras-tuner", "scikit-learn"],
     },
     classifiers=[
         "Programming Language :: Python :: 3",
