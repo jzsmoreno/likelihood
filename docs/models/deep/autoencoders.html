@@ -76,7 +76,7 @@ The neural network model.</p></div>
 The AutoClassifier instance.</p></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.setup_model"><code class="name flex">
-<span>def <span class="ident">setup_model</span></span>(<span>data: pandas.core.frame.DataFrame, target: str, epochs: int, train_size: float = 0.7, seed=None, **kwargs) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
+<span>def <span class="ident">setup_model</span></span>(<span>data: pandas.core.frame.DataFrame, target: str, epochs: int, train_size: float = 0.7, seed=None, filepath: str = './my_dir/best_model.keras', **kwargs) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
 </code></dt>
 <dd>
 <div class="desc"><p>Setup model for training and tuning.</p>
@@ -92,6 +92,8 @@ The AutoClassifier instance.</p></div>
 <dd>The proportion of the dataset to use for training.</dd>
 <dt><strong><code>seed</code></strong> :&ensp;<code>Any` | `int</code></dt>
 <dd>The random seed to use for reproducibility.</dd>
+<dt><strong><code>filepath</code></strong> :&ensp;<code>str</code></dt>
+<dd>The path to save the best model to.</dd>
 </dl>
 <h2 id="keyword-arguments">Keyword Arguments:</h2>
 <p>Additional keyword arguments to pass to the model.</p>
