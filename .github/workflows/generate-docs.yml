@@ -32,6 +32,7 @@ jobs:
         pip install pdoc3
         pip install tensorflow
         pip install keras-tuner
+        pip install scikit-learn
 
     - name: Set up Git
       env:
