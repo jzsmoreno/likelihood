@@ -175,7 +175,13 @@ def build_model(hp, input_shape: None | int, num_classes: None | int) -> AutoCla
 
 
 def setup_model(
-    data: DataFrame, target: str, epochs: int, train_size: float = 0.7, seed=None, **kwargs
+    data: DataFrame,
+    target: str,
+    epochs: int,
+    train_size: float = 0.7,
+    seed=None,
+    filepath: str = "./my_dir/best_model.keras",
+    **kwargs
 ) -> AutoClassifier:
     """Setup model for training and tuning.
 
@@ -191,6 +197,8 @@ def setup_model(
         The proportion of the dataset to use for training.
     seed : `Any` | `int`
         The random seed to use for reproducibility.
+    filepath : `str`
+        The path to save the best model to.
 
     Keyword Arguments:
     ----------
@@ -257,13 +265,13 @@ def setup_model(
         best_model = models[0]
 
         # save model
-        best_model.save("./my_dir/best_model.keras")
+        best_model.save(filepath)
 
         if verbose:
             tuner.results_summary()
     else:
         # Load the best model from the directory
-        best_model = tf.keras.models.load_model("./my_dir/best_model.keras")
+        best_model = tf.keras.models.load_model(filepath)
 
     return best_model
 
