@@ -1202,7 +1202,7 @@ class FeatureSelection:
 
 
 def check_nan_inf(df: DataFrame) -> DataFrame:
-    """Check for `NaN` and `Inf` values in the `DataFrame`. If any are found removes them."""
+    """Checks for `NaN` and `Inf` values in the `DataFrame`. If any are found they will be removed."""
     nan_values = df.isnull().values.any()
     count = np.isinf(df.select_dtypes(include="number")).values.sum()
     print("There are null values : ", nan_values)
