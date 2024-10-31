@@ -22,7 +22,8 @@ def xi_corr(df: pd.DataFrame) -> pd.DataFrame:
         A square dataframe with variable names as both index and columns,
         containing their corresponding correlation coefficients.
     """
-    columns = df.columns
+
+    columns = df.select_dtypes(include="number").columns
     n = len(columns)
 
     # Initialize a square matrix for the correlations
@@ -284,7 +285,7 @@ if __name__ == "__main__":
     X = np.random.rand(100, 1)
     Y = X * X
     print("coefficient for Y = X * X : ", xicor(X, Y, False))
-
+    df["index"] = ["A", "B", "C", "D"]
     print("New correlation coefficient test for pandas DataFrame")
     values_df = xi_corr(df)
     breakpoint()
