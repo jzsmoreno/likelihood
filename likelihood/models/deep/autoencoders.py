@@ -15,26 +15,26 @@ class AutoClassifier(tf.keras.Model):
     An auto-classifier model that automatically determines the best classification strategy based on the input data.
 
     Attributes:
-        - input_shape: The shape of the input data.
+        - input_shape_parm: The shape of the input data.
         - num_classes: The number of classes in the dataset.
         - units: The number of neurons in each hidden layer.
         - activation: The type of activation function to use for the neural network layers.
 
     Methods:
-        __init__(self, input_shape, num_classes, units, activation): Initializes an AutoClassifier instance with the given parameters.
-        build(self, input_shape): Builds the model architecture based on input_shape.
+        __init__(self, input_shape_parm, num_classes, units, activation): Initializes an AutoClassifier instance with the given parameters.
+        build(self, input_shape_parm): Builds the model architecture based on input_shape_parm.
         call(self, x): Defines the forward pass of the model.
         get_config(self): Returns the configuration of the model.
         from_config(cls, config): Recreates an instance of AutoClassifier from its configuration.
     """
 
-    def __init__(self, input_shape, num_classes, units, activation):
+    def __init__(self, input_shape_parm, num_classes, units, activation):
         """
         Initializes an AutoClassifier instance with the given parameters.
 
         Parameters
         ----------
-        input_shape : `int`
+        input_shape_parm : `int`
             The shape of the input data.
         num_classes : `int`
             The number of classes in the dataset.
@@ -44,7 +44,7 @@ class AutoClassifier(tf.keras.Model):
             The type of activation function to use for the neural network layers.
         """
         super(AutoClassifier, self).__init__()
-        self.input_shape = input_shape
+        self.input_shape_parm = input_shape_parm
         self.num_classes = num_classes
         self.units = units
         self.activation = activation
@@ -53,7 +53,7 @@ class AutoClassifier(tf.keras.Model):
         self.decoder = None
         self.classifier = None
 
-    def build(self, input_shape):
+    def build(self, input_shape_parm):
         self.encoder = tf.keras.Sequential(
             [
                 tf.keras.layers.Dense(units=self.units, activation=self.activation),
@@ -64,7 +64,7 @@ class AutoClassifier(tf.keras.Model):
         self.decoder = tf.keras.Sequential(
             [
                 tf.keras.layers.Dense(units=self.units, activation=self.activation),
-                tf.keras.layers.Dense(units=self.input_shape, activation=self.activation),
+                tf.keras.layers.Dense(units=self.input_shape_parm, activation=self.activation),
             ]
         )
 
@@ -81,7 +81,7 @@ class AutoClassifier(tf.keras.Model):
 
     def get_config(self):
         config = {
-            "input_shape": self.input_shape,
+            "input_shape_parm": self.input_shape_parm,
             "num_classes": self.num_classes,
             "units": self.units,
             "activation": self.activation,
@@ -92,7 +92,7 @@ class AutoClassifier(tf.keras.Model):
     @classmethod
     def from_config(cls, config):
         return cls(
-            input_shape=config["input_shape"],
+            input_shape_parm=config["input_shape_parm"],
             num_classes=config["num_classes"],
             units=config["units"],
             activation=config["activation"],
@@ -104,7 +104,7 @@ def call_existing_code(
     activation: str,
     threshold: float,
     optimizer: str,
-    input_shape: None | int = None,
+    input_shape_parm: None | int = None,
     num_classes: None | int = None,
 ) -> AutoClassifier:
     """
@@ -120,7 +120,7 @@ def call_existing_code(
         The threshold for the classifier.
     optimizer : `str`
         The type of optimizer to use for the neural network layers.
-    input_shape : `None` | `int`
+    input_shape_parm : `None` | `int`
         The shape of the input data.
     num_classes : `int`
         The number of classes in the dataset.
@@ -131,7 +131,10 @@ def call_existing_code(
         The AutoClassifier instance.
     """
     model = AutoClassifier(
-        input_shape=input_shape, num_classes=num_classes, units=units, activation=activation
+        input_shape_parm=input_shape_parm,
+        num_classes=num_classes,
+        units=units,
+        activation=activation,
     )
     model.compile(
         optimizer=optimizer,
@@ -141,14 +144,14 @@ def call_existing_code(
     return model
 
 
-def build_model(hp, input_shape: None | int, num_classes: None | int) -> AutoClassifier:
+def build_model(hp, input_shape_parm: None | int, num_classes: None | int) -> AutoClassifier:
     """Builds a neural network model using Keras Tuner's search algorithm.
 
     Parameters
     ----------
     hp : `keras_tuner.HyperParameters`
         The hyperparameters to tune.
-    input_shape : `None` | `int`
+    input_shape_parm : `None` | `int`
         The shape of the input data.
     num_classes : `int`
         The number of classes in the dataset.
@@ -158,7 +161,9 @@ def build_model(hp, input_shape: None | int, num_classes: None | int) -> AutoCla
     `keras.Model`
         The neural network model.
     """
-    units = hp.Int("units", min_value=int(input_shape * 0.2), max_value=input_shape, step=2)
+    units = hp.Int(
+        "units", min_value=int(input_shape_parm * 0.2), max_value=input_shape_parm, step=2
+    )
     activation = hp.Choice("activation", ["sigmoid", "relu", "tanh", "selu", "softplus"])
     optimizer = hp.Choice("optimizer", ["sgd", "adam", "adadelta"])
     threshold = hp.Float("threshold", min_value=0.1, max_value=0.9, sampling="log")
@@ -168,7 +173,7 @@ def build_model(hp, input_shape: None | int, num_classes: None | int) -> AutoCla
         activation=activation,
         threshold=threshold,
         optimizer=optimizer,
-        input_shape=input_shape,
+        input_shape_parm=input_shape_parm,
         num_classes=num_classes,
     )
     return model
@@ -245,10 +250,12 @@ def setup_model(
 
         y = np.asarray(y).astype(np.float32)
 
-        input_shape = X.shape[1]
+        input_shape_parm = X.shape[1]
         num_classes = y.shape[1]
         global build_model
-        build_model = partial(build_model, input_shape=input_shape, num_classes=num_classes)
+        build_model = partial(
+            build_model, input_shape_parm=input_shape_parm, num_classes=num_classes
+        )
 
         # Create the AutoKeras model
         tuner = keras_tuner.RandomSearch(
