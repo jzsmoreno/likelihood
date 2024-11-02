@@ -1,5 +1,6 @@
 import os
 from functools import partial
+from shutil import rmtree
 
 import keras_tuner
 import numpy as np
@@ -185,8 +186,9 @@ def setup_model(
     epochs: int,
     train_size: float = 0.7,
     seed=None,
+    train_mode: bool = True,
     filepath: str = "./my_dir/best_model.keras",
-    **kwargs
+    **kwargs,
 ) -> AutoClassifier:
     """Setup model for training and tuning.
 
@@ -202,6 +204,8 @@ def setup_model(
         The proportion of the dataset to use for training.
     seed : `Any` | `int`
         The random seed to use for reproducibility.
+    train_mode : `bool`
+        Whether to train the model or not.
     filepath : `str`
         The path to save the best model to.
 
@@ -239,8 +243,18 @@ def setup_model(
     ), "Categorical variables within the DataFrame must be encoded, this is done by using the DataFrameEncoder from likelihood."
     validation_split = 1.0 - train_size
     # Create my_dir path if it does not exist
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+
+    if train_mode:
+        # Create a new directory if it does not exist
+        try:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            else:
+                print(f"Directory {directory} already exists, it will be deleted.")
+                rmtree(directory)
+                os.makedirs(directory)
+        except:
+            print("Warning: unable to create directory")
 
         # Create a Classifier instance
         y_encoder = OneHotEncoder()
