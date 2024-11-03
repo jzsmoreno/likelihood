@@ -1,14 +1,14 @@
 from typing import Dict
 
 import numpy as np
+import pandas as pd
 from numpy import arange, array, ndarray, random
 from numpy.linalg import solve
 from pandas.core.frame import DataFrame
 
+
 # -------------------------------------------------------------------------
-
-
-def xi_corr(df: DataFrame) -> DataFrame:
+def xi_corr(df: pd.DataFrame) -> pd.DataFrame:
     """Calculate new coefficient of correlation for all pairs of columns in a `DataFrame`.
 
     Parameters
@@ -19,11 +19,15 @@ def xi_corr(df: DataFrame) -> DataFrame:
     Returns
     -------
     `DataFrame`
-        A dataframe with variable names as keys and their corresponding
-        correlation coefficients as values.
+        A square dataframe with variable names as both index and columns,
+        containing their corresponding correlation coefficients.
     """
-    correlations = {}
-    columns = df.columns
+
+    columns = df.select_dtypes(include="number").columns
+    n = len(columns)
+
+    # Initialize a square matrix for the correlations
+    correlations = pd.DataFrame(1.0, index=columns, columns=columns)
 
     for i, col1 in enumerate(columns):
         for j, col2 in enumerate(columns):
@@ -32,9 +36,9 @@ def xi_corr(df: DataFrame) -> DataFrame:
                 y = df[col2].values
 
                 correlation = xicor(x, y)
-                correlations[(col1, col2)] = round(correlation, 8)
-    # dictionary to dataframe
-    correlations = DataFrame(list(correlations.items()), columns=["Variables", "Xi Correlation"])
+                correlations.loc[col1, col2] = round(correlation, 8)
+                correlations.loc[col2, col1] = round(correlation, 8)  # Mirror the correlation
+
     return correlations
 
 
@@ -51,10 +55,11 @@ def xi_corr(df: DataFrame) -> DataFrame:
 """
 
 
-def xicor(X: ndarray, Y: ndarray, ties: bool = True) -> float:
-    """Calculate a new coefficient of correlation between two variables.
+def xicor(X: np.ndarray, Y: np.ndarray, ties: bool = True, random_seed: int = None) -> float:
+    """
+    Calculate a generalized coefficient of correlation between two variables.
 
-    The new coefficient of correlation is a generalization of Pearson's correlation.
+    This coefficient is an extension of Pearson's correlation, accounting for ties with optional randomization.
 
     Parameters
     ----------
@@ -62,30 +67,52 @@ def xicor(X: ndarray, Y: ndarray, ties: bool = True) -> float:
         The first variable to be correlated. Must have at least one dimension.
     Y : `np.ndarray`
         The second variable to be correlated. Must have at least one dimension.
+    ties : bool
+        Whether to handle ties using randomization.
+    random_seed : int, optional
+        Seed for the random number generator for reproducibility.
 
     Returns
     -------
     xi : `float`
         The estimated value of the new coefficient of correlation.
     """
-    random.seed(42)
+
+    # Early return for identical arrays
+    if np.array_equal(X, Y):
+        return 1.0
+
     n = len(X)
-    order = array([i[0] for i in sorted(enumerate(X), key=lambda x: x[1])])
+
+    # Early return for cases with less than 2 elements
+    if n < 2:
+        return 0.0
+
+    # Flatten the input arrays if they are multidimensional
+    X = X.flatten()
+    Y = Y.flatten()
+
+    # Get the sorted order of X
+    order = np.argsort(X)
+
     if ties:
-        l = array([sum(y >= Y[order]) for y in Y[order]])
-        r = l.copy()
-        for j in range(n):
-            if sum([r[j] == r[i] for i in range(n)]) > 1:
-                tie_index = array([r[j] == r[i] for i in range(n)])
-                r[tie_index] = random.choice(
-                    r[tie_index] - arange(0, sum([r[j] == r[i] for i in range(n)])),
-                    sum(tie_index),
-                    replace=False,
-                )
-        return 1 - n * sum(abs(r[1:] - r[: n - 1])) / (2 * sum(l * (n - l)))
+        np.random.seed(random_seed)  # Set seed for reproducibility if needed
+        ranks = np.argsort(np.argsort(Y[order]))  # Get ranks
+        unique_ranks, counts = np.unique(ranks, return_counts=True)
+
+        # Adjust ranks for ties by shuffling
+        for rank, count in zip(unique_ranks, counts):
+            if count > 1:
+                tie_indices = np.where(ranks == rank)[0]
+                np.random.shuffle(ranks[tie_indices])  # Randomize ties
+
+        cumulative_counts = np.array([np.sum(y >= Y[order]) for y in Y[order]])
+        return 1 - n * np.sum(np.abs(ranks[1:] - ranks[: n - 1])) / (
+            2 * np.sum(cumulative_counts * (n - cumulative_counts))
+        )
     else:
-        r = array([sum(y >= Y[order]) for y in Y[order]])
-        return 1 - 3 * sum(abs(r[1:] - r[: n - 1])) / (n**2 - 1)
+        ranks = np.argsort(np.argsort(Y[order]))  # Get ranks without randomization
+        return 1 - 3 * np.sum(np.abs(ranks[1:] - ranks[: n - 1])) / (n**2 - 1)
 
 
 # -------------------------------------------------------------------------
@@ -257,8 +284,8 @@ if __name__ == "__main__":
     print("New correlation coefficient test")
     X = np.random.rand(100, 1)
     Y = X * X
-    print("coefficient for Y = X * X : ", xicor(X, Y))
-
+    print("coefficient for Y = X * X : ", xicor(X, Y, False))
+    df["index"] = ["A", "B", "C", "D"]
     print("New correlation coefficient test for pandas DataFrame")
     values_df = xi_corr(df)
     breakpoint()

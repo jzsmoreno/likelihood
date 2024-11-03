@@ -640,14 +640,14 @@ def cal_average(y: ndarray, alpha: float = 1):
 class DataScaler:
     """numpy array `scaler` and `rescaler`"""
 
-    __slots__ = ["dataset_", "_n", "data_scaled", "values", "transpose"]
+    __slots__ = ["dataset_", "_n", "data_scaled", "values", "transpose", "inv_fitting"]
 
     def __init__(self, dataset: ndarray, n: int = 1) -> None:
         """Initializes the parameters required for scaling the data"""
         self.dataset_ = dataset.copy()
         self._n = n
 
-    def rescale(self) -> ndarray:
+    def rescale(self, dataset_: ndarray | None = None) -> ndarray:
         """Perform a standard rescaling of the data
 
         Returns
@@ -655,11 +655,26 @@ class DataScaler:
         data_scaled : `np.array`
             An array containing the scaled data.
         """
+        if isinstance(dataset_, ndarray):
+            data_scaled = np.copy(dataset_)
+            mu = self.values[0]
+            sigma = self.values[1]
+            f = self.values[2]
+            data_scaled = data_scaled.reshape((self.dataset_.shape[0], -1))
+            for i in range(self.dataset_.shape[0]):
+                if self._n != None:
+                    poly = f[i](self.inv_fitting[i](data_scaled[i]))
+                    data_scaled[i] += -poly
+                data_scaled[i] = 2 * ((data_scaled[i] - mu[i]) / sigma[i]) - 1
+            return data_scaled
+        else:
+            self.data_scaled = np.copy(self.dataset_.copy())
 
         mu = []
         sigma = []
         fitting = []
-        self.data_scaled = np.copy(self.dataset_)
+        self.inv_fitting = []
+
         try:
             xaxis = range(self.dataset_.shape[1])
         except:
@@ -675,12 +690,15 @@ class DataScaler:
         for i in range(self.dataset_.shape[0]):
             if self._n != None:
                 fit = np.polyfit(xaxis, self.dataset_[i, :], self._n)
+                inv_fit = np.polyfit(self.dataset_[i, :], xaxis, self._n)
                 f = np.poly1d(fit)
                 poly = f(xaxis)
                 fitting.append(f)
+                self.inv_fitting.append(inv_fit)
                 self.data_scaled[i, :] += -poly
             else:
                 fitting.append(0.0)
+                self.inv_fitting.append(0.0)
             mu.append(np.min(self.data_scaled[i, :]))
             if np.max(self.data_scaled[i, :]) != 0:
                 sigma.append(np.max(self.data_scaled[i, :]) - mu[i])
@@ -1064,7 +1082,7 @@ class FeatureSelection:
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
 
-    def get_digraph(self, dataset: DataFrame, n_importances: int) -> str:
+    def get_digraph(self, dataset: DataFrame, n_importances: int, use_scaler: bool = False) -> str:
         """
         Get directed graph showing importance of features.
 
@@ -1092,10 +1110,11 @@ class FeatureSelection:
             feature_string += column + "; "
 
         numeric_df = curr_dataset.select_dtypes(include="number")
-        self.scaler = DataScaler(numeric_df.copy().to_numpy().T, n=None)
-        numeric_scaled = self.scaler.rescale()
-        numeric_df = pd.DataFrame(numeric_scaled.T, columns=numeric_df.columns)
-        curr_dataset[numeric_df.columns] = numeric_df
+        if use_scaler:
+            self.scaler = DataScaler(numeric_df.copy().to_numpy().T, n=None)
+            numeric_scaled = self.scaler.rescale()
+            numeric_df = pd.DataFrame(numeric_scaled.T, columns=numeric_df.columns)
+            curr_dataset[numeric_df.columns] = numeric_df
 
         # We construct dictionary to save index for scaling
         numeric_dict = dict(zip(list(numeric_df.columns), range(len(list(numeric_df.columns)))))
@@ -1119,7 +1138,6 @@ class FeatureSelection:
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
                 # We train
-
                 Model.fit(encoded_df.to_numpy().T, Y.to_numpy().T)
                 # We obtain importance
                 importance = Model.get_importances()
@@ -1202,7 +1220,7 @@ class FeatureSelection:
 
 
 def check_nan_inf(df: DataFrame) -> DataFrame:
-    """Check for `NaN` and `Inf` values in the `DataFrame`. If any are found removes them."""
+    """Checks for `NaN` and `Inf` values in the `DataFrame`. If any are found they will be removed."""
     nan_values = df.isnull().values.any()
     count = np.isinf(df.select_dtypes(include="number")).values.sum()
     print("There are null values : ", nan_values)
