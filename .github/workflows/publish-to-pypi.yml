@@ -39,6 +39,7 @@ jobs:
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         password: ${{ secrets.PYPI_API_TOKEN }}
+      continue-on-error: true
 
     - name: Get package version
       id: get_version
