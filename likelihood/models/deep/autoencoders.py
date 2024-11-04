@@ -6,11 +6,13 @@ import keras_tuner
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from likelihood.tools import OneHotEncoder
 from pandas.core.frame import DataFrame
 
-from likelihood.tools import OneHotEncoder
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
+@tf.keras.saving.register_keras_serializable(package="Custom", name="AutoClassifier")
 class AutoClassifier(tf.keras.Model):
     """
     An auto-classifier model that automatically determines the best classification strategy based on the input data.
@@ -54,7 +56,7 @@ class AutoClassifier(tf.keras.Model):
         self.decoder = None
         self.classifier = None
 
-    def build(self, input_shape_parm):
+    def build(self, input_shape):
         self.encoder = tf.keras.Sequential(
             [
                 tf.keras.layers.Dense(units=self.units, activation=self.activation),
@@ -187,7 +189,7 @@ def setup_model(
     train_size: float = 0.7,
     seed=None,
     train_mode: bool = True,
-    filepath: str = "./my_dir/best_model.keras",
+    filepath: str = "./my_dir/best_model",
     **kwargs,
 ) -> AutoClassifier:
     """Setup model for training and tuning.
@@ -236,6 +238,7 @@ def setup_model(
     verbose = kwargs["verbose"] if "verbose" in kwargs else True
 
     X = data.drop(columns=target)
+    input_sample = X.sample(1)
     y = data[target]
     # Verify if there are categorical columns in the dataframe
     assert (
@@ -260,8 +263,9 @@ def setup_model(
         y_encoder = OneHotEncoder()
         y = y_encoder.encode(y.to_list())
         X = X.to_numpy()
+        input_sample.to_numpy()
         X = np.asarray(X).astype(np.float32)
-
+        input_sample = np.asarray(input_sample).astype(np.float32)
         y = np.asarray(y).astype(np.float32)
 
         input_shape_parm = X.shape[1]
@@ -284,9 +288,10 @@ def setup_model(
         tuner.search(X, y, epochs=epochs, validation_split=validation_split)
         models = tuner.get_best_models(num_models=2)
         best_model = models[0]
+        best_model(input_sample)
 
         # save model
-        best_model.save(filepath)
+        best_model.save(filepath, save_format="tf")
 
         if verbose:
             tuner.results_summary()
