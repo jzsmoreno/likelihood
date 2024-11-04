@@ -57,3 +57,4 @@ jobs:
         release_name: Release ${{ steps.get_version.outputs.version }}
         draft: false
         prerelease: false
+      continue-on-error: true

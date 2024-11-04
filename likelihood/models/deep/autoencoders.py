@@ -12,7 +12,7 @@ from pandas.core.frame import DataFrame
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
-@tf.keras.saving.register_keras_serializable(package="Custom", name="AutoClassifier")
+@tf.keras.utils.register_keras_serializable(package="Custom", name="AutoClassifier")
 class AutoClassifier(tf.keras.Model):
     """
     An auto-classifier model that automatically determines the best classification strategy based on the input data.
