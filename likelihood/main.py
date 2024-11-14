@@ -45,7 +45,7 @@ def fun_like(
     y: ndarray,
     model: Callable,
     theta: ndarray,
-    conditions: List[Tuple[float, float]] = None,
+    conditions: List[Tuple[float, float]] | None = None,
     var2: float = 1.0,
 ) -> float:
     """Computes the likelihood.
@@ -119,7 +119,7 @@ def walk(
     y: ndarray,
     model: Callable,
     theta: ndarray,
-    conditions: List[Tuple[float, float]] = None,
+    conditions: List[Tuple[float, float]] | None = None,
     var2: float = 0.01,
     mov: int = 100,
     d: int = 1,
@@ -214,7 +214,7 @@ def walkers(
     y: ndarray,
     model: Callable,
     theta: ndarray,
-    conditions: bool = None,
+    conditions: List[Tuple[float, float]] | None = None,
     var2: float = 0.01,
     mov: int = 100,
     d: int = 1,
