@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.1">
+<title>likelihood.models.simulation API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>likelihood.models.simulation</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="likelihood.models.simulation.SimulationEngine"><code class="flex name class">
+<span>class <span class="ident">SimulationEngine</span></span>
+<span>(</span><span>df: pandas.core.frame.DataFrame, n_importances: int, use_scaler: bool = False, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>This class implements a predictive model that utilizes multiple linear regression for numerical target variables
+and multiple logistic regression for categorical target variables.</p>
+<p>The class provides methods for training the model on a given dataset, making predictions,
+and evaluating the model's performance.</p>
+<p>Key features:
+- Supports both numerical and categorical target variables, automatically selecting the appropriate regression method.
+- Includes methods for data preprocessing, model fitting, prediction, and evaluation metrics.
+- Designed to be flexible and user-friendly, allowing for easy integration with various datasets.</p>
+<p>Usage:
+- Instantiate the class with the training data and target variable.
+- Call the fit method to train the model.
+- Use the predict method to generate predictions on new data.
+- Evaluate the model using built-in metrics for accuracy and error.</p>
+<p>This class is suitable for applications in data analysis and machine learning, enabling users to leverage regression techniques
+for both numerical and categorical outcomes efficiently.</p>
+<p>The initializer of the class. The initial parameter is a list of strings with variables to discard.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class SimulationEngine(FeatureSelection):
+    &#34;&#34;&#34;
+    This class implements a predictive model that utilizes multiple linear regression for numerical target variables
+    and multiple logistic regression for categorical target variables.
+
+    The class provides methods for training the model on a given dataset, making predictions,
+    and evaluating the model&#39;s performance.
+
+    Key features:
+    - Supports both numerical and categorical target variables, automatically selecting the appropriate regression method.
+    - Includes methods for data preprocessing, model fitting, prediction, and evaluation metrics.
+    - Designed to be flexible and user-friendly, allowing for easy integration with various datasets.
+
+    Usage:
+    - Instantiate the class with the training data and target variable.
+    - Call the fit method to train the model.
+    - Use the predict method to generate predictions on new data.
+    - Evaluate the model using built-in metrics for accuracy and error.
+
+    This class is suitable for applications in data analysis and machine learning, enabling users to leverage regression techniques
+    for both numerical and categorical outcomes efficiently.
+    &#34;&#34;&#34;
+
+    def __init__(self, df: DataFrame, n_importances: int, use_scaler: bool = False, **kwargs):
+
+        self.df = df
+        self.n_importances = n_importances
+        self.use_scaler = use_scaler
+
+        super().__init__(**kwargs)
+
+    def predict(self, df: DataFrame, column: str) -&gt; ndarray | list:
+        # Let us assign the dictionary entries corresponding to the column
+        w, quick_encoder, names_cols, dfe, numeric_dict = self.w_dict[column]
+
+        df = df[names_cols].copy()
+        # Change the scale of the dataframe
+        dataset = self.df.copy()
+        dataset.drop(columns=column, inplace=True)
+        numeric_df = dataset.select_dtypes(include=&#34;number&#34;)
+        if self.use_scaler:
+            scaler = DataScaler(numeric_df.copy().to_numpy().T, n=None)
+            _ = scaler.rescale()
+            dataset_ = df.copy()
+            numeric_df = dataset_.select_dtypes(include=&#34;number&#34;)
+            numeric_scaled = scaler.rescale(dataset_=numeric_df.to_numpy())
+            numeric_df = pd.DataFrame(numeric_scaled.T, columns=numeric_df.columns)
+            for col in numeric_df.columns:
+                df[col] = numeric_df[col].values
+
+        # Encoding the datadrame
+        for num, colname in enumerate(dfe._encode_columns):
+            if df[colname].dtype == &#34;object&#34;:
+                encode_dict = dfe.encoding_list[num]
+                df[colname] = df[colname].apply(
+                    dfe._code_transformation_to, dictionary_list=encode_dict
+                )
+
+        # PREDICTION
+        y = df.to_numpy() @ w
+
+        # Categorical column
+        if quick_encoder != None:
+
+            one_hot = OneHotEncoder()
+            y = one_hot.decode(y)
+            encoding_dic = quick_encoder.decoding_list[0]
+            y = [encoding_dic[item] for item in y]
+        # Numeric column
+        else:
+            if self.use_scaler:
+                # scale output
+                y += 1
+                y /= 2
+                y = y * (self.df[column].max() - self.df[column].min())
+
+        return y[:]
+
+    def fit(self, **kwargs) -&gt; None:
+
+        # We run the feature selection algorithm
+        self.get_digraph(self.df, self.n_importances, self.use_scaler)
+
+    def _clean_data(self, df: DataFrame) -&gt; DataFrame:
+
+        df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        df.replace(&#34; &#34;, np.nan, inplace=True)
+        df = check_nan_inf(df)
+        df = df.reset_index()
+        df = df.drop(columns=[&#34;index&#34;])
+
+        return df</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="likelihood.tools.tools.FeatureSelection" href="../tools/tools.html#likelihood.tools.tools.FeatureSelection">FeatureSelection</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="likelihood.models.simulation.SimulationEngine.fit"><code class="name flex">
+<span>def <span class="ident">fit</span></span>(<span>self, **kwargs) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="likelihood.models.simulation.SimulationEngine.predict"><code class="name flex">
+<span>def <span class="ident">predict</span></span>(<span>self, df: pandas.core.frame.DataFrame, column: str) ‑> numpy.ndarray | list</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="likelihood.tools.tools.FeatureSelection" href="../tools/tools.html#likelihood.tools.tools.FeatureSelection">FeatureSelection</a></b></code>:
+<ul class="hlist">
+<li><code><a title="likelihood.tools.tools.FeatureSelection.get_digraph" href="../tools/tools.html#likelihood.tools.tools.FeatureSelection.get_digraph">get_digraph</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="likelihood.models" href="index.html">likelihood.models</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="likelihood.models.simulation.SimulationEngine" href="#likelihood.models.simulation.SimulationEngine">SimulationEngine</a></code></h4>
+<ul class="">
+<li><code><a title="likelihood.models.simulation.SimulationEngine.fit" href="#likelihood.models.simulation.SimulationEngine.fit">fit</a></code></li>
+<li><code><a title="likelihood.models.simulation.SimulationEngine.predict" href="#likelihood.models.simulation.SimulationEngine.predict">predict</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.1</a>.</p>
+</footer>
+</body>
+</html>

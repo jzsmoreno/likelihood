@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.1">
+<title>likelihood.models.deep.autoencoders API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>likelihood.models.deep.autoencoders</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="likelihood.models.deep.autoencoders.build_model"><code class="name flex">
+<span>def <span class="ident">build_model</span></span>(<span>hp, input_shape_parm: None | int, num_classes: None | int) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Builds a neural network model using Keras Tuner's search algorithm.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>hp</code></strong> :&ensp;<code>keras_tuner.HyperParameters</code></dt>
+<dd>The hyperparameters to tune.</dd>
+<dt><strong><code>input_shape_parm</code></strong> :&ensp;<code>None` | `int</code></dt>
+<dd>The shape of the input data.</dd>
+<dt><strong><code>num_classes</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of classes in the dataset.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>keras.Model</code>
+The neural network model.</p></div>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.call_existing_code"><code class="name flex">
+<span>def <span class="ident">call_existing_code</span></span>(<span>units: int, activation: str, threshold: float, optimizer: str, input_shape_parm: None | int = None, num_classes: None | int = None) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Calls an existing AutoClassifier instance.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>units</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of neurons in each hidden layer.</dd>
+<dt><strong><code>activation</code></strong> :&ensp;<code>str</code></dt>
+<dd>The type of activation function to use for the neural network layers.</dd>
+<dt><strong><code>threshold</code></strong> :&ensp;<code>float</code></dt>
+<dd>The threshold for the classifier.</dd>
+<dt><strong><code>optimizer</code></strong> :&ensp;<code>str</code></dt>
+<dd>The type of optimizer to use for the neural network layers.</dd>
+<dt><strong><code>input_shape_parm</code></strong> :&ensp;<code>None` | `int</code></dt>
+<dd>The shape of the input data.</dd>
+<dt><strong><code>num_classes</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of classes in the dataset.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code><a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></code>
+The AutoClassifier instance.</p></div>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.setup_model"><code class="name flex">
+<span>def <span class="ident">setup_model</span></span>(<span>data: pandas.core.frame.DataFrame, target: str, epochs: int, train_size: float = 0.7, seed=None, train_mode: bool = True, filepath: str = './my_dir/best_model', **kwargs) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Setup model for training and tuning.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>data</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dd>The dataset to train the model on.</dd>
+<dt><strong><code>target</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the target column.</dd>
+<dt><strong><code>epochs</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of epochs to train the model for.</dd>
+<dt><strong><code>train_size</code></strong> :&ensp;<code>float</code></dt>
+<dd>The proportion of the dataset to use for training.</dd>
+<dt><strong><code>seed</code></strong> :&ensp;<code>Any` | `int</code></dt>
+<dd>The random seed to use for reproducibility.</dd>
+<dt><strong><code>train_mode</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether to train the model or not.</dd>
+<dt><strong><code>filepath</code></strong> :&ensp;<code>str</code></dt>
+<dd>The path to save the best model to.</dd>
+</dl>
+<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<p>Additional keyword arguments to pass to the model.</p>
+<p>max_trials : <code>int</code>
+The maximum number of trials to perform.
+directory : <code>str</code>
+The directory to save the model to.
+project_name : <code>str</code>
+The name of the project.
+objective : <code>str</code>
+The objective to optimize.
+verbose : <code>bool</code>
+Whether to print verbose output.</p>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>model</code></strong> :&ensp;<code><a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></code></dt>
+<dd>The trained model.</dd>
+</dl></div>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier"><code class="flex name class">
+<span>class <span class="ident">AutoClassifier</span></span>
+<span>(</span><span>input_shape_parm, num_classes, units, activation)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>An auto-classifier model that automatically determines the best classification strategy based on the input data.</p>
+<h2 id="attributes">Attributes</h2>
+<ul>
+<li>input_shape_parm: The shape of the input data.</li>
+<li>num_classes: The number of classes in the dataset.</li>
+<li>units: The number of neurons in each hidden layer.</li>
+<li>activation: The type of activation function to use for the neural network layers.</li>
+</ul>
+<h2 id="methods">Methods</h2>
+<p><strong>init</strong>(self, input_shape_parm, num_classes, units, activation): Initializes an AutoClassifier instance with the given parameters.
+build(self, input_shape_parm): Builds the model architecture based on input_shape_parm.
+call(self, x): Defines the forward pass of the model.
+get_config(self): Returns the configuration of the model.
+from_config(cls, config): Recreates an instance of AutoClassifier from its configuration.</p>
+<p>Initializes an AutoClassifier instance with the given parameters.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>input_shape_parm</code></strong> :&ensp;<code>int</code></dt>
+<dd>The shape of the input data.</dd>
+<dt><strong><code>num_classes</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of classes in the dataset.</dd>
+<dt><strong><code>units</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of neurons in each hidden layer.</dd>
+<dt><strong><code>activation</code></strong> :&ensp;<code>str</code></dt>
+<dd>The type of activation function to use for the neural network layers.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@tf.keras.utils.register_keras_serializable(package=&#34;Custom&#34;, name=&#34;AutoClassifier&#34;)
+class AutoClassifier(tf.keras.Model):
+    &#34;&#34;&#34;
+    An auto-classifier model that automatically determines the best classification strategy based on the input data.
+
+    Attributes:
+        - input_shape_parm: The shape of the input data.
+        - num_classes: The number of classes in the dataset.
+        - units: The number of neurons in each hidden layer.
+        - activation: The type of activation function to use for the neural network layers.
+
+    Methods:
+        __init__(self, input_shape_parm, num_classes, units, activation): Initializes an AutoClassifier instance with the given parameters.
+        build(self, input_shape_parm): Builds the model architecture based on input_shape_parm.
+        call(self, x): Defines the forward pass of the model.
+        get_config(self): Returns the configuration of the model.
+        from_config(cls, config): Recreates an instance of AutoClassifier from its configuration.
+    &#34;&#34;&#34;
+
+    def __init__(self, input_shape_parm, num_classes, units, activation):
+        &#34;&#34;&#34;
+        Initializes an AutoClassifier instance with the given parameters.
+
+        Parameters
+        ----------
+        input_shape_parm : `int`
+            The shape of the input data.
+        num_classes : `int`
+            The number of classes in the dataset.
+        units : `int`
+            The number of neurons in each hidden layer.
+        activation : `str`
+            The type of activation function to use for the neural network layers.
+        &#34;&#34;&#34;
+        super(AutoClassifier, self).__init__()
+        self.input_shape_parm = input_shape_parm
+        self.num_classes = num_classes
+        self.units = units
+        self.activation = activation
+
+        self.encoder = None
+        self.decoder = None
+        self.classifier = None
+
+    def build(self, input_shape):
+        self.encoder = tf.keras.Sequential(
+            [
+                tf.keras.layers.Dense(units=self.units, activation=self.activation),
+                tf.keras.layers.Dense(units=int(self.units / 2), activation=self.activation),
+            ]
+        )
+
+        self.decoder = tf.keras.Sequential(
+            [
+                tf.keras.layers.Dense(units=self.units, activation=self.activation),
+                tf.keras.layers.Dense(units=self.input_shape_parm, activation=self.activation),
+            ]
+        )
+
+        self.classifier = tf.keras.Sequential(
+            [tf.keras.layers.Dense(self.num_classes, activation=&#34;softmax&#34;)]
+        )
+
+    def call(self, x):
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        combined = tf.concat([decoded, encoded], axis=1)
+        classification = self.classifier(combined)
+        return classification
+
+    def get_config(self):
+        config = {
+            &#34;input_shape_parm&#34;: self.input_shape_parm,
+            &#34;num_classes&#34;: self.num_classes,
+            &#34;units&#34;: self.units,
+            &#34;activation&#34;: self.activation,
+        }
+        base_config = super(AutoClassifier, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(
+            input_shape_parm=config[&#34;input_shape_parm&#34;],
+            num_classes=config[&#34;num_classes&#34;],
+            units=config[&#34;units&#34;],
+            activation=config[&#34;activation&#34;],
+        )</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>keras.src.models.model.Model</li>
+<li>keras.src.backend.tensorflow.trainer.TensorFlowTrainer</li>
+<li>keras.src.trainers.trainer.Trainer</li>
+<li>keras.src.layers.layer.Layer</li>
+<li>keras.src.backend.tensorflow.layer.TFLayer</li>
+<li>keras.src.backend.tensorflow.trackable.KerasAutoTrackable</li>
+<li>tensorflow.python.trackable.autotrackable.AutoTrackable</li>
+<li>tensorflow.python.trackable.base.Trackable</li>
+<li>keras.src.ops.operation.Operation</li>
+<li>keras.src.saving.keras_saveable.KerasSaveable</li>
+</ul>
+<h3>Static methods</h3>
+<dl>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.from_config"><code class="name flex">
+<span>def <span class="ident">from_config</span></span>(<span>config)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Creates an operation from its config.</p>
+<p>This method is the reverse of <code>get_config</code>, capable of instantiating the
+same operation from the config dictionary.</p>
+<p>Note: If you override this method, you might receive a serialized dtype
+config, which is a <code>dict</code>. You can deserialize it as follows:</p>
+<pre><code class="language-python">if &quot;dtype&quot; in config and isinstance(config[&quot;dtype&quot;], dict):
+    policy = dtype_policies.deserialize(config[&quot;dtype&quot;])
+</code></pre>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>config</code></strong></dt>
+<dd>A Python dictionary, typically the output of <code>get_config</code>.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>An operation instance.</p></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.build"><code class="name flex">
+<span>def <span class="ident">build</span></span>(<span>self, input_shape)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.call"><code class="name flex">
+<span>def <span class="ident">call</span></span>(<span>self, x)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.get_config"><code class="name flex">
+<span>def <span class="ident">get_config</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Returns the config of the object.</p>
+<p>An object config is a Python dictionary (serializable)
+containing the information needed to re-instantiate it.</p></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="likelihood.models.deep" href="index.html">likelihood.models.deep</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="likelihood.models.deep.autoencoders.build_model" href="#likelihood.models.deep.autoencoders.build_model">build_model</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.call_existing_code" href="#likelihood.models.deep.autoencoders.call_existing_code">call_existing_code</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.setup_model" href="#likelihood.models.deep.autoencoders.setup_model">setup_model</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></code></h4>
+<ul class="">
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.build" href="#likelihood.models.deep.autoencoders.AutoClassifier.build">build</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.call" href="#likelihood.models.deep.autoencoders.AutoClassifier.call">call</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.from_config" href="#likelihood.models.deep.autoencoders.AutoClassifier.from_config">from_config</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.get_config" href="#likelihood.models.deep.autoencoders.AutoClassifier.get_config">get_config</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.1</a>.</p>
+</footer>
+</body>
+</html>
