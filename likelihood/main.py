@@ -24,9 +24,9 @@ def lnprior(theta: np.ndarray, conditions: List[Tuple[float, float]]) -> float:
         raise ValueError("Length of conditions must be twice the length of theta.")
 
     cond = np.array(conditions).reshape((len(theta), 2))
-    for i in range(len(theta)):
-        if not (cond[i, 0] < theta[i] < cond[i, 1]):
-            return np.inf
+    within_bounds = np.logical_and(cond[:, 0] < theta, theta < cond[:, 1])
+    if not np.all(within_bounds):
+        return np.inf
 
     return 0.0
 
@@ -73,12 +73,12 @@ def fun_like(
         y_hat = y_hat[np.newaxis, ...].T
 
     y_sum = np.sum((y - y_hat) ** 2 * inv_sigma2 - np.log(inv_sigma2))
-    lhood = 0.5 * y_sum + lp
+    lhood = 0.5 * y_sum
 
     if not np.isfinite(lhood):
-        lhood = np.inf
+        return np.inf
 
-    return lhood
+    return lhood + lp
 
 
 def update_theta(theta: np.ndarray, d: float) -> np.ndarray:
@@ -157,9 +157,9 @@ def walk(
 
         y0 = fun_like(x, y, model, theta, conditions, var2)
         y1 = fun_like(x, y, model, theta_new, conditions, var2)
-
-        if mode and (y0 <= tol or y1 <= tol):
-            print("Goal reached!")
+        if y0 <= tol or y1 <= tol:
+            if mode:
+                print("Goal reached!")
             return (theta_new, nwalk, y1) if y1 <= tol else (theta, nwalk, y0)
 
         if y1 >= y0:
@@ -168,9 +168,13 @@ def walk(
 
             if prob > np.random.rand():
                 theta = theta_new
+        else:
+            theta = theta_new
+            theta_new = update_theta(theta, d)
 
-    print("Maximum number of iterations reached!")
-    print(f"The log-likelihood is: {y0}")
+    if mode:
+        print("Maximum number of iterations reached!")
+        print(f"The log-likelihood is: {y0}")
 
     return theta, nwalk, y0
 
