@@ -6,8 +6,9 @@ import keras_tuner
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from likelihood.tools import OneHotEncoder
 from pandas.core.frame import DataFrame
+
+from likelihood.tools import OneHotEncoder
 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 

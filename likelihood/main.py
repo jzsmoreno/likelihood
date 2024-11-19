@@ -1,4 +1,5 @@
 from typing import Callable, List, Tuple
+
 import corner
 import matplotlib.pyplot as plt
 import numpy as np
