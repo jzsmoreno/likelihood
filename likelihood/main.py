@@ -26,7 +26,7 @@ def lnprior(theta: np.ndarray, conditions: List[Tuple[float, float]]) -> float:
     cond = np.array(conditions).reshape((len(theta), 2))
     for i in range(len(theta)):
         if not (cond[i, 0] < theta[i] < cond[i, 1]):
-            return -np.inf
+            return np.inf
 
     return 0.0
 
