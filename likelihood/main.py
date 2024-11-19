@@ -3,10 +3,9 @@ from typing import Callable, List, Tuple
 import corner
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy import ndarray
 
 
-def lnprior(theta: ndarray, conditions: List[Tuple[float, float]]) -> float:
+def lnprior(theta: np.ndarray, conditions: List[Tuple[float, float]]) -> float:
     """Computes the prior probability.
 
     Parameters
@@ -22,29 +21,22 @@ def lnprior(theta: ndarray, conditions: List[Tuple[float, float]]) -> float:
     lp : `float`
         The a priori probability.
     """
+    if len(conditions) != 2 * len(theta):
+        raise ValueError("Length of conditions must be twice the length of theta.")
 
-    try:
-        if len(conditions) != 2 * len(theta):
-            error_type = "IndexError"
-            msg = "Length of conditions must be twice the length of theta."
-            print(f"{error_type}: {msg}")
-        else:
-            cond = np.array(conditions).reshape((len(theta), 2))
-            for i in range(len(theta)):
-                if cond[i, 0] < theta[i] < cond[i, 1]:
-                    lp = 0.0
-                else:
-                    return np.inf
-            return lp
-    except:
-        return 0.0
+    cond = np.array(conditions).reshape((len(theta), 2))
+    within_bounds = np.logical_and(cond[:, 0] < theta, theta < cond[:, 1])
+    if not np.all(within_bounds):
+        return np.inf
+
+    return 0.0
 
 
 def fun_like(
-    x: ndarray,
-    y: ndarray,
+    x: np.ndarray,
+    y: np.ndarray,
     model: Callable,
-    theta: ndarray,
+    theta: np.ndarray,
     conditions: List[Tuple[float, float]] = None,
     var2: float = 1.0,
 ) -> float:
@@ -57,14 +49,14 @@ def fun_like(
     y : `np.ndarray`
         An $n$ dimensional array that will be compared with model's output.
     model : `Callable`
-        A Python function defined by the user. This function should recieve
-        two arguments $(`x`, `theta`)$.
+        A Python function defined by the user. This function should receive
+        two arguments $(x, theta)$.
     theta : `np.ndarray`
         The array containing the model's parameters.
-    conditions : `list`
+    conditions : `list`, optional
         A list containing $2n$-conditions for the (min, max) range of the
-        $n$ parameters.
-    var2 : `float`
+        $n$ parameters. Defaults to None.
+    var2 : `float`, optional
         Determines the step size of the walker. By default it is set to `1.0`.
 
     Returns
@@ -72,28 +64,25 @@ def fun_like(
     lhood : `float`
         The computed likelihood.
     """
-
-    lp = lnprior(theta, conditions)
-    inv_sigma2 = 1.0 / (var2)
+    lp = 0.0 if conditions is None else lnprior(theta, conditions)
+    inv_sigma2 = 1.0 / var2
     y_hat = model(x, theta)
 
     try:
         y_hat.shape[1]
-    except:
+    except IndexError:
         y_hat = y_hat[np.newaxis, ...].T
 
     y_sum = np.sum((y - y_hat) ** 2 * inv_sigma2 - np.log(inv_sigma2))
     lhood = 0.5 * y_sum
 
-    if not np.isfinite(lp):
-        lhood = np.inf
-    else:
-        lhood += lp
+    if not np.isfinite(lhood):
+        return np.inf
 
-    return lhood
+    return lhood + lp
 
 
-def update_theta(theta: ndarray, d: float) -> ndarray:
+def update_theta(theta: np.ndarray, d: float) -> np.ndarray:
     """Updates the theta parameters.
 
     Parameters
@@ -108,21 +97,18 @@ def update_theta(theta: ndarray, d: float) -> ndarray:
     theta_new : `np.array`
         An ndarray with the updated theta values.
     """
-
-    theta_new = [np.random.normal(theta[k], d / 2.0) for k in range(len(theta))]
-
-    return theta_new
+    return np.random.normal(theta, d / 2.0)
 
 
 def walk(
-    x: ndarray,
-    y: ndarray,
+    x: np.ndarray,
+    y: np.ndarray,
     model: Callable,
-    theta: ndarray,
+    theta: np.ndarray,
     conditions: List[Tuple[float, float]] = None,
     var2: float = 0.01,
     mov: int = 100,
-    d: int = 1,
+    d: float = 1.0,
     tol: float = 1e-4,
     mode: bool = True,
 ):
@@ -135,25 +121,25 @@ def walk(
     y : np.ndarray
         An $n$ dimensional array that will be compared with model's output.
     model : `Callable`
-        A Python function defined by the user. This function should recieve
+        A Python function defined by the user. This function should receive
         two arguments $(x, theta)$.
     theta : `np.ndarray`
         The array containing the model's parameters.
-    conditions : `list`
+    conditions : `list`, optional
         A list containing $2n$-conditions for the (min, max) range of the
-        $n$ parameters.
-    var2 : `float`
+        $n$ parameters. Defaults to None.
+    var2 : `float`, optional
         Determines the step size of the walker. By default it is set to `1.0`.
-    mov : `int`
+    mov : `int`, optional
         Number of movements that walker will perform. By default it is set
         to `100`.
-    d : `float`
+    d : `float`, optional
         Size of the Gaussian step for the walker.
-    tol : `float`
+    tol : `float`, optional
         Convergence criteria for the log-likelihood. By default it is set
         to `1e-3`.
-    mode : `bool`
-        By default it is set to `True`.
+    mode : `bool`, optional
+        Defaults to `True`.
 
     Returns
     -------
@@ -164,43 +150,29 @@ def walk(
     y0 : `float`
         The log-likelihood value.
     """
-
-    greach = False
     nwalk = []
 
     for i in range(mov):
         nwalk.append(theta)
         theta_new = update_theta(theta, d)
 
-        if not greach:
-            y0 = fun_like(x, y, model, theta, conditions, var2)
-            y1 = fun_like(x, y, model, theta_new, conditions, var2)
-
-            if y0 <= tol and mode:
+        y0 = fun_like(x, y, model, theta, conditions, var2)
+        y1 = fun_like(x, y, model, theta_new, conditions, var2)
+        if y0 <= tol or y1 <= tol:
+            if mode:
                 print("Goal reached!")
-                greach = True
+            return (theta_new, nwalk, y1) if y1 <= tol else (theta, nwalk, y0)
 
-                return theta, nwalk, y0
-            else:
-                if y1 <= tol and mode:
-                    print("Goal reached!")
-                    greach = True
+        if y1 >= y0:
+            ratio = y0 / y1
+            prob = np.exp(-ratio)
 
-                    return theta_new, nwalk, y1
-                else:
-                    ratio = y0 / y1
-                    boltz = np.random.rand(1)
-                    prob = np.exp(-ratio)
+            if prob > np.random.rand():
+                theta = theta_new
+        else:
+            theta = theta_new
+            theta_new = update_theta(theta, d)
 
-                    if y1 < y0:
-                        theta = theta_new
-                        theta_new = update_theta(theta, d)
-                    else:
-                        if prob > boltz:
-                            theta = theta_new
-                            theta_new = update_theta(theta, d)
-                        else:
-                            theta_new = update_theta(theta, d)
     if mode:
         print("Maximum number of iterations reached!")
         print(f"The log-likelihood is: {y0}")
@@ -210,14 +182,14 @@ def walk(
 
 def walkers(
     nwalkers: int,
-    x: ndarray,
-    y: ndarray,
+    x: np.ndarray,
+    y: np.ndarray,
     model: Callable,
-    theta: ndarray,
-    conditions: bool = None,
+    theta: np.ndarray,
+    conditions: List[Tuple[float, float]] = None,
     var2: float = 0.01,
     mov: int = 100,
-    d: int = 1,
+    d: float = 1.0,
     tol: float = 1e-4,
     mode: bool = False,
     figname: str = "fig_out.png",
@@ -233,27 +205,27 @@ def walkers(
     y : `np.ndarray`
         An $n$ dimensional array that will be compared with model's output.
     model : `Callable`
-        A Python function defined by the user. This function should recieve
+        A Python function defined by the user. This function should receive
         two arguments $(x, theta)$.
     theta : `np.ndarray`
         The array containing the model's parameters.
-    conditions : `list`
+    conditions : `list`, optional
         A list containing $2n$-conditions for the (min, max) range of the
-        $n$ parameters.
-    var2 : `float`
+        $n$ parameters. Defaults to None.
+    var2 : `float`, optional
         Determines the step size of the walker. By default it is set to `1.0`.
-    mov : `int`
+    mov : `int`, optional
         Number of movements that walker will perform. By default it is set
         to `100`.
-    d : `float`
+    d : `float`, optional
         Size of the Gaussian step for the walker.
-    tol : `float`
-        Convergence criteria for the log-likelihhod. By default it is set
+    tol : `float`, optional
+        Convergence criteria for the log-likelihood. By default it is set
         to `1e-3`.
-    mode : `bool`
+    mode : `bool`, optional
         Specifies that we will be working with more than one walker. By
         default it is set to `False`.
-    figname : `str`
+    figname : `str`, optional
         The name of the output file for the figure. By default it is set
         to `fig_out.png`.
 
@@ -264,7 +236,6 @@ def walkers(
     error : `np.array`
         The log-likelihood array.
     """
-
     error = []
     par = []
 
@@ -274,30 +245,29 @@ def walkers(
         nwalk = np.array(nwalk).reshape((len(nwalk), len(nwalk[i])))
         error.append(y0)
 
-        if figname != None:
+        if figname:
             for k in range(nwalk.shape[1]):
-                sub = "$\\theta _{" + str(k) + "}$"
+                sub = f"$\\theta _{k}$"
                 plt.plot(range(len(nwalk[:, k])), nwalk[:, k], "-", label=sub)
                 plt.ylabel("$\\theta$")
                 plt.xlabel("iterations")
-                plt.savefig("walkers_" + figname, dpi=300, transparent=True)
+                plt.savefig(f"walkers_{figname}", dpi=300, transparent=True)
 
-    if figname != None:
+    if figname:
         plt.show()
 
-    if nwalk.shape[1] == 2:
-        if figname != None:
-            fig = corner.hist2d(
-                nwalk[:, 0],
-                nwalk[:, 1],
-                range=None,
-                bins=18,
-                smooth=True,
-                plot_datapoints=True,
-                plot_density=True,
-            )
-            plt.ylabel("$\\theta_{1}$")
-            plt.xlabel("$\\theta_{0}$")
-            plt.savefig("theta_" + figname, dpi=300, transparent=True)
+    if len(theta) == 2 and figname:
+        corner.hist2d(
+            nwalk[:, 0],
+            nwalk[:, 1],
+            range=None,
+            bins=18,
+            smooth=True,
+            plot_datapoints=True,
+            plot_density=True,
+        )
+        plt.ylabel("$\\theta_{1}$")
+        plt.xlabel("$\\theta_{0}$")
+        plt.savefig(f"theta_{figname}", dpi=300, transparent=True)
 
     return par, error

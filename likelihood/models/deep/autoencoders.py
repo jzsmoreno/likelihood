@@ -1,3 +1,4 @@
+import logging
 import os
 from functools import partial
 from shutil import rmtree
@@ -6,8 +7,11 @@ import keras_tuner
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from likelihood.tools import OneHotEncoder
 from pandas.core.frame import DataFrame
+
+from likelihood.tools import OneHotEncoder
+
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
@@ -141,7 +145,7 @@ def call_existing_code(
     )
     model.compile(
         optimizer=optimizer,
-        loss="categorical_crossentropy",
+        loss=tf.keras.losses.CategoricalCrossentropy(),
         metrics=[tf.keras.metrics.F1Score(threshold=threshold)],
     )
     return model
@@ -250,9 +254,9 @@ def setup_model(
     if train_mode:
         # Create a new directory if it does not exist
         try:
-            if not os.path.exists(directory):
+            if (not os.path.exists(directory)) and directory != "./":
                 os.makedirs(directory)
-            else:
+            elif directory != "./":
                 print(f"Directory {directory} already exists, it will be deleted.")
                 rmtree(directory)
                 os.makedirs(directory)

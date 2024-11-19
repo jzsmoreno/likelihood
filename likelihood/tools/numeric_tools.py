@@ -8,6 +8,93 @@ from pandas.core.frame import DataFrame
 
 
 # -------------------------------------------------------------------------
+def get_metrics(dataset, actual_column_name, predicted_column_name, verbose=False):
+    # Variables to keep track of the number of correct and total predictions
+    true_positives = 0  # Correctly predicted positives
+    true_negatives = 0  # Correctly predicted negatives
+    false_positives = 0  # Negatives predicted as positives
+    false_negatives = 0  # Positives predicted as negatives
+    total_predictions = len(dataset)
+
+    # Counters for actual and predicted classes
+    actual_positive_count = 0
+    actual_negative_count = 0
+    predicted_positive_count = 0
+    predicted_negative_count = 0
+
+    for index, row in dataset.iterrows():
+        actual_class = row[actual_column_name]
+        predicted_class = row[predicted_column_name]
+
+        # Update confusion matrix counts
+        if actual_class == 1 and predicted_class == 1:  # True positive
+            true_positives += 1
+        elif actual_class == 0 and predicted_class == 0:  # True negative
+            true_negatives += 1
+        elif actual_class == 0 and predicted_class == 1:  # False positive
+            false_positives += 1
+        elif actual_class == 1 and predicted_class == 0:  # False negative
+            false_negatives += 1
+
+        # Update class counts
+        if actual_class == 1:
+            actual_positive_count += 1
+        else:
+            actual_negative_count += 1
+
+        if predicted_class == 1:
+            predicted_positive_count += 1
+        else:
+            predicted_negative_count += 1
+
+    # Calculate accuracy
+    accuracy = (true_positives + true_negatives) / total_predictions * 100
+
+    # Calculate precision
+    if true_positives + false_positives > 0:
+        precision = true_positives / (true_positives + false_positives) * 100
+    else:
+        precision = 0  # Avoid division by zero
+
+    # Calculate recall
+    if true_positives + false_negatives > 0:
+        recall = true_positives / (true_positives + false_negatives) * 100
+    else:
+        recall = 0  # Avoid division by zero
+
+    # Calculate F1-Score
+    if precision + recall > 0:
+        f1_score = 2 * (precision * recall) / (precision + recall)
+    else:
+        f1_score = 0  # Avoid division by zero
+
+    coeff_1 = (true_positives + false_positives) * (false_positives + true_negatives)
+    coeff_2 = (true_positives + false_negatives) * (false_negatives + true_negatives)
+    if coeff_1 + coeff_2 > 0:
+        kappa = (
+            2
+            * (true_positives * true_negatives - false_negatives * false_positives)
+            / (coeff_1 + coeff_2)
+        )
+
+    metrics = {
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
+        "f1_score": f1_score,
+        "kappa": kappa,
+    }
+
+    if verbose:
+        print(f"Accuracy: {accuracy:.2f}%")
+        print(f"Precision: {precision:.2f}%")
+        print(f"Recall: {recall:.2f}%")
+        print(f"F1-Score: {f1_score:.2f}")
+        print(f"Cohen's Kappa: {kappa:.4f}")
+    else:
+        return metrics
+
+
 def xi_corr(df: pd.DataFrame) -> pd.DataFrame:
     """Calculate new coefficient of correlation for all pairs of columns in a `DataFrame`.
 
