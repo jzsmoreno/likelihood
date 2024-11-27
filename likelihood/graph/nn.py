@@ -1,15 +1,24 @@
+import os
+
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+import logging
 import warnings
 from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from IPython.display import clear_output
 from numpy import ndarray
 from pandas.core.frame import DataFrame
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 
 from likelihood.tools import generate_feature_yaml
+
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
 def compare_similarity(arr1: ndarray, arr2: ndarray) -> int:
@@ -180,14 +189,6 @@ class VanillaGNN(tf.keras.Model):
         self.gnn2 = VanillaGNNLayer(self.dim_h, self.dim_h)
         self.gnn3 = VanillaGNNLayer(self.dim_h, self.dim_out)
 
-    def build(self, input_shape):
-        super(VanillaGNN, self).build(input_shape)
-        dummy_input = tf.keras.Input(shape=input_shape[1:])
-        dummy_adjacency = tf.sparse.SparseTensor(
-            indices=[[0, 0]], values=[1.0], dense_shape=[input_shape[0], input_shape[0]]
-        )
-        _ = self(dummy_input, dummy_adjacency)
-
     def call(self, x, adjacency):
         h = self.gnn1(x, adjacency)
         h = tf.nn.tanh(h)
@@ -289,10 +290,11 @@ class VanillaGNN(tf.keras.Model):
             train_losses.append(train_loss)
             train_f1_scores.append(train_f1)
 
-            if epoch % 2 == 0:
+            if epoch % 5 == 0:
                 val_loss, val_f1 = self.evaluate(X_test, adjacency_test, y_test)
                 val_losses.append(val_loss)
                 val_f1_scores.append(val_f1)
+                clear_output(wait=True)
                 print(
                     f"Epoch {epoch:>3} | Train Loss: {train_loss:.3f} | Train F1: {train_f1:.3f} | Val Loss: {val_loss:.3f} | Val F1: {val_f1:.3f}"
                 )
@@ -327,9 +329,9 @@ if __name__ == "__main__":
     model = VanillaGNN(dim_in=data.x.shape[1], dim_h=8, dim_out=len(iris_df["species"].unique()))
     print("Before training F1:", model.test(data))
     model.fit(data, epochs=200, batch_size=32, test_size=0.5)
-    model.save("./best_model.keras")
+    model.save("./best_model", save_format="tf")
     print("After training F1:", model.test(data))
-    best_model = tf.keras.models.load_model("./best_model.keras")
+    best_model = tf.keras.models.load_model("./best_model")
 
     print("After loading F1:", best_model.test(data))
     df_results = pd.DataFrame()
