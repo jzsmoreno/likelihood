@@ -136,4 +136,4 @@ dmypy.json
 /examples/*.png
 
 # Ignore <files>.pkl for testing
-/examples/*.pkl
+*.pkl

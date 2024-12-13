@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yaml
-from numpy import ndarray
 from pandas.core.frame import DataFrame
 
 # -------------------------------------------------------------------------
@@ -68,7 +67,7 @@ def difference_quotient(f: Callable, x: float, h: float) -> Callable:
     return (f(x + h) - f(x)) / h
 
 
-def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float) -> ndarray:
+def partial_difference_quotient(f: Callable, v: np.ndarray, i: int, h: float) -> np.ndarray:
     """Calculates the partial difference quotient of `f`
 
     Parameters
@@ -93,7 +92,7 @@ def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float) -> nd
     return (f(w) - f(v)) / h
 
 
-def estimate_gradient(f: Callable, v: ndarray, h: float = 1e-4) -> List[ndarray]:
+def estimate_gradient(f: Callable, v: np.ndarray, h: float = 1e-4) -> List[np.ndarray]:
     """Calculates the gradient of `f` at `v`
 
     Parameters
@@ -495,7 +494,7 @@ class LogisticRegression:
 
         self.importance = []
 
-    def fit(self, dataset: ndarray, values: ndarray) -> None:
+    def fit(self, dataset: np.ndarray, values: np.ndarray) -> None:
         """Performs linear multiple model training
 
         Parameters
@@ -528,7 +527,7 @@ class LogisticRegression:
                 a = np.around(self.w[i], decimals=8)
                 self.importance.append(a)
 
-    def predict(self, datapoints: ndarray) -> ndarray:
+    def predict(self, datapoints: np.ndarray) -> np.ndarray:
         """
         Performs predictions for a set of points
 
@@ -542,7 +541,7 @@ class LogisticRegression:
 
         return sig(np.array(self.importance) @ datapoints)
 
-    def get_importances(self, print_important_features: bool = False) -> ndarray:
+    def get_importances(self, print_important_features: bool = False) -> np.ndarray:
         """
         Returns the important features
 
@@ -574,7 +573,7 @@ class LinearRegression:
 
         self.importance = []
 
-    def fit(self, dataset: ndarray, values: ndarray, verbose: bool = False) -> None:
+    def fit(self, dataset: np.ndarray, values: np.ndarray, verbose: bool = False) -> None:
         """Performs linear multiple model training
 
         Parameters
@@ -607,7 +606,7 @@ class LinearRegression:
             print("\nParameters:", np.array(self.importance).shape)
             print("RMSE: {:.4f}".format(mean_square_error(self.y, self.predict(self.X))))
 
-    def predict(self, datapoints: ndarray) -> ndarray:
+    def predict(self, datapoints: np.ndarray) -> np.ndarray:
         """
         Performs predictions for a set of points
 
@@ -619,7 +618,7 @@ class LinearRegression:
         """
         return np.array(self.importance) @ datapoints
 
-    def get_importances(self, print_important_features: bool = False) -> ndarray:
+    def get_importances(self, print_important_features: bool = False) -> np.ndarray:
         """
         Returns the important features
 
@@ -641,7 +640,7 @@ class LinearRegression:
         return np.array(self.importance)
 
 
-def cal_average(y: ndarray, alpha: float = 1):
+def cal_average(y: np.ndarray, alpha: float = 1):
     """Calculates the moving average of the data
 
     Parameters
@@ -669,12 +668,12 @@ class DataScaler:
 
     __slots__ = ["dataset_", "_n", "data_scaled", "values", "transpose", "inv_fitting"]
 
-    def __init__(self, dataset: ndarray, n: int = 1) -> None:
+    def __init__(self, dataset: np.ndarray, n: int = 1) -> None:
         """Initializes the parameters required for scaling the data"""
         self.dataset_ = dataset.copy()
         self._n = n
 
-    def rescale(self, dataset_: ndarray | None = None) -> ndarray:
+    def rescale(self, dataset_: np.ndarray | None = None) -> np.ndarray:
         """Perform a standard rescaling of the data
 
         Returns
@@ -682,7 +681,7 @@ class DataScaler:
         data_scaled : `np.array`
             An array containing the scaled data.
         """
-        if isinstance(dataset_, ndarray):
+        if isinstance(dataset_, np.ndarray):
             data_scaled = np.copy(dataset_)
             mu = self.values[0]
             sigma = self.values[1]
@@ -738,7 +737,7 @@ class DataScaler:
 
         return self.data_scaled
 
-    def scale(self, dataset_: ndarray) -> ndarray:
+    def scale(self, dataset_: np.ndarray) -> np.ndarray:
         """Performs the inverse operation to the rescale function
 
         Parameters
@@ -782,7 +781,7 @@ def generate_series(n: int, n_steps: int, incline: bool = True):
     return series.astype(np.float32)
 
 
-def mean_square_error(y_true: ndarray, y_pred: ndarray, print_error: bool = False):
+def mean_square_error(y_true: np.ndarray, y_pred: np.ndarray, print_error: bool = False):
     """Calculates the Root Mean Squared Error
 
     Parameters
@@ -973,88 +972,65 @@ class PerformanceMeasures:
         pass
 
     # Performance measure Res_T
-    def f_mean(self, y_true: ndarray, y_pred: ndarray, labels: list) -> None:
-        n = len(labels)
+    def f_mean(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> float:
+        F_vec = self._f1_score(y_true, y_pred, labels)
+        mean_f_measure = np.mean(F_vec)
 
-        F_vec = self._f1_score(y_true, y_pred, labels=labels)
-        a = np.sum(F_vec)
+        for label, f_measure in zip(labels, F_vec):
+            print(f"F-measure of label {label} -> {f_measure}")
 
-        for i in range(len(F_vec)):
-            print("F-measure of label ", labels[i], " -> ", F_vec[i])
+        print(f"Mean of F-measure -> {mean_f_measure}")
 
-        print("Mean of F-measure -> ", a / n)
+        return mean_f_measure
 
     # Performance measure Res_P
-    def resp(self, y_true: ndarray, y_pred: ndarray, labels: list) -> None:
-        # We initialize sum counters
-        sum1 = 0
-        sum2 = 0
-
-        # Calculamos T_C
+    def resp(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> float:
         T_C = len(y_true)
-        for i in range(len(labels)):
-            # We calculate instances of the classes and their F-measures
-            sum1 += (1 - ((y_true == labels[i]).sum() / T_C)) * self._fi_measure(
-                y_true, y_pred, labels, i
-            )
-            sum2 += 1 - ((y_true == labels[i]).sum()) / T_C
+        sum1, sum2 = 0.0, 0.0
+        F_vec = self._f1_score(y_true, y_pred, labels)
 
-        # Print the metric corresponding to the prediction vector
-        print("Metric Res_p ->", sum1 / sum2)
+        for label_idx, label in enumerate(labels):
+            class_instances = np.sum(y_true == label) / T_C
+            sum1 += (1 - class_instances) * F_vec[label_idx]
+            sum2 += 1 - class_instances
 
-    def _fi_measure(self, y_true: ndarray, y_pred: ndarray, labels: list, i: int) -> int:
-        F_vec = self._f1_score(y_true, y_pred, labels=labels)
+        res_p = sum1 / sum2 if sum2 != 0 else 0.0  # Avoid division by zero
+        print(f"Metric Res_p -> {res_p}")
 
-        return F_vec[i]  # We return the position of the f1-score corresponding to the label
+        return res_p
 
-    # Summary of the labels predicted
-    def _summary_pred(self, y_true: ndarray, y_pred: ndarray, labels: list) -> None:
+    def _summary_pred(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> None:
         count_mat = self._confu_mat(y_true, y_pred, labels)
-        print("        ", end="")
-        for i in range(len(labels)):
-            print("|--", labels[i], "--", end="")
-            if i + 1 == len(labels):
-                print("|", end="")
-        for i in range(len(labels)):
-            print("")
-            print("|--", labels[i], "--|", end="")
-            for j in range(len(labels)):
-                if j != 0:
-                    print(" ", end="")
-                print("  ", int(count_mat[i, j]), "  ", end="")
+        print("       ", " | ".join(f"--{label}--" for label in labels))
+        for i, label_i in enumerate(labels):
+            row = [f"  {int(count_mat[i, j])}  " for j in range(len(labels))]
+            print(f"--{label_i}--|", " | ".join(row))
 
-    def _f1_score(self, y_true: ndarray, y_pred: ndarray, labels: list) -> ndarray:
-        f1_vec = np.zeros(len(labels))
-
-        # Calculate confusion mat
+    def _f1_score(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> np.ndarray:
         count_mat = self._confu_mat(y_true, y_pred, labels)
+        sum_cols = np.sum(count_mat, axis=0)
+        sum_rows = np.sum(count_mat, axis=1)
 
-        # sums over columns
-        sum1 = np.sum(count_mat, axis=0)
-        # sums over rows
-        sum2 = np.sum(count_mat, axis=1)
-        # Iterate over labels to calculate f1 scores of each one
-        for i in range(len(labels)):
-            precision = count_mat[i, i] / (sum1[i])
-            recall = count_mat[i, i] / (sum2[i])
-
-            f1_vec[i] = 2 * ((precision * recall) / (precision + recall))
+        # Avoid division by zero
+        precision = np.divide(
+            count_mat.diagonal(), sum_cols, out=np.zeros_like(sum_cols), where=sum_cols != 0
+        )
+        recall = np.divide(
+            count_mat.diagonal(), sum_rows, out=np.zeros_like(sum_rows), where=sum_rows != 0
+        )
+        f1_vec = 2 * ((precision * recall) / (precision + recall))
 
         return f1_vec
 
     # Returns confusion matrix of predictions
-    def _confu_mat(self, y_true: ndarray, y_pred: ndarray, labels: list) -> ndarray:
-        labels = np.array(labels)
-        count_mat = np.zeros((len(labels), len(labels)))
+    def _confu_mat(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> np.ndarray:
+        num_classes = len(labels)
+        label_mapping = {label: idx for idx, label in enumerate(labels)}
+        count_mat = np.zeros((num_classes, num_classes))
 
-        for i in range(len(labels)):
-            for j in range(len(y_pred)):
-                if y_pred[j] == labels[i]:
-                    if y_pred[j] == y_true[j]:
-                        count_mat[i, i] += 1
-                    else:
-                        x = np.where(labels == y_true[j])
-                        count_mat[i, x[0]] += 1
+        for pred_label, true_label in zip(y_pred, y_true):
+            if pred_label in label_mapping and true_label in label_mapping:
+                count_mat[label_mapping[pred_label], label_mapping[true_label]] += 1
 
         return count_mat
 
@@ -1062,33 +1038,36 @@ class PerformanceMeasures:
 class OneHotEncoder:
     """
     Class used to encode categorical variables.
-    It receives an array of integers and returns a binary array using the one-hot encoding method.
+    It receives an array of non-negative integers and returns a binary array using the one-hot encoding method.
     """
-
-    __slots__ = ["x"]
 
     def __init__(self) -> None:
         pass
 
-    def encode(self, x: ndarray | list):
-        self.x = x
+    def encode(self, x: Union[np.ndarray, list[int]]) -> np.ndarray:
+        # Ensure input is a numpy array
+        if not isinstance(x, np.ndarray):
+            x = np.array(x)
 
-        if not isinstance(self.x, ndarray):
-            self.x = np.array(self.x)  # If not numpy array then convert it
+        # Validate that the input contains only non-negative integers
+        if (x < 0).any() or not np.issubdtype(x.dtype, np.integer):
+            raise ValueError("Input should be an array of non-negative integers")
 
-        y = np.zeros(
-            (self.x.size, self.x.max() + 1)
-        )  # Build matrix of (size num of entries) x (max value + 1)
-
-        y[np.arange(self.x.size), self.x] = 1  # Label with ones
+        num_classes = int(np.max(x)) + 1
+        y = np.zeros((len(x), num_classes), dtype=int)
+        y[np.arange(len(x)), x] = 1
 
         return y
 
-    def decode(self, x: ndarray | list) -> ndarray:
-        if not isinstance(x, ndarray):
-            x = np.array(x)  # If not numpy array then convert it
+    def decode(self, x: Union[np.ndarray, list[int]]) -> np.ndarray:
+        # Ensure input is a numpy array
+        if not isinstance(x, np.ndarray):
+            x = np.array(x)
 
-        # We return the max values of each row
+        # Validate that the input is a binary matrix (each row should sum to 1)
+        if not np.all(np.isin(x, [0, 1])) or not np.all(x.sum(axis=1) == 1):
+            raise ValueError("Input should be a binary one-hot encoded matrix")
+
         y = np.argmax(x, axis=1)
 
         return y
@@ -1247,17 +1226,33 @@ class FeatureSelection:
 
 
 def check_nan_inf(df: DataFrame) -> DataFrame:
-    """Checks for `NaN` and `Inf` values in the `DataFrame`. If any are found they will be removed."""
+    """
+    Checks for NaN and Inf values in the DataFrame. If any are found, they will be removed.
+
+    Parameters:
+        df (DataFrame): The input DataFrame to be checked.
+
+    Returns:
+        DataFrame: A new DataFrame with NaN and Inf values removed.
+    """
+
     nan_values = df.isnull().values.any()
-    count = np.isinf(df.select_dtypes(include="number")).values.sum()
-    print("There are null values : ", nan_values)
-    print("It contains " + str(count) + " infinite values")
+    inf_values = np.isinf(df.select_dtypes(include="number")).values.any()
+
     if nan_values:
-        warning_type = "UserWarning"
-        msg = "Some rows may have been deleted due to the existence of nan values."
-        print(f"{warning_type}: {msg}")
-        print("Missing values correctly removed : ", "{:,}".format(df.isnull().values.sum()))
-        df = df.dropna()
+        print("UserWarning: Some rows may have been deleted due to the existence of NaN values.")
+        df.dropna(inplace=True)
+
+    if inf_values:
+        print("UserWarning: Some rows may have been deleted due to the existence of Inf values.")
+        df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        df.dropna(inplace=True)
+
+    nan_count = df.isnull().values.sum()
+    inf_count = np.isinf(df.select_dtypes(include="number")).values.sum()
+
+    print(f"NaN values removed: {nan_count}")
+    print(f"Infinite values removed: {inf_count}")
 
     return df
 
@@ -1271,6 +1266,7 @@ if __name__ == "__main__":
     helper = PerformanceMeasures()
     helper._summary_pred(y_true, y_pred, labels)
     print(helper._f1_score(y_true, y_pred, labels))
+    print(helper.f_mean(y_true, y_pred, labels))
 
     # Use DataFrameEncoder
     # Create a DataFrame
@@ -1300,6 +1296,13 @@ if __name__ == "__main__":
     # Generate data
     x = np.random.rand(3, 100)
     y = 0.1 * x[0, :] + 0.4 * x[1, :] + 0.5 * x[2, :] + 0.1
+    # Create a DataFrame
+    df = pd.DataFrame(x.T, columns=["x1", "x2", "x3"])
+    df["y"] = y
+    # Instantiate FeatureSelection
+    fs = FeatureSelection()
+    print(fs.get_digraph(df, n_importances=1))
+
     linear_model = LinearRegression()
     linear_model.fit(x, y)
     importance = linear_model.get_importances()
@@ -1340,3 +1343,18 @@ if __name__ == "__main__":
     x = np.random.normal(mu, sigma, N)
     f, cdf_, ox = cdf(x, plot=True)
     invf, cdf_, ox = cdf(x, plot=True, inv=True)
+
+    encoder = OneHotEncoder()
+    encoding = encoder.encode([1, 2, 3, 4, 5])
+    assert np.array_equal(
+        encoding,
+        np.array(
+            [
+                [0, 1, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0],
+                [0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 0, 1],
+            ]
+        ),
+    )
