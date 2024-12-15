@@ -1038,37 +1038,25 @@ class PerformanceMeasures:
 class OneHotEncoder:
     """
     Class used to encode categorical variables.
-    It receives an array of non-negative integers and returns a binary array using the one-hot encoding method.
+    It receives an array of integers and returns a binary array using the one-hot encoding method.
     """
+
+    __slots__ = ["x"]
 
     def __init__(self) -> None:
         pass
 
-    def encode(self, x: Union[np.ndarray, list[int]]) -> np.ndarray:
-        # Ensure input is a numpy array
-        if not isinstance(x, np.ndarray):
-            x = np.array(x)
+    def encode(self, x: Union[np.ndarray, list]):
+        self.x = x
 
-        # Validate that the input contains only non-negative integers
-        if (x < 0).any() or not np.issubdtype(x.dtype, np.integer):
-            raise ValueError("Input should be an array of non-negative integers")
+        if not isinstance(self.x, np.ndarray):
+            self.x = np.array(self.x)  # If not numpy array then convert it
 
-        num_classes = int(np.max(x)) + 1
-        y = np.zeros((len(x), num_classes), dtype=int)
-        y[np.arange(len(x)), x] = 1
+        y = np.zeros(
+            (self.x.size, self.x.max() + 1)
+        )  # Build matrix of (size num of entries) x (max value + 1)
 
-        return y
-
-    def decode(self, x: Union[np.ndarray, list[int]]) -> np.ndarray:
-        # Ensure input is a numpy array
-        if not isinstance(x, np.ndarray):
-            x = np.array(x)
-
-        # Validate that the input is a binary matrix (each row should sum to 1)
-        if not np.all(np.isin(x, [0, 1])) or not np.all(x.sum(axis=1) == 1):
-            raise ValueError("Input should be a binary one-hot encoded matrix")
-
-        y = np.argmax(x, axis=1)
+        y[np.arange(self.x.size), self.x] = 1  # Label with ones
 
         return y
 
