@@ -1,4 +1,5 @@
-from typing import Union
+import warnings
+from typing import List, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,16 +7,30 @@ import pandas as pd
 from numpy import ndarray
 from pandas.core.frame import DataFrame
 
-from likelihood.tools import (
-    DataFrameEncoder,
-    DataScaler,
-    FeatureSelection,
-    OneHotEncoder,
-    cdf,
-    check_nan_inf,
-)
+from likelihood.tools import DataScaler, FeatureSelection, OneHotEncoder, cdf, check_nan_inf
+
+# Suppress RankWarning
+warnings.simplefilter("ignore", np.RankWarning)
+
 
 # --------------------------------------------------------------------------------------------------------------------------------------
+def categories_by_quartile(df: DataFrame, column: str) -> Tuple[str, str]:
+    # Count the frequency of each category in the column
+    freq = df[column].value_counts()
+
+    # Calculate the 25th percentile (Q1) and 75th percentile (Q3)
+    q1 = freq.quantile(0.25)
+    q3 = freq.quantile(0.75)
+
+    # Filter categories that are below the 25th percentile and above the 75th percentile
+    least_frequent = freq[freq <= q1]
+    most_frequent = freq[freq >= q3]
+
+    # Get the least frequent category (25th percentile) and the most frequent category (75th percentile)
+    least_frequent_category = least_frequent.idxmin() if not least_frequent.empty else None
+    most_frequent_category = most_frequent.idxmax() if not most_frequent.empty else None
+
+    return least_frequent_category, most_frequent_category
 
 
 class SimulationEngine(FeatureSelection):
@@ -101,7 +116,7 @@ class SimulationEngine(FeatureSelection):
         df = df.copy()
         column = df.columns[0]
         frec = df[column].value_counts() / len(df)
-        df.loc[:, "frec"] = df[column].drop_duplicates().map(frec)
+        df.loc[:, "frec"] = df[column].map(frec)
         df.sort_values("frec", inplace=True)
         keys = df[column].to_list()
         values = df["frec"].to_list()
@@ -121,21 +136,28 @@ class SimulationEngine(FeatureSelection):
             poly = kwargs.get("poly", 9)
             plot = kwargs.get("plot", False)
             if not x[1]:
+                media = self.df[key].mean()
+                desviacion_estandar = self.df[key].std()
+                cota_inferior = media - 1.5 * desviacion_estandar
+                cota_superior = media + 1.5 * desviacion_estandar
                 f, cdf_, ox = cdf(x[0].flatten(), poly=poly, plot=plot)
             else:
-                f = None
-            tol = kwargs.get("tol", 0.25)
+                f, ox = None, None
+                frecuencias = self.df[key].value_counts()
+                least_frequent_category, most_frequent_category = categories_by_quartile(
+                    self.df[[key]], key
+                )
+                cota_inferior = x[1].get(least_frequent_category, 0)
+                cota_superior = x[1].get(most_frequent_category, 0)
             self.proba_dict[key] = (
                 f if f else None,
                 x[1],
-                (
-                    (np.min(x[0].flatten()) / 2.0 if np.min(x[0].flatten()) > 0.0 else tol)
-                    if f
-                    else None
-                ),
+                (np.mean(np.abs(np.diff(ox))) / 2.0 if isinstance(ox, np.ndarray) else None),
+                f(cota_inferior) if f else cota_inferior,
+                f(cota_superior) if f else cota_superior,
             )
 
-    def get_proba(self, value: Union[Union[float, int], str] | list, colname: str) -> list | float:
+    def get_proba(self, value: Union[Union[float, int], str] | list, colname: str) -> List[float]:
         value = (
             value
             if isinstance(value, list)
@@ -149,6 +171,16 @@ class SimulationEngine(FeatureSelection):
                 else self.proba_dict[colname][1].get(val, 0)
             )
             for val in value
+        ]
+
+    def pred_outliers(self, value: Union[Union[float, int], str] | list, colname: str) -> List[str]:
+        return [
+            (
+                "inlier"
+                if (self.proba_dict[colname][3] < val < self.proba_dict[colname][4])
+                else "outlier"
+            )
+            for val in self.get_proba(value, colname)
         ]
 
     def _clean_data(self, df: DataFrame) -> DataFrame:

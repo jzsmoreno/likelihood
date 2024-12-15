@@ -1,6 +1,7 @@
 import math
 import os
 import pickle
+import warnings
 from typing import Callable, Dict, List, Tuple, Union
 
 import matplotlib.pyplot as plt
@@ -8,6 +9,9 @@ import numpy as np
 import pandas as pd
 import yaml
 from pandas.core.frame import DataFrame
+
+# Suppress RankWarning
+warnings.simplefilter("ignore", np.RankWarning)
 
 # -------------------------------------------------------------------------
 
