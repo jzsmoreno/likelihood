@@ -1046,7 +1046,7 @@ class OneHotEncoder:
     def __init__(self) -> None:
         pass
 
-    def encode(self, x: Union[np.ndarray, list]):
+    def encode(self, x: np.ndarray | list):
         self.x = x
 
         if not isinstance(self.x, np.ndarray):
@@ -1057,6 +1057,15 @@ class OneHotEncoder:
         )  # Build matrix of (size num of entries) x (max value + 1)
 
         y[np.arange(self.x.size), self.x] = 1  # Label with ones
+
+        return y
+
+    def decode(self, x: np.ndarray | list) -> np.ndarray:
+        if not isinstance(x, np.ndarray):
+            x = np.array(x)  # If not numpy array then convert it
+
+        # We return the max values of each row
+        y = np.argmax(x, axis=1)
 
         return y
 

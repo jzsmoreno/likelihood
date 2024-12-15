@@ -1,10 +1,19 @@
+from typing import Union
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from numpy import ndarray
 from pandas.core.frame import DataFrame
 
-from likelihood.tools import DataScaler, FeatureSelection, OneHotEncoder, check_nan_inf
+from likelihood.tools import (
+    DataFrameEncoder,
+    DataScaler,
+    FeatureSelection,
+    OneHotEncoder,
+    cdf,
+    check_nan_inf,
+)
 
 # --------------------------------------------------------------------------------------------------------------------------------------
 
@@ -37,6 +46,7 @@ class SimulationEngine(FeatureSelection):
         self.df = df
         self.n_importances = n_importances
         self.use_scaler = use_scaler
+        self.proba_dict = {}
 
         super().__init__(**kwargs)
 
@@ -87,10 +97,59 @@ class SimulationEngine(FeatureSelection):
 
         return y[:]
 
+    def _encode(self, df: DataFrame) -> ndarray | list:
+        df = df.copy()
+        column = df.columns[0]
+        frec = df[column].value_counts() / len(df)
+        df.loc[:, "frec"] = df[column].drop_duplicates().map(frec)
+        df.sort_values("frec", inplace=True)
+        keys = df[column].to_list()
+        values = df["frec"].to_list()
+        return dict(zip(keys, values))
+
     def fit(self, **kwargs) -> None:
 
         # We run the feature selection algorithm
         self.get_digraph(self.df, self.n_importances, self.use_scaler)
+        proba_dict_keys = list(self.w_dict.keys())
+        self.proba_dict = dict(zip(proba_dict_keys, [i for i in range(len(proba_dict_keys))]))
+        for key in proba_dict_keys:
+            x = (
+                self.df[key].values,
+                None if self.df[key].dtype != "object" else self._encode(self.df[[key]]),
+            )
+            poly = kwargs.get("poly", 9)
+            plot = kwargs.get("plot", False)
+            if not x[1]:
+                f, cdf_, ox = cdf(x[0].flatten(), poly=poly, plot=plot)
+            else:
+                f = None
+            tol = kwargs.get("tol", 0.25)
+            self.proba_dict[key] = (
+                f if f else None,
+                x[1],
+                (
+                    (np.min(x[0].flatten()) / 2.0 if np.min(x[0].flatten()) > 0.0 else tol)
+                    if f
+                    else None
+                ),
+            )
+
+    def get_proba(self, value: Union[Union[float, int], str] | list, colname: str) -> list | float:
+        value = (
+            value
+            if isinstance(value, list)
+            else value.flatten().tolist() if isinstance(value, np.ndarray) else [value]
+        )
+        return [
+            (
+                self.proba_dict[colname][0](val)
+                - self.proba_dict[colname][0](val - self.proba_dict[colname][2])
+                if (isinstance(val, float) or isinstance(val, int))
+                else self.proba_dict[colname][1].get(val, 0)
+            )
+            for val in value
+        ]
 
     def _clean_data(self, df: DataFrame) -> DataFrame:
 
