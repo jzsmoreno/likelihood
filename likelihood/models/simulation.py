@@ -1,3 +1,4 @@
+import pickle
 import warnings
 from typing import List, Tuple, Union
 
@@ -56,10 +57,10 @@ class SimulationEngine(FeatureSelection):
     for both numerical and categorical outcomes efficiently.
     """
 
-    def __init__(self, df: DataFrame, n_importances: int, use_scaler: bool = False, **kwargs):
+    def __init__(self, use_scaler: bool = False, **kwargs):
 
-        self.df = df
-        self.n_importances = n_importances
+        self.df = pd.DataFrame()
+        self.n_importances = None
         self.use_scaler = use_scaler
         self.proba_dict = {}
 
@@ -122,8 +123,9 @@ class SimulationEngine(FeatureSelection):
         values = df["frec"].to_list()
         return dict(zip(keys, values))
 
-    def fit(self, **kwargs) -> None:
-
+    def fit(self, df: DataFrame, n_importances: int, **kwargs) -> None:
+        self.df = df
+        self.n_importances = n_importances
         # We run the feature selection algorithm
         self.get_digraph(self.df, self.n_importances, self.use_scaler)
         proba_dict_keys = list(self.w_dict.keys())
@@ -140,10 +142,11 @@ class SimulationEngine(FeatureSelection):
                 desviacion_estandar = self.df[key].std()
                 cota_inferior = media - 1.5 * desviacion_estandar
                 cota_superior = media + 1.5 * desviacion_estandar
+                if plot:
+                    print(f"Cumulative Distribution Function ({key})")
                 f, cdf_, ox = cdf(x[0].flatten(), poly=poly, plot=plot)
             else:
                 f, ox = None, None
-                frecuencias = self.df[key].value_counts()
                 least_frequent_category, most_frequent_category = categories_by_quartile(
                     self.df[[key]], key
                 )
@@ -192,3 +195,29 @@ class SimulationEngine(FeatureSelection):
         df = df.drop(columns=["index"])
 
         return df
+
+    def save(self, filename: str = "./simulation_model") -> None:
+        """
+        Save the state of the SimulationEngine to a file.
+
+        Parameters:
+            filename (str): The name of the file where the object will be saved.
+        """
+        filename = filename if filename.endswith(".pkl") else filename + ".pkl"
+        with open(filename, "wb") as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load(filename: str = "./simulation_model"):
+        """
+        Load the state of a SimulationEngine from a file.
+
+        Parameters:
+            filename (str): The name of the file containing the saved object.
+
+        Returns:
+            SimulationEngine: A new instance of SimulationEngine with the loaded state.
+        """
+        filename = filename + ".pkl" if not filename.endswith(".pkl") else filename
+        with open(filename, "rb") as f:
+            return pickle.load(f)
