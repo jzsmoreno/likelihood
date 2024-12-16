@@ -1,14 +1,17 @@
 import math
 import os
 import pickle
-from typing import Callable, Dict, List, Tuple
+import warnings
+from typing import Callable, Dict, List, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yaml
-from numpy import ndarray
 from pandas.core.frame import DataFrame
+
+# Suppress RankWarning
+warnings.simplefilter("ignore", np.RankWarning)
 
 # -------------------------------------------------------------------------
 
@@ -68,7 +71,7 @@ def difference_quotient(f: Callable, x: float, h: float) -> Callable:
     return (f(x + h) - f(x)) / h
 
 
-def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float) -> ndarray:
+def partial_difference_quotient(f: Callable, v: np.ndarray, i: int, h: float) -> np.ndarray:
     """Calculates the partial difference quotient of `f`
 
     Parameters
@@ -93,7 +96,7 @@ def partial_difference_quotient(f: Callable, v: ndarray, i: int, h: float) -> nd
     return (f(w) - f(v)) / h
 
 
-def estimate_gradient(f: Callable, v: ndarray, h: float = 1e-4) -> List[ndarray]:
+def estimate_gradient(f: Callable, v: np.ndarray, h: float = 1e-4) -> List[np.ndarray]:
     """Calculates the gradient of `f` at `v`
 
     Parameters
@@ -138,35 +141,32 @@ def generate_feature_yaml(
         A dictionary with four keys ('ordinal_features', 'numeric_features', 'categorical_features', 'ignore_features')
         mapping to lists of feature names. Or a YAML formatted string if `yaml_string` is `True`.
     """
+    ignore_features = ignore_features or []
     feature_info = {
         "ordinal_features": [],
         "numeric_features": [],
         "categorical_features": [],
-        "ignore_features": [],
+        "ignore_features": ignore_features,
     }
 
     for col in df.columns:
-        if ignore_features and col in ignore_features:
+        if col in ignore_features:
             continue
 
         if pd.api.types.is_numeric_dtype(df[col]):
-            feature_info["numeric_features"].append(col)
+            if pd.api.types.is_integer_dtype(df[col]) or pd.api.types.is_float_dtype(df[col]):
+                feature_info["numeric_features"].append(col)
+            elif pd.api.types.is_bool_dtype(df[col]):
+                feature_info["ordinal_features"].append(col)  # Assuming bool can be ordinal
         elif pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_categorical_dtype(df[col]):
             feature_info["categorical_features"].append(col)
-        elif pd.api.types.is_integer_dtype(df[col]):
-            feature_info["ordinal_features"].append(col)
-        elif pd.api.types.is_float_dtype(df[col]):
-            feature_info["ordinal_features"].append(col)
-        elif pd.api.types.is_bool_dtype(df[col]):
-            feature_info["ordinal_features"].append(col)
         else:
             print(f"Unknown type for feature {col}")
-        feature_info["ignore_features"] = ignore_features
 
     if yaml_string:
         return yaml.dump(feature_info, default_flow_style=False)
-    else:
-        return feature_info
+
+    return feature_info
 
 
 # a function that calculates the percentage of missing values per column is defined
@@ -192,61 +192,9 @@ def cal_missing_values(df: DataFrame) -> None:
         )
 
 
-def calculate_probability(x: ndarray, points: int = 1, cond: bool = True) -> ndarray:
-    """Calculates the probability of the data.
-
-    Parameters
-    ----------
-    x : `np.array`
-        An array containing the data.
-    points : `int`
-        An integer value. By default it is set to `1`.
-    cond : `bool`
-        A boolean value. By default it is set to `True`.
-
-    Returns
-    -------
-    p : `np.array`
-        An array containing the probability of the data.
-
-    """
-
-    p = []
-
-    f = cdf(x)[0]
-    for i in range(len(x)):
-        p.append(f(x[i]))
-    p = np.array(p)
-    if cond:
-        if np.prod(p[-points]) > 1:
-            print("\nThe probability of the data cannot be calculated.\n")
-        else:
-            if np.prod(p[-points]) < 0:
-                print("\nThe probability of the data cannot be calculated.\n")
-            else:
-                print(
-                    "The model has a probability of {:.2f}% of being correct".format(
-                        np.prod(p[-points]) * 100
-                    )
-                )
-    else:
-        if np.sum(p[-points]) < 0:
-            print("\nThe probability of the data cannot be calculated.\n")
-        else:
-            if np.sum(p[-points]) > 1:
-                print("\nThe probability of the data cannot be calculated.\n")
-            else:
-                print(
-                    "The model has a probability of {:.2f}% of being correct".format(
-                        np.sum(p[-points]) * 100
-                    )
-                )
-    return p
-
-
 def cdf(
-    x: ndarray, poly: int = 9, inv: bool = False, plot: bool = False, savename: str = None
-) -> ndarray:
+    x: np.ndarray, poly: int = 9, inv: bool = False, plot: bool = False, savename: str = None
+) -> tuple:
     """Calculates the cumulative distribution function of the data.
 
     Parameters
@@ -254,165 +202,229 @@ def cdf(
     x : `np.array`
         An array containing the data.
     poly : `int`
-        An integer value. By default it is set to `9`.
+        Degree of the polynomial fit. By default it is set to `9`.
     inv : `bool`
-        A boolean value. By default it is set to `False`.
+        If True, calculate the inverse CDF (quantile function).
+    plot : `bool`
+        If True, plot the results.
+    savename : `str`, optional
+        Filename to save the plot.
 
     Returns
     -------
-    cdf_ : `np.array`
-        An array containing the cumulative distribution function.
-
+    fit : `np.poly1d`
+        Polynomial fit of the CDF or quantile function.
+    cdf_values : `np.array`
+        Cumulative distribution values.
+    sorted_x : `np.array`
+        Sorted input data.
     """
 
-    cdf_ = np.cumsum(x) / np.sum(x)
+    if len(x) == 0:
+        raise ValueError("Input array 'x' must not be empty.")
 
-    ox = np.sort(x)
-    I = np.ones(len(ox))
-    M = np.triu(I)
-    df = np.dot(ox, M)
-    df_ = df / np.max(df)
+    cdf_values = np.cumsum(x) / np.sum(x)
+    sorted_x = np.sort(x)
+
+    # Calculate the CDF or inverse CDF (quantile function)
+    probabilities = np.linspace(0, 1, len(sorted_x))
 
     if inv:
-        fit = np.polyfit(df_, ox, poly)
+        fit = np.polyfit(probabilities, sorted_x, poly)
         f = np.poly1d(fit)
+        plot_label = "Quantile Function"
+        x_values = probabilities
+        y_values = sorted_x
     else:
-        fit = np.polyfit(ox, df_, poly)
+        fit = np.polyfit(sorted_x, probabilities, poly)
         f = np.poly1d(fit)
+        plot_label = "Cumulative Distribution Function"
+        x_values = sorted_x
+        y_values = cdf_values
 
     if plot:
-        if inv:
-            plt.plot(df_, ox, "o", label="inv cdf")
-            plt.plot(df_, f(df_), "r--", label="fit")
-            plt.title("Quantile Function")
-            plt.xlabel("Probability")
-            plt.ylabel("Value")
-            plt.legend()
-            if savename != None:
-                plt.savefig(savename, dpi=300)
-            plt.show()
-        else:
-            plt.plot(ox, cdf_, "o", label="cdf")
-            plt.plot(ox, f(ox), "r--", label="fit")
-            plt.title("Cumulative Distribution Function")
-            plt.xlabel("Value")
-            plt.ylabel("Probability")
-            plt.legend()
-            if savename != None:
-                plt.savefig(savename, dpi=300)
-            plt.show()
+        plt.figure()
+        plt.plot(x_values, y_values, "o", label="data")
+        plt.plot(x_values, f(x_values), "r--", label="fit")
+        plt.title(plot_label)
+        plt.xlabel("Probability" if inv else "Value")
+        plt.ylabel("Value" if inv else "Probability")
+        plt.legend()
+        if savename:
+            plt.savefig(savename, dpi=300)
+        plt.show()
 
-    return f, cdf_, ox
+    return f, cdf_values, sorted_x
 
 
-class corr:
-    """Calculates the correlation of the data.
+def calculate_probability(x: np.ndarray, points: int = 1, cond: bool = True) -> np.ndarray:
+    """Calculates the probability of the data based on the CDF fit.
 
     Parameters
     ----------
     x : `np.array`
         An array containing the data.
-    y : `np.array`
-        An array containing the data.
+    points : `int`
+        Number of points to consider for the final probability calculation.
+    cond : `bool`
+        Condition to use product (True) or sum (False) for the final probability check.
 
     Returns
     -------
-    z : `np.array`
+    p : `np.array`
+        Array containing the probabilities of the data.
+    """
+
+    if len(x) == 0:
+        raise ValueError("Input array 'x' must not be empty.")
+
+    fit, _, sorted_x = cdf(x)
+    p = fit(x)
+
+    # Validate probability values
+    if cond:
+        prob_value = np.prod(p[-points])
+        message = "product"
+    else:
+        prob_value = np.sum(p[-points])
+        message = "sum"
+
+    if 0 <= prob_value <= 1:
+        print(f"The model has a probability of {prob_value * 100:.2f}% based on the {message}.")
+    else:
+        print("\nThe probability of the data cannot be calculated.\n")
+
+    return p
+
+
+class CorrelationBase:
+    """Base class for correlation calculations."""
+
+    __slots__ = ["x", "y", "result", "z"]
+
+    def __init__(self, x: np.ndarray, y: Union[np.ndarray, None] = None):
+        self.x = x
+        self.y = y if y is not None else x  # Default to autocorrelation if y is not provided
+        self._compute_correlation()
+        self.z = self.result[self.result.size // 2 :]
+        self.z /= np.abs(self.z).max()
+
+    def _compute_correlation(self):
+        """Compute the correlation between x and y (or x with itself for autocorrelation)."""
+        self.result = np.correlate(self.x, self.y, mode="full")
+
+    def plot(self):
+        """Plot the correlation or autocorrelation."""
+        plt.plot(range(len(self.z)), self.z, label=self._get_label())
+        plt.legend()
+        plt.show()
+
+    def _get_label(self) -> str:
+        return "Autocorrelation" if np.array_equal(self.x, self.y) else "Correlation"
+
+    def __call__(self):
+        """Return the computed correlation or autocorrelation."""
+        return self.z
+
+
+class Correlation(CorrelationBase):
+    """Calculates the cross-correlation of two datasets.
+
+    Parameters
+    ----------
+    x : `np.ndarray`
+        An array containing the first dataset.
+    y : `np.ndarray`
+        An array containing the second dataset.
+
+    Returns
+    -------
+    z : `np.ndarray`
         An array containing the correlation of `x` and `y`.
 
     """
 
-    __slots__ = ["x", "y", "result", "z"]
-
-    def __init__(self, x: ndarray, y: ndarray):
-        self.x = x
-        self.y = y
-        self.result = np.correlate(x, y, mode="full")
-        self.z = self.result[self.result.size // 2 :]
-        self.z = self.z / float(np.abs(self.z).max())
-
-    def plot(self):
-        plt.plot(range(len(self.z)), self.z, label="Correlation")
-        plt.legend()
-        plt.show()
-
-    def __call__(self):
-        return self.z
+    def __init__(self, x: np.ndarray, y: np.ndarray):
+        super().__init__(x, y)
 
 
-class autocorr:
-    """Calculates the autocorrelation of the data.
+class AutoCorrelation(CorrelationBase):
+    """Calculates the autocorrelation of a dataset.
 
     Parameters
     ----------
-    x : `np.array`
+    x : `np.ndarray`
         An array containing the data.
 
     Returns
     -------
-    z : `np.array`
+    z : `np.ndarray`
         An array containing the autocorrelation of the data.
-
     """
 
-    __slots__ = ["x", "result", "z"]
-
-    def __init__(self, x: ndarray):
-        self.x = x
-        self.result = np.correlate(x, x, mode="full")
-        self.z = self.result[self.result.size // 2 :]
-        self.z = self.z / float(np.abs(self.z).max())
-
-    def plot(self):
-        plt.plot(range(len(self.z)), self.z, label="Autocorrelation")
-        plt.legend()
-        plt.show()
-
-    def __call__(self):
-        return self.z
+    def __init__(self, x: np.ndarray):
+        super().__init__(x)
 
 
-def fft_denoise(dataset: ndarray, sigma: float = 0, mode: bool = True) -> Tuple[ndarray, float]:
-    """Performs the noise removal using the Fast Fourier Transform.
+def fft_denoise(
+    dataset: np.ndarray, sigma: float = 0, mode: bool = True
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Performs noise removal using the Fast Fourier Transform.
 
     Parameters
     ----------
-    dataset : `np.array`
-        An array containing the noised data.
-    sigma : `float`
-        A `float` between `0` and `1`. By default it is set to `0`.
-    mode : `bool`
-        A boolean value. By default it is set to `True`.
+    dataset : `np.ndarray`
+        An array containing the noised data. Expected shape (num_samples, num_points).
+    sigma : `float`, default=0
+        A float between 0 and 1 representing the threshold for noise filtering.
+    mode : `bool`, default=True
+        If True, print progress messages.
 
     Returns
     -------
-    dataset : `np.array`
-        An array containing the denoised data.
-    period : `float`
-        period of the function described by the dataset
-
+    denoised_dataset : `np.ndarray`
+        An array containing the denoised data with the same shape as `dataset`.
+    periods : `np.ndarray`
+        Array of estimated periods for each sample in `dataset`.
     """
-    dataset_ = dataset.copy()
-    for i in range(dataset.shape[0]):
-        n = dataset.shape[1]
-        fhat = np.fft.fft(dataset[i, :], n)
-        freq = (1 / n) * np.arange(n)
-        L = np.arange(1, np.floor(n / 2), dtype="int")
-        PSD = fhat * np.conj(fhat) / n
-        indices = PSD > np.mean(PSD) + sigma * np.std(PSD)
-        PSDclean = PSD * indices  # Zero out all others
-        fhat = indices * fhat
-        ffilt = np.fft.ifft(fhat)  # Inverse FFT for filtered time signal
-        dataset_[i, :] = ffilt.real
+
+    if not (0 <= sigma <= 1):
+        raise ValueError("sigma must be between 0 and 1")
+
+    num_samples, n_points = dataset.shape
+    denoised_dataset = np.zeros_like(dataset)
+    periods = np.zeros(num_samples)
+
+    # Precompute values that do not change within the loop
+    freq = (1 / n_points) * np.arange(n_points)
+    L = np.arange(1, np.floor(n_points / 2), dtype=int)
+
+    for i in range(num_samples):
+        fhat = np.fft.fft(dataset[i, :], n_points)
+        PSD = fhat * np.conj(fhat) / n_points
+        threshold = np.mean(PSD) + sigma * np.std(PSD)
+        indices = PSD > threshold
+
+        # Zero out all others in frequency domain
+        PSDclean = PSD * indices
+        fhat_cleaned = fhat * indices
+
+        # Inverse FFT for filtered time signal
+        denoised_signal = np.fft.ifft(fhat_cleaned).real
+        denoised_dataset[i, :] = denoised_signal
+
         # Calculate the period of the signal
-        period = 1 / (2 * freq[L][np.argmax(fhat[L])])
+        peak_index = L[np.argmax(np.abs(fhat[L]))]
+        periods[i] = 1 / (2 * freq[peak_index])
+
         if mode:
             print(f"The {i+1}-th row of the dataset has been denoised.")
-            print(f"The period is {round(period, 4)}")
-    return dataset_, period
+            print(f"The estimated period is {round(periods[i], 4)}")
+
+    return denoised_dataset, periods
 
 
-def get_period(dataset: ndarray) -> float:
+def get_period(dataset: np.ndarray) -> float:
     """Calculates the periodicity of a `dataset`.
 
     Parameters
@@ -426,13 +438,31 @@ def get_period(dataset: ndarray) -> float:
         period of the function described by the `dataset`
     """
     n = dataset.size
-    fhat = np.fft.fft(dataset, n)
-    freq = (1 / n) * np.arange(n)
-    L = np.arange(1, np.floor(n / 2), dtype="int")
-    PSD = fhat * np.conj(fhat) / n
-    indices = PSD > np.mean(PSD) + np.std(PSD)
-    fhat = indices * fhat
-    period = 1 / (2 * freq[L][np.argmax(fhat[L])])
+
+    # Ensure there are enough points for FFT analysis
+    if n < 2:
+        raise ValueError("Dataset must contain at least two points.")
+
+    # Compute the FFT and PSD
+    fhat = np.fft.rfft(dataset)  # Use rfft for real-valued input to save computation
+    freqs = np.fft.rfftfreq(n)  # Get only positive frequencies
+
+    # Calculate the Power Spectral Density (PSD)
+    PSD = np.abs(fhat) ** 2 / n
+
+    # Remove the first frequency component (DC component)
+    PSD[0] = 0
+
+    # Find the index of the maximum PSD value, excluding the DC component
+    max_psd_index = np.argmax(PSD)
+
+    # Calculate the period based on the corresponding frequency
+    dominant_freq = freqs[max_psd_index]
+    if dominant_freq == 0:
+        raise ValueError("No significant periodic component found in the dataset.")
+
+    period = 1 / dominant_freq
+
     return period
 
 
@@ -468,7 +498,7 @@ class LogisticRegression:
 
         self.importance = []
 
-    def fit(self, dataset: ndarray, values: ndarray) -> None:
+    def fit(self, dataset: np.ndarray, values: np.ndarray) -> None:
         """Performs linear multiple model training
 
         Parameters
@@ -501,7 +531,7 @@ class LogisticRegression:
                 a = np.around(self.w[i], decimals=8)
                 self.importance.append(a)
 
-    def predict(self, datapoints: ndarray) -> ndarray:
+    def predict(self, datapoints: np.ndarray) -> np.ndarray:
         """
         Performs predictions for a set of points
 
@@ -515,7 +545,7 @@ class LogisticRegression:
 
         return sig(np.array(self.importance) @ datapoints)
 
-    def get_importances(self, print_important_features: bool = False) -> ndarray:
+    def get_importances(self, print_important_features: bool = False) -> np.ndarray:
         """
         Returns the important features
 
@@ -547,7 +577,7 @@ class LinearRegression:
 
         self.importance = []
 
-    def fit(self, dataset: ndarray, values: ndarray, verbose: bool = False) -> None:
+    def fit(self, dataset: np.ndarray, values: np.ndarray, verbose: bool = False) -> None:
         """Performs linear multiple model training
 
         Parameters
@@ -580,7 +610,7 @@ class LinearRegression:
             print("\nParameters:", np.array(self.importance).shape)
             print("RMSE: {:.4f}".format(mean_square_error(self.y, self.predict(self.X))))
 
-    def predict(self, datapoints: ndarray) -> ndarray:
+    def predict(self, datapoints: np.ndarray) -> np.ndarray:
         """
         Performs predictions for a set of points
 
@@ -592,7 +622,7 @@ class LinearRegression:
         """
         return np.array(self.importance) @ datapoints
 
-    def get_importances(self, print_important_features: bool = False) -> ndarray:
+    def get_importances(self, print_important_features: bool = False) -> np.ndarray:
         """
         Returns the important features
 
@@ -614,7 +644,7 @@ class LinearRegression:
         return np.array(self.importance)
 
 
-def cal_average(y: ndarray, alpha: float = 1):
+def cal_average(y: np.ndarray, alpha: float = 1):
     """Calculates the moving average of the data
 
     Parameters
@@ -642,12 +672,12 @@ class DataScaler:
 
     __slots__ = ["dataset_", "_n", "data_scaled", "values", "transpose", "inv_fitting"]
 
-    def __init__(self, dataset: ndarray, n: int = 1) -> None:
+    def __init__(self, dataset: np.ndarray, n: int = 1) -> None:
         """Initializes the parameters required for scaling the data"""
         self.dataset_ = dataset.copy()
         self._n = n
 
-    def rescale(self, dataset_: ndarray | None = None) -> ndarray:
+    def rescale(self, dataset_: np.ndarray | None = None) -> np.ndarray:
         """Perform a standard rescaling of the data
 
         Returns
@@ -655,7 +685,7 @@ class DataScaler:
         data_scaled : `np.array`
             An array containing the scaled data.
         """
-        if isinstance(dataset_, ndarray):
+        if isinstance(dataset_, np.ndarray):
             data_scaled = np.copy(dataset_)
             mu = self.values[0]
             sigma = self.values[1]
@@ -711,7 +741,7 @@ class DataScaler:
 
         return self.data_scaled
 
-    def scale(self, dataset_: ndarray) -> ndarray:
+    def scale(self, dataset_: np.ndarray) -> np.ndarray:
         """Performs the inverse operation to the rescale function
 
         Parameters
@@ -755,7 +785,7 @@ def generate_series(n: int, n_steps: int, incline: bool = True):
     return series.astype(np.float32)
 
 
-def mean_square_error(y_true: ndarray, y_pred: ndarray, print_error: bool = False):
+def mean_square_error(y_true: np.ndarray, y_pred: np.ndarray, print_error: bool = False):
     """Calculates the Root Mean Squared Error
 
     Parameters
@@ -946,88 +976,65 @@ class PerformanceMeasures:
         pass
 
     # Performance measure Res_T
-    def f_mean(self, y_true: ndarray, y_pred: ndarray, labels: list) -> None:
-        n = len(labels)
+    def f_mean(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> float:
+        F_vec = self._f1_score(y_true, y_pred, labels)
+        mean_f_measure = np.mean(F_vec)
 
-        F_vec = self._f1_score(y_true, y_pred, labels=labels)
-        a = np.sum(F_vec)
+        for label, f_measure in zip(labels, F_vec):
+            print(f"F-measure of label {label} -> {f_measure}")
 
-        for i in range(len(F_vec)):
-            print("F-measure of label ", labels[i], " -> ", F_vec[i])
+        print(f"Mean of F-measure -> {mean_f_measure}")
 
-        print("Mean of F-measure -> ", a / n)
+        return mean_f_measure
 
     # Performance measure Res_P
-    def resp(self, y_true: ndarray, y_pred: ndarray, labels: list) -> None:
-        # We initialize sum counters
-        sum1 = 0
-        sum2 = 0
-
-        # Calculamos T_C
+    def resp(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> float:
         T_C = len(y_true)
-        for i in range(len(labels)):
-            # We calculate instances of the classes and their F-measures
-            sum1 += (1 - ((y_true == labels[i]).sum() / T_C)) * self._fi_measure(
-                y_true, y_pred, labels, i
-            )
-            sum2 += 1 - ((y_true == labels[i]).sum()) / T_C
+        sum1, sum2 = 0.0, 0.0
+        F_vec = self._f1_score(y_true, y_pred, labels)
 
-        # Print the metric corresponding to the prediction vector
-        print("Metric Res_p ->", sum1 / sum2)
+        for label_idx, label in enumerate(labels):
+            class_instances = np.sum(y_true == label) / T_C
+            sum1 += (1 - class_instances) * F_vec[label_idx]
+            sum2 += 1 - class_instances
 
-    def _fi_measure(self, y_true: ndarray, y_pred: ndarray, labels: list, i: int) -> int:
-        F_vec = self._f1_score(y_true, y_pred, labels=labels)
+        res_p = sum1 / sum2 if sum2 != 0 else 0.0  # Avoid division by zero
+        print(f"Metric Res_p -> {res_p}")
 
-        return F_vec[i]  # We return the position of the f1-score corresponding to the label
+        return res_p
 
-    # Summary of the labels predicted
-    def _summary_pred(self, y_true: ndarray, y_pred: ndarray, labels: list) -> None:
+    def _summary_pred(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> None:
         count_mat = self._confu_mat(y_true, y_pred, labels)
-        print("        ", end="")
-        for i in range(len(labels)):
-            print("|--", labels[i], "--", end="")
-            if i + 1 == len(labels):
-                print("|", end="")
-        for i in range(len(labels)):
-            print("")
-            print("|--", labels[i], "--|", end="")
-            for j in range(len(labels)):
-                if j != 0:
-                    print(" ", end="")
-                print("  ", int(count_mat[i, j]), "  ", end="")
+        print("       ", " | ".join(f"--{label}--" for label in labels))
+        for i, label_i in enumerate(labels):
+            row = [f"  {int(count_mat[i, j])}  " for j in range(len(labels))]
+            print(f"--{label_i}--|", " | ".join(row))
 
-    def _f1_score(self, y_true: ndarray, y_pred: ndarray, labels: list) -> ndarray:
-        f1_vec = np.zeros(len(labels))
-
-        # Calculate confusion mat
+    def _f1_score(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> np.ndarray:
         count_mat = self._confu_mat(y_true, y_pred, labels)
+        sum_cols = np.sum(count_mat, axis=0)
+        sum_rows = np.sum(count_mat, axis=1)
 
-        # sums over columns
-        sum1 = np.sum(count_mat, axis=0)
-        # sums over rows
-        sum2 = np.sum(count_mat, axis=1)
-        # Iterate over labels to calculate f1 scores of each one
-        for i in range(len(labels)):
-            precision = count_mat[i, i] / (sum1[i])
-            recall = count_mat[i, i] / (sum2[i])
-
-            f1_vec[i] = 2 * ((precision * recall) / (precision + recall))
+        # Avoid division by zero
+        precision = np.divide(
+            count_mat.diagonal(), sum_cols, out=np.zeros_like(sum_cols), where=sum_cols != 0
+        )
+        recall = np.divide(
+            count_mat.diagonal(), sum_rows, out=np.zeros_like(sum_rows), where=sum_rows != 0
+        )
+        f1_vec = 2 * ((precision * recall) / (precision + recall))
 
         return f1_vec
 
     # Returns confusion matrix of predictions
-    def _confu_mat(self, y_true: ndarray, y_pred: ndarray, labels: list) -> ndarray:
-        labels = np.array(labels)
-        count_mat = np.zeros((len(labels), len(labels)))
+    def _confu_mat(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> np.ndarray:
+        num_classes = len(labels)
+        label_mapping = {label: idx for idx, label in enumerate(labels)}
+        count_mat = np.zeros((num_classes, num_classes))
 
-        for i in range(len(labels)):
-            for j in range(len(y_pred)):
-                if y_pred[j] == labels[i]:
-                    if y_pred[j] == y_true[j]:
-                        count_mat[i, i] += 1
-                    else:
-                        x = np.where(labels == y_true[j])
-                        count_mat[i, x[0]] += 1
+        for pred_label, true_label in zip(y_pred, y_true):
+            if pred_label in label_mapping and true_label in label_mapping:
+                count_mat[label_mapping[pred_label], label_mapping[true_label]] += 1
 
         return count_mat
 
@@ -1043,10 +1050,10 @@ class OneHotEncoder:
     def __init__(self) -> None:
         pass
 
-    def encode(self, x: ndarray | list):
+    def encode(self, x: np.ndarray | list):
         self.x = x
 
-        if not isinstance(self.x, ndarray):
+        if not isinstance(self.x, np.ndarray):
             self.x = np.array(self.x)  # If not numpy array then convert it
 
         y = np.zeros(
@@ -1057,8 +1064,8 @@ class OneHotEncoder:
 
         return y
 
-    def decode(self, x: ndarray | list) -> ndarray:
-        if not isinstance(x, ndarray):
+    def decode(self, x: np.ndarray | list) -> np.ndarray:
+        if not isinstance(x, np.ndarray):
             x = np.array(x)  # If not numpy array then convert it
 
         # We return the max values of each row
@@ -1220,17 +1227,33 @@ class FeatureSelection:
 
 
 def check_nan_inf(df: DataFrame) -> DataFrame:
-    """Checks for `NaN` and `Inf` values in the `DataFrame`. If any are found they will be removed."""
+    """
+    Checks for NaN and Inf values in the DataFrame. If any are found, they will be removed.
+
+    Parameters:
+        df (DataFrame): The input DataFrame to be checked.
+
+    Returns:
+        DataFrame: A new DataFrame with NaN and Inf values removed.
+    """
+
     nan_values = df.isnull().values.any()
-    count = np.isinf(df.select_dtypes(include="number")).values.sum()
-    print("There are null values : ", nan_values)
-    print("It contains " + str(count) + " infinite values")
+    inf_values = np.isinf(df.select_dtypes(include="number")).values.any()
+
     if nan_values:
-        warning_type = "UserWarning"
-        msg = "Some rows may have been deleted due to the existence of nan values."
-        print(f"{warning_type}: {msg}")
-        print("Missing values correctly removed : ", "{:,}".format(df.isnull().values.sum()))
-        df = df.dropna()
+        print("UserWarning: Some rows may have been deleted due to the existence of NaN values.")
+        df.dropna(inplace=True)
+
+    if inf_values:
+        print("UserWarning: Some rows may have been deleted due to the existence of Inf values.")
+        df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        df.dropna(inplace=True)
+
+    nan_count = df.isnull().values.sum()
+    inf_count = np.isinf(df.select_dtypes(include="number")).values.sum()
+
+    print(f"NaN values removed: {nan_count}")
+    print(f"Infinite values removed: {inf_count}")
 
     return df
 
@@ -1244,6 +1267,7 @@ if __name__ == "__main__":
     helper = PerformanceMeasures()
     helper._summary_pred(y_true, y_pred, labels)
     print(helper._f1_score(y_true, y_pred, labels))
+    print(helper.f_mean(y_true, y_pred, labels))
 
     # Use DataFrameEncoder
     # Create a DataFrame
@@ -1273,6 +1297,13 @@ if __name__ == "__main__":
     # Generate data
     x = np.random.rand(3, 100)
     y = 0.1 * x[0, :] + 0.4 * x[1, :] + 0.5 * x[2, :] + 0.1
+    # Create a DataFrame
+    df = pd.DataFrame(x.T, columns=["x1", "x2", "x3"])
+    df["y"] = y
+    # Instantiate FeatureSelection
+    fs = FeatureSelection()
+    print(fs.get_digraph(df, n_importances=1))
+
     linear_model = LinearRegression()
     linear_model.fit(x, y)
     importance = linear_model.get_importances()
@@ -1303,7 +1334,7 @@ if __name__ == "__main__":
     plt.show()
 
     # Calculate the autocorrelation of the data
-    z = autocorr(a[0, :])
+    z = AutoCorrelation(a[0, :])
     z.plot()
     # print(z())
 
@@ -1313,3 +1344,18 @@ if __name__ == "__main__":
     x = np.random.normal(mu, sigma, N)
     f, cdf_, ox = cdf(x, plot=True)
     invf, cdf_, ox = cdf(x, plot=True, inv=True)
+
+    encoder = OneHotEncoder()
+    encoding = encoder.encode([1, 2, 3, 4, 5])
+    assert np.array_equal(
+        encoding,
+        np.array(
+            [
+                [0, 1, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0],
+                [0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 0, 1],
+            ]
+        ),
+    )

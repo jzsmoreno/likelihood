@@ -124,8 +124,8 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Ignore test_<files>.py for testing
-*test*.py
+# Ignore test_<files> for testing
+*test_*.ipynb
 *.sql
 /*.html
 
@@ -136,4 +136,7 @@ dmypy.json
 /examples/*.png
 
 # Ignore <files>.pkl for testing
-/examples/*.pkl
+*.pkl
+
+# Ignore <files>.csv for testing
+*.csv

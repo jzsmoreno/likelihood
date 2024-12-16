@@ -74,3 +74,20 @@ class DynamicGraph(FeatureSelection):
             nx_graph.add_edges_from([(source, target, edge)])
 
         return nx_graph
+
+
+# -------------------------------------------------------------------------
+if __name__ == "__main__":
+    import numpy as np
+    import pandas as pd
+
+    # Generate data
+    x = np.random.rand(3, 100)
+    y = 0.1 * x[0, :] + 0.4 * x[1, :] + 0.5 * x[2, :] + 0.1
+    # Create a DataFrame
+    df = pd.DataFrame(x.T, columns=["x1", "x2", "x3"])
+    df["y"] = y
+    # Instantiate DynamicGraph
+    fs = DynamicGraph(df, n_importances=2)
+    print(fs.fit())
+    fs.draw()
