@@ -1,10 +1,12 @@
 import logging
 import os
+import pickle
 
 import numpy as np
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+from IPython.display import clear_output
 
 
 class HMM:
@@ -16,6 +18,17 @@ class HMM:
         self.pi = np.random.dirichlet(np.ones(n_states), size=1)[0]
         self.A = np.random.dirichlet(np.ones(n_states), size=n_states)
         self.B = np.random.dirichlet(np.ones(n_observations), size=n_states)
+
+    def save_model(self, filename="./hmm_model"):
+        filename = filename if filename.endswith(".pkl") else filename + ".pkl"
+        with open(filename, "wb") as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load_model(filename="./hmm_model"):
+        filename = filename + ".pkl" if not filename.endswith(".pkl") else filename
+        with open(filename, "rb") as f:
+            return pickle.load(f)
 
     def forward(self, sequence):
         T = len(sequence)
@@ -115,6 +128,7 @@ class HMM:
             # Logging parameters every 10 iterations
             if iteration % 10 == 0:
                 os.system("cls" if os.name == "nt" else "clear")
+                clear_output(wait=True)
                 logging.info(f"Iteration {iteration}:")
                 logging.info("Pi: %s", self.pi)
                 logging.info("A:\n%s", self.A)
@@ -145,47 +159,7 @@ class HMM:
 
         return smoothed_probs
 
-
-# Example usage
-if __name__ == "__main__":
-    # Define the HMM class (the one we just created)
-    # If you haven't already, make sure to define the HMM class with the methods we discussed.
-
-    # Define the parameters of the model
-    n_states = 3  # Sunny (0), Rainy (1), Cloudy (2)
-    n_observations = 2  # Walk (0), Shop (1)
-
-    # Create an HMM instance
-    hmm = HMM(n_states, n_observations)
-
-    # Generate some synthetic observation sequences (e.g., 3 sequences of 5 days)
-    # Each number represents an observation: 0 -> Walk, 1 -> Shop
-    sequences = [
-        [0, 1, 0, 0, 1],  # Sequence 1: Walk, Shop, Walk, Walk, Shop
-        [1, 1, 0, 1, 0],  # Sequence 2: Shop, Shop, Walk, Shop, Walk
-        [0, 0, 0, 1, 1],  # Sequence 3: Walk, Walk, Walk, Shop, Shop
-    ]
-
-    # Define the true hidden states for the sequences (ground truth for training/testing)
-    true_states = [
-        [0, 0, 0, 1, 2],  # Sequence 1: Sunny, Sunny, Sunny, Rainy, Cloudy
-        [1, 1, 0, 1, 2],  # Sequence 2: Rainy, Rainy, Sunny, Rainy, Cloudy
-        [0, 0, 0, 1, 2],  # Sequence 3: Sunny, Sunny, Sunny, Rainy, Cloudy
-    ]
-
-    # Train the HMM using the Baum-Welch algorithm
-    print("Training the HMM with Baum-Welch...")
-    hmm.baum_welch(sequences, n_iterations=50)
-
-    # After training, evaluate the model's accuracy
-    accuracy = hmm.decoding_accuracy(sequences, true_states)
-    print(f"Decoding Accuracy: {accuracy:.2f}%")
-
-    # Now let's use the trained HMM to predict the hidden states for one of the sequences
-    test_sequence = [0, 1, 0, 0, 1]  # Test sequence: Walk, Shop, Walk, Walk, Shop
-    predicted_states = hmm.viterbi(test_sequence)
-    smoothed_probs = hmm.state_probabilities(test_sequence)
-
-    print(f"Test Sequence: {test_sequence}")
-    print(f"Predicted States: {predicted_states}")
-    print(f"Probabilities States: {smoothed_probs}")
+    def sequence_probability(self, sequence):
+        smoothed_probs = self.state_probabilities(sequence)
+        row_averages = np.mean(smoothed_probs, axis=0)
+        return row_averages / np.sum(row_averages)
