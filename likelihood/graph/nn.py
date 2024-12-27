@@ -1,6 +1,8 @@
 import os
 
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+# Suppress TensorFlow INFO logs
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import logging
 import warnings
 from typing import List, Tuple
