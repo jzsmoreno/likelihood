@@ -1,6 +1,10 @@
+import logging
 import os
 
 import numpy as np
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
 class HMM:
@@ -17,15 +21,20 @@ class HMM:
         T = len(sequence)
         alpha = np.zeros((T, self.n_states))
 
-        # Initialization
-        alpha[0] = self.pi * self.B[:, sequence[0]]
-        alpha[0] /= np.sum(alpha[0])  # Normalization
+        # Add a small constant (smoothing) to avoid log(0)
+        epsilon = 1e-10  # Small value to avoid taking log(0)
 
-        # Recursion
+        # Initialization (log-space)
+        alpha[0] = np.log(self.pi + epsilon) + np.log(self.B[:, sequence[0]] + epsilon)
+        alpha[0] -= np.log(np.sum(np.exp(alpha[0])))  # Normalization (log-space)
+
+        # Recursion (log-space)
         for t in range(1, T):
             for i in range(self.n_states):
-                alpha[t, i] = np.sum(alpha[t - 1] * self.A[:, i]) * self.B[i, sequence[t]]
-            alpha[t] /= np.sum(alpha[t])  # Normalization
+                alpha[t, i] = np.log(
+                    np.sum(np.exp(alpha[t - 1] + np.log(self.A[:, i] + epsilon)))
+                ) + np.log(self.B[i, sequence[t]] + epsilon)
+            alpha[t] -= np.log(np.sum(np.exp(alpha[t])))  # Normalization
 
         return alpha
 
@@ -76,7 +85,7 @@ class HMM:
 
                 # Update pi
                 gamma = (alpha * beta) / np.sum(alpha * beta, axis=1, keepdims=True)
-                pi_num += gamma[0]  # Accumulate the first step of each sequence
+                pi_num += gamma[0]
 
                 # Update A and B
                 for t in range(T - 1):
@@ -103,13 +112,13 @@ class HMM:
             self.A = A_num / np.sum(A_num, axis=1, keepdims=True)
             self.B = B_num / np.sum(B_num, axis=1, keepdims=True)
 
-            # Display the parameters every 10 iterations
+            # Logging parameters every 10 iterations
             if iteration % 10 == 0:
                 os.system("cls" if os.name == "nt" else "clear")
-                print(f"Iteration {iteration}:")
-                print("Pi:", self.pi)
-                print("A:\n", self.A)
-                print("B:\n", self.B)
+                logging.info(f"Iteration {iteration}:")
+                logging.info("Pi: %s", self.pi)
+                logging.info("A:\n%s", self.A)
+                logging.info("B:\n%s", self.B)
 
     def decoding_accuracy(self, sequences, true_states):
         correct_predictions = 0
@@ -123,6 +132,19 @@ class HMM:
         accuracy = (correct_predictions / total_predictions) * 100
         return accuracy
 
+    def state_probabilities(self, sequence):
+        """
+        Returns the smoothed probabilities of the hidden states at each time step.
+        This is done by using both forward and backward probabilities.
+        """
+        alpha = self.forward(sequence)
+        beta = self.backward(sequence)
+
+        # Compute smoothed probabilities (gamma)
+        smoothed_probs = (alpha * beta) / np.sum(alpha * beta, axis=1, keepdims=True)
+
+        return smoothed_probs
+
 
 # Example usage
 if __name__ == "__main__":
@@ -130,7 +152,7 @@ if __name__ == "__main__":
     # If you haven't already, make sure to define the HMM class with the methods we discussed.
 
     # Define the parameters of the model
-    n_states = 2  # Sunny (0), Rainy (1)
+    n_states = 3  # Sunny (0), Rainy (1), Cloudy (2)
     n_observations = 2  # Walk (0), Shop (1)
 
     # Create an HMM instance
@@ -146,9 +168,9 @@ if __name__ == "__main__":
 
     # Define the true hidden states for the sequences (ground truth for training/testing)
     true_states = [
-        [0, 0, 0, 1, 1],  # Sequence 1: Sunny, Sunny, Sunny, Rainy, Rainy
-        [1, 1, 0, 1, 1],  # Sequence 2: Rainy, Rainy, Sunny, Rainy, Rainy
-        [0, 0, 0, 1, 1],  # Sequence 3: Sunny, Sunny, Sunny, Rainy, Rainy
+        [0, 0, 0, 1, 2],  # Sequence 1: Sunny, Sunny, Sunny, Rainy, Cloudy
+        [1, 1, 0, 1, 2],  # Sequence 2: Rainy, Rainy, Sunny, Rainy, Cloudy
+        [0, 0, 0, 1, 2],  # Sequence 3: Sunny, Sunny, Sunny, Rainy, Cloudy
     ]
 
     # Train the HMM using the Baum-Welch algorithm
@@ -160,8 +182,10 @@ if __name__ == "__main__":
     print(f"Decoding Accuracy: {accuracy:.2f}%")
 
     # Now let's use the trained HMM to predict the hidden states for one of the sequences
-    test_sequence = [0, 1, 0, 1, 0]  # Test sequence: Walk, Shop, Walk, Shop, Walk
+    test_sequence = [0, 1, 0, 0, 1]  # Test sequence: Walk, Shop, Walk, Walk, Shop
     predicted_states = hmm.viterbi(test_sequence)
+    smoothed_probs = hmm.state_probabilities(test_sequence)
 
     print(f"Test Sequence: {test_sequence}")
     print(f"Predicted States: {predicted_states}")
+    print(f"Probabilities States: {smoothed_probs}")
