@@ -71,7 +71,7 @@ class SimulationEngine(FeatureSelection):
         w, quick_encoder, names_cols, dfe, numeric_dict = self.w_dict[column]
 
         df = df[names_cols].copy()
-        # Change the scale of the dataframe
+        # Change the scale of the DataFrame
         dataset = self.df.copy()
         dataset.drop(columns=column, inplace=True)
         numeric_df = dataset.select_dtypes(include="number")
@@ -85,7 +85,7 @@ class SimulationEngine(FeatureSelection):
             for col in numeric_df.columns:
                 df[col] = numeric_df[col].values
 
-        # Encoding the datadrame
+        # Encoding the DataFrame
         for num, colname in enumerate(dfe._encode_columns):
             if df[colname].dtype == "object":
                 encode_dict = dfe.encoding_list[num]
