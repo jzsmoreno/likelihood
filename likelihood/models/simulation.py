@@ -5,7 +5,6 @@ from typing import List, Tuple, Union
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from numpy import ndarray
 from pandas.core.frame import DataFrame
 
 from likelihood.tools import DataScaler, FeatureSelection, OneHotEncoder, cdf, check_nan_inf
@@ -66,12 +65,12 @@ class SimulationEngine(FeatureSelection):
 
         super().__init__(**kwargs)
 
-    def predict(self, df: DataFrame, column: str) -> ndarray | list:
+    def predict(self, df: DataFrame, column: str) -> np.ndarray | list:
         # Let us assign the dictionary entries corresponding to the column
         w, quick_encoder, names_cols, dfe, numeric_dict = self.w_dict[column]
 
         df = df[names_cols].copy()
-        # Change the scale of the dataframe
+        # Change the scale of the DataFrame
         dataset = self.df.copy()
         dataset.drop(columns=column, inplace=True)
         numeric_df = dataset.select_dtypes(include="number")
@@ -85,7 +84,7 @@ class SimulationEngine(FeatureSelection):
             for col in numeric_df.columns:
                 df[col] = numeric_df[col].values
 
-        # Encoding the datadrame
+        # Encoding the DataFrame
         for num, colname in enumerate(dfe._encode_columns):
             if df[colname].dtype == "object":
                 encode_dict = dfe.encoding_list[num]
@@ -93,7 +92,7 @@ class SimulationEngine(FeatureSelection):
                     dfe._code_transformation_to, dictionary_list=encode_dict
                 )
 
-        # PREDICTION
+        # Prediction
         y = df.to_numpy() @ w
 
         # Categorical column
@@ -113,7 +112,7 @@ class SimulationEngine(FeatureSelection):
 
         return y[:]
 
-    def _encode(self, df: DataFrame) -> ndarray | list:
+    def _encode(self, df: DataFrame) -> np.ndarray | list:
         df = df.copy()
         column = df.columns[0]
         frec = df[column].value_counts() / len(df)

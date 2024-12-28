@@ -129,6 +129,7 @@ dmypy.json
 *.sql
 /*.html
 
+/best_model/*
 # Ignore <files>.txt for testing
 /examples/*.txt
 

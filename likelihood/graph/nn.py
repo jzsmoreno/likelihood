@@ -1,6 +1,8 @@
 import os
 
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+# Suppress TensorFlow INFO logs
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import logging
 import warnings
 from typing import List, Tuple
@@ -9,7 +11,6 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from IPython.display import clear_output
-from numpy import ndarray
 from pandas.core.frame import DataFrame
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
@@ -21,7 +22,7 @@ logging.getLogger("tensorflow").setLevel(logging.ERROR)
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
-def compare_similarity(arr1: ndarray, arr2: ndarray) -> int:
+def compare_similarity(arr1: np.ndarray, arr2: np.ndarray) -> int:
     """Compares the similarity between two arrays of categories.
 
     Parameters
@@ -44,9 +45,9 @@ def compare_similarity(arr1: ndarray, arr2: ndarray) -> int:
     return count
 
 
-def cal_adjency_matrix(
+def cal_adjacency_matrix(
     df: DataFrame, exclude_subset: List[str] = [], sparse: bool = True, **kwargs
-) -> Tuple[dict, ndarray]:
+) -> Tuple[dict, np.ndarray]:
     """Calculates the adjacency matrix for a given DataFrame.
     The adjacency matrix is a matrix that represents the similarity between each pair of categories.
     The similarity is calculated using the `compare_similarity` function.
@@ -133,7 +134,7 @@ class Data:
         target: str | None = None,
         exclude_subset: List[str] = [],
     ):
-        _, adjacency = cal_adjency_matrix(df, exclude_subset=exclude_subset, sparse=True)
+        _, adjacency = cal_adjacency_matrix(df, exclude_subset=exclude_subset, sparse=True)
         if target is not None:
             X = df.drop(columns=[target] + exclude_subset)
         else:
