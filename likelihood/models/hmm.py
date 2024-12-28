@@ -1,16 +1,14 @@
 import logging
 import os
 import pickle
+from typing import List, Tuple
 
 import numpy as np
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(message)s")
 from IPython.display import clear_output
 
 
 class HMM:
-    def __init__(self, n_states, n_observations):
+    def __init__(self, n_states: int, n_observations: int):
         self.n_states = n_states
         self.n_observations = n_observations
 
@@ -19,18 +17,18 @@ class HMM:
         self.A = np.random.dirichlet(np.ones(n_states), size=n_states)
         self.B = np.random.dirichlet(np.ones(n_observations), size=n_states)
 
-    def save_model(self, filename="./hmm_model"):
+    def save_model(self, filename: str = "./hmm") -> None:
         filename = filename if filename.endswith(".pkl") else filename + ".pkl"
         with open(filename, "wb") as f:
             pickle.dump(self, f)
 
     @staticmethod
-    def load_model(filename="./hmm_model"):
+    def load_model(filename: str = "./hmm") -> "HMM":
         filename = filename + ".pkl" if not filename.endswith(".pkl") else filename
         with open(filename, "rb") as f:
             return pickle.load(f)
 
-    def forward(self, sequence):
+    def forward(self, sequence: List[int]) -> np.ndarray:
         T = len(sequence)
         alpha = np.zeros((T, self.n_states))
 
@@ -51,7 +49,7 @@ class HMM:
 
         return alpha
 
-    def backward(self, sequence):
+    def backward(self, sequence: List[int]) -> np.ndarray:
         T = len(sequence)
         beta = np.ones((T, self.n_states))
 
@@ -62,7 +60,7 @@ class HMM:
 
         return beta
 
-    def viterbi(self, sequence):
+    def viterbi(self, sequence: List[int]) -> np.ndarray:
         T = len(sequence)
         delta = np.zeros((T, self.n_states))
         psi = np.zeros((T, self.n_states), dtype=int)
@@ -84,7 +82,9 @@ class HMM:
 
         return state_sequence
 
-    def baum_welch(self, sequences, n_iterations):
+    def baum_welch(
+        self, sequences: List[List[int]], n_iterations: int, verbose: bool = False
+    ) -> None:
         for iteration in range(n_iterations):
             # Initialize accumulators
             A_num = np.zeros((self.n_states, self.n_states))
@@ -126,7 +126,7 @@ class HMM:
             self.B = B_num / np.sum(B_num, axis=1, keepdims=True)
 
             # Logging parameters every 10 iterations
-            if iteration % 10 == 0:
+            if iteration % 10 == 0 and verbose:
                 os.system("cls" if os.name == "nt" else "clear")
                 clear_output(wait=True)
                 logging.info(f"Iteration {iteration}:")
@@ -134,7 +134,7 @@ class HMM:
                 logging.info("A:\n%s", self.A)
                 logging.info("B:\n%s", self.B)
 
-    def decoding_accuracy(self, sequences, true_states):
+    def decoding_accuracy(self, sequences: List[List[int]], true_states: List[List[int]]) -> float:
         correct_predictions = 0
         total_predictions = 0
 
@@ -146,7 +146,7 @@ class HMM:
         accuracy = (correct_predictions / total_predictions) * 100
         return accuracy
 
-    def state_probabilities(self, sequence):
+    def state_probabilities(self, sequence: List[int]) -> np.ndarray:
         """
         Returns the smoothed probabilities of the hidden states at each time step.
         This is done by using both forward and backward probabilities.
@@ -159,7 +159,5 @@ class HMM:
 
         return smoothed_probs
 
-    def sequence_probability(self, sequence):
-        smoothed_probs = self.state_probabilities(sequence)
-        row_averages = np.mean(smoothed_probs, axis=0)
-        return row_averages / np.sum(row_averages)
+    def sequence_probability(self, sequence: List[int]) -> np.ndarray:
+        return self.state_probabilities(sequence)[-1]
