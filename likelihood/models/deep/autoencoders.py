@@ -1,10 +1,14 @@
 import logging
 import os
+import random
 from functools import partial
 from shutil import rmtree
 
+import matplotlib
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
+from pandas.plotting import radviz
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
@@ -313,8 +317,67 @@ class GetInsights:
         self.model = model
         self.encoder_layer = self.model.encoder.layers[0]
         self.decoder_layer = self.model.decoder.layers[0]
+        self.classifier_layer = self.model.classifier.layers[0]
         self.encoder_weights = self.encoder_layer.get_weights()[0]
         self.decoder_weights = self.decoder_layer.get_weights()[0]
+        self.classifier_weights = self.classifier_layer.get_weights()[0]
+        colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
+
+        by_hsv = sorted(
+            (tuple(mcolors.rgb_to_hsv(mcolors.to_rgba(color)[:3])), name)
+            for name, color in colors.items()
+        )
+        self.sorted_names = [name for hsv, name in by_hsv if hsv[1] > 0.4 and hsv[2] >= 0.4]
+        random.shuffle(self.sorted_names)
+
+    def predictor_analyzer(
+        self,
+        frac=None,
+        cmap: str = "viridis",
+        aspect: str = "auto",
+        highlight: bool = True,
+        **kwargs,
+    ) -> None:
+        self._viz_weights(cmap=cmap, aspect=aspect, highlight=highlight, **kwargs)
+        inputs = self.inputs.copy()
+        if frac:
+            n = int(frac * self.inputs.shape[0])
+            indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
+            inputs = inputs[indexes]
+        inputs[np.isnan(inputs)] = 0.0
+        encoded = self.model.encoder(inputs)
+        reconstructed = self.model.decoder(encoded)
+        combined = tf.concat([reconstructed, encoded], axis=1)
+        self.classification = self.model.classifier(combined).numpy().argmax(axis=1)
+        ax = plt.subplot(1, 2, 1)
+        plt.imshow(self.inputs, cmap=cmap, aspect=aspect)
+        plt.colorbar()
+        plt.title("Original Data")
+        plt.subplot(1, 2, 2, sharex=ax, sharey=ax)
+        plt.imshow(reconstructed, cmap=cmap, aspect=aspect)
+        plt.colorbar()
+        plt.title("Decoder Layer Reconstruction")
+        plt.show()
+
+        self._get_tsne_repr(inputs=inputs, frac=frac)
+        self._viz_tsne_repr(c=self.classification)
+
+        data = pd.DataFrame(encoded, columns=[f"Feature {i}" for i in range(encoded.shape[1])])
+        data_input = pd.DataFrame(
+            inputs,
+            columns=(
+                [f"Feature {i}" for i in range(inputs.shape[1])] if y_labels is None else y_labels
+            ),
+        )
+        data["class"] = self.classification
+        data_input["class"] = self.classification
+        radviz(data, "class", color=self.colors)
+        plt.title("Radviz Visualization of Latent Space")
+        plt.show()
+
+        radviz(data_input, "class", color=self.colors)
+        plt.title("Radviz Visualization of Input Data")
+        plt.show()
 
     def _viz_weights(
         self, cmap: str = "viridis", aspect: str = "auto", highlight: bool = True, **kwargs
@@ -340,40 +403,35 @@ class GetInsights:
             )
         plt.show()
 
-    def _compare_reconstruction(
-        self, frac=None, cmap: str = "viridis", aspect: str = "auto"
-    ) -> None:
-        inputs = self.inputs.copy()
-        if frac:
-            n = int(frac * self.inputs.shape[0])
-            indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
-            inputs = inputs[indexes]
-        inputs[np.isnan(inputs)] = 0.0
-        reconstructed = self.model.decoder(self.model.encoder(inputs))
-        ax = plt.subplot(1, 2, 1)
-        plt.imshow(self.inputs, cmap=cmap, aspect=aspect)
-        plt.colorbar()
-        plt.title("Original Data")
-        plt.subplot(1, 2, 2, sharex=ax, sharey=ax)
-        plt.imshow(reconstructed, cmap=cmap, aspect=aspect)
-        plt.colorbar()
-        plt.title("Decoder Layer Reconstruction")
-        plt.show()
-
-    def _get_tsne_repr(self, frac=None) -> None:
-        inputs = self.inputs.copy()
-        if frac:
-            n = int(frac * self.inputs.shape[0])
-            indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
-            inputs = inputs[indexes]
-        inputs[np.isnan(inputs)] = 0.0
+    def _get_tsne_repr(self, inputs=None, frac=None) -> None:
+        if inputs is None:
+            inputs = self.inputs.copy()
+            if frac:
+                n = int(frac * self.inputs.shape[0])
+                indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
+                inputs = inputs[indexes]
+            inputs[np.isnan(inputs)] = 0.0
         self.latent_representations = inputs @ self.encoder_weights
 
         tsne = TSNE(n_components=2)
         self.reduced_data_tsne = tsne.fit_transform(self.latent_representations)
 
-    def _viz_tsne_repr(self) -> None:
-        plt.scatter(self.reduced_data_tsne[:, 0], self.reduced_data_tsne[:, 1])
+    def _viz_tsne_repr(self, **kwargs) -> None:
+        c = kwargs.get("c", None)
+        self.colors = (
+            kwargs.get("colors", self.sorted_names[: len(np.unique(c))]) if c is not None else None
+        )
+        plt.scatter(
+            self.reduced_data_tsne[:, 0],
+            self.reduced_data_tsne[:, 1],
+            cmap=matplotlib.colors.ListedColormap(self.colors) if c is not None else None,
+            c=c,
+        )
+        if c is not None:
+            cb = plt.colorbar()
+            loc = np.arange(0, max(c), max(c) / float(len(self.colors)))
+            cb.set_ticks(loc)
+            cb.set_ticklabels(np.unique(c))
         plt.title("t-SNE Visualization of Latent Space")
         plt.xlabel("t-SNE 1")
         plt.ylabel("t-SNE 2")
@@ -415,7 +473,8 @@ if __name__ == "__main__":
     model.fit(X, y, epochs=50, validation_split=0.2)
 
     insights = GetInsights(model, X)
-    insights._viz_weights(y_labels=y_labels)
-    insights._get_tsne_repr(frac=1.0)
+    insights.predictor_analyzer(frac=1.0, y_labels=y_labels)
+    insights._get_tsne_repr()
     insights._viz_tsne_repr()
-    insights._compare_reconstruction(frac=1.0)
+    insights._viz_tsne_repr(c=iris_df["species"])
+    insights._viz_weights()
