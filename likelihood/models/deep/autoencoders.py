@@ -3,17 +3,18 @@ import os
 from functools import partial
 from shutil import rmtree
 
-import keras_tuner
+import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import tensorflow as tf
-from pandas.core.frame import DataFrame
 
-from likelihood.tools import OneHotEncoder
-
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+import keras_tuner
+import tensorflow as tf
+from pandas.core.frame import DataFrame
+from sklearn.manifold import TSNE
+
+from likelihood.tools import OneHotEncoder
 
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="AutoClassifier")
@@ -306,4 +307,115 @@ def setup_model(
     return best_model
 
 
+class GetInsights:
+    def __init__(self, model: AutoClassifier, inputs: np.ndarray) -> None:
+        self.inputs = inputs
+        self.model = model
+        self.encoder_layer = self.model.encoder.layers[0]
+        self.decoder_layer = self.model.decoder.layers[0]
+        self.encoder_weights = self.encoder_layer.get_weights()[0]
+        self.decoder_weights = self.decoder_layer.get_weights()[0]
+
+    def _viz_weights(
+        self, cmap: str = "viridis", aspect: str = "auto", highlight: bool = True, **kwargs
+    ) -> None:
+        title = kwargs.get("title", "Encoder Layer Weights (Dense Layer)")
+        y_labels = kwargs.get("y_labels", None)
+        cmap_highlight = kwargs.get("cmap_highlight", "Pastel1")
+        highlight_mask = np.zeros_like(self.encoder_weights, dtype=bool)
+
+        plt.imshow(self.encoder_weights, cmap=cmap, aspect=aspect)
+        plt.colorbar()
+        plt.title(title)
+        if y_labels is not None:
+            plt.yticks(ticks=np.arange(self.encoder_weights.shape[0]), labels=y_labels)
+        if highlight:
+            for i, j in enumerate(self.encoder_weights.argmax(axis=1)):
+                highlight_mask[i, j] = True
+            plt.imshow(
+                np.ma.masked_where(~highlight_mask, self.encoder_weights),
+                cmap=cmap_highlight,
+                alpha=0.5,
+                aspect=aspect,
+            )
+        plt.show()
+
+    def _compare_reconstruction(
+        self, frac=None, cmap: str = "viridis", aspect: str = "auto"
+    ) -> None:
+        inputs = self.inputs.copy()
+        if frac:
+            n = int(frac * self.inputs.shape[0])
+            indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
+            inputs = inputs[indexes]
+        inputs[np.isnan(inputs)] = 0.0
+        reconstructed = self.model.decoder(self.model.encoder(inputs))
+        ax = plt.subplot(1, 2, 1)
+        plt.imshow(self.inputs, cmap=cmap, aspect=aspect)
+        plt.colorbar()
+        plt.title("Original Data")
+        plt.subplot(1, 2, 2, sharex=ax, sharey=ax)
+        plt.imshow(reconstructed, cmap=cmap, aspect=aspect)
+        plt.colorbar()
+        plt.title("Decoder Layer Reconstruction")
+        plt.show()
+
+    def _get_tsne_repr(self, frac=None) -> None:
+        inputs = self.inputs.copy()
+        if frac:
+            n = int(frac * self.inputs.shape[0])
+            indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
+            inputs = inputs[indexes]
+        inputs[np.isnan(inputs)] = 0.0
+        self.latent_representations = inputs @ self.encoder_weights
+
+        tsne = TSNE(n_components=2)
+        self.reduced_data_tsne = tsne.fit_transform(self.latent_representations)
+
+    def _viz_tsne_repr(self) -> None:
+        plt.scatter(self.reduced_data_tsne[:, 0], self.reduced_data_tsne[:, 1])
+        plt.title("t-SNE Visualization of Latent Space")
+        plt.xlabel("t-SNE 1")
+        plt.ylabel("t-SNE 2")
+        plt.show()
+
+
 ########################################################################################
+
+if __name__ == "__main__":
+    # Example usage
+    import pandas as pd
+    from sklearn.datasets import load_iris
+    from sklearn.preprocessing import OneHotEncoder
+
+    # Load the dataset
+    iris = load_iris()
+
+    # Convert to a DataFrame for easy exploration
+    iris_df = pd.DataFrame(data=iris.data, columns=iris.feature_names)
+    iris_df["species"] = iris.target
+
+    X = iris_df.drop(columns="species")
+    y_labels = X.columns
+    X = X.values
+    y = iris_df["species"].values
+
+    X = np.asarray(X).astype(np.float32)
+
+    encoder = OneHotEncoder()
+    y = encoder.fit_transform(y.reshape(-1, 1)).toarray()
+    y = np.asarray(y).astype(np.float32)
+
+    model = AutoClassifier(input_shape_parm=X.shape[1], num_classes=3, units=27, activation="selu")
+    model.compile(
+        optimizer="adam",
+        loss=tf.keras.losses.CategoricalCrossentropy(),
+        metrics=[tf.keras.metrics.F1Score(threshold=0.5)],
+    )
+    model.fit(X, y, epochs=50, validation_split=0.2)
+
+    insights = GetInsights(model, X)
+    insights._viz_weights(y_labels=y_labels)
+    insights._get_tsne_repr(frac=1.0)
+    insights._viz_tsne_repr()
+    insights._compare_reconstruction(frac=1.0)
