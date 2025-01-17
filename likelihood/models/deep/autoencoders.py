@@ -378,6 +378,29 @@ class GetInsights:
         radviz(data_input, "class", color=self.colors)
         plt.title("Radviz Visualization of Input Data")
         plt.show()
+        return self._statistics(data_input)
+
+    def _statistics(self, data_input: DataFrame, **kwargs) -> DataFrame:
+        data = data_input.copy(deep=True)
+
+        if not pd.api.types.is_string_dtype(data["class"]):
+            data["class"] = data["class"].astype(str)
+
+        data.ffill(inplace=True)
+        grouped_data = data.groupby("class")
+
+        numerical_stats = grouped_data.agg(["mean", "min", "max", "std", "median"])
+        numerical_stats.columns = ["_".join(col).strip() for col in numerical_stats.columns.values]
+
+        def get_mode(x):
+            mode_series = x.mode()
+            return mode_series.iloc[0] if not mode_series.empty else None
+
+        mode_stats = grouped_data.apply(get_mode, include_groups=False)
+        mode_stats.columns = [f"{col}_mode" for col in mode_stats.columns]
+        combined_stats = pd.concat([numerical_stats, mode_stats], axis=1)
+
+        return combined_stats.T
 
     def _viz_weights(
         self, cmap: str = "viridis", aspect: str = "auto", highlight: bool = True, **kwargs
@@ -473,8 +496,9 @@ if __name__ == "__main__":
     model.fit(X, y, epochs=50, validation_split=0.2)
 
     insights = GetInsights(model, X)
-    insights.predictor_analyzer(frac=1.0, y_labels=y_labels)
+    summary = insights.predictor_analyzer(frac=1.0, y_labels=y_labels)
     insights._get_tsne_repr()
     insights._viz_tsne_repr()
     insights._viz_tsne_repr(c=iris_df["species"])
     insights._viz_weights()
+    print(summary)
