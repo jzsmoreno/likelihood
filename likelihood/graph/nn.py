@@ -17,9 +17,7 @@ from sklearn.model_selection import train_test_split
 
 from likelihood.tools import generate_feature_yaml
 
-logging.getLogger("tensorflow").setLevel(logging.ERROR)
-
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+tf.get_logger().setLevel("ERROR")
 
 
 def compare_similarity(arr1: np.ndarray, arr2: np.ndarray) -> int:
