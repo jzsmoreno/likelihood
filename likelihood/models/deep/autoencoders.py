@@ -408,10 +408,10 @@ class GetInsights:
         self.model = model
         self.encoder_layer = self.model.encoder.layers[0]
         self.decoder_layer = self.model.decoder.layers[0]
-        self.classifier_layer = self.model.classifier.layers[-1]
+        self.classifier_layer = self.model.classifier.layers[-2]
         self.encoder_weights = self.encoder_layer.get_weights()[0]
         self.decoder_weights = self.decoder_layer.get_weights()[0]
-        self.classifier_weights = self.classifier_layer.get_weights()[-1]
+        self.classifier_weights = self.classifier_layer.get_weights()[0]
         colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 
         by_hsv = sorted(
@@ -431,6 +431,7 @@ class GetInsights:
     ) -> None:
         self._viz_weights(cmap=cmap, aspect=aspect, highlight=highlight, **kwargs)
         inputs = self.inputs.copy()
+        y_labels = kwargs.get("y_labels", None)
         if frac:
             n = int(frac * self.inputs.shape[0])
             indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
@@ -453,23 +454,23 @@ class GetInsights:
         self._get_tsne_repr(inputs=inputs, frac=frac)
         self._viz_tsne_repr(c=self.classification)
 
-        data = pd.DataFrame(encoded, columns=[f"Feature {i}" for i in range(encoded.shape[1])])
-        data_input = pd.DataFrame(
+        self.data = pd.DataFrame(encoded, columns=[f"Feature {i}" for i in range(encoded.shape[1])])
+        self.data_input = pd.DataFrame(
             inputs,
             columns=(
                 [f"Feature {i}" for i in range(inputs.shape[1])] if y_labels is None else y_labels
             ),
         )
-        data["class"] = self.classification
-        data_input["class"] = self.classification
-        radviz(data, "class", color=self.colors)
+        self.data["class"] = self.classification
+        self.data_input["class"] = self.classification
+        radviz(self.data, "class", color=self.colors)
         plt.title("Radviz Visualization of Latent Space")
         plt.show()
 
-        radviz(data_input, "class", color=self.colors)
+        radviz(self.data_input, "class", color=self.colors)
         plt.title("Radviz Visualization of Input Data")
         plt.show()
-        return self._statistics(data_input)
+        return self._statistics(self.data_input)
 
     def _statistics(self, data_input: DataFrame, **kwargs) -> DataFrame:
         data = data_input.copy(deep=True)
