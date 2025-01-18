@@ -1,9 +1,9 @@
+import logging
 import os
 
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-# Suppress TensorFlow INFO logs
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-import logging
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
+
 import warnings
 from typing import List, Tuple
 
@@ -17,9 +17,7 @@ from sklearn.model_selection import train_test_split
 
 from likelihood.tools import generate_feature_yaml
 
-logging.getLogger("tensorflow").setLevel(logging.ERROR)
-
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+tf.get_logger().setLevel("ERROR")
 
 
 def compare_similarity(arr1: np.ndarray, arr2: np.ndarray) -> int:
