@@ -45,14 +45,16 @@ el.replaceWith(d);
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.models.deep.autoencoders.build_model"><code class="name flex">
-<span>def <span class="ident">build_model</span></span>(<span>hp, input_shape_parm: None | int, num_classes: None | int) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
+<span>def <span class="ident">build_model</span></span>(<span>hp, input_shape_parm: None | int, num_classes: None | int, **kwargs) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def build_model(hp, input_shape_parm: None | int, num_classes: None | int) -&gt; AutoClassifier:
+<pre><code class="python">def build_model(
+    hp, input_shape_parm: None | int, num_classes: None | int, **kwargs
+) -&gt; AutoClassifier:
     &#34;&#34;&#34;Builds a neural network model using Keras Tuner&#39;s search algorithm.
 
     Parameters
@@ -64,17 +66,51 @@ el.replaceWith(d);
     num_classes : `int`
         The number of classes in the dataset.
 
+    Keyword Arguments:
+    ----------
+    Additional keyword arguments to pass to the model.
+
+    hyperparameters : `dict`
+        The hyperparameters to set.
+
     Returns
     -------
     `keras.Model`
         The neural network model.
     &#34;&#34;&#34;
-    units = hp.Int(
-        &#34;units&#34;, min_value=int(input_shape_parm * 0.2), max_value=input_shape_parm, step=2
+    hyperparameters = kwargs.get(&#34;hyperparameters&#34;, None)
+    hyperparameters_keys = hyperparameters.keys() if hyperparameters is not None else []
+
+    units = (
+        hp.Int(
+            &#34;units&#34;,
+            min_value=int(input_shape_parm * 0.2),
+            max_value=int(input_shape_parm * 1.5),
+            step=2,
+        )
+        if &#34;units&#34; not in hyperparameters_keys
+        else hyperparameters[&#34;units&#34;]
     )
-    activation = hp.Choice(&#34;activation&#34;, [&#34;sigmoid&#34;, &#34;relu&#34;, &#34;tanh&#34;, &#34;selu&#34;, &#34;softplus&#34;])
-    optimizer = hp.Choice(&#34;optimizer&#34;, [&#34;sgd&#34;, &#34;adam&#34;, &#34;adadelta&#34;])
-    threshold = hp.Float(&#34;threshold&#34;, min_value=0.1, max_value=0.9, sampling=&#34;log&#34;)
+    activation = (
+        hp.Choice(&#34;activation&#34;, [&#34;sigmoid&#34;, &#34;relu&#34;, &#34;tanh&#34;, &#34;selu&#34;, &#34;softplus&#34;, &#34;softsign&#34;])
+        if &#34;activation&#34; not in hyperparameters_keys
+        else hyperparameters[&#34;activation&#34;]
+    )
+    optimizer = (
+        hp.Choice(&#34;optimizer&#34;, [&#34;sgd&#34;, &#34;adam&#34;, &#34;adadelta&#34;, &#34;rmsprop&#34;, &#34;adamax&#34;, &#34;adagrad&#34;])
+        if &#34;optimizer&#34; not in hyperparameters_keys
+        else hyperparameters[&#34;optimizer&#34;]
+    )
+    threshold = (
+        hp.Float(&#34;threshold&#34;, min_value=0.1, max_value=0.9, sampling=&#34;log&#34;)
+        if &#34;threshold&#34; not in hyperparameters_keys
+        else hyperparameters[&#34;threshold&#34;]
+    )
+    num_layers = (
+        hp.Int(&#34;num_layers&#34;, min_value=1, max_value=10, step=1)
+        if &#34;num_layers&#34; not in hyperparameters_keys
+        else hyperparameters[&#34;num_layers&#34;]
+    )
 
     model = call_existing_code(
         units=units,
@@ -83,6 +119,7 @@ el.replaceWith(d);
         optimizer=optimizer,
         input_shape_parm=input_shape_parm,
         num_classes=num_classes,
+        num_layers=num_layers,
     )
     return model</code></pre>
 </details>
@@ -96,12 +133,16 @@ el.replaceWith(d);
 <dt><strong><code>num_classes</code></strong> :&ensp;<code>int</code></dt>
 <dd>The number of classes in the dataset.</dd>
 </dl>
+<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<p>Additional keyword arguments to pass to the model.</p>
+<p>hyperparameters : <code>dict</code>
+The hyperparameters to set.</p>
 <h2 id="returns">Returns</h2>
 <p><code>keras.Model</code>
 The neural network model.</p></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.call_existing_code"><code class="name flex">
-<span>def <span class="ident">call_existing_code</span></span>(<span>units: int,<br>activation: str,<br>threshold: float,<br>optimizer: str,<br>input_shape_parm: None | int = None,<br>num_classes: None | int = None) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
+<span>def <span class="ident">call_existing_code</span></span>(<span>units: int,<br>activation: str,<br>threshold: float,<br>optimizer: str,<br>input_shape_parm: None | int = None,<br>num_classes: None | int = None,<br>num_layers: int = 1) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
 </code></dt>
 <dd>
 <details class="source">
@@ -115,6 +156,7 @@ The neural network model.</p></div>
     optimizer: str,
     input_shape_parm: None | int = None,
     num_classes: None | int = None,
+    num_layers: int = 1,
 ) -&gt; AutoClassifier:
     &#34;&#34;&#34;
     Calls an existing AutoClassifier instance.
@@ -144,6 +186,7 @@ The neural network model.</p></div>
         num_classes=num_classes,
         units=units,
         activation=activation,
+        num_layers=num_layers,
     )
     model.compile(
         optimizer=optimizer,
@@ -173,14 +216,15 @@ The neural network model.</p></div>
 The AutoClassifier instance.</p></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.setup_model"><code class="name flex">
-<span>def <span class="ident">setup_model</span></span>(<span>data: pandas.core.frame.DataFrame,<br>target: str,<br>epochs: int,<br>train_size: float = 0.7,<br>seed=None,<br>train_mode: bool = True,<br>filepath: str = './my_dir/best_model',<br>**kwargs) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
+<span>def <span class="ident">setup_model</span></span>(<span>data: pandas.core.frame.DataFrame,<br>target: str,<br>epochs: int,<br>train_size: float = 0.7,<br>seed=None,<br>train_mode: bool = True,<br>filepath: str = './my_dir/best_model',<br>method: str = 'Hyperband',<br>**kwargs) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def setup_model(
+<pre><code class="python">@suppress_warnings
+def setup_model(
     data: DataFrame,
     target: str,
     epochs: int,
@@ -188,6 +232,7 @@ The AutoClassifier instance.</p></div>
     seed=None,
     train_mode: bool = True,
     filepath: str = &#34;./my_dir/best_model&#34;,
+    method: str = &#34;Hyperband&#34;,
     **kwargs,
 ) -&gt; AutoClassifier:
     &#34;&#34;&#34;Setup model for training and tuning.
@@ -208,6 +253,8 @@ The AutoClassifier instance.</p></div>
         Whether to train the model or not.
     filepath : `str`
         The path to save the best model to.
+    method : `str`
+        The method to use for hyperparameter tuning. Options are &#34;Hyperband&#34; and &#34;RandomSearch&#34;.
 
     Keyword Arguments:
     ----------
@@ -223,30 +270,30 @@ The AutoClassifier instance.</p></div>
         The objective to optimize.
     verbose : `bool`
         Whether to print verbose output.
+    hyperparameters : `dict`
+        The hyperparameters to set.
 
     Returns
     -------
     model : `AutoClassifier`
         The trained model.
     &#34;&#34;&#34;
-    max_trials = kwargs[&#34;max_trials&#34;] if &#34;max_trials&#34; in kwargs else 10
-    directory = kwargs[&#34;directory&#34;] if &#34;directory&#34; in kwargs else &#34;./my_dir&#34;
-    project_name = kwargs[&#34;project_name&#34;] if &#34;project_name&#34; in kwargs else &#34;get_best&#34;
-    objective = kwargs[&#34;objective&#34;] if &#34;objective&#34; in kwargs else &#34;val_loss&#34;
-    verbose = kwargs[&#34;verbose&#34;] if &#34;verbose&#34; in kwargs else True
+    max_trials = kwargs.get(&#34;max_trials&#34;, 10)
+    directory = kwargs.get(&#34;directory&#34;, &#34;./my_dir&#34;)
+    project_name = kwargs.get(&#34;project_name&#34;, &#34;get_best&#34;)
+    objective = kwargs.get(&#34;objective&#34;, &#34;val_loss&#34;)
+    verbose = kwargs.get(&#34;verbose&#34;, True)
+    hyperparameters = kwargs.get(&#34;hyperparameters&#34;, None)
 
     X = data.drop(columns=target)
     input_sample = X.sample(1)
     y = data[target]
-    # Verify if there are categorical columns in the dataframe
     assert (
         X.select_dtypes(include=[&#34;object&#34;]).empty == True
     ), &#34;Categorical variables within the DataFrame must be encoded, this is done by using the DataFrameEncoder from likelihood.&#34;
     validation_split = 1.0 - train_size
-    # Create my_dir path if it does not exist
 
     if train_mode:
-        # Create a new directory if it does not exist
         try:
             if (not os.path.exists(directory)) and directory != &#34;./&#34;:
                 os.makedirs(directory)
@@ -257,7 +304,6 @@ The AutoClassifier instance.</p></div>
         except:
             print(&#34;Warning: unable to create directory&#34;)
 
-        # Create a Classifier instance
         y_encoder = OneHotEncoder()
         y = y_encoder.encode(y.to_list())
         X = X.to_numpy()
@@ -270,34 +316,46 @@ The AutoClassifier instance.</p></div>
         num_classes = y.shape[1]
         global build_model
         build_model = partial(
-            build_model, input_shape_parm=input_shape_parm, num_classes=num_classes
+            build_model,
+            input_shape_parm=input_shape_parm,
+            num_classes=num_classes,
+            hyperparameters=hyperparameters,
         )
 
-        # Create the AutoKeras model
-        tuner = keras_tuner.RandomSearch(
-            hypermodel=build_model,
-            objective=objective,
-            max_trials=max_trials,
-            directory=directory,
-            project_name=project_name,
-            seed=seed,
-        )
+        if method == &#34;Hyperband&#34;:
+            tuner = keras_tuner.Hyperband(
+                hypermodel=build_model,
+                objective=objective,
+                max_epochs=epochs,
+                factor=3,
+                directory=directory,
+                project_name=project_name,
+                seed=seed,
+            )
+        elif method == &#34;RandomSearch&#34;:
+            tuner = keras_tuner.RandomSearch(
+                hypermodel=build_model,
+                objective=objective,
+                max_trials=max_trials,
+                directory=directory,
+                project_name=project_name,
+                seed=seed,
+            )
 
-        tuner.search(X, y, epochs=epochs, validation_split=validation_split)
+        tuner.search(X, y, epochs=epochs, validation_split=validation_split, verbose=verbose)
         models = tuner.get_best_models(num_models=2)
         best_model = models[0]
         best_model(input_sample)
 
-        # save model
         best_model.save(filepath, save_format=&#34;tf&#34;)
 
         if verbose:
             tuner.results_summary()
     else:
-        # Load the best model from the directory
         best_model = tf.keras.models.load_model(filepath)
 
-    return best_model</code></pre>
+    best_hps = tuner.get_best_hyperparameters(1)[0].values
+    return best_model, pd.DataFrame(best_hps, index=[&#34;Value&#34;])</code></pre>
 </details>
 <div class="desc"><p>Setup model for training and tuning.</p>
 <h2 id="parameters">Parameters</h2>
@@ -316,6 +374,8 @@ The AutoClassifier instance.</p></div>
 <dd>Whether to train the model or not.</dd>
 <dt><strong><code>filepath</code></strong> :&ensp;<code>str</code></dt>
 <dd>The path to save the best model to.</dd>
+<dt><strong><code>method</code></strong> :&ensp;<code>str</code></dt>
+<dd>The method to use for hyperparameter tuning. Options are "Hyperband" and "RandomSearch".</dd>
 </dl>
 <h2 id="keyword-arguments">Keyword Arguments:</h2>
 <p>Additional keyword arguments to pass to the model.</p>
@@ -328,12 +388,33 @@ The name of the project.
 objective : <code>str</code>
 The objective to optimize.
 verbose : <code>bool</code>
-Whether to print verbose output.</p>
+Whether to print verbose output.
+hyperparameters : <code>dict</code>
+The hyperparameters to set.</p>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><strong><code>model</code></strong> :&ensp;<code><a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></code></dt>
 <dd>The trained model.</dd>
 </dl></div>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.suppress_warnings"><code class="name flex">
+<span>def <span class="ident">suppress_warnings</span></span>(<span>func)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def suppress_warnings(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        with warnings.catch_warnings():
+            warnings.simplefilter(&#34;ignore&#34;)
+            return func(*args, **kwargs)
+
+    return wrapper</code></pre>
+</details>
+<div class="desc"></div>
 </dd>
 </dl>
 </section>
@@ -342,7 +423,7 @@ Whether to print verbose output.</p>
 <dl>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier"><code class="flex name class">
 <span>class <span class="ident">AutoClassifier</span></span>
-<span>(</span><span>input_shape_parm, num_classes, units, activation)</span>
+<span>(</span><span>input_shape_parm, num_classes, units, activation, **kwargs)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -368,7 +449,7 @@ class AutoClassifier(tf.keras.Model):
         from_config(cls, config): Recreates an instance of AutoClassifier from its configuration.
     &#34;&#34;&#34;
 
-    def __init__(self, input_shape_parm, num_classes, units, activation):
+    def __init__(self, input_shape_parm, num_classes, units, activation, **kwargs):
         &#34;&#34;&#34;
         Initializes an AutoClassifier instance with the given parameters.
 
@@ -382,6 +463,15 @@ class AutoClassifier(tf.keras.Model):
             The number of neurons in each hidden layer.
         activation : `str`
             The type of activation function to use for the neural network layers.
+
+        Keyword Arguments:
+        ----------
+        Additional keyword arguments to pass to the model.
+
+        classifier_activation : `str`
+            The activation function to use for the classifier layer. Default is &#34;softmax&#34;. If the activation function is not a classification function, the model can be used in regression problems.
+        num_layers : `int`
+            The number of hidden layers in the classifier. Default is 1.
         &#34;&#34;&#34;
         super(AutoClassifier, self).__init__()
         self.input_shape_parm = input_shape_parm
@@ -392,6 +482,8 @@ class AutoClassifier(tf.keras.Model):
         self.encoder = None
         self.decoder = None
         self.classifier = None
+        self.classifier_activation = kwargs.get(&#34;classifier_activation&#34;, &#34;softmax&#34;)
+        self.num_layers = kwargs.get(&#34;num_layers&#34;, 1)
 
     def build(self, input_shape):
         self.encoder = tf.keras.Sequential(
@@ -408,8 +500,14 @@ class AutoClassifier(tf.keras.Model):
             ]
         )
 
-        self.classifier = tf.keras.Sequential(
-            [tf.keras.layers.Dense(self.num_classes, activation=&#34;softmax&#34;)]
+        self.classifier = tf.keras.Sequential()
+        if self.num_layers &gt; 1:
+            for _ in range(self.num_layers - 1):
+                self.classifier.add(
+                    tf.keras.layers.Dense(units=self.units, activation=self.activation)
+                )
+        self.classifier.add(
+            tf.keras.layers.Dense(units=self.num_classes, activation=self.classifier_activation)
         )
 
     def call(self, x):
@@ -425,6 +523,8 @@ class AutoClassifier(tf.keras.Model):
             &#34;num_classes&#34;: self.num_classes,
             &#34;units&#34;: self.units,
             &#34;activation&#34;: self.activation,
+            &#34;classifier_activation&#34;: self.classifier_activation,
+            &#34;num_layers&#34;: self.num_layers,
         }
         base_config = super(AutoClassifier, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -436,6 +536,8 @@ class AutoClassifier(tf.keras.Model):
             num_classes=config[&#34;num_classes&#34;],
             units=config[&#34;units&#34;],
             activation=config[&#34;activation&#34;],
+            classifier_activation=config[&#34;classifier_activation&#34;],
+            num_layers=config[&#34;num_layers&#34;],
         )</code></pre>
 </details>
 <div class="desc"><p>An auto-classifier model that automatically determines the best classification strategy based on the input data.</p>
@@ -463,7 +565,13 @@ from_config(cls, config): Recreates an instance of AutoClassifier from its confi
 <dd>The number of neurons in each hidden layer.</dd>
 <dt><strong><code>activation</code></strong> :&ensp;<code>str</code></dt>
 <dd>The type of activation function to use for the neural network layers.</dd>
-</dl></div>
+</dl>
+<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<p>Additional keyword arguments to pass to the model.</p>
+<p>classifier_activation : <code>str</code>
+The activation function to use for the classifier layer. Default is "softmax". If the activation function is not a classification function, the model can be used in regression problems.
+num_layers : <code>int</code>
+The number of hidden layers in the classifier. Default is 1.</p></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li>keras.src.models.model.Model</li>
@@ -525,8 +633,14 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
         ]
     )
 
-    self.classifier = tf.keras.Sequential(
-        [tf.keras.layers.Dense(self.num_classes, activation=&#34;softmax&#34;)]
+    self.classifier = tf.keras.Sequential()
+    if self.num_layers &gt; 1:
+        for _ in range(self.num_layers - 1):
+            self.classifier.add(
+                tf.keras.layers.Dense(units=self.units, activation=self.activation)
+            )
+    self.classifier.add(
+        tf.keras.layers.Dense(units=self.num_classes, activation=self.classifier_activation)
     )</code></pre>
 </details>
 <div class="desc"></div>
@@ -562,6 +676,8 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
         &#34;num_classes&#34;: self.num_classes,
         &#34;units&#34;: self.units,
         &#34;activation&#34;: self.activation,
+        &#34;classifier_activation&#34;: self.classifier_activation,
+        &#34;num_layers&#34;: self.num_layers,
     }
     base_config = super(AutoClassifier, self).get_config()
     return dict(list(base_config.items()) + list(config.items()))</code></pre>
@@ -569,6 +685,231 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 <div class="desc"><p>Returns the config of the object.</p>
 <p>An object config is a Python dictionary (serializable)
 containing the information needed to re-instantiate it.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.GetInsights"><code class="flex name class">
+<span>class <span class="ident">GetInsights</span></span>
+<span>(</span><span>model: <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a>,<br>inputs: numpy.ndarray)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class GetInsights:
+    def __init__(self, model: AutoClassifier, inputs: np.ndarray) -&gt; None:
+        self.inputs = inputs
+        self.model = model
+        self.encoder_layer = self.model.encoder.layers[0]
+        self.decoder_layer = self.model.decoder.layers[0]
+        self.classifier_layer = self.model.classifier.layers[-2]
+        self.encoder_weights = self.encoder_layer.get_weights()[0]
+        self.decoder_weights = self.decoder_layer.get_weights()[0]
+        self.classifier_weights = self.classifier_layer.get_weights()[0]
+        colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
+
+        by_hsv = sorted(
+            (tuple(mcolors.rgb_to_hsv(mcolors.to_rgba(color)[:3])), name)
+            for name, color in colors.items()
+        )
+        self.sorted_names = [name for hsv, name in by_hsv if hsv[1] &gt; 0.4 and hsv[2] &gt;= 0.4]
+        random.shuffle(self.sorted_names)
+
+    def predictor_analyzer(
+        self,
+        frac=None,
+        cmap: str = &#34;viridis&#34;,
+        aspect: str = &#34;auto&#34;,
+        highlight: bool = True,
+        **kwargs,
+    ) -&gt; None:
+        self._viz_weights(cmap=cmap, aspect=aspect, highlight=highlight, **kwargs)
+        inputs = self.inputs.copy()
+        y_labels = kwargs.get(&#34;y_labels&#34;, None)
+        if frac:
+            n = int(frac * self.inputs.shape[0])
+            indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
+            inputs = inputs[indexes]
+        inputs[np.isnan(inputs)] = 0.0
+        encoded = self.model.encoder(inputs)
+        reconstructed = self.model.decoder(encoded)
+        combined = tf.concat([reconstructed, encoded], axis=1)
+        self.classification = self.model.classifier(combined).numpy().argmax(axis=1)
+        ax = plt.subplot(1, 2, 1)
+        plt.imshow(self.inputs, cmap=cmap, aspect=aspect)
+        plt.colorbar()
+        plt.title(&#34;Original Data&#34;)
+        plt.subplot(1, 2, 2, sharex=ax, sharey=ax)
+        plt.imshow(reconstructed, cmap=cmap, aspect=aspect)
+        plt.colorbar()
+        plt.title(&#34;Decoder Layer Reconstruction&#34;)
+        plt.show()
+
+        self._get_tsne_repr(inputs=inputs, frac=frac)
+        self._viz_tsne_repr(c=self.classification)
+
+        self.data = pd.DataFrame(encoded, columns=[f&#34;Feature {i}&#34; for i in range(encoded.shape[1])])
+        self.data_input = pd.DataFrame(
+            inputs,
+            columns=(
+                [f&#34;Feature {i}&#34; for i in range(inputs.shape[1])] if y_labels is None else y_labels
+            ),
+        )
+        self.data[&#34;class&#34;] = self.classification
+        self.data_input[&#34;class&#34;] = self.classification
+        radviz(self.data, &#34;class&#34;, color=self.colors)
+        plt.title(&#34;Radviz Visualization of Latent Space&#34;)
+        plt.show()
+
+        radviz(self.data_input, &#34;class&#34;, color=self.colors)
+        plt.title(&#34;Radviz Visualization of Input Data&#34;)
+        plt.show()
+        return self._statistics(self.data_input)
+
+    def _statistics(self, data_input: DataFrame, **kwargs) -&gt; DataFrame:
+        data = data_input.copy(deep=True)
+
+        if not pd.api.types.is_string_dtype(data[&#34;class&#34;]):
+            data[&#34;class&#34;] = data[&#34;class&#34;].astype(str)
+
+        data.ffill(inplace=True)
+        grouped_data = data.groupby(&#34;class&#34;)
+
+        numerical_stats = grouped_data.agg([&#34;mean&#34;, &#34;min&#34;, &#34;max&#34;, &#34;std&#34;, &#34;median&#34;])
+        numerical_stats.columns = [&#34;_&#34;.join(col).strip() for col in numerical_stats.columns.values]
+
+        def get_mode(x):
+            mode_series = x.mode()
+            return mode_series.iloc[0] if not mode_series.empty else None
+
+        mode_stats = grouped_data.apply(get_mode, include_groups=False)
+        mode_stats.columns = [f&#34;{col}_mode&#34; for col in mode_stats.columns]
+        combined_stats = pd.concat([numerical_stats, mode_stats], axis=1)
+
+        return combined_stats.T
+
+    def _viz_weights(
+        self, cmap: str = &#34;viridis&#34;, aspect: str = &#34;auto&#34;, highlight: bool = True, **kwargs
+    ) -&gt; None:
+        title = kwargs.get(&#34;title&#34;, &#34;Encoder Layer Weights (Dense Layer)&#34;)
+        y_labels = kwargs.get(&#34;y_labels&#34;, None)
+        cmap_highlight = kwargs.get(&#34;cmap_highlight&#34;, &#34;Pastel1&#34;)
+        highlight_mask = np.zeros_like(self.encoder_weights, dtype=bool)
+
+        plt.imshow(self.encoder_weights, cmap=cmap, aspect=aspect)
+        plt.colorbar()
+        plt.title(title)
+        if y_labels is not None:
+            plt.yticks(ticks=np.arange(self.encoder_weights.shape[0]), labels=y_labels)
+        if highlight:
+            for i, j in enumerate(self.encoder_weights.argmax(axis=1)):
+                highlight_mask[i, j] = True
+            plt.imshow(
+                np.ma.masked_where(~highlight_mask, self.encoder_weights),
+                cmap=cmap_highlight,
+                alpha=0.5,
+                aspect=aspect,
+            )
+        plt.show()
+
+    def _get_tsne_repr(self, inputs=None, frac=None) -&gt; None:
+        if inputs is None:
+            inputs = self.inputs.copy()
+            if frac:
+                n = int(frac * self.inputs.shape[0])
+                indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
+                inputs = inputs[indexes]
+            inputs[np.isnan(inputs)] = 0.0
+        self.latent_representations = inputs @ self.encoder_weights
+
+        tsne = TSNE(n_components=2)
+        self.reduced_data_tsne = tsne.fit_transform(self.latent_representations)
+
+    def _viz_tsne_repr(self, **kwargs) -&gt; None:
+        c = kwargs.get(&#34;c&#34;, None)
+        self.colors = (
+            kwargs.get(&#34;colors&#34;, self.sorted_names[: len(np.unique(c))]) if c is not None else None
+        )
+        plt.scatter(
+            self.reduced_data_tsne[:, 0],
+            self.reduced_data_tsne[:, 1],
+            cmap=matplotlib.colors.ListedColormap(self.colors) if c is not None else None,
+            c=c,
+        )
+        if c is not None:
+            cb = plt.colorbar()
+            loc = np.arange(0, max(c), max(c) / float(len(self.colors)))
+            cb.set_ticks(loc)
+            cb.set_ticklabels(np.unique(c))
+        plt.title(&#34;t-SNE Visualization of Latent Space&#34;)
+        plt.xlabel(&#34;t-SNE 1&#34;)
+        plt.ylabel(&#34;t-SNE 2&#34;)
+        plt.show()</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="likelihood.models.deep.autoencoders.GetInsights.predictor_analyzer"><code class="name flex">
+<span>def <span class="ident">predictor_analyzer</span></span>(<span>self,<br>frac=None,<br>cmap: str = 'viridis',<br>aspect: str = 'auto',<br>highlight: bool = True,<br>**kwargs) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def predictor_analyzer(
+    self,
+    frac=None,
+    cmap: str = &#34;viridis&#34;,
+    aspect: str = &#34;auto&#34;,
+    highlight: bool = True,
+    **kwargs,
+) -&gt; None:
+    self._viz_weights(cmap=cmap, aspect=aspect, highlight=highlight, **kwargs)
+    inputs = self.inputs.copy()
+    y_labels = kwargs.get(&#34;y_labels&#34;, None)
+    if frac:
+        n = int(frac * self.inputs.shape[0])
+        indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
+        inputs = inputs[indexes]
+    inputs[np.isnan(inputs)] = 0.0
+    encoded = self.model.encoder(inputs)
+    reconstructed = self.model.decoder(encoded)
+    combined = tf.concat([reconstructed, encoded], axis=1)
+    self.classification = self.model.classifier(combined).numpy().argmax(axis=1)
+    ax = plt.subplot(1, 2, 1)
+    plt.imshow(self.inputs, cmap=cmap, aspect=aspect)
+    plt.colorbar()
+    plt.title(&#34;Original Data&#34;)
+    plt.subplot(1, 2, 2, sharex=ax, sharey=ax)
+    plt.imshow(reconstructed, cmap=cmap, aspect=aspect)
+    plt.colorbar()
+    plt.title(&#34;Decoder Layer Reconstruction&#34;)
+    plt.show()
+
+    self._get_tsne_repr(inputs=inputs, frac=frac)
+    self._viz_tsne_repr(c=self.classification)
+
+    self.data = pd.DataFrame(encoded, columns=[f&#34;Feature {i}&#34; for i in range(encoded.shape[1])])
+    self.data_input = pd.DataFrame(
+        inputs,
+        columns=(
+            [f&#34;Feature {i}&#34; for i in range(inputs.shape[1])] if y_labels is None else y_labels
+        ),
+    )
+    self.data[&#34;class&#34;] = self.classification
+    self.data_input[&#34;class&#34;] = self.classification
+    radviz(self.data, &#34;class&#34;, color=self.colors)
+    plt.title(&#34;Radviz Visualization of Latent Space&#34;)
+    plt.show()
+
+    radviz(self.data_input, &#34;class&#34;, color=self.colors)
+    plt.title(&#34;Radviz Visualization of Input Data&#34;)
+    plt.show()
+    return self._statistics(self.data_input)</code></pre>
+</details>
+<div class="desc"></div>
 </dd>
 </dl>
 </dd>
@@ -590,6 +931,7 @@ containing the information needed to re-instantiate it.</p></div>
 <li><code><a title="likelihood.models.deep.autoencoders.build_model" href="#likelihood.models.deep.autoencoders.build_model">build_model</a></code></li>
 <li><code><a title="likelihood.models.deep.autoencoders.call_existing_code" href="#likelihood.models.deep.autoencoders.call_existing_code">call_existing_code</a></code></li>
 <li><code><a title="likelihood.models.deep.autoencoders.setup_model" href="#likelihood.models.deep.autoencoders.setup_model">setup_model</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.suppress_warnings" href="#likelihood.models.deep.autoencoders.suppress_warnings">suppress_warnings</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
@@ -601,6 +943,12 @@ containing the information needed to re-instantiate it.</p></div>
 <li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.call" href="#likelihood.models.deep.autoencoders.AutoClassifier.call">call</a></code></li>
 <li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.from_config" href="#likelihood.models.deep.autoencoders.AutoClassifier.from_config">from_config</a></code></li>
 <li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.get_config" href="#likelihood.models.deep.autoencoders.AutoClassifier.get_config">get_config</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="likelihood.models.deep.autoencoders.GetInsights" href="#likelihood.models.deep.autoencoders.GetInsights">GetInsights</a></code></h4>
+<ul class="">
+<li><code><a title="likelihood.models.deep.autoencoders.GetInsights.predictor_analyzer" href="#likelihood.models.deep.autoencoders.GetInsights.predictor_analyzer">predictor_analyzer</a></code></li>
 </ul>
 </li>
 </ul>
