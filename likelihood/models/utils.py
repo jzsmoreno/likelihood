@@ -1,12 +1,10 @@
-import matplotlib.pyplot as plt
 import numpy as np
-from numpy import ndarray
 
 from likelihood.tools import cal_average
 
 
 class FeaturesArima:
-    def forward(self, y_sum: ndarray, theta: list, mode: bool, noise: float):
+    def forward(self, y_sum: np.ndarray, theta: list, mode: bool, noise: float):
         if mode:
             y_vec = []
 
@@ -31,20 +29,14 @@ class FeaturesArima:
 
         return np.array(y_vec)
 
-    def integrated(self, datapoints: ndarray):
+    def integrated(self, datapoints: np.ndarray):
         datapoints = self.datapoints
-        # n = datapoints.shape[0]
-
-        # y_sum = [
-        #    ((1.0 - datapoints[i - 1] / datapoints[i]) ** self.d) * datapoints[i]
-        #    for i in range(1, n)
-        # ]
         y_sum = list(np.diff(datapoints, self.d))
         y_sum.insert(0, datapoints[0])
 
         return np.array(y_sum)
 
-    def average(self, datapoints: ndarray):
+    def average(self, datapoints: np.ndarray):
         y_sum_average = cal_average(datapoints)
         y_sum_eps = datapoints - y_sum_average
 

@@ -45,8 +45,8 @@ class DynamicGraph(FeatureSelection):
 
     def draw(self, name="graph.html", **kwargs) -> None:
         """Display the network using HTML format"""
-        spring_length = kwargs["spring_length"] if "spring_length" in kwargs else 500
-        node_distance = kwargs["node_distance"] if "node_distance" in kwargs else 100
+        spring_length = kwargs.get("spring_length", 500)
+        node_distance = kwargs.get("node_distance", 100)
         self.G.repulsion(node_distance=node_distance, spring_length=spring_length)
         self.G.show_buttons(filter_=["physics"])
         self.G.show(name)
@@ -89,5 +89,5 @@ if __name__ == "__main__":
     df["y"] = y
     # Instantiate DynamicGraph
     fs = DynamicGraph(df, n_importances=2)
-    print(fs.fit())
+    fs.fit()
     fs.draw()
