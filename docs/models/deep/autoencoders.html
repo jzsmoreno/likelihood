@@ -111,6 +111,11 @@ el.replaceWith(d);
         if &#34;num_layers&#34; not in hyperparameters_keys
         else hyperparameters[&#34;num_layers&#34;]
     )
+    dropout = (
+        hp.Float(&#34;dropout&#34;, min_value=0.1, max_value=0.9, sampling=&#34;log&#34;)
+        if &#34;dropout&#34; not in hyperparameters_keys
+        else hyperparameters[&#34;dropout&#34;]
+    )
 
     model = call_existing_code(
         units=units,
@@ -120,6 +125,7 @@ el.replaceWith(d);
         input_shape_parm=input_shape_parm,
         num_classes=num_classes,
         num_layers=num_layers,
+        dropout=dropout,
     )
     return model</code></pre>
 </details>
@@ -142,7 +148,7 @@ The hyperparameters to set.</p>
 The neural network model.</p></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.call_existing_code"><code class="name flex">
-<span>def <span class="ident">call_existing_code</span></span>(<span>units: int,<br>activation: str,<br>threshold: float,<br>optimizer: str,<br>input_shape_parm: None | int = None,<br>num_classes: None | int = None,<br>num_layers: int = 1) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
+<span>def <span class="ident">call_existing_code</span></span>(<span>units: int,<br>activation: str,<br>threshold: float,<br>optimizer: str,<br>input_shape_parm: None | int = None,<br>num_classes: None | int = None,<br>num_layers: int = 1,<br>**kwargs) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
 </code></dt>
 <dd>
 <details class="source">
@@ -157,6 +163,7 @@ The neural network model.</p></div>
     input_shape_parm: None | int = None,
     num_classes: None | int = None,
     num_layers: int = 1,
+    **kwargs,
 ) -&gt; AutoClassifier:
     &#34;&#34;&#34;
     Calls an existing AutoClassifier instance.
@@ -181,12 +188,14 @@ The neural network model.</p></div>
     `AutoClassifier`
         The AutoClassifier instance.
     &#34;&#34;&#34;
+    dropout = kwargs.get(&#34;dropout&#34;, None)
     model = AutoClassifier(
         input_shape_parm=input_shape_parm,
         num_classes=num_classes,
         units=units,
         activation=activation,
         num_layers=num_layers,
+        dropout=dropout,
     )
     model.compile(
         optimizer=optimizer,
@@ -472,6 +481,8 @@ class AutoClassifier(tf.keras.Model):
             The activation function to use for the classifier layer. Default is &#34;softmax&#34;. If the activation function is not a classification function, the model can be used in regression problems.
         num_layers : `int`
             The number of hidden layers in the classifier. Default is 1.
+        dropout : `float`
+            The dropout rate to use in the classifier. Default is None.
         &#34;&#34;&#34;
         super(AutoClassifier, self).__init__()
         self.input_shape_parm = input_shape_parm
@@ -484,6 +495,7 @@ class AutoClassifier(tf.keras.Model):
         self.classifier = None
         self.classifier_activation = kwargs.get(&#34;classifier_activation&#34;, &#34;softmax&#34;)
         self.num_layers = kwargs.get(&#34;num_layers&#34;, 1)
+        self.dropout = kwargs.get(&#34;dropout&#34;, None)
 
     def build(self, input_shape):
         self.encoder = tf.keras.Sequential(
@@ -506,6 +518,8 @@ class AutoClassifier(tf.keras.Model):
                 self.classifier.add(
                     tf.keras.layers.Dense(units=self.units, activation=self.activation)
                 )
+                if self.dropout:
+                    self.classifier.add(tf.keras.layers.Dropout(self.dropout))
         self.classifier.add(
             tf.keras.layers.Dense(units=self.num_classes, activation=self.classifier_activation)
         )
@@ -525,6 +539,7 @@ class AutoClassifier(tf.keras.Model):
             &#34;activation&#34;: self.activation,
             &#34;classifier_activation&#34;: self.classifier_activation,
             &#34;num_layers&#34;: self.num_layers,
+            &#34;dropout&#34;: self.dropout,
         }
         base_config = super(AutoClassifier, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -538,6 +553,7 @@ class AutoClassifier(tf.keras.Model):
             activation=config[&#34;activation&#34;],
             classifier_activation=config[&#34;classifier_activation&#34;],
             num_layers=config[&#34;num_layers&#34;],
+            dropout=config[&#34;dropout&#34;],
         )</code></pre>
 </details>
 <div class="desc"><p>An auto-classifier model that automatically determines the best classification strategy based on the input data.</p>
@@ -571,7 +587,9 @@ from_config(cls, config): Recreates an instance of AutoClassifier from its confi
 <p>classifier_activation : <code>str</code>
 The activation function to use for the classifier layer. Default is "softmax". If the activation function is not a classification function, the model can be used in regression problems.
 num_layers : <code>int</code>
-The number of hidden layers in the classifier. Default is 1.</p></div>
+The number of hidden layers in the classifier. Default is 1.
+dropout : <code>float</code>
+The dropout rate to use in the classifier. Default is None.</p></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li>keras.src.models.model.Model</li>
@@ -639,6 +657,8 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
             self.classifier.add(
                 tf.keras.layers.Dense(units=self.units, activation=self.activation)
             )
+            if self.dropout:
+                self.classifier.add(tf.keras.layers.Dropout(self.dropout))
     self.classifier.add(
         tf.keras.layers.Dense(units=self.num_classes, activation=self.classifier_activation)
     )</code></pre>
@@ -678,6 +698,7 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
         &#34;activation&#34;: self.activation,
         &#34;classifier_activation&#34;: self.classifier_activation,
         &#34;num_layers&#34;: self.num_layers,
+        &#34;dropout&#34;: self.dropout,
     }
     base_config = super(AutoClassifier, self).get_config()
     return dict(list(base_config.items()) + list(config.items()))</code></pre>
@@ -703,10 +724,8 @@ containing the information needed to re-instantiate it.</p></div>
         self.model = model
         self.encoder_layer = self.model.encoder.layers[0]
         self.decoder_layer = self.model.decoder.layers[0]
-        self.classifier_layer = self.model.classifier.layers[-2]
         self.encoder_weights = self.encoder_layer.get_weights()[0]
         self.decoder_weights = self.decoder_layer.get_weights()[0]
-        self.classifier_weights = self.classifier_layer.get_weights()[0]
         colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 
         by_hsv = sorted(

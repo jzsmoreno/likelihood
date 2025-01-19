@@ -105,7 +105,7 @@ el.replaceWith(d);
 
     assert len(df_categorical) &gt; 0
 
-    similarity = kwargs[&#34;similarity&#34;] if &#34;similarity&#34; in kwargs else len(df_categorical.columns) - 1
+    similarity = kwargs.get(&#34;similarity&#34;, len(df_categorical.columns) - 1)
     assert similarity &lt;= df_categorical.shape[1]
 
     adj_dict = {}

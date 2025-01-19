@@ -92,8 +92,8 @@ el.replaceWith(d);
 
     def draw(self, name=&#34;graph.html&#34;, **kwargs) -&gt; None:
         &#34;&#34;&#34;Display the network using HTML format&#34;&#34;&#34;
-        spring_length = kwargs[&#34;spring_length&#34;] if &#34;spring_length&#34; in kwargs else 500
-        node_distance = kwargs[&#34;node_distance&#34;] if &#34;node_distance&#34; in kwargs else 100
+        spring_length = kwargs.get(&#34;spring_length&#34;, 500)
+        node_distance = kwargs.get(&#34;node_distance&#34;, 100)
         self.G.repulsion(node_distance=node_distance, spring_length=spring_length)
         self.G.show_buttons(filter_=[&#34;physics&#34;])
         self.G.show(name)
@@ -140,8 +140,8 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def draw(self, name=&#34;graph.html&#34;, **kwargs) -&gt; None:
     &#34;&#34;&#34;Display the network using HTML format&#34;&#34;&#34;
-    spring_length = kwargs[&#34;spring_length&#34;] if &#34;spring_length&#34; in kwargs else 500
-    node_distance = kwargs[&#34;node_distance&#34;] if &#34;node_distance&#34; in kwargs else 100
+    spring_length = kwargs.get(&#34;spring_length&#34;, 500)
+    node_distance = kwargs.get(&#34;node_distance&#34;, 100)
     self.G.repulsion(node_distance=node_distance, spring_length=spring_length)
     self.G.show_buttons(filter_=[&#34;physics&#34;])
     self.G.show(name)
