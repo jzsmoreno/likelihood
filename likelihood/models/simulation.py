@@ -2,31 +2,25 @@ import pickle
 import warnings
 from typing import List, Tuple, Union
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pandas.core.frame import DataFrame
 
 from likelihood.tools import DataScaler, FeatureSelection, OneHotEncoder, cdf, check_nan_inf
 
-# Suppress RankWarning
 warnings.simplefilter("ignore", np.RankWarning)
 
 
 # --------------------------------------------------------------------------------------------------------------------------------------
 def categories_by_quartile(df: DataFrame, column: str) -> Tuple[str, str]:
-    # Count the frequency of each category in the column
     freq = df[column].value_counts()
 
-    # Calculate the 25th percentile (Q1) and 75th percentile (Q3)
     q1 = freq.quantile(0.25)
     q3 = freq.quantile(0.75)
 
-    # Filter categories that are below the 25th percentile and above the 75th percentile
     least_frequent = freq[freq <= q1]
     most_frequent = freq[freq >= q3]
 
-    # Get the least frequent category (25th percentile) and the most frequent category (75th percentile)
     least_frequent_category = least_frequent.idxmin() if not least_frequent.empty else None
     most_frequent_category = most_frequent.idxmax() if not most_frequent.empty else None
 

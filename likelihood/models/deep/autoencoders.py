@@ -79,6 +79,8 @@ class AutoClassifier(tf.keras.Model):
             The activation function to use for the classifier layer. Default is "softmax". If the activation function is not a classification function, the model can be used in regression problems.
         num_layers : `int`
             The number of hidden layers in the classifier. Default is 1.
+        dropout : `float`
+            The dropout rate to use in the classifier. Default is None.
         """
         super(AutoClassifier, self).__init__()
         self.input_shape_parm = input_shape_parm
@@ -91,6 +93,7 @@ class AutoClassifier(tf.keras.Model):
         self.classifier = None
         self.classifier_activation = kwargs.get("classifier_activation", "softmax")
         self.num_layers = kwargs.get("num_layers", 1)
+        self.dropout = kwargs.get("dropout", None)
 
     def build(self, input_shape):
         self.encoder = tf.keras.Sequential(
@@ -113,6 +116,8 @@ class AutoClassifier(tf.keras.Model):
                 self.classifier.add(
                     tf.keras.layers.Dense(units=self.units, activation=self.activation)
                 )
+                if self.dropout:
+                    self.classifier.add(tf.keras.layers.Dropout(self.dropout))
         self.classifier.add(
             tf.keras.layers.Dense(units=self.num_classes, activation=self.classifier_activation)
         )
@@ -132,6 +137,7 @@ class AutoClassifier(tf.keras.Model):
             "activation": self.activation,
             "classifier_activation": self.classifier_activation,
             "num_layers": self.num_layers,
+            "dropout": self.dropout,
         }
         base_config = super(AutoClassifier, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -145,6 +151,7 @@ class AutoClassifier(tf.keras.Model):
             activation=config["activation"],
             classifier_activation=config["classifier_activation"],
             num_layers=config["num_layers"],
+            dropout=config["dropout"],
         )
 
 
@@ -156,6 +163,7 @@ def call_existing_code(
     input_shape_parm: None | int = None,
     num_classes: None | int = None,
     num_layers: int = 1,
+    **kwargs,
 ) -> AutoClassifier:
     """
     Calls an existing AutoClassifier instance.
@@ -180,12 +188,14 @@ def call_existing_code(
     `AutoClassifier`
         The AutoClassifier instance.
     """
+    dropout = kwargs.get("dropout", None)
     model = AutoClassifier(
         input_shape_parm=input_shape_parm,
         num_classes=num_classes,
         units=units,
         activation=activation,
         num_layers=num_layers,
+        dropout=dropout,
     )
     model.compile(
         optimizer=optimizer,
@@ -254,6 +264,11 @@ def build_model(
         if "num_layers" not in hyperparameters_keys
         else hyperparameters["num_layers"]
     )
+    dropout = (
+        hp.Float("dropout", min_value=0.1, max_value=0.9, sampling="log")
+        if "dropout" not in hyperparameters_keys
+        else hyperparameters["dropout"]
+    )
 
     model = call_existing_code(
         units=units,
@@ -263,6 +278,7 @@ def build_model(
         input_shape_parm=input_shape_parm,
         num_classes=num_classes,
         num_layers=num_layers,
+        dropout=dropout,
     )
     return model
 
@@ -408,10 +424,8 @@ class GetInsights:
         self.model = model
         self.encoder_layer = self.model.encoder.layers[0]
         self.decoder_layer = self.model.decoder.layers[0]
-        self.classifier_layer = self.model.classifier.layers[-2]
         self.encoder_weights = self.encoder_layer.get_weights()[0]
         self.decoder_weights = self.decoder_layer.get_weights()[0]
-        self.classifier_weights = self.classifier_layer.get_weights()[0]
         colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 
         by_hsv = sorted(
@@ -580,7 +594,12 @@ if __name__ == "__main__":
     y = np.asarray(y).astype(np.float32)
 
     model = AutoClassifier(
-        input_shape_parm=X.shape[1], num_classes=3, units=27, activation="selu", num_layers=2
+        input_shape_parm=X.shape[1],
+        num_classes=3,
+        units=27,
+        activation="tanh",
+        num_layers=2,
+        dropout=0.2,
     )
     model.compile(
         optimizer="adam",

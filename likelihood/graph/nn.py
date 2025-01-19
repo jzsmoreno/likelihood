@@ -96,7 +96,7 @@ def cal_adjacency_matrix(
 
     assert len(df_categorical) > 0
 
-    similarity = kwargs["similarity"] if "similarity" in kwargs else len(df_categorical.columns) - 1
+    similarity = kwargs.get("similarity", len(df_categorical.columns) - 1)
     assert similarity <= df_categorical.shape[1]
 
     adj_dict = {}
