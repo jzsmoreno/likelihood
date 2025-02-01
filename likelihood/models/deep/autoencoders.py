@@ -21,6 +21,7 @@ import keras_tuner
 import tensorflow as tf
 from pandas.core.frame import DataFrame
 from sklearn.manifold import TSNE
+from tensorflow.keras.regularizers import l2
 
 from likelihood.tools import OneHotEncoder
 
@@ -81,6 +82,8 @@ class AutoClassifier(tf.keras.Model):
             The number of hidden layers in the classifier. Default is 1.
         dropout : `float`
             The dropout rate to use in the classifier. Default is None.
+        l2_reg : `float`
+            The L2 regularization parameter. Default is 0.0.
         """
         super(AutoClassifier, self).__init__()
         self.input_shape_parm = input_shape_parm
@@ -94,32 +97,56 @@ class AutoClassifier(tf.keras.Model):
         self.classifier_activation = kwargs.get("classifier_activation", "softmax")
         self.num_layers = kwargs.get("num_layers", 1)
         self.dropout = kwargs.get("dropout", None)
+        self.l2_reg = kwargs.get("l2_reg", 0.0)
 
     def build(self, input_shape):
+        # Encoder with L2 regularization
         self.encoder = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(units=self.units, activation=self.activation),
-                tf.keras.layers.Dense(units=int(self.units / 2), activation=self.activation),
+                tf.keras.layers.Dense(
+                    units=self.units, activation=self.activation, kernel_regularizer=l2(self.l2_reg)
+                ),
+                tf.keras.layers.Dense(
+                    units=int(self.units / 2),
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                ),
             ]
         )
 
+        # Decoder with L2 regularization
         self.decoder = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(units=self.units, activation=self.activation),
-                tf.keras.layers.Dense(units=self.input_shape_parm, activation=self.activation),
+                tf.keras.layers.Dense(
+                    units=self.units, activation=self.activation, kernel_regularizer=l2(self.l2_reg)
+                ),
+                tf.keras.layers.Dense(
+                    units=self.input_shape_parm,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                ),
             ]
         )
 
+        # Classifier with L2 regularization
         self.classifier = tf.keras.Sequential()
         if self.num_layers > 1:
             for _ in range(self.num_layers - 1):
                 self.classifier.add(
-                    tf.keras.layers.Dense(units=self.units, activation=self.activation)
+                    tf.keras.layers.Dense(
+                        units=self.units,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    )
                 )
                 if self.dropout:
                     self.classifier.add(tf.keras.layers.Dropout(self.dropout))
         self.classifier.add(
-            tf.keras.layers.Dense(units=self.num_classes, activation=self.classifier_activation)
+            tf.keras.layers.Dense(
+                units=self.num_classes,
+                activation=self.classifier_activation,
+                kernel_regularizer=l2(self.l2_reg),
+            )
         )
 
     def call(self, x):
@@ -128,6 +155,24 @@ class AutoClassifier(tf.keras.Model):
         combined = tf.concat([decoded, encoded], axis=1)
         classification = self.classifier(combined)
         return classification
+
+    def freeze_encoder_decoder(self):
+        """
+        Freezes the encoder and decoder layers to prevent them from being updated during training.
+        """
+        for layer in self.encoder.layers:
+            layer.trainable = False
+        for layer in self.decoder.layers:
+            layer.trainable = False
+
+    def unfreeze_encoder_decoder(self):
+        """
+        Unfreezes the encoder and decoder layers allowing them to be updated during training.
+        """
+        for layer in self.encoder.layers:
+            layer.trainable = True
+        for layer in self.decoder.layers:
+            layer.trainable = True
 
     def get_config(self):
         config = {
@@ -138,6 +183,7 @@ class AutoClassifier(tf.keras.Model):
             "classifier_activation": self.classifier_activation,
             "num_layers": self.num_layers,
             "dropout": self.dropout,
+            "l2_reg": self.l2_reg,
         }
         base_config = super(AutoClassifier, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -189,6 +235,7 @@ def call_existing_code(
         The AutoClassifier instance.
     """
     dropout = kwargs.get("dropout", None)
+    l2_reg = kwargs.get("l2_reg", 0.0)
     model = AutoClassifier(
         input_shape_parm=input_shape_parm,
         num_classes=num_classes,
@@ -196,6 +243,7 @@ def call_existing_code(
         activation=activation,
         num_layers=num_layers,
         dropout=dropout,
+        l2_reg=l2_reg,
     )
     model.compile(
         optimizer=optimizer,
@@ -242,32 +290,65 @@ def build_model(
             step=2,
         )
         if "units" not in hyperparameters_keys
-        else hyperparameters["units"]
+        else (
+            hp.Choice("units", hyperparameters["units"])
+            if isinstance(hyperparameters["units"], list)
+            else hyperparameters["units"]
+        )
     )
     activation = (
         hp.Choice("activation", ["sigmoid", "relu", "tanh", "selu", "softplus", "softsign"])
         if "activation" not in hyperparameters_keys
-        else hyperparameters["activation"]
+        else (
+            hp.Choice("activation", hyperparameters["activation"])
+            if isinstance(hyperparameters["activation"], list)
+            else hyperparameters["activation"]
+        )
     )
     optimizer = (
         hp.Choice("optimizer", ["sgd", "adam", "adadelta", "rmsprop", "adamax", "adagrad"])
         if "optimizer" not in hyperparameters_keys
-        else hyperparameters["optimizer"]
+        else (
+            hp.Choice("optimizer", hyperparameters["optimizer"])
+            if isinstance(hyperparameters["optimizer"], list)
+            else hyperparameters["optimizer"]
+        )
     )
     threshold = (
         hp.Float("threshold", min_value=0.1, max_value=0.9, sampling="log")
         if "threshold" not in hyperparameters_keys
-        else hyperparameters["threshold"]
+        else (
+            hp.Choice("threshold", hyperparameters["threshold"])
+            if isinstance(hyperparameters["threshold"], list)
+            else hyperparameters["threshold"]
+        )
     )
     num_layers = (
         hp.Int("num_layers", min_value=1, max_value=10, step=1)
         if "num_layers" not in hyperparameters_keys
-        else hyperparameters["num_layers"]
+        else (
+            hp.Choice("num_layers", hyperparameters["num_layers"])
+            if isinstance(hyperparameters["num_layers"], list)
+            else hyperparameters["num_layers"]
+        )
     )
     dropout = (
         hp.Float("dropout", min_value=0.1, max_value=0.9, sampling="log")
         if "dropout" not in hyperparameters_keys
-        else hyperparameters["dropout"]
+        else (
+            hp.Choice("dropout", hyperparameters["dropout"])
+            if isinstance(hyperparameters["dropout"], list)
+            else hyperparameters["dropout"]
+        )
+    )
+    l2_reg = (
+        hp.Float("l2_reg", min_value=1e-6, max_value=0.1, sampling="log")
+        if "l2_reg" not in hyperparameters_keys
+        else (
+            hp.Choice("l2_reg", hyperparameters["l2_reg"])
+            if isinstance(hyperparameters["l2_reg"], list)
+            else hyperparameters["l2_reg"]
+        )
     )
 
     model = call_existing_code(
@@ -279,6 +360,7 @@ def build_model(
         num_classes=num_classes,
         num_layers=num_layers,
         dropout=dropout,
+        l2_reg=l2_reg,
     )
     return model
 
@@ -477,11 +559,31 @@ class GetInsights:
         )
         self.data["class"] = self.classification
         self.data_input["class"] = self.classification
-        radviz(self.data, "class", color=self.colors)
+
+        self.data_normalized = self.data.copy(deep=True)
+        self.data_normalized.iloc[:, :-1] = (
+            2.0
+            * (self.data_normalized.iloc[:, :-1] - self.data_normalized.iloc[:, :-1].min())
+            / (self.data_normalized.iloc[:, :-1].max() - self.data_normalized.iloc[:, :-1].min())
+            - 1
+        )
+        radviz(self.data_normalized, "class", color=self.colors)
         plt.title("Radviz Visualization of Latent Space")
         plt.show()
-
-        radviz(self.data_input, "class", color=self.colors)
+        self.data_input_normalized = self.data_input.copy(deep=True)
+        self.data_input_normalized.iloc[:, :-1] = (
+            2.0
+            * (
+                self.data_input_normalized.iloc[:, :-1]
+                - self.data_input_normalized.iloc[:, :-1].min()
+            )
+            / (
+                self.data_input_normalized.iloc[:, :-1].max()
+                - self.data_input_normalized.iloc[:, :-1].min()
+            )
+            - 1
+        )
+        radviz(self.data_input_normalized, "class", color=self.colors)
         plt.title("Radviz Visualization of Input Data")
         plt.show()
         return self._statistics(self.data_input)

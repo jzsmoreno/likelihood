@@ -129,7 +129,7 @@ dmypy.json
 *.sql
 /*.html
 
-*best_model*
+*_model*
 *my_dir*
 # Ignore <files>.txt for testing
 /examples/*.txt
