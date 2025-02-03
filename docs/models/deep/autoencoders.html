@@ -89,32 +89,65 @@ el.replaceWith(d);
             step=2,
         )
         if &#34;units&#34; not in hyperparameters_keys
-        else hyperparameters[&#34;units&#34;]
+        else (
+            hp.Choice(&#34;units&#34;, hyperparameters[&#34;units&#34;])
+            if isinstance(hyperparameters[&#34;units&#34;], list)
+            else hyperparameters[&#34;units&#34;]
+        )
     )
     activation = (
         hp.Choice(&#34;activation&#34;, [&#34;sigmoid&#34;, &#34;relu&#34;, &#34;tanh&#34;, &#34;selu&#34;, &#34;softplus&#34;, &#34;softsign&#34;])
         if &#34;activation&#34; not in hyperparameters_keys
-        else hyperparameters[&#34;activation&#34;]
+        else (
+            hp.Choice(&#34;activation&#34;, hyperparameters[&#34;activation&#34;])
+            if isinstance(hyperparameters[&#34;activation&#34;], list)
+            else hyperparameters[&#34;activation&#34;]
+        )
     )
     optimizer = (
         hp.Choice(&#34;optimizer&#34;, [&#34;sgd&#34;, &#34;adam&#34;, &#34;adadelta&#34;, &#34;rmsprop&#34;, &#34;adamax&#34;, &#34;adagrad&#34;])
         if &#34;optimizer&#34; not in hyperparameters_keys
-        else hyperparameters[&#34;optimizer&#34;]
+        else (
+            hp.Choice(&#34;optimizer&#34;, hyperparameters[&#34;optimizer&#34;])
+            if isinstance(hyperparameters[&#34;optimizer&#34;], list)
+            else hyperparameters[&#34;optimizer&#34;]
+        )
     )
     threshold = (
         hp.Float(&#34;threshold&#34;, min_value=0.1, max_value=0.9, sampling=&#34;log&#34;)
         if &#34;threshold&#34; not in hyperparameters_keys
-        else hyperparameters[&#34;threshold&#34;]
+        else (
+            hp.Choice(&#34;threshold&#34;, hyperparameters[&#34;threshold&#34;])
+            if isinstance(hyperparameters[&#34;threshold&#34;], list)
+            else hyperparameters[&#34;threshold&#34;]
+        )
     )
     num_layers = (
         hp.Int(&#34;num_layers&#34;, min_value=1, max_value=10, step=1)
         if &#34;num_layers&#34; not in hyperparameters_keys
-        else hyperparameters[&#34;num_layers&#34;]
+        else (
+            hp.Choice(&#34;num_layers&#34;, hyperparameters[&#34;num_layers&#34;])
+            if isinstance(hyperparameters[&#34;num_layers&#34;], list)
+            else hyperparameters[&#34;num_layers&#34;]
+        )
     )
     dropout = (
         hp.Float(&#34;dropout&#34;, min_value=0.1, max_value=0.9, sampling=&#34;log&#34;)
         if &#34;dropout&#34; not in hyperparameters_keys
-        else hyperparameters[&#34;dropout&#34;]
+        else (
+            hp.Choice(&#34;dropout&#34;, hyperparameters[&#34;dropout&#34;])
+            if isinstance(hyperparameters[&#34;dropout&#34;], list)
+            else hyperparameters[&#34;dropout&#34;]
+        )
+    )
+    l2_reg = (
+        hp.Float(&#34;l2_reg&#34;, min_value=1e-6, max_value=0.1, sampling=&#34;log&#34;)
+        if &#34;l2_reg&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;l2_reg&#34;, hyperparameters[&#34;l2_reg&#34;])
+            if isinstance(hyperparameters[&#34;l2_reg&#34;], list)
+            else hyperparameters[&#34;l2_reg&#34;]
+        )
     )
 
     model = call_existing_code(
@@ -126,6 +159,7 @@ el.replaceWith(d);
         num_classes=num_classes,
         num_layers=num_layers,
         dropout=dropout,
+        l2_reg=l2_reg,
     )
     return model</code></pre>
 </details>
@@ -189,6 +223,7 @@ The neural network model.</p></div>
         The AutoClassifier instance.
     &#34;&#34;&#34;
     dropout = kwargs.get(&#34;dropout&#34;, None)
+    l2_reg = kwargs.get(&#34;l2_reg&#34;, 0.0)
     model = AutoClassifier(
         input_shape_parm=input_shape_parm,
         num_classes=num_classes,
@@ -196,6 +231,7 @@ The neural network model.</p></div>
         activation=activation,
         num_layers=num_layers,
         dropout=dropout,
+        l2_reg=l2_reg,
     )
     model.compile(
         optimizer=optimizer,
@@ -483,6 +519,8 @@ class AutoClassifier(tf.keras.Model):
             The number of hidden layers in the classifier. Default is 1.
         dropout : `float`
             The dropout rate to use in the classifier. Default is None.
+        l2_reg : `float`
+            The L2 regularization parameter. Default is 0.0.
         &#34;&#34;&#34;
         super(AutoClassifier, self).__init__()
         self.input_shape_parm = input_shape_parm
@@ -496,32 +534,68 @@ class AutoClassifier(tf.keras.Model):
         self.classifier_activation = kwargs.get(&#34;classifier_activation&#34;, &#34;softmax&#34;)
         self.num_layers = kwargs.get(&#34;num_layers&#34;, 1)
         self.dropout = kwargs.get(&#34;dropout&#34;, None)
+        self.l2_reg = kwargs.get(&#34;l2_reg&#34;, 0.0)
 
     def build(self, input_shape):
-        self.encoder = tf.keras.Sequential(
-            [
-                tf.keras.layers.Dense(units=self.units, activation=self.activation),
-                tf.keras.layers.Dense(units=int(self.units / 2), activation=self.activation),
-            ]
+        # Encoder with L2 regularization
+        self.encoder = (
+            tf.keras.Sequential(
+                [
+                    tf.keras.layers.Dense(
+                        units=self.units,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                    tf.keras.layers.Dense(
+                        units=int(self.units / 2),
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                ]
+            )
+            if not self.encoder
+            else self.encoder
         )
 
-        self.decoder = tf.keras.Sequential(
-            [
-                tf.keras.layers.Dense(units=self.units, activation=self.activation),
-                tf.keras.layers.Dense(units=self.input_shape_parm, activation=self.activation),
-            ]
+        # Decoder with L2 regularization
+        self.decoder = (
+            tf.keras.Sequential(
+                [
+                    tf.keras.layers.Dense(
+                        units=self.units,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                    tf.keras.layers.Dense(
+                        units=self.input_shape_parm,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                ]
+            )
+            if not self.decoder
+            else self.decoder
         )
 
+        # Classifier with L2 regularization
         self.classifier = tf.keras.Sequential()
         if self.num_layers &gt; 1:
             for _ in range(self.num_layers - 1):
                 self.classifier.add(
-                    tf.keras.layers.Dense(units=self.units, activation=self.activation)
+                    tf.keras.layers.Dense(
+                        units=self.units,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    )
                 )
                 if self.dropout:
                     self.classifier.add(tf.keras.layers.Dropout(self.dropout))
         self.classifier.add(
-            tf.keras.layers.Dense(units=self.num_classes, activation=self.classifier_activation)
+            tf.keras.layers.Dense(
+                units=self.num_classes,
+                activation=self.classifier_activation,
+                kernel_regularizer=l2(self.l2_reg),
+            )
         )
 
     def call(self, x):
@@ -530,6 +604,84 @@ class AutoClassifier(tf.keras.Model):
         combined = tf.concat([decoded, encoded], axis=1)
         classification = self.classifier(combined)
         return classification
+
+    def freeze_encoder_decoder(self):
+        &#34;&#34;&#34;
+        Freezes the encoder and decoder layers to prevent them from being updated during training.
+        &#34;&#34;&#34;
+        for layer in self.encoder.layers:
+            layer.trainable = False
+        for layer in self.decoder.layers:
+            layer.trainable = False
+
+    def unfreeze_encoder_decoder(self):
+        &#34;&#34;&#34;
+        Unfreezes the encoder and decoder layers allowing them to be updated during training.
+        &#34;&#34;&#34;
+        for layer in self.encoder.layers:
+            layer.trainable = True
+        for layer in self.decoder.layers:
+            layer.trainable = True
+
+    def set_encoder_decoder(self, source_model):
+        &#34;&#34;&#34;
+        Sets the encoder and decoder layers from another AutoClassifier instance,
+        ensuring compatibility in dimensions.
+
+        Parameters:
+        -----------
+        source_model : AutoClassifier
+            The source model to copy the encoder and decoder layers from.
+
+        Raises:
+        -------
+        ValueError
+            If the input shape or units of the source model do not match.
+        &#34;&#34;&#34;
+        if not isinstance(source_model, AutoClassifier):
+            raise ValueError(&#34;Source model must be an instance of AutoClassifier.&#34;)
+
+        # Check compatibility in input shape and units
+        if self.input_shape_parm != source_model.input_shape_parm:
+            raise ValueError(
+                f&#34;Incompatible input shape. Expected {self.input_shape_parm}, got {source_model.input_shape_parm}.&#34;
+            )
+        if self.units != source_model.units:
+            raise ValueError(
+                f&#34;Incompatible number of units. Expected {self.units}, got {source_model.units}.&#34;
+            )
+        self.encoder, self.decoder = tf.keras.Sequential(), tf.keras.Sequential()
+        # Copy the encoder layers
+        for i, layer in enumerate(source_model.encoder.layers):
+            if isinstance(layer, tf.keras.layers.Dense):  # Make sure it&#39;s a Dense layer
+                dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
+                dense_layer = tf.keras.layers.Dense(
+                    units=layer.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                )
+                dense_layer.build(dummy_input.shape)
+                self.encoder.add(dense_layer)
+                # Set the weights correctly
+                self.encoder.layers[i].set_weights(layer.get_weights())
+            elif not isinstance(layer, InputLayer):
+                raise ValueError(f&#34;Layer type {type(layer)} not supported for copying.&#34;)
+
+        # Copy the decoder layers
+        for i, layer in enumerate(source_model.decoder.layers):
+            if isinstance(layer, tf.keras.layers.Dense):  # Ensure it&#39;s a Dense layer
+                dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
+                dense_layer = tf.keras.layers.Dense(
+                    units=layer.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                )
+                dense_layer.build(dummy_input.shape)
+                self.decoder.add(dense_layer)
+                # Set the weights correctly
+                self.decoder.layers[i].set_weights(layer.get_weights())
+            elif not isinstance(layer, InputLayer):
+                raise ValueError(f&#34;Layer type {type(layer)} not supported for copying.&#34;)
 
     def get_config(self):
         config = {
@@ -540,6 +692,7 @@ class AutoClassifier(tf.keras.Model):
             &#34;classifier_activation&#34;: self.classifier_activation,
             &#34;num_layers&#34;: self.num_layers,
             &#34;dropout&#34;: self.dropout,
+            &#34;l2_reg&#34;: self.l2_reg,
         }
         base_config = super(AutoClassifier, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -554,6 +707,7 @@ class AutoClassifier(tf.keras.Model):
             classifier_activation=config[&#34;classifier_activation&#34;],
             num_layers=config[&#34;num_layers&#34;],
             dropout=config[&#34;dropout&#34;],
+            l2_reg=config[&#34;l2_reg&#34;],
         )</code></pre>
 </details>
 <div class="desc"><p>An auto-classifier model that automatically determines the best classification strategy based on the input data.</p>
@@ -589,7 +743,9 @@ The activation function to use for the classifier layer. Default is "softmax". I
 num_layers : <code>int</code>
 The number of hidden layers in the classifier. Default is 1.
 dropout : <code>float</code>
-The dropout rate to use in the classifier. Default is None.</p></div>
+The dropout rate to use in the classifier. Default is None.
+l2_reg : <code>float</code>
+The L2 regularization parameter. Default is 0.0.</p></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li>keras.src.models.model.Model</li>
@@ -637,30 +793,65 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def build(self, input_shape):
-    self.encoder = tf.keras.Sequential(
-        [
-            tf.keras.layers.Dense(units=self.units, activation=self.activation),
-            tf.keras.layers.Dense(units=int(self.units / 2), activation=self.activation),
-        ]
+    # Encoder with L2 regularization
+    self.encoder = (
+        tf.keras.Sequential(
+            [
+                tf.keras.layers.Dense(
+                    units=self.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                ),
+                tf.keras.layers.Dense(
+                    units=int(self.units / 2),
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                ),
+            ]
+        )
+        if not self.encoder
+        else self.encoder
     )
 
-    self.decoder = tf.keras.Sequential(
-        [
-            tf.keras.layers.Dense(units=self.units, activation=self.activation),
-            tf.keras.layers.Dense(units=self.input_shape_parm, activation=self.activation),
-        ]
+    # Decoder with L2 regularization
+    self.decoder = (
+        tf.keras.Sequential(
+            [
+                tf.keras.layers.Dense(
+                    units=self.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                ),
+                tf.keras.layers.Dense(
+                    units=self.input_shape_parm,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                ),
+            ]
+        )
+        if not self.decoder
+        else self.decoder
     )
 
+    # Classifier with L2 regularization
     self.classifier = tf.keras.Sequential()
     if self.num_layers &gt; 1:
         for _ in range(self.num_layers - 1):
             self.classifier.add(
-                tf.keras.layers.Dense(units=self.units, activation=self.activation)
+                tf.keras.layers.Dense(
+                    units=self.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                )
             )
             if self.dropout:
                 self.classifier.add(tf.keras.layers.Dropout(self.dropout))
     self.classifier.add(
-        tf.keras.layers.Dense(units=self.num_classes, activation=self.classifier_activation)
+        tf.keras.layers.Dense(
+            units=self.num_classes,
+            activation=self.classifier_activation,
+            kernel_regularizer=l2(self.l2_reg),
+        )
     )</code></pre>
 </details>
 <div class="desc"></div>
@@ -682,6 +873,25 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 </details>
 <div class="desc"></div>
 </dd>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.freeze_encoder_decoder"><code class="name flex">
+<span>def <span class="ident">freeze_encoder_decoder</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def freeze_encoder_decoder(self):
+    &#34;&#34;&#34;
+    Freezes the encoder and decoder layers to prevent them from being updated during training.
+    &#34;&#34;&#34;
+    for layer in self.encoder.layers:
+        layer.trainable = False
+    for layer in self.decoder.layers:
+        layer.trainable = False</code></pre>
+</details>
+<div class="desc"><p>Freezes the encoder and decoder layers to prevent them from being updated during training.</p></div>
+</dd>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier.get_config"><code class="name flex">
 <span>def <span class="ident">get_config</span></span>(<span>self)</span>
 </code></dt>
@@ -699,6 +909,7 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
         &#34;classifier_activation&#34;: self.classifier_activation,
         &#34;num_layers&#34;: self.num_layers,
         &#34;dropout&#34;: self.dropout,
+        &#34;l2_reg&#34;: self.l2_reg,
     }
     base_config = super(AutoClassifier, self).get_config()
     return dict(list(base_config.items()) + list(config.items()))</code></pre>
@@ -706,6 +917,102 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 <div class="desc"><p>Returns the config of the object.</p>
 <p>An object config is a Python dictionary (serializable)
 containing the information needed to re-instantiate it.</p></div>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.set_encoder_decoder"><code class="name flex">
+<span>def <span class="ident">set_encoder_decoder</span></span>(<span>self, source_model)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_encoder_decoder(self, source_model):
+    &#34;&#34;&#34;
+    Sets the encoder and decoder layers from another AutoClassifier instance,
+    ensuring compatibility in dimensions.
+
+    Parameters:
+    -----------
+    source_model : AutoClassifier
+        The source model to copy the encoder and decoder layers from.
+
+    Raises:
+    -------
+    ValueError
+        If the input shape or units of the source model do not match.
+    &#34;&#34;&#34;
+    if not isinstance(source_model, AutoClassifier):
+        raise ValueError(&#34;Source model must be an instance of AutoClassifier.&#34;)
+
+    # Check compatibility in input shape and units
+    if self.input_shape_parm != source_model.input_shape_parm:
+        raise ValueError(
+            f&#34;Incompatible input shape. Expected {self.input_shape_parm}, got {source_model.input_shape_parm}.&#34;
+        )
+    if self.units != source_model.units:
+        raise ValueError(
+            f&#34;Incompatible number of units. Expected {self.units}, got {source_model.units}.&#34;
+        )
+    self.encoder, self.decoder = tf.keras.Sequential(), tf.keras.Sequential()
+    # Copy the encoder layers
+    for i, layer in enumerate(source_model.encoder.layers):
+        if isinstance(layer, tf.keras.layers.Dense):  # Make sure it&#39;s a Dense layer
+            dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
+            dense_layer = tf.keras.layers.Dense(
+                units=layer.units,
+                activation=self.activation,
+                kernel_regularizer=l2(self.l2_reg),
+            )
+            dense_layer.build(dummy_input.shape)
+            self.encoder.add(dense_layer)
+            # Set the weights correctly
+            self.encoder.layers[i].set_weights(layer.get_weights())
+        elif not isinstance(layer, InputLayer):
+            raise ValueError(f&#34;Layer type {type(layer)} not supported for copying.&#34;)
+
+    # Copy the decoder layers
+    for i, layer in enumerate(source_model.decoder.layers):
+        if isinstance(layer, tf.keras.layers.Dense):  # Ensure it&#39;s a Dense layer
+            dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
+            dense_layer = tf.keras.layers.Dense(
+                units=layer.units,
+                activation=self.activation,
+                kernel_regularizer=l2(self.l2_reg),
+            )
+            dense_layer.build(dummy_input.shape)
+            self.decoder.add(dense_layer)
+            # Set the weights correctly
+            self.decoder.layers[i].set_weights(layer.get_weights())
+        elif not isinstance(layer, InputLayer):
+            raise ValueError(f&#34;Layer type {type(layer)} not supported for copying.&#34;)</code></pre>
+</details>
+<div class="desc"><p>Sets the encoder and decoder layers from another AutoClassifier instance,
+ensuring compatibility in dimensions.</p>
+<h2 id="parameters">Parameters:</h2>
+<p>source_model : AutoClassifier
+The source model to copy the encoder and decoder layers from.</p>
+<h2 id="raises">Raises:</h2>
+<p>ValueError
+If the input shape or units of the source model do not match.</p></div>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.unfreeze_encoder_decoder"><code class="name flex">
+<span>def <span class="ident">unfreeze_encoder_decoder</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def unfreeze_encoder_decoder(self):
+    &#34;&#34;&#34;
+    Unfreezes the encoder and decoder layers allowing them to be updated during training.
+    &#34;&#34;&#34;
+    for layer in self.encoder.layers:
+        layer.trainable = True
+    for layer in self.decoder.layers:
+        layer.trainable = True</code></pre>
+</details>
+<div class="desc"><p>Unfreezes the encoder and decoder layers allowing them to be updated during training.</p></div>
 </dd>
 </dl>
 </dd>
@@ -777,11 +1084,31 @@ containing the information needed to re-instantiate it.</p></div>
         )
         self.data[&#34;class&#34;] = self.classification
         self.data_input[&#34;class&#34;] = self.classification
-        radviz(self.data, &#34;class&#34;, color=self.colors)
+
+        self.data_normalized = self.data.copy(deep=True)
+        self.data_normalized.iloc[:, :-1] = (
+            2.0
+            * (self.data_normalized.iloc[:, :-1] - self.data_normalized.iloc[:, :-1].min())
+            / (self.data_normalized.iloc[:, :-1].max() - self.data_normalized.iloc[:, :-1].min())
+            - 1
+        )
+        radviz(self.data_normalized, &#34;class&#34;, color=self.colors)
         plt.title(&#34;Radviz Visualization of Latent Space&#34;)
         plt.show()
-
-        radviz(self.data_input, &#34;class&#34;, color=self.colors)
+        self.data_input_normalized = self.data_input.copy(deep=True)
+        self.data_input_normalized.iloc[:, :-1] = (
+            2.0
+            * (
+                self.data_input_normalized.iloc[:, :-1]
+                - self.data_input_normalized.iloc[:, :-1].min()
+            )
+            / (
+                self.data_input_normalized.iloc[:, :-1].max()
+                - self.data_input_normalized.iloc[:, :-1].min()
+            )
+            - 1
+        )
+        radviz(self.data_input_normalized, &#34;class&#34;, color=self.colors)
         plt.title(&#34;Radviz Visualization of Input Data&#34;)
         plt.show()
         return self._statistics(self.data_input)
@@ -919,11 +1246,31 @@ containing the information needed to re-instantiate it.</p></div>
     )
     self.data[&#34;class&#34;] = self.classification
     self.data_input[&#34;class&#34;] = self.classification
-    radviz(self.data, &#34;class&#34;, color=self.colors)
+
+    self.data_normalized = self.data.copy(deep=True)
+    self.data_normalized.iloc[:, :-1] = (
+        2.0
+        * (self.data_normalized.iloc[:, :-1] - self.data_normalized.iloc[:, :-1].min())
+        / (self.data_normalized.iloc[:, :-1].max() - self.data_normalized.iloc[:, :-1].min())
+        - 1
+    )
+    radviz(self.data_normalized, &#34;class&#34;, color=self.colors)
     plt.title(&#34;Radviz Visualization of Latent Space&#34;)
     plt.show()
-
-    radviz(self.data_input, &#34;class&#34;, color=self.colors)
+    self.data_input_normalized = self.data_input.copy(deep=True)
+    self.data_input_normalized.iloc[:, :-1] = (
+        2.0
+        * (
+            self.data_input_normalized.iloc[:, :-1]
+            - self.data_input_normalized.iloc[:, :-1].min()
+        )
+        / (
+            self.data_input_normalized.iloc[:, :-1].max()
+            - self.data_input_normalized.iloc[:, :-1].min()
+        )
+        - 1
+    )
+    radviz(self.data_input_normalized, &#34;class&#34;, color=self.colors)
     plt.title(&#34;Radviz Visualization of Input Data&#34;)
     plt.show()
     return self._statistics(self.data_input)</code></pre>
@@ -960,8 +1307,11 @@ containing the information needed to re-instantiate it.</p></div>
 <ul class="">
 <li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.build" href="#likelihood.models.deep.autoencoders.AutoClassifier.build">build</a></code></li>
 <li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.call" href="#likelihood.models.deep.autoencoders.AutoClassifier.call">call</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.freeze_encoder_decoder" href="#likelihood.models.deep.autoencoders.AutoClassifier.freeze_encoder_decoder">freeze_encoder_decoder</a></code></li>
 <li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.from_config" href="#likelihood.models.deep.autoencoders.AutoClassifier.from_config">from_config</a></code></li>
 <li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.get_config" href="#likelihood.models.deep.autoencoders.AutoClassifier.get_config">get_config</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.set_encoder_decoder" href="#likelihood.models.deep.autoencoders.AutoClassifier.set_encoder_decoder">set_encoder_decoder</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.unfreeze_encoder_decoder" href="#likelihood.models.deep.autoencoders.AutoClassifier.unfreeze_encoder_decoder">unfreeze_encoder_decoder</a></code></li>
 </ul>
 </li>
 <li>

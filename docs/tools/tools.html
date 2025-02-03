@@ -5190,6 +5190,7 @@ It receives an array of integers and returns a binary array using the one-hot en
     def f_mean(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -&gt; float:
         F_vec = self._f1_score(y_true, y_pred, labels)
         mean_f_measure = np.mean(F_vec)
+        mean_f_measure = np.around(mean_f_measure, decimals=4)
 
         for label, f_measure in zip(labels, F_vec):
             print(f&#34;F-measure of label {label} -&gt; {f_measure}&#34;)
@@ -5216,9 +5217,9 @@ It receives an array of integers and returns a binary array using the one-hot en
 
     def _summary_pred(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -&gt; None:
         count_mat = self._confu_mat(y_true, y_pred, labels)
-        print(&#34;       &#34;, &#34; | &#34;.join(f&#34;--{label}--&#34; for label in labels))
+        print(&#34; &#34; * 6, &#34; | &#34;.join(f&#34;--{label}--&#34; for label in labels))
         for i, label_i in enumerate(labels):
-            row = [f&#34;  {int(count_mat[i, j])}  &#34; for j in range(len(labels))]
+            row = [f&#34; {int(count_mat[i, j]):5d} &#34; for j in range(len(labels))]
             print(f&#34;--{label_i}--|&#34;, &#34; | &#34;.join(row))
 
     def _f1_score(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -&gt; np.ndarray:
@@ -5234,6 +5235,7 @@ It receives an array of integers and returns a binary array using the one-hot en
             count_mat.diagonal(), sum_rows, out=np.zeros_like(sum_rows), where=sum_rows != 0
         )
         f1_vec = 2 * ((precision * recall) / (precision + recall))
+        f1_vec = np.around(f1_vec, decimals=4)
 
         return f1_vec
 
@@ -5263,6 +5265,7 @@ It receives an array of integers and returns a binary array using the one-hot en
 <pre><code class="python">def f_mean(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -&gt; float:
     F_vec = self._f1_score(y_true, y_pred, labels)
     mean_f_measure = np.mean(F_vec)
+    mean_f_measure = np.around(mean_f_measure, decimals=4)
 
     for label, f_measure in zip(labels, F_vec):
         print(f&#34;F-measure of label {label} -&gt; {f_measure}&#34;)
