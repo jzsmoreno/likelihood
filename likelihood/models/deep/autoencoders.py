@@ -19,6 +19,7 @@ from functools import wraps
 
 import keras_tuner
 import tensorflow as tf
+from keras.src.engine.input_layer import InputLayer
 from pandas.core.frame import DataFrame
 from sklearn.manifold import TSNE
 from tensorflow.keras.regularizers import l2
@@ -227,7 +228,7 @@ class AutoClassifier(tf.keras.Model):
                 self.encoder.add(dense_layer)
                 # Set the weights correctly
                 self.encoder.layers[i].set_weights(layer.get_weights())
-            else:
+            elif not isinstance(layer, InputLayer):
                 raise ValueError(f"Layer type {type(layer)} not supported for copying.")
 
         # Copy the decoder layers
@@ -243,7 +244,7 @@ class AutoClassifier(tf.keras.Model):
                 self.decoder.add(dense_layer)
                 # Set the weights correctly
                 self.decoder.layers[i].set_weights(layer.get_weights())
-            else:
+            elif not isinstance(layer, InputLayer):
                 raise ValueError(f"Layer type {type(layer)} not supported for copying.")
 
     def get_config(self):
