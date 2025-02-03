@@ -19,9 +19,9 @@ from functools import wraps
 
 import keras_tuner
 import tensorflow as tf
-from keras.src.engine.input_layer import InputLayer
 from pandas.core.frame import DataFrame
 from sklearn.manifold import TSNE
+from tensorflow.keras.layers import InputLayer
 from tensorflow.keras.regularizers import l2
 
 from likelihood.tools import OneHotEncoder
