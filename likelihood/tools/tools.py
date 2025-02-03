@@ -979,6 +979,7 @@ class PerformanceMeasures:
     def f_mean(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> float:
         F_vec = self._f1_score(y_true, y_pred, labels)
         mean_f_measure = np.mean(F_vec)
+        mean_f_measure = np.around(mean_f_measure, decimals=4)
 
         for label, f_measure in zip(labels, F_vec):
             print(f"F-measure of label {label} -> {f_measure}")
@@ -1005,9 +1006,9 @@ class PerformanceMeasures:
 
     def _summary_pred(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> None:
         count_mat = self._confu_mat(y_true, y_pred, labels)
-        print("       ", " | ".join(f"--{label}--" for label in labels))
+        print(" " * 6, " | ".join(f"--{label}--" for label in labels))
         for i, label_i in enumerate(labels):
-            row = [f"  {int(count_mat[i, j])}  " for j in range(len(labels))]
+            row = [f" {int(count_mat[i, j]):5d} " for j in range(len(labels))]
             print(f"--{label_i}--|", " | ".join(row))
 
     def _f1_score(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> np.ndarray:
@@ -1023,6 +1024,7 @@ class PerformanceMeasures:
             count_mat.diagonal(), sum_rows, out=np.zeros_like(sum_rows), where=sum_rows != 0
         )
         f1_vec = 2 * ((precision * recall) / (precision + recall))
+        f1_vec = np.around(f1_vec, decimals=4)
 
         return f1_vec
 

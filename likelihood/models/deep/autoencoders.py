@@ -101,31 +101,43 @@ class AutoClassifier(tf.keras.Model):
 
     def build(self, input_shape):
         # Encoder with L2 regularization
-        self.encoder = tf.keras.Sequential(
-            [
-                tf.keras.layers.Dense(
-                    units=self.units, activation=self.activation, kernel_regularizer=l2(self.l2_reg)
-                ),
-                tf.keras.layers.Dense(
-                    units=int(self.units / 2),
-                    activation=self.activation,
-                    kernel_regularizer=l2(self.l2_reg),
-                ),
-            ]
+        self.encoder = (
+            tf.keras.Sequential(
+                [
+                    tf.keras.layers.Dense(
+                        units=self.units,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                    tf.keras.layers.Dense(
+                        units=int(self.units / 2),
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                ]
+            )
+            if not self.encoder
+            else self.encoder
         )
 
         # Decoder with L2 regularization
-        self.decoder = tf.keras.Sequential(
-            [
-                tf.keras.layers.Dense(
-                    units=self.units, activation=self.activation, kernel_regularizer=l2(self.l2_reg)
-                ),
-                tf.keras.layers.Dense(
-                    units=self.input_shape_parm,
-                    activation=self.activation,
-                    kernel_regularizer=l2(self.l2_reg),
-                ),
-            ]
+        self.decoder = (
+            tf.keras.Sequential(
+                [
+                    tf.keras.layers.Dense(
+                        units=self.units,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                    tf.keras.layers.Dense(
+                        units=self.input_shape_parm,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                ]
+            )
+            if not self.decoder
+            else self.decoder
         )
 
         # Classifier with L2 regularization
@@ -174,6 +186,66 @@ class AutoClassifier(tf.keras.Model):
         for layer in self.decoder.layers:
             layer.trainable = True
 
+    def set_encoder_decoder(self, source_model):
+        """
+        Sets the encoder and decoder layers from another AutoClassifier instance,
+        ensuring compatibility in dimensions.
+
+        Parameters:
+        -----------
+        source_model : AutoClassifier
+            The source model to copy the encoder and decoder layers from.
+
+        Raises:
+        -------
+        ValueError
+            If the input shape or units of the source model do not match.
+        """
+        if not isinstance(source_model, AutoClassifier):
+            raise ValueError("Source model must be an instance of AutoClassifier.")
+
+        # Check compatibility in input shape and units
+        if self.input_shape_parm != source_model.input_shape_parm:
+            raise ValueError(
+                f"Incompatible input shape. Expected {self.input_shape_parm}, got {source_model.input_shape_parm}."
+            )
+        if self.units != source_model.units:
+            raise ValueError(
+                f"Incompatible number of units. Expected {self.units}, got {source_model.units}."
+            )
+        self.encoder, self.decoder = tf.keras.Sequential(), tf.keras.Sequential()
+        # Copy the encoder layers
+        for i, layer in enumerate(source_model.encoder.layers):
+            if isinstance(layer, tf.keras.layers.Dense):  # Make sure it's a Dense layer
+                dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
+                dense_layer = tf.keras.layers.Dense(
+                    units=layer.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                )
+                dense_layer.build(dummy_input.shape)
+                self.encoder.add(dense_layer)
+                # Set the weights correctly
+                self.encoder.layers[i].set_weights(layer.get_weights())
+            else:
+                raise ValueError(f"Layer type {type(layer)} not supported for copying.")
+
+        # Copy the decoder layers
+        for i, layer in enumerate(source_model.decoder.layers):
+            if isinstance(layer, tf.keras.layers.Dense):  # Ensure it's a Dense layer
+                dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
+                dense_layer = tf.keras.layers.Dense(
+                    units=layer.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                )
+                dense_layer.build(dummy_input.shape)
+                self.decoder.add(dense_layer)
+                # Set the weights correctly
+                self.decoder.layers[i].set_weights(layer.get_weights())
+            else:
+                raise ValueError(f"Layer type {type(layer)} not supported for copying.")
+
     def get_config(self):
         config = {
             "input_shape_parm": self.input_shape_parm,
@@ -198,6 +270,7 @@ class AutoClassifier(tf.keras.Model):
             classifier_activation=config["classifier_activation"],
             num_layers=config["num_layers"],
             dropout=config["dropout"],
+            l2_reg=config["l2_reg"],
         )
 
 
