@@ -430,7 +430,7 @@ class AutoClassifier(tf.keras.Model):
                 break
 
             if epoch % 10 == 0 and verbose:
-                print(f"Epoch {epoch}: Loss: {loss}")
+                print(f"Epoch {epoch}: Loss: {loss:.6f}")
         self.freeze_encoder_decoder()
 
     def call(self, x):
