@@ -39,6 +39,172 @@ def suppress_warnings(func):
     return wrapper
 
 
+class EarlyStopping:
+    def __init__(self, patience=10, min_delta=0.001):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.best_loss = np.inf
+        self.counter = 0
+        self.stop_training = False
+
+    def __call__(self, current_loss):
+        if self.best_loss - current_loss > self.min_delta:
+            self.best_loss = current_loss
+            self.counter = 0
+        else:
+            self.counter += 1
+
+        if self.counter >= self.patience:
+            self.stop_training = True
+
+
+def mse_loss(y_true, y_pred):
+    """
+    Mean squared error loss function.
+
+    Parameters
+    ----------
+    y_true : `tf.Tensor`
+        The true values.
+    y_pred : `tf.Tensor`
+        The predicted values.
+
+    Returns
+    -------
+    `tf.Tensor`
+    """
+    return tf.reduce_mean(tf.square(y_true - y_pred))
+
+
+def kl_loss(mean, log_var):
+    """
+    Kullback-Leibler divergence loss function.
+
+    Parameters
+    ----------
+    mean : `tf.Tensor`
+        The mean of the distribution.
+    log_var : `tf.Tensor`
+        The log variance of the distribution.
+
+    Returns
+    -------
+    `tf.Tensor`
+    """
+    return -0.5 * tf.reduce_mean(1 + log_var - tf.square(mean) - tf.exp(log_var))
+
+
+def vae_loss(y_true, y_pred, mean, log_var):
+    """
+    Variational autoencoder loss function.
+
+    Parameters
+    ----------
+    y_true : `tf.Tensor`
+        The true values.
+    y_pred : `tf.Tensor`
+        The predicted values.
+    mean : `tf.Tensor`
+        The mean of the distribution.
+    log_var : `tf.Tensor`
+        The log variance of the distribution.
+
+    Returns
+    -------
+    `tf.Tensor`
+    """
+    return mse_loss(y_true, y_pred) + kl_loss(mean, log_var)
+
+
+def sampling(mean, log_var, epsilon_value=1e-8):
+    """
+    Samples from the distribution.
+
+    Parameters
+    ----------
+    mean : `tf.Tensor`
+        The mean of the distribution.
+    log_var : `tf.Tensor`
+        The log variance of the distribution.
+    epsilon_value : float
+        A small value to avoid numerical instability.
+
+    Returns
+    -------
+    `tf.Tensor`
+    """
+    epsilon = tf.random.normal(shape=tf.shape(mean), mean=0.0, stddev=1.0)
+    log_var = tf.clip_by_value(log_var, -10.0, 10.0)
+    stddev = tf.exp(0.5 * log_var) + epsilon_value
+    epsilon = tf.random.normal(shape=tf.shape(mean), mean=0.0, stddev=1.0)
+    return mean + stddev * epsilon
+
+
+def check_for_nans(tensors, name="Tensor"):
+    for t in tensors:
+        if tf.reduce_any(tf.math.is_nan(t)) or tf.reduce_any(tf.math.is_inf(t)):
+            print(f"Warning: {name} contains NaNs or Infs")
+            return True
+    return False
+
+
+@tf.function
+def train_step(batch, encoder, decoder, optimizer, vae_mode=False):
+    """
+    Trains the model on a batch of data.
+
+    Parameters
+    ----------
+    mean : `tf.Tensor`
+        The mean of the distribution.
+    log_var : `tf.Tensor`
+        The log variance of the distribution.
+    batch : `tf.Tensor`
+        The batch of data.
+    encoder : `tf.keras.Model`
+        The encoder model.
+    decoder : `tf.keras.Model`
+        The decoder model.
+    optimizer : `tf.keras.optimizers.Optimizer`
+        The optimizer to use.
+    vae_mode : `bool`
+        Whether to use variational autoencoder mode.
+
+    Returns
+    -------
+    `tf.Tensor`
+        The loss value.
+    """
+    optimizer.build(encoder.trainable_variables + decoder.trainable_variables)
+    clip_value = 0.5
+    with tf.GradientTape() as encoder_tape, tf.GradientTape() as decoder_tape:
+        if vae_mode:
+            mean, log_var = encoder(batch, training=True)
+            log_var = tf.clip_by_value(log_var, clip_value_min=1e-8, clip_value_max=tf.float32.max)
+            decoded = decoder(sampling(mean, log_var), training=True)
+            loss = vae_loss(batch, decoded, mean, log_var)
+        else:
+            encoded = encoder(batch, training=True)
+            decoded = decoder(encoded, training=True)
+            loss = mse_loss(batch, decoded)
+
+    gradients_of_encoder = encoder_tape.gradient(loss, encoder.trainable_variables)
+    gradients_of_decoder = decoder_tape.gradient(loss, decoder.trainable_variables)
+    gradients_of_encoder = [
+        tf.clip_by_value(g, -clip_value, clip_value) if g is not None else None
+        for g in gradients_of_encoder
+    ]
+    gradients_of_decoder = [
+        tf.clip_by_value(g, -clip_value, clip_value) if g is not None else None
+        for g in gradients_of_decoder
+    ]
+
+    optimizer.apply_gradients(zip(gradients_of_encoder, encoder.trainable_variables))
+    optimizer.apply_gradients(zip(gradients_of_decoder, decoder.trainable_variables))
+
+    return loss
+
+
 @tf.keras.utils.register_keras_serializable(package="Custom", name="AutoClassifier")
 class AutoClassifier(tf.keras.Model):
     """
@@ -85,6 +251,10 @@ class AutoClassifier(tf.keras.Model):
             The dropout rate to use in the classifier. Default is None.
         l2_reg : `float`
             The L2 regularization parameter. Default is 0.0.
+        vae_mode : `bool`
+            Whether to use variational autoencoder mode. Default is False.
+        vae_units : `int`
+            The number of units in the variational autoencoder. Default is 2.
         """
         super(AutoClassifier, self).__init__()
         self.input_shape_parm = input_shape_parm
@@ -99,9 +269,10 @@ class AutoClassifier(tf.keras.Model):
         self.num_layers = kwargs.get("num_layers", 1)
         self.dropout = kwargs.get("dropout", None)
         self.l2_reg = kwargs.get("l2_reg", 0.0)
+        self.vae_mode = kwargs.get("vae_mode", False)
+        self.vae_units = kwargs.get("vae_units", 2)
 
-    def build(self, input_shape):
-        # Encoder with L2 regularization
+    def build_encoder_decoder(self, input_shape):
         self.encoder = (
             tf.keras.Sequential(
                 [
@@ -121,7 +292,6 @@ class AutoClassifier(tf.keras.Model):
             else self.encoder
         )
 
-        # Decoder with L2 regularization
         self.decoder = (
             tf.keras.Sequential(
                 [
@@ -140,6 +310,58 @@ class AutoClassifier(tf.keras.Model):
             if not self.decoder
             else self.decoder
         )
+
+    def build(self, input_shape):
+        if self.vae_mode:
+            inputs = tf.keras.Input(shape=self.input_shape_parm, name="encoder_input")
+            x = tf.keras.layers.Dense(
+                units=self.units,
+                kernel_regularizer=l2(self.l2_reg),
+                kernel_initializer="he_normal",
+            )(inputs)
+            x = tf.keras.layers.BatchNormalization()(x)
+            x = tf.keras.layers.Activation(self.activation)(x)
+            x = tf.keras.layers.Dense(
+                units=int(self.units / 2),
+                kernel_regularizer=l2(self.l2_reg),
+                kernel_initializer="he_normal",
+                name="encoder_hidden",
+            )(x)
+            x = tf.keras.layers.BatchNormalization()(x)
+            x = tf.keras.layers.Activation(self.activation)(x)
+
+            mean = tf.keras.layers.Dense(2, name="mean")(x)
+            log_var = tf.keras.layers.Dense(2, name="log_var")(x)
+            log_var = tf.keras.layers.Lambda(lambda x: x + 1e-7)(log_var)
+
+            self.encoder = (
+                tf.keras.Model(inputs, [mean, log_var], name="encoder")
+                if not self.encoder
+                else self.encoder
+            )
+            self.decoder = (
+                tf.keras.Sequential(
+                    [
+                        tf.keras.layers.Dense(
+                            units=self.units,
+                            kernel_regularizer=l2(self.l2_reg),
+                        ),
+                        tf.keras.layers.BatchNormalization(),
+                        tf.keras.layers.Activation(self.activation),
+                        tf.keras.layers.Dense(
+                            units=self.input_shape_parm,
+                            kernel_regularizer=l2(self.l2_reg),
+                        ),
+                        tf.keras.layers.BatchNormalization(),
+                        tf.keras.layers.Activation(self.activation),
+                    ]
+                )
+                if not self.decoder
+                else self.decoder
+            )
+
+        else:
+            self.build_encoder_decoder(input_shape)
 
         # Classifier with L2 regularization
         self.classifier = tf.keras.Sequential()
@@ -162,8 +384,61 @@ class AutoClassifier(tf.keras.Model):
             )
         )
 
+    def train_encoder_decoder(self, data, epochs, batch_size, patience=10, **kwargs):
+        """
+        Trains the encoder and decoder on the input data.
+
+        Parameters
+        ----------
+        data : `tf.data.Dataset`, `np.ndarray`
+            The input data.
+        epochs : `int`
+            The number of epochs to train for.
+        batch_size : `int`
+            The batch size to use.
+        patience : `int`
+            The number of epochs to wait before early stopping.
+
+        Keyword Arguments:
+        ----------
+        Additional keyword arguments to pass to the model.
+        """
+        verbose = kwargs.get("verbose", True)
+        optimizer = kwargs.get("optimizer", tf.keras.optimizers.Adam(learning_rate=0.001))
+        dummy_input = tf.convert_to_tensor(tf.random.normal([1, self.input_shape_parm]))
+        self.build(dummy_input.shape)
+        if not self.vae_mode:
+            dummy_output = self.encoder(dummy_input)
+            self.decoder(dummy_output)
+        else:
+            mean, log_var = self.encoder(dummy_input)
+            dummy_output = sampling(mean, log_var)
+            self.decoder(dummy_output)
+
+        if isinstance(data, np.ndarray):
+            data = tf.data.Dataset.from_tensor_slices(data).batch(batch_size)
+            data = data.map(lambda x: tf.cast(x, tf.float32))
+
+        early_stopping = EarlyStopping(patience=patience)
+        for epoch in range(epochs):
+            for batch in data:
+                loss = train_step(batch, self.encoder, self.decoder, optimizer, self.vae_mode)
+            early_stopping(loss)
+
+            if early_stopping.stop_training:
+                print(f"Early stopping triggered at epoch {epoch}.")
+                break
+
+            if epoch % 10 == 0 and verbose:
+                print(f"Epoch {epoch}: Loss: {loss}")
+        self.freeze_encoder_decoder()
+
     def call(self, x):
-        encoded = self.encoder(x)
+        if self.vae_mode:
+            mean, log_var = self.encoder(x)
+            encoded = sampling(mean, log_var)
+        else:
+            encoded = self.encoder(x)
         decoded = self.decoder(encoded)
         combined = tf.concat([decoded, encoded], axis=1)
         classification = self.classifier(combined)
@@ -257,6 +532,8 @@ class AutoClassifier(tf.keras.Model):
             "num_layers": self.num_layers,
             "dropout": self.dropout,
             "l2_reg": self.l2_reg,
+            "vae_mode": self.vae_mode,
+            "vae_units": self.vae_units,
         }
         base_config = super(AutoClassifier, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -272,6 +549,8 @@ class AutoClassifier(tf.keras.Model):
             num_layers=config["num_layers"],
             dropout=config["dropout"],
             l2_reg=config["l2_reg"],
+            vae_mode=config["vae_mode"],
+            vae_units=config["vae_units"],
         )
 
 
@@ -578,7 +857,10 @@ class GetInsights:
     def __init__(self, model: AutoClassifier, inputs: np.ndarray) -> None:
         self.inputs = inputs
         self.model = model
-        self.encoder_layer = self.model.encoder.layers[0]
+        if isinstance(self.model.encoder.layers[0], InputLayer):
+            self.encoder_layer = self.model.encoder.layers[1]
+        else:
+            self.encoder_layer = self.model.encoder.layers[0]
         self.decoder_layer = self.model.decoder.layers[0]
         self.encoder_weights = self.encoder_layer.get_weights()[0]
         self.decoder_weights = self.decoder_layer.get_weights()[0]
@@ -607,7 +889,12 @@ class GetInsights:
             indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
             inputs = inputs[indexes]
         inputs[np.isnan(inputs)] = 0.0
-        encoded = self.model.encoder(inputs)
+        # check if self.model.encoder(inputs) has two outputs
+        try:
+            mean, log_var = self.model.encoder(inputs)
+            encoded = sampling(mean, log_var)
+        except:
+            encoded = self.model.encoder(inputs)
         reconstructed = self.model.decoder(encoded)
         combined = tf.concat([reconstructed, encoded], axis=1)
         self.classification = self.model.classifier(combined).numpy().argmax(axis=1)
