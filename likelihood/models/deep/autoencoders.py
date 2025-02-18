@@ -134,7 +134,6 @@ def sampling(mean, log_var, epsilon_value=1e-8):
     `tf.Tensor`
     """
     epsilon = tf.random.normal(shape=tf.shape(mean), mean=0.0, stddev=1.0)
-    log_var = tf.clip_by_value(log_var, -10.0, 10.0)
     stddev = tf.exp(0.5 * log_var) + epsilon_value
     epsilon = tf.random.normal(shape=tf.shape(mean), mean=0.0, stddev=1.0)
     return mean + stddev * epsilon
@@ -146,6 +145,43 @@ def check_for_nans(tensors, name="Tensor"):
             print(f"Warning: {name} contains NaNs or Infs")
             return True
     return False
+
+
+def cal_loss_step(batch, encoder, decoder, vae_mode=False, training=True):
+    """
+    Calculates the loss value on a batch of data.
+
+    Parameters
+    ----------
+    batch : `tf.Tensor`
+        The batch of data.
+    encoder : `tf.keras.Model`
+        The encoder model.
+    decoder : `tf.keras.Model`
+        The decoder model.
+    optimizer : `tf.keras.optimizers.Optimizer`
+        The optimizer to use.
+    vae_mode : `bool`
+        Whether to use variational autoencoder mode. Default is False.
+    training : `bool`
+        Whether the model is in training mode. Default is True.
+
+    Returns
+    -------
+    `tf.Tensor`
+        The loss value.
+    """
+    if vae_mode:
+        mean, log_var = encoder(batch, training=training)
+        log_var = tf.clip_by_value(log_var, clip_value_min=1e-8, clip_value_max=tf.float32.max)
+        decoded = decoder(sampling(mean, log_var), training=training)
+        loss = vae_loss(batch, decoded, mean, log_var)
+    else:
+        encoded = encoder(batch, training=training)
+        decoded = decoder(encoded, training=training)
+        loss = mse_loss(batch, decoded)
+
+    return loss
 
 
 @tf.function
@@ -168,7 +204,7 @@ def train_step(batch, encoder, decoder, optimizer, vae_mode=False):
     optimizer : `tf.keras.optimizers.Optimizer`
         The optimizer to use.
     vae_mode : `bool`
-        Whether to use variational autoencoder mode.
+        Whether to use variational autoencoder mode. Default is False.
 
     Returns
     -------
@@ -176,28 +212,12 @@ def train_step(batch, encoder, decoder, optimizer, vae_mode=False):
         The loss value.
     """
     optimizer.build(encoder.trainable_variables + decoder.trainable_variables)
-    clip_value = 0.5
+
     with tf.GradientTape() as encoder_tape, tf.GradientTape() as decoder_tape:
-        if vae_mode:
-            mean, log_var = encoder(batch, training=True)
-            log_var = tf.clip_by_value(log_var, clip_value_min=1e-8, clip_value_max=tf.float32.max)
-            decoded = decoder(sampling(mean, log_var), training=True)
-            loss = vae_loss(batch, decoded, mean, log_var)
-        else:
-            encoded = encoder(batch, training=True)
-            decoded = decoder(encoded, training=True)
-            loss = mse_loss(batch, decoded)
+        loss = cal_loss_step(batch, encoder, decoder, vae_mode=vae_mode)
 
     gradients_of_encoder = encoder_tape.gradient(loss, encoder.trainable_variables)
     gradients_of_decoder = decoder_tape.gradient(loss, decoder.trainable_variables)
-    gradients_of_encoder = [
-        tf.clip_by_value(g, -clip_value, clip_value) if g is not None else None
-        for g in gradients_of_encoder
-    ]
-    gradients_of_decoder = [
-        tf.clip_by_value(g, -clip_value, clip_value) if g is not None else None
-        for g in gradients_of_decoder
-    ]
 
     optimizer.apply_gradients(zip(gradients_of_encoder, encoder.trainable_variables))
     optimizer.apply_gradients(zip(gradients_of_decoder, decoder.trainable_variables))
@@ -210,52 +230,36 @@ class AutoClassifier(tf.keras.Model):
     """
     An auto-classifier model that automatically determines the best classification strategy based on the input data.
 
-    Attributes:
-        - input_shape_parm: The shape of the input data.
-        - num_classes: The number of classes in the dataset.
-        - units: The number of neurons in each hidden layer.
-        - activation: The type of activation function to use for the neural network layers.
+    Parameters
+    ----------
+    input_shape_parm : `int`
+        The shape of the input data.
+    num_classes : `int`
+        The number of classes in the dataset.
+    units : `int`
+        The number of neurons in each hidden layer.
+    activation : `str`
+        The type of activation function to use for the neural network layers.
 
-    Methods:
-        __init__(self, input_shape_parm, num_classes, units, activation): Initializes an AutoClassifier instance with the given parameters.
-        build(self, input_shape_parm): Builds the model architecture based on input_shape_parm.
-        call(self, x): Defines the forward pass of the model.
-        get_config(self): Returns the configuration of the model.
-        from_config(cls, config): Recreates an instance of AutoClassifier from its configuration.
+    Keyword Arguments:
+    ----------
+    Additional keyword arguments to pass to the model.
+
+    classifier_activation : `str`
+        The activation function to use for the classifier layer. Default is "softmax". If the activation function is not a classification function, the model can be used in regression problems.
+    num_layers : `int`
+        The number of hidden layers in the classifier. Default is 1.
+    dropout : `float`
+        The dropout rate to use in the classifier. Default is None.
+    l2_reg : `float`
+        The L2 regularization parameter. Default is 0.0.
+    vae_mode : `bool`
+        Whether to use variational autoencoder mode. Default is False.
+    vae_units : `int`
+        The number of units in the variational autoencoder. Default is 2.
     """
 
     def __init__(self, input_shape_parm, num_classes, units, activation, **kwargs):
-        """
-        Initializes an AutoClassifier instance with the given parameters.
-
-        Parameters
-        ----------
-        input_shape_parm : `int`
-            The shape of the input data.
-        num_classes : `int`
-            The number of classes in the dataset.
-        units : `int`
-            The number of neurons in each hidden layer.
-        activation : `str`
-            The type of activation function to use for the neural network layers.
-
-        Keyword Arguments:
-        ----------
-        Additional keyword arguments to pass to the model.
-
-        classifier_activation : `str`
-            The activation function to use for the classifier layer. Default is "softmax". If the activation function is not a classification function, the model can be used in regression problems.
-        num_layers : `int`
-            The number of hidden layers in the classifier. Default is 1.
-        dropout : `float`
-            The dropout rate to use in the classifier. Default is None.
-        l2_reg : `float`
-            The L2 regularization parameter. Default is 0.0.
-        vae_mode : `bool`
-            Whether to use variational autoencoder mode. Default is False.
-        vae_units : `int`
-            The number of units in the variational autoencoder. Default is 2.
-        """
         super(AutoClassifier, self).__init__()
         self.input_shape_parm = input_shape_parm
         self.num_classes = num_classes
@@ -384,7 +388,9 @@ class AutoClassifier(tf.keras.Model):
             )
         )
 
-    def train_encoder_decoder(self, data, epochs, batch_size, patience=10, **kwargs):
+    def train_encoder_decoder(
+        self, data, epochs, batch_size, validation_split=0.2, patience=10, **kwargs
+    ):
         """
         Trains the encoder and decoder on the input data.
 
@@ -396,15 +402,17 @@ class AutoClassifier(tf.keras.Model):
             The number of epochs to train for.
         batch_size : `int`
             The batch size to use.
+        validation_split : `float`
+            The proportion of the dataset to use for validation. Default is 0.2.
         patience : `int`
-            The number of epochs to wait before early stopping.
+            The number of epochs to wait before early stopping. Default is 10.
 
         Keyword Arguments:
         ----------
         Additional keyword arguments to pass to the model.
         """
         verbose = kwargs.get("verbose", True)
-        optimizer = kwargs.get("optimizer", tf.keras.optimizers.Adam(learning_rate=0.001))
+        optimizer = kwargs.get("optimizer", tf.keras.optimizers.Adam())
         dummy_input = tf.convert_to_tensor(tf.random.normal([1, self.input_shape_parm]))
         self.build(dummy_input.shape)
         if not self.vae_mode:
@@ -420,17 +428,27 @@ class AutoClassifier(tf.keras.Model):
             data = data.map(lambda x: tf.cast(x, tf.float32))
 
         early_stopping = EarlyStopping(patience=patience)
+        train_batches = data.take(int((1 - validation_split) * len(data)))
+        val_batches = data.skip(int((1 - validation_split) * len(data)))
         for epoch in range(epochs):
-            for batch in data:
-                loss = train_step(batch, self.encoder, self.decoder, optimizer, self.vae_mode)
-            early_stopping(loss)
+            for train_batch, val_batch in zip(train_batches, val_batches):
+                loss_train = train_step(
+                    train_batch, self.encoder, self.decoder, optimizer, self.vae_mode
+                )
+                loss_val = cal_loss_step(
+                    val_batch, self.encoder, self.decoder, self.vae_mode, False
+                )
+
+            early_stopping(loss_train)
 
             if early_stopping.stop_training:
                 print(f"Early stopping triggered at epoch {epoch}.")
                 break
 
             if epoch % 10 == 0 and verbose:
-                print(f"Epoch {epoch}: Loss: {loss:.6f}")
+                print(
+                    f"Epoch {epoch}: Train Loss: {loss_train:.6f} Validation Loss: {loss_val:.6f}"
+                )
         self.freeze_encoder_decoder()
 
     def call(self, x):
@@ -465,7 +483,7 @@ class AutoClassifier(tf.keras.Model):
     def set_encoder_decoder(self, source_model):
         """
         Sets the encoder and decoder layers from another AutoClassifier instance,
-        ensuring compatibility in dimensions.
+        ensuring compatibility in dimensions. Only works if vae_mode is False.
 
         Parameters:
         -----------
@@ -581,6 +599,8 @@ def call_existing_code(
         The shape of the input data.
     num_classes : `int`
         The number of classes in the dataset.
+    num_layers : `int`
+        The number of hidden layers in the classifier. Default is 1.
 
     Returns
     -------
