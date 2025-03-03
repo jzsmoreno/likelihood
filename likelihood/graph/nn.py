@@ -5,7 +5,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 import warnings
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -15,48 +15,43 @@ from pandas.core.frame import DataFrame
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 
-from likelihood.tools import generate_feature_yaml
-
 tf.get_logger().setLevel("ERROR")
 
+from likelihood.tools import LoRALayer
 
-def compare_similarity(arr1: np.ndarray, arr2: np.ndarray) -> int:
-    """Compares the similarity between two arrays of categories.
 
-    Parameters
-    ----------
-    arr1 : `ndarray`
-        The first array of categories.
-    arr2 : `ndarray`
-        The second array of categories.
+def compare_similarity(arr1: List[Any], arr2: List[Any], threshold: float = 0.05) -> int:
+    """Calculate the similarity between two arrays considering numeric values near to 1 in ratio."""
 
-    Returns
-    -------
-    count: `int`
-        The number of categories that are the same in both arrays.
-    """
+    def is_similar(a: Any, b: Any) -> bool:
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+            if a == 0 and b == 0:
+                return True
+            if a == 0 or b == 0:
+                return False
+            # For numeric values, check if their ratio is within the threshold range
+            ratio = max(a, b) / min(a, b)
+            return 1 - threshold <= ratio <= 1 + threshold
+        else:
+            return a == b
 
-    count = 0
-    for i in range(len(arr1)):
-        if arr1[i] == arr2[i]:
-            count += 1
-    return count
+    return sum(is_similar(a, b) for a, b in zip(arr1, arr2))
 
 
 def cal_adjacency_matrix(
     df: DataFrame, exclude_subset: List[str] = [], sparse: bool = True, **kwargs
 ) -> Tuple[dict, np.ndarray]:
     """Calculates the adjacency matrix for a given DataFrame.
-    The adjacency matrix is a matrix that represents the similarity between each pair of categories.
+    The adjacency matrix is a matrix that represents the similarity between each pair of features.
     The similarity is calculated using the `compare_similarity` function.
-    The resulting matrix is a square matrix with the same number of rows and columns as the input DataFrame.
+    The resulting matrix is a square matrix with the same number of rows and columns as the rows of the input DataFrame.
 
     Parameters
     ----------
     df : `DataFrame`
-        The input DataFrame containing the categories.
+        The input DataFrame containing the features.
     exclude_subset : `List[str]`, optional
-        A list of categories to exclude from the calculation of the adjacency matrix.
+        A list of features to exclude from the calculation of the adjacency matrix.
     sparse : `bool`, optional
         Whether to return a sparse matrix or a dense matrix.
     **kwargs : `dict`
@@ -65,48 +60,33 @@ def cal_adjacency_matrix(
     Keyword Arguments:
     ----------
     similarity: `int`
-        The minimum number of categories that must be the same in both arrays to be considered similar.
+        The minimum number of features that must be the same in both arrays to be considered similar.
 
     Returns
     -------
     adj_dict : `dict`
-        A dictionary containing the categories.
+        A dictionary containing the features.
     adjacency_matrix : `ndarray`
         The adjacency matrix.
     """
 
-    yaml_ = generate_feature_yaml(df)
-    categorical_columns = yaml_["categorical_features"]
     if len(exclude_subset) > 0:
-        categorical_columns = [col for col in categorical_columns if col not in exclude_subset]
-
-    if len(categorical_columns) > 1:
-        df_categorical = df[categorical_columns].copy()
+        columns = [col for col in df.columns if col not in exclude_subset]
+        df_ = df[columns].copy()
     else:
-        categorical_columns = [
-            col
-            for col in df.columns
-            if (
-                col not in exclude_subset
-                and pd.api.types.is_integer_dtype(df[col])
-                and len(df[col].unique()) > 2
-            )
-        ]
-        df_categorical = df[categorical_columns].copy()
+        df_ = df.copy()
 
-    assert len(df_categorical) > 0
+    assert len(df_) > 0
 
-    similarity = kwargs.get("similarity", len(df_categorical.columns) - 1)
-    assert similarity <= df_categorical.shape[1]
+    similarity = kwargs.get("similarity", len(df_.columns) - 1)
+    assert similarity <= df_.shape[1]
 
-    adj_dict = {}
-    for index, row in df_categorical.iterrows():
-        adj_dict[index] = row.to_list()
+    adj_dict = {index: row.tolist() for index, row in df_.iterrows()}
 
-    adjacency_matrix = np.zeros((len(df_categorical), len(df_categorical)))
+    adjacency_matrix = np.zeros((len(df_), len(df_)))
 
-    for i in range(len(df_categorical)):
-        for j in range(len(df_categorical)):
+    for i in range(len(df_)):
+        for j in range(len(df_)):
             if compare_similarity(adj_dict[i], adj_dict[j]) >= similarity:
                 adjacency_matrix[i][j] = 1
 
@@ -131,8 +111,10 @@ class Data:
         df: DataFrame,
         target: str | None = None,
         exclude_subset: List[str] = [],
+        **kwargs,
     ):
-        _, adjacency = cal_adjacency_matrix(df, exclude_subset=exclude_subset, sparse=True)
+        sparse = kwargs.get("sparse", True)
+        _, adjacency = cal_adjacency_matrix(df, exclude_subset=exclude_subset, sparse=sparse)
         if target is not None:
             X = df.drop(columns=[target] + exclude_subset)
         else:
@@ -147,16 +129,20 @@ class Data:
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="VanillaGNNLayer")
 class VanillaGNNLayer(tf.keras.layers.Layer):
-    def __init__(self, dim_in, dim_out, kernel_initializer="glorot_uniform", **kwargs):
+    def __init__(self, dim_in, dim_out, rank=None, kernel_initializer="glorot_uniform", **kwargs):
         super(VanillaGNNLayer, self).__init__(**kwargs)
         self.dim_out = dim_out
+        self.rank = rank
         self.kernel_initializer = kernel_initializer
         self.linear = None
 
     def build(self, input_shape):
-        self.linear = tf.keras.layers.Dense(
-            self.dim_out, use_bias=False, kernel_initializer=self.kernel_initializer
-        )
+        if self.rank:
+            self.linear = LoRALayer(self.dim_out, rank=self.rank)
+        else:
+            self.linear = tf.keras.layers.Dense(
+                self.dim_out, use_bias=False, kernel_initializer=self.kernel_initializer
+            )
         super(VanillaGNNLayer, self).build(input_shape)
 
     def call(self, x, adjacency):
@@ -169,8 +155,11 @@ class VanillaGNNLayer(tf.keras.layers.Layer):
         config.update(
             {
                 "dim_out": self.dim_out,
-                "kernel_initializer": tf.keras.initializers.serialize(
-                    self.linear.kernel_initializer
+                "rank": self.rank,
+                "kernel_initializer": (
+                    None
+                    if self.rank
+                    else tf.keras.initializers.serialize(self.linear.kernel_initializer)
                 ),
             }
         )
@@ -179,14 +168,16 @@ class VanillaGNNLayer(tf.keras.layers.Layer):
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="VanillaGNN")
 class VanillaGNN(tf.keras.Model):
-    def __init__(self, dim_in, dim_h, dim_out, **kwargs):
+    def __init__(self, dim_in, dim_h, dim_out, rank=2, **kwargs):
         super(VanillaGNN, self).__init__(**kwargs)
         self.dim_in = dim_in
         self.dim_h = dim_h
         self.dim_out = dim_out
-        self.gnn1 = VanillaGNNLayer(self.dim_in, self.dim_h)
-        self.gnn2 = VanillaGNNLayer(self.dim_h, self.dim_h)
-        self.gnn3 = VanillaGNNLayer(self.dim_h, self.dim_out)
+        self.rank = rank
+
+        self.gnn1 = VanillaGNNLayer(self.dim_in, self.dim_h, self.rank)
+        self.gnn2 = VanillaGNNLayer(self.dim_h, self.dim_h, self.rank)
+        self.gnn3 = VanillaGNNLayer(self.dim_h, self.dim_out, None)
 
     def call(self, x, adjacency):
         h = self.gnn1(x, adjacency)
@@ -208,13 +199,13 @@ class VanillaGNN(tf.keras.Model):
         out = self(x, adjacency)
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=out)
         loss = tf.reduce_mean(loss)
-        f1 = self.compute_f1_score(out, y)
+        f1 = round(self.compute_f1_score(out, y), 4)
         return loss.numpy(), f1
 
     def test(self, data):
         out = self(data.x, data.adjacency)
         test_f1 = self.compute_f1_score(out, data.y)
-        return test_f1
+        return round(test_f1, 4)
 
     def predict(self, data):
         out = self(data.x, data.adjacency)
@@ -225,6 +216,7 @@ class VanillaGNN(tf.keras.Model):
             "dim_in": self.dim_in,
             "dim_h": self.dim_h,
             "dim_out": self.dim_out,
+            "rank": self.rank,
         }
         base_config = super(VanillaGNN, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -235,6 +227,7 @@ class VanillaGNN(tf.keras.Model):
             dim_in=config["dim_in"],
             dim_h=config["dim_h"],
             dim_out=config["dim_out"],
+            rank=config["rank"],
         )
 
     @tf.function
@@ -248,10 +241,6 @@ class VanillaGNN(tf.keras.Model):
         return loss
 
     def fit(self, data, epochs, batch_size, test_size=0.2, optimizer="adam"):
-        warnings.warn(
-            "It is normal for validation metrics to underperform. Use the test method to validate after training.",
-            UserWarning,
-        )
         optimizers = {
             "sgd": tf.keras.optimizers.SGD(),
             "adam": tf.keras.optimizers.Adam(),
@@ -290,56 +279,20 @@ class VanillaGNN(tf.keras.Model):
             train_f1_scores.append(train_f1)
 
             if epoch % 5 == 0:
+                clear_output(wait=True)
+                warnings.warn(
+                    "It is normal for validation metrics to underperform during training. Use the test method to validate after training.",
+                    UserWarning,
+                )
                 val_loss, val_f1 = self.evaluate(X_test, adjacency_test, y_test)
                 val_losses.append(val_loss)
                 val_f1_scores.append(val_f1)
-                clear_output(wait=True)
                 print(
-                    f"Epoch {epoch:>3} | Train Loss: {train_loss:.3f} | Train F1: {train_f1:.3f} | Val Loss: {val_loss:.3f} | Val F1: {val_f1:.3f}"
+                    f"Epoch {epoch:>3} | Train Loss: {train_loss:.4f} | Train F1: {train_f1:.4f} | Val Loss: {val_loss:.4f} | Val F1: {val_f1:.4f}"
                 )
 
         return train_losses, train_f1_scores, val_losses, val_f1_scores
 
 
 if __name__ == "__main__":
-    # Example usage
-    import pandas as pd
-    from sklearn.datasets import load_iris
-
-    # Load the dataset
-    iris = load_iris()
-
-    # Convert to a DataFrame for easy exploration
-    iris_df = pd.DataFrame(data=iris.data, columns=iris.feature_names)
-    iris_df["species"] = iris.target
-
-    iris_df["sepal length (cm)"] = iris_df["sepal length (cm)"].astype("category")
-    iris_df["sepal width (cm)"] = iris_df["sepal width (cm)"].astype("category")
-    iris_df["petal length (cm)"] = iris_df["petal length (cm)"].astype("category")
-    iris_df["petal width (cm)"] = iris_df["petal width (cm)"].astype("category")
-
-    # Display the first few rows of the dataset
-    print(iris_df.head())
-
-    iris_df = iris_df.sample(frac=1, replace=False).reset_index(drop=True)
-
-    data = Data(iris_df, "species")
-
-    model = VanillaGNN(dim_in=data.x.shape[1], dim_h=8, dim_out=len(iris_df["species"].unique()))
-    print("Before training F1:", model.test(data))
-    model.fit(data, epochs=200, batch_size=32, test_size=0.5)
-    model.save("./best_model", save_format="tf")
-    print("After training F1:", model.test(data))
-    best_model = tf.keras.models.load_model("./best_model")
-
-    print("After loading F1:", best_model.test(data))
-    df_results = pd.DataFrame()
-
-    # Suppose we have a new dataset without the target variable
-    iris_df = iris_df.drop(columns=["species"])
-    data_new = Data(iris_df)
-    print("Predictions:", best_model.predict(data_new))
-    df_results["predicted"] = list(model.predict(data))
-    df_results["actual"] = list(data.y)
-    # df_results.to_csv("results.csv", index=False)
-    breakpoint()
+    print("Examples will be running below")
