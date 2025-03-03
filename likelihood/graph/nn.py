@@ -241,10 +241,6 @@ class VanillaGNN(tf.keras.Model):
         return loss
 
     def fit(self, data, epochs, batch_size, test_size=0.2, optimizer="adam"):
-        warnings.warn(
-            "It is normal for validation metrics to underperform. Use the test method to validate after training.",
-            UserWarning,
-        )
         optimizers = {
             "sgd": tf.keras.optimizers.SGD(),
             "adam": tf.keras.optimizers.Adam(),
@@ -283,10 +279,14 @@ class VanillaGNN(tf.keras.Model):
             train_f1_scores.append(train_f1)
 
             if epoch % 5 == 0:
+                clear_output(wait=True)
+                warnings.warn(
+                    "It is normal for validation metrics to underperform during training. Use the test method to validate after training.",
+                    UserWarning,
+                )
                 val_loss, val_f1 = self.evaluate(X_test, adjacency_test, y_test)
                 val_losses.append(val_loss)
                 val_f1_scores.append(val_f1)
-                clear_output(wait=True)
                 print(
                     f"Epoch {epoch:>3} | Train Loss: {train_loss:.4f} | Train F1: {train_f1:.4f} | Val Loss: {val_loss:.4f} | Val F1: {val_f1:.4f}"
                 )
