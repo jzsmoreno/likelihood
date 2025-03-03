@@ -1,10 +1,13 @@
 import logging
 import os
 
-import tensorflow as tf
+import networkx as nx
+import pandas as pd
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
+
+import tensorflow as tf
 
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="LoRALayer")
@@ -17,6 +20,15 @@ class LoRALayer(tf.keras.layers.Layer):
     def build(self, input_shape):
         input_dim = input_shape[-1]
         print(f"Input shape: {input_shape}")
+
+        if self.rank > input_dim:
+            raise ValueError(
+                f"Rank ({self.rank}) cannot be greater than input dimension ({input_dim})."
+            )
+        if self.rank > self.units:
+            raise ValueError(
+                f"Rank ({self.rank}) cannot be greater than number of units ({self.units})."
+            )
 
         self.A = self.add_weight(
             shape=(input_dim, self.rank), initializer="random_normal", trainable=True, name="A"
@@ -44,3 +56,46 @@ def apply_lora(model, rank=4):
             x = layer(x)
     new_model = tf.keras.Model(inputs=inputs, outputs=x)
     return new_model
+
+
+def graph_metrics(adj_matrix, eigenvector_threshold=1e-6):
+    """
+    This function calculates the following graph metrics using the adjacency matrix:
+    1. Degree Centrality
+    2. Clustering Coefficient
+    3. Eigenvector Centrality
+    4. Degree
+    5. Betweenness Centrality
+    6. Closeness Centrality
+    7. Assortativity
+    """
+    adj_matrix = adj_matrix.astype(int)
+    G = nx.from_numpy_array(adj_matrix)
+    degree_centrality = nx.degree_centrality(G)
+    clustering_coeff = nx.clustering(G)
+    try:
+        eigenvector_centrality = nx.eigenvector_centrality(G, max_iter=500)
+    except nx.PowerIterationFailedConvergence:
+        print("Power iteration failed to converge. Returning NaN for eigenvector centrality.")
+        eigenvector_centrality = {node: float("nan") for node in G.nodes()}
+
+    for node, centrality in eigenvector_centrality.items():
+        if centrality < eigenvector_threshold:
+            eigenvector_centrality[node] = 0.0
+    degree = dict(G.degree())
+    betweenness_centrality = nx.betweenness_centrality(G)
+    closeness_centrality = nx.closeness_centrality(G)
+    assortativity = nx.degree_assortativity_coefficient(G)
+    metrics_df = pd.DataFrame(
+        {
+            "Degree": degree,
+            "Degree Centrality": degree_centrality,
+            "Clustering Coefficient": clustering_coeff,
+            "Eigenvector Centrality": eigenvector_centrality,
+            "Betweenness Centrality": betweenness_centrality,
+            "Closeness Centrality": closeness_centrality,
+        }
+    )
+    metrics_df["Assortativity"] = assortativity
+
+    return metrics_df

@@ -24,7 +24,7 @@ from sklearn.manifold import TSNE
 from tensorflow.keras.layers import InputLayer
 from tensorflow.keras.regularizers import l2
 
-from likelihood.tools import OneHotEncoder, LoRALayer
+from likelihood.tools import LoRALayer, OneHotEncoder
 
 tf.get_logger().setLevel("ERROR")
 
