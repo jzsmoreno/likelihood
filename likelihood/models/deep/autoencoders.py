@@ -601,7 +601,7 @@ class AutoClassifier(tf.keras.Model):
             vae_mode=config["vae_mode"],
             vae_units=config["vae_units"],
             lora_mode=config["lora_mode"],
-            lora_rang=config["lora_rank"],
+            lora_rank=config["lora_rank"],
         )
 
 
