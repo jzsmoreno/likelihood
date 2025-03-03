@@ -408,6 +408,14 @@ class AutoClassifier(tf.keras.Model):
                     kernel_regularizer=l2(self.l2_reg),
                 )
             )
+        else:
+            self.classifier.add(
+                tf.keras.layers.Dense(
+                    units=self.num_classes,
+                    activation=self.classifier_activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                )
+            )
 
     def train_encoder_decoder(
         self, data, epochs, batch_size, validation_split=0.2, patience=10, **kwargs
