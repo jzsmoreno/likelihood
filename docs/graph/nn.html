@@ -56,16 +56,16 @@ el.replaceWith(d);
     df: DataFrame, exclude_subset: List[str] = [], sparse: bool = True, **kwargs
 ) -&gt; Tuple[dict, np.ndarray]:
     &#34;&#34;&#34;Calculates the adjacency matrix for a given DataFrame.
-    The adjacency matrix is a matrix that represents the similarity between each pair of categories.
+    The adjacency matrix is a matrix that represents the similarity between each pair of features.
     The similarity is calculated using the `compare_similarity` function.
-    The resulting matrix is a square matrix with the same number of rows and columns as the input DataFrame.
+    The resulting matrix is a square matrix with the same number of rows and columns as the rows of the input DataFrame.
 
     Parameters
     ----------
     df : `DataFrame`
-        The input DataFrame containing the categories.
+        The input DataFrame containing the features.
     exclude_subset : `List[str]`, optional
-        A list of categories to exclude from the calculation of the adjacency matrix.
+        A list of features to exclude from the calculation of the adjacency matrix.
     sparse : `bool`, optional
         Whether to return a sparse matrix or a dense matrix.
     **kwargs : `dict`
@@ -74,48 +74,33 @@ el.replaceWith(d);
     Keyword Arguments:
     ----------
     similarity: `int`
-        The minimum number of categories that must be the same in both arrays to be considered similar.
+        The minimum number of features that must be the same in both arrays to be considered similar.
 
     Returns
     -------
     adj_dict : `dict`
-        A dictionary containing the categories.
+        A dictionary containing the features.
     adjacency_matrix : `ndarray`
         The adjacency matrix.
     &#34;&#34;&#34;
 
-    yaml_ = generate_feature_yaml(df)
-    categorical_columns = yaml_[&#34;categorical_features&#34;]
     if len(exclude_subset) &gt; 0:
-        categorical_columns = [col for col in categorical_columns if col not in exclude_subset]
-
-    if len(categorical_columns) &gt; 1:
-        df_categorical = df[categorical_columns].copy()
+        columns = [col for col in df.columns if col not in exclude_subset]
+        df_ = df[columns].copy()
     else:
-        categorical_columns = [
-            col
-            for col in df.columns
-            if (
-                col not in exclude_subset
-                and pd.api.types.is_integer_dtype(df[col])
-                and len(df[col].unique()) &gt; 2
-            )
-        ]
-        df_categorical = df[categorical_columns].copy()
+        df_ = df.copy()
 
-    assert len(df_categorical) &gt; 0
+    assert len(df_) &gt; 0
 
-    similarity = kwargs.get(&#34;similarity&#34;, len(df_categorical.columns) - 1)
-    assert similarity &lt;= df_categorical.shape[1]
+    similarity = kwargs.get(&#34;similarity&#34;, len(df_.columns) - 1)
+    assert similarity &lt;= df_.shape[1]
 
-    adj_dict = {}
-    for index, row in df_categorical.iterrows():
-        adj_dict[index] = row.to_list()
+    adj_dict = {index: row.tolist() for index, row in df_.iterrows()}
 
-    adjacency_matrix = np.zeros((len(df_categorical), len(df_categorical)))
+    adjacency_matrix = np.zeros((len(df_), len(df_)))
 
-    for i in range(len(df_categorical)):
-        for j in range(len(df_categorical)):
+    for i in range(len(df_)):
+        for j in range(len(df_)):
             if compare_similarity(adj_dict[i], adj_dict[j]) &gt;= similarity:
                 adjacency_matrix[i][j] = 1
 
@@ -134,15 +119,15 @@ el.replaceWith(d);
         return adj_dict, adjacency_matrix</code></pre>
 </details>
 <div class="desc"><p>Calculates the adjacency matrix for a given DataFrame.
-The adjacency matrix is a matrix that represents the similarity between each pair of categories.
+The adjacency matrix is a matrix that represents the similarity between each pair of features.
 The similarity is calculated using the <code><a title="likelihood.graph.nn.compare_similarity" href="#likelihood.graph.nn.compare_similarity">compare_similarity()</a></code> function.
-The resulting matrix is a square matrix with the same number of rows and columns as the input DataFrame.</p>
+The resulting matrix is a square matrix with the same number of rows and columns as the rows of the input DataFrame.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
-<dd>The input DataFrame containing the categories.</dd>
+<dd>The input DataFrame containing the features.</dd>
 <dt><strong><code>exclude_subset</code></strong> :&ensp;<code>List[str]</code>, optional</dt>
-<dd>A list of categories to exclude from the calculation of the adjacency matrix.</dd>
+<dd>A list of features to exclude from the calculation of the adjacency matrix.</dd>
 <dt><strong><code>sparse</code></strong> :&ensp;<code>bool</code>, optional</dt>
 <dd>Whether to return a sparse matrix or a dense matrix.</dd>
 <dt><strong><code>**kwargs</code></strong> :&ensp;<code>dict</code></dt>
@@ -150,58 +135,41 @@ The resulting matrix is a square matrix with the same number of rows and columns
 </dl>
 <h2 id="keyword-arguments">Keyword Arguments:</h2>
 <p>similarity: <code>int</code>
-The minimum number of categories that must be the same in both arrays to be considered similar.</p>
+The minimum number of features that must be the same in both arrays to be considered similar.</p>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><strong><code>adj_dict</code></strong> :&ensp;<code>dict</code></dt>
-<dd>A dictionary containing the categories.</dd>
+<dd>A dictionary containing the features.</dd>
 <dt><strong><code>adjacency_matrix</code></strong> :&ensp;<code>ndarray</code></dt>
 <dd>The adjacency matrix.</dd>
 </dl></div>
 </dd>
 <dt id="likelihood.graph.nn.compare_similarity"><code class="name flex">
-<span>def <span class="ident">compare_similarity</span></span>(<span>arr1: numpy.ndarray, arr2: numpy.ndarray) ‑> int</span>
+<span>def <span class="ident">compare_similarity</span></span>(<span>arr1: List[Any], arr2: List[Any], threshold: float = 0.05) ‑> int</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def compare_similarity(arr1: np.ndarray, arr2: np.ndarray) -&gt; int:
-    &#34;&#34;&#34;Compares the similarity between two arrays of categories.
+<pre><code class="python">def compare_similarity(arr1: List[Any], arr2: List[Any], threshold: float = 0.05) -&gt; int:
+    &#34;&#34;&#34;Calculate the similarity between two arrays considering numeric values near to 1 in ratio.&#34;&#34;&#34;
 
-    Parameters
-    ----------
-    arr1 : `ndarray`
-        The first array of categories.
-    arr2 : `ndarray`
-        The second array of categories.
+    def is_similar(a: Any, b: Any) -&gt; bool:
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+            if a == 0 and b == 0:
+                return True
+            if a == 0 or b == 0:
+                return False
+            # For numeric values, check if their ratio is within the threshold range
+            ratio = max(a, b) / min(a, b)
+            return 1 - threshold &lt;= ratio &lt;= 1 + threshold
+        else:
+            return a == b
 
-    Returns
-    -------
-    count: `int`
-        The number of categories that are the same in both arrays.
-    &#34;&#34;&#34;
-
-    count = 0
-    for i in range(len(arr1)):
-        if arr1[i] == arr2[i]:
-            count += 1
-    return count</code></pre>
+    return sum(is_similar(a, b) for a, b in zip(arr1, arr2))</code></pre>
 </details>
-<div class="desc"><p>Compares the similarity between two arrays of categories.</p>
-<h2 id="parameters">Parameters</h2>
-<dl>
-<dt><strong><code>arr1</code></strong> :&ensp;<code>ndarray</code></dt>
-<dd>The first array of categories.</dd>
-<dt><strong><code>arr2</code></strong> :&ensp;<code>ndarray</code></dt>
-<dd>The second array of categories.</dd>
-</dl>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><strong><code>count</code></strong> :&ensp;<code>int</code></dt>
-<dd>The number of categories that are the same in both arrays.</dd>
-</dl></div>
+<div class="desc"><p>Calculate the similarity between two arrays considering numeric values near to 1 in ratio.</p></div>
 </dd>
 </dl>
 </section>
@@ -210,7 +178,7 @@ The minimum number of categories that must be the same in both arrays to be cons
 <dl>
 <dt id="likelihood.graph.nn.Data"><code class="flex name class">
 <span>class <span class="ident">Data</span></span>
-<span>(</span><span>df: pandas.core.frame.DataFrame,<br>target: str | None = None,<br>exclude_subset: List[str] = [])</span>
+<span>(</span><span>df: pandas.core.frame.DataFrame,<br>target: str | None = None,<br>exclude_subset: List[str] = [],<br>**kwargs)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -223,8 +191,10 @@ The minimum number of categories that must be the same in both arrays to be cons
         df: DataFrame,
         target: str | None = None,
         exclude_subset: List[str] = [],
+        **kwargs,
     ):
-        _, adjacency = cal_adjacency_matrix(df, exclude_subset=exclude_subset, sparse=True)
+        sparse = kwargs.get(&#34;sparse&#34;, True)
+        _, adjacency = cal_adjacency_matrix(df, exclude_subset=exclude_subset, sparse=sparse)
         if target is not None:
             X = df.drop(columns=[target] + exclude_subset)
         else:
@@ -240,7 +210,7 @@ The minimum number of categories that must be the same in both arrays to be cons
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNN"><code class="flex name class">
 <span>class <span class="ident">VanillaGNN</span></span>
-<span>(</span><span>dim_in, dim_h, dim_out, **kwargs)</span>
+<span>(</span><span>dim_in, dim_h, dim_out, rank=2, **kwargs)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -249,14 +219,16 @@ The minimum number of categories that must be the same in both arrays to be cons
 </summary>
 <pre><code class="python">@tf.keras.utils.register_keras_serializable(package=&#34;Custom&#34;, name=&#34;VanillaGNN&#34;)
 class VanillaGNN(tf.keras.Model):
-    def __init__(self, dim_in, dim_h, dim_out, **kwargs):
+    def __init__(self, dim_in, dim_h, dim_out, rank=2, **kwargs):
         super(VanillaGNN, self).__init__(**kwargs)
         self.dim_in = dim_in
         self.dim_h = dim_h
         self.dim_out = dim_out
-        self.gnn1 = VanillaGNNLayer(self.dim_in, self.dim_h)
-        self.gnn2 = VanillaGNNLayer(self.dim_h, self.dim_h)
-        self.gnn3 = VanillaGNNLayer(self.dim_h, self.dim_out)
+        self.rank = rank
+
+        self.gnn1 = VanillaGNNLayer(self.dim_in, self.dim_h, self.rank)
+        self.gnn2 = VanillaGNNLayer(self.dim_h, self.dim_h, self.rank)
+        self.gnn3 = VanillaGNNLayer(self.dim_h, self.dim_out, None)
 
     def call(self, x, adjacency):
         h = self.gnn1(x, adjacency)
@@ -278,13 +250,13 @@ class VanillaGNN(tf.keras.Model):
         out = self(x, adjacency)
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=out)
         loss = tf.reduce_mean(loss)
-        f1 = self.compute_f1_score(out, y)
+        f1 = round(self.compute_f1_score(out, y), 4)
         return loss.numpy(), f1
 
     def test(self, data):
         out = self(data.x, data.adjacency)
         test_f1 = self.compute_f1_score(out, data.y)
-        return test_f1
+        return round(test_f1, 4)
 
     def predict(self, data):
         out = self(data.x, data.adjacency)
@@ -295,6 +267,7 @@ class VanillaGNN(tf.keras.Model):
             &#34;dim_in&#34;: self.dim_in,
             &#34;dim_h&#34;: self.dim_h,
             &#34;dim_out&#34;: self.dim_out,
+            &#34;rank&#34;: self.rank,
         }
         base_config = super(VanillaGNN, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -305,6 +278,7 @@ class VanillaGNN(tf.keras.Model):
             dim_in=config[&#34;dim_in&#34;],
             dim_h=config[&#34;dim_h&#34;],
             dim_out=config[&#34;dim_out&#34;],
+            rank=config[&#34;rank&#34;],
         )
 
     @tf.function
@@ -318,10 +292,6 @@ class VanillaGNN(tf.keras.Model):
         return loss
 
     def fit(self, data, epochs, batch_size, test_size=0.2, optimizer=&#34;adam&#34;):
-        warnings.warn(
-            &#34;It is normal for validation metrics to underperform. Use the test method to validate after training.&#34;,
-            UserWarning,
-        )
         optimizers = {
             &#34;sgd&#34;: tf.keras.optimizers.SGD(),
             &#34;adam&#34;: tf.keras.optimizers.Adam(),
@@ -360,12 +330,16 @@ class VanillaGNN(tf.keras.Model):
             train_f1_scores.append(train_f1)
 
             if epoch % 5 == 0:
+                clear_output(wait=True)
+                warnings.warn(
+                    &#34;It is normal for validation metrics to underperform during training. Use the test method to validate after training.&#34;,
+                    UserWarning,
+                )
                 val_loss, val_f1 = self.evaluate(X_test, adjacency_test, y_test)
                 val_losses.append(val_loss)
                 val_f1_scores.append(val_f1)
-                clear_output(wait=True)
                 print(
-                    f&#34;Epoch {epoch:&gt;3} | Train Loss: {train_loss:.3f} | Train F1: {train_f1:.3f} | Val Loss: {val_loss:.3f} | Val F1: {val_f1:.3f}&#34;
+                    f&#34;Epoch {epoch:&gt;3} | Train Loss: {train_loss:.4f} | Train F1: {train_f1:.4f} | Val Loss: {val_loss:.4f} | Val F1: {val_f1:.4f}&#34;
                 )
 
         return train_losses, train_f1_scores, val_losses, val_f1_scores</code></pre>
@@ -532,7 +506,7 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
     out = self(x, adjacency)
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=out)
     loss = tf.reduce_mean(loss)
-    f1 = self.compute_f1_score(out, y)
+    f1 = round(self.compute_f1_score(out, y), 4)
     return loss.numpy(), f1</code></pre>
 </details>
 <div class="desc"><p>Returns the loss value &amp; metrics values for the model in test mode.</p>
@@ -637,10 +611,6 @@ the display labels for the scalar outputs.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def fit(self, data, epochs, batch_size, test_size=0.2, optimizer=&#34;adam&#34;):
-    warnings.warn(
-        &#34;It is normal for validation metrics to underperform. Use the test method to validate after training.&#34;,
-        UserWarning,
-    )
     optimizers = {
         &#34;sgd&#34;: tf.keras.optimizers.SGD(),
         &#34;adam&#34;: tf.keras.optimizers.Adam(),
@@ -679,12 +649,16 @@ the display labels for the scalar outputs.</p></div>
         train_f1_scores.append(train_f1)
 
         if epoch % 5 == 0:
+            clear_output(wait=True)
+            warnings.warn(
+                &#34;It is normal for validation metrics to underperform during training. Use the test method to validate after training.&#34;,
+                UserWarning,
+            )
             val_loss, val_f1 = self.evaluate(X_test, adjacency_test, y_test)
             val_losses.append(val_loss)
             val_f1_scores.append(val_f1)
-            clear_output(wait=True)
             print(
-                f&#34;Epoch {epoch:&gt;3} | Train Loss: {train_loss:.3f} | Train F1: {train_f1:.3f} | Val Loss: {val_loss:.3f} | Val F1: {val_f1:.3f}&#34;
+                f&#34;Epoch {epoch:&gt;3} | Train Loss: {train_loss:.4f} | Train F1: {train_f1:.4f} | Val Loss: {val_loss:.4f} | Val F1: {val_f1:.4f}&#34;
             )
 
     return train_losses, train_f1_scores, val_losses, val_f1_scores</code></pre>
@@ -898,6 +872,7 @@ and validation metrics values (if applicable).</p></div>
         &#34;dim_in&#34;: self.dim_in,
         &#34;dim_h&#34;: self.dim_h,
         &#34;dim_out&#34;: self.dim_out,
+        &#34;rank&#34;: self.rank,
     }
     base_config = super(VanillaGNN, self).get_config()
     return dict(list(base_config.items()) + list(config.items()))</code></pre>
@@ -983,7 +958,7 @@ List of callbacks to apply during prediction.</dd>
 <pre><code class="python">def test(self, data):
     out = self(data.x, data.adjacency)
     test_f1 = self.compute_f1_score(out, data.y)
-    return test_f1</code></pre>
+    return round(test_f1, 4)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -1011,7 +986,7 @@ def train_step(self, batch_x, batch_adjacency, batch_y, optimizer):
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNNLayer"><code class="flex name class">
 <span>class <span class="ident">VanillaGNNLayer</span></span>
-<span>(</span><span>dim_in, dim_out, kernel_initializer='glorot_uniform', **kwargs)</span>
+<span>(</span><span>dim_in, dim_out, rank=None, kernel_initializer='glorot_uniform', **kwargs)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1020,16 +995,20 @@ def train_step(self, batch_x, batch_adjacency, batch_y, optimizer):
 </summary>
 <pre><code class="python">@tf.keras.utils.register_keras_serializable(package=&#34;Custom&#34;, name=&#34;VanillaGNNLayer&#34;)
 class VanillaGNNLayer(tf.keras.layers.Layer):
-    def __init__(self, dim_in, dim_out, kernel_initializer=&#34;glorot_uniform&#34;, **kwargs):
+    def __init__(self, dim_in, dim_out, rank=None, kernel_initializer=&#34;glorot_uniform&#34;, **kwargs):
         super(VanillaGNNLayer, self).__init__(**kwargs)
         self.dim_out = dim_out
+        self.rank = rank
         self.kernel_initializer = kernel_initializer
         self.linear = None
 
     def build(self, input_shape):
-        self.linear = tf.keras.layers.Dense(
-            self.dim_out, use_bias=False, kernel_initializer=self.kernel_initializer
-        )
+        if self.rank:
+            self.linear = LoRALayer(self.dim_out, rank=self.rank)
+        else:
+            self.linear = tf.keras.layers.Dense(
+                self.dim_out, use_bias=False, kernel_initializer=self.kernel_initializer
+            )
         super(VanillaGNNLayer, self).build(input_shape)
 
     def call(self, x, adjacency):
@@ -1042,8 +1021,11 @@ class VanillaGNNLayer(tf.keras.layers.Layer):
         config.update(
             {
                 &#34;dim_out&#34;: self.dim_out,
-                &#34;kernel_initializer&#34;: tf.keras.initializers.serialize(
-                    self.linear.kernel_initializer
+                &#34;rank&#34;: self.rank,
+                &#34;kernel_initializer&#34;: (
+                    None
+                    if self.rank
+                    else tf.keras.initializers.serialize(self.linear.kernel_initializer)
                 ),
             }
         )
@@ -1225,9 +1207,12 @@ assert my_sum.trainable_weights == []
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def build(self, input_shape):
-    self.linear = tf.keras.layers.Dense(
-        self.dim_out, use_bias=False, kernel_initializer=self.kernel_initializer
-    )
+    if self.rank:
+        self.linear = LoRALayer(self.dim_out, rank=self.rank)
+    else:
+        self.linear = tf.keras.layers.Dense(
+            self.dim_out, use_bias=False, kernel_initializer=self.kernel_initializer
+        )
     super(VanillaGNNLayer, self).build(input_shape)</code></pre>
 </details>
 <div class="desc"></div>
@@ -1260,8 +1245,11 @@ assert my_sum.trainable_weights == []
     config.update(
         {
             &#34;dim_out&#34;: self.dim_out,
-            &#34;kernel_initializer&#34;: tf.keras.initializers.serialize(
-                self.linear.kernel_initializer
+            &#34;rank&#34;: self.rank,
+            &#34;kernel_initializer&#34;: (
+                None
+                if self.rank
+                else tf.keras.initializers.serialize(self.linear.kernel_initializer)
             ),
         }
     )

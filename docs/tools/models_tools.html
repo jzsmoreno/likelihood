@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.5">
+<title>likelihood.tools.models_tools API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>likelihood.tools.models_tools</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="likelihood.tools.models_tools.apply_lora"><code class="name flex">
+<span>def <span class="ident">apply_lora</span></span>(<span>model, rank=4)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def apply_lora(model, rank=4):
+    inputs = tf.keras.Input(shape=model.input_shape[1:])
+    x = inputs
+
+    for layer in model.layers:
+        if isinstance(layer, tf.keras.layers.Dense):
+            print(f&#34;Applying LoRA to layer {layer.name}&#34;)
+            x = LoRALayer(units=layer.units, rank=rank)(x)
+        else:
+            x = layer(x)
+    new_model = tf.keras.Model(inputs=inputs, outputs=x)
+    return new_model</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="likelihood.tools.models_tools.graph_metrics"><code class="name flex">
+<span>def <span class="ident">graph_metrics</span></span>(<span>adj_matrix, eigenvector_threshold=1e-06)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def graph_metrics(adj_matrix, eigenvector_threshold=1e-6):
+    &#34;&#34;&#34;
+    This function calculates the following graph metrics using the adjacency matrix:
+    1. Degree Centrality
+    2. Clustering Coefficient
+    3. Eigenvector Centrality
+    4. Degree
+    5. Betweenness Centrality
+    6. Closeness Centrality
+    7. Assortativity
+    &#34;&#34;&#34;
+    adj_matrix = adj_matrix.astype(int)
+    G = nx.from_numpy_array(adj_matrix)
+    degree_centrality = nx.degree_centrality(G)
+    clustering_coeff = nx.clustering(G)
+    try:
+        eigenvector_centrality = nx.eigenvector_centrality(G, max_iter=500)
+    except nx.PowerIterationFailedConvergence:
+        print(&#34;Power iteration failed to converge. Returning NaN for eigenvector centrality.&#34;)
+        eigenvector_centrality = {node: float(&#34;nan&#34;) for node in G.nodes()}
+
+    for node, centrality in eigenvector_centrality.items():
+        if centrality &lt; eigenvector_threshold:
+            eigenvector_centrality[node] = 0.0
+    degree = dict(G.degree())
+    betweenness_centrality = nx.betweenness_centrality(G)
+    closeness_centrality = nx.closeness_centrality(G)
+    assortativity = nx.degree_assortativity_coefficient(G)
+    metrics_df = pd.DataFrame(
+        {
+            &#34;Degree&#34;: degree,
+            &#34;Degree Centrality&#34;: degree_centrality,
+            &#34;Clustering Coefficient&#34;: clustering_coeff,
+            &#34;Eigenvector Centrality&#34;: eigenvector_centrality,
+            &#34;Betweenness Centrality&#34;: betweenness_centrality,
+            &#34;Closeness Centrality&#34;: closeness_centrality,
+        }
+    )
+    metrics_df[&#34;Assortativity&#34;] = assortativity
+
+    return metrics_df</code></pre>
+</details>
+<div class="desc"><p>This function calculates the following graph metrics using the adjacency matrix:
+1. Degree Centrality
+2. Clustering Coefficient
+3. Eigenvector Centrality
+4. Degree
+5. Betweenness Centrality
+6. Closeness Centrality
+7. Assortativity</p></div>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="likelihood.tools.models_tools.LoRALayer"><code class="flex name class">
+<span>class <span class="ident">LoRALayer</span></span>
+<span>(</span><span>units, rank=4, **kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@tf.keras.utils.register_keras_serializable(package=&#34;Custom&#34;, name=&#34;LoRALayer&#34;)
+class LoRALayer(tf.keras.layers.Layer):
+    def __init__(self, units, rank=4, **kwargs):
+        super(LoRALayer, self).__init__(**kwargs)
+        self.units = units
+        self.rank = rank
+
+    def build(self, input_shape):
+        input_dim = input_shape[-1]
+        print(f&#34;Input shape: {input_shape}&#34;)
+
+        if self.rank &gt; input_dim:
+            raise ValueError(
+                f&#34;Rank ({self.rank}) cannot be greater than input dimension ({input_dim}).&#34;
+            )
+        if self.rank &gt; self.units:
+            raise ValueError(
+                f&#34;Rank ({self.rank}) cannot be greater than number of units ({self.units}).&#34;
+            )
+
+        self.A = self.add_weight(
+            shape=(input_dim, self.rank), initializer=&#34;random_normal&#34;, trainable=True, name=&#34;A&#34;
+        )
+        self.B = self.add_weight(
+            shape=(self.rank, self.units), initializer=&#34;random_normal&#34;, trainable=True, name=&#34;B&#34;
+        )
+        print(f&#34;Dense weights shape: {input_dim}x{self.units}&#34;)
+        print(f&#34;LoRA weights shape: A{self.A.shape}, B{self.B.shape}&#34;)
+
+    def call(self, inputs):
+        lora_output = tf.matmul(tf.matmul(inputs, self.A), self.B)
+        return lora_output</code></pre>
+</details>
+<div class="desc"><p>This is the class from which all layers inherit.</p>
+<p>A layer is a callable object that takes as input one or more tensors and
+that outputs one or more tensors. It involves <em>computation</em>, defined
+in the <code>call()</code> method, and a <em>state</em> (weight variables). State can be
+created:</p>
+<ul>
+<li>in <code>__init__()</code>, for instance via <code>self.add_weight()</code>;</li>
+<li>in the optional <code>build()</code> method, which is invoked by the first
+<code>__call__()</code> to the layer, and supplies the shape(s) of the input(s),
+which may not have been known at initialization time.</li>
+</ul>
+<p>Layers are recursively composable: If you assign a Layer instance as an
+attribute of another Layer, the outer layer will start tracking the weights
+created by the inner layer. Nested layers should be instantiated in the
+<code>__init__()</code> method or <code>build()</code> method.</p>
+<p>Users will just instantiate a layer and then treat it as a callable.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>trainable</code></strong></dt>
+<dd>Boolean, whether the layer's variables should be trainable.</dd>
+<dt><strong><code>name</code></strong></dt>
+<dd>String name of the layer.</dd>
+<dt><strong><code>dtype</code></strong></dt>
+<dd>The dtype of the layer's computations and weights. Can also be a
+<code>keras.DTypePolicy</code>,
+which allows the computation and
+weight dtype to differ. Defaults to <code>None</code>. <code>None</code> means to use
+<code>keras.config.dtype_policy()</code>,
+which is a <code>float32</code> policy unless set to different value
+(via <code>keras.config.set_dtype_policy()</code>).</dd>
+</dl>
+<h2 id="attributes">Attributes</h2>
+<dl>
+<dt><strong><code>name</code></strong></dt>
+<dd>The name of the layer (string).</dd>
+<dt><strong><code>dtype</code></strong></dt>
+<dd>Dtype of the layer's weights. Alias of <code>layer.variable_dtype</code>.</dd>
+<dt><strong><code>variable_dtype</code></strong></dt>
+<dd>Dtype of the layer's weights.</dd>
+<dt><strong><code>compute_dtype</code></strong></dt>
+<dd>The dtype of the layer's computations.
+Layers automatically cast inputs to this dtype, which causes
+the computations and output to also be in this dtype.
+When mixed precision is used with a
+<code>keras.DTypePolicy</code>, this will be different
+than <code>variable_dtype</code>.</dd>
+<dt><strong><code>trainable_weights</code></strong></dt>
+<dd>List of variables to be included in backprop.</dd>
+<dt><strong><code>non_trainable_weights</code></strong></dt>
+<dd>List of variables that should not be
+included in backprop.</dd>
+<dt><strong><code>weights</code></strong></dt>
+<dd>The concatenation of the lists trainable_weights and
+non_trainable_weights (in this order).</dd>
+<dt><strong><code>trainable</code></strong></dt>
+<dd>Whether the layer should be trained (boolean), i.e.
+whether its potentially-trainable weights should be returned
+as part of <code>layer.trainable_weights</code>.</dd>
+<dt><strong><code>input_spec</code></strong></dt>
+<dd>Optional (list of) <code>InputSpec</code> object(s) specifying the
+constraints on inputs that can be accepted by the layer.</dd>
+</dl>
+<p>We recommend that descendants of <code>Layer</code> implement the following methods:</p>
+<ul>
+<li><code>__init__()</code>: Defines custom layer attributes, and creates layer weights
+that do not depend on input shapes, using <code>add_weight()</code>,
+or other state.</li>
+<li><code>build(self, input_shape)</code>: This method can be used to create weights that
+depend on the shape(s) of the input(s), using <code>add_weight()</code>, or other
+state. <code>__call__()</code> will automatically build the layer
+(if it has not been built yet) by calling <code>build()</code>.</li>
+<li><code>call(self, *args, **kwargs)</code>: Called in <code>__call__</code> after making
+sure <code>build()</code> has been called. <code>call()</code> performs the logic of applying
+the layer to the input arguments.
+Two reserved keyword arguments you can optionally use in <code>call()</code> are:
+1. <code>training</code> (boolean, whether the call is in inference mode or
+training mode).
+2. <code>mask</code> (boolean tensor encoding masked timesteps in the input,
+used e.g. in RNN layers).
+A typical signature for this method is <code>call(self, inputs)</code>, and user
+could optionally add <code>training</code> and <code>mask</code> if the layer need them.</li>
+<li><code>get_config(self)</code>: Returns a dictionary containing the configuration
+used to initialize this layer. If the keys differ from the arguments
+in <code>__init__()</code>, then override <code>from_config(self)</code> as well.
+This method is used when saving
+the layer or a model that contains this layer.</li>
+</ul>
+<p>Examples:</p>
+<p>Here's a basic example: a layer with two variables, <code>w</code> and <code>b</code>,
+that returns <code>y = w . x + b</code>.
+It shows how to implement <code>build()</code> and <code>call()</code>.
+Variables set as attributes of a layer are tracked as weights
+of the layers (in <code>layer.weights</code>).</p>
+<pre><code class="language-python">class SimpleDense(Layer):
+    def __init__(self, units=32):
+        super().__init__()
+        self.units = units
+
+    # Create the state of the layer (weights)
+    def build(self, input_shape):
+        self.kernel = self.add_weight(
+            shape=(input_shape[-1], self.units),
+            initializer=&quot;glorot_uniform&quot;,
+            trainable=True,
+            name=&quot;kernel&quot;,
+        )
+        self.bias = self.add_weight(
+            shape=(self.units,),
+            initializer=&quot;zeros&quot;,
+            trainable=True,
+            name=&quot;bias&quot;,
+        )
+
+    # Defines the computation
+    def call(self, inputs):
+        return ops.matmul(inputs, self.kernel) + self.bias
+
+# Instantiates the layer.
+linear_layer = SimpleDense(4)
+
+# This will also call `build(input_shape)` and create the weights.
+y = linear_layer(ops.ones((2, 2)))
+assert len(linear_layer.weights) == 2
+
+# These weights are trainable, so they're listed in `trainable_weights`:
+assert len(linear_layer.trainable_weights) == 2
+</code></pre>
+<p>Besides trainable weights, updated via backpropagation during training,
+layers can also have non-trainable weights. These weights are meant to
+be updated manually during <code>call()</code>. Here's a example layer that computes
+the running sum of its inputs:</p>
+<pre><code class="language-python">class ComputeSum(Layer):
+
+  def __init__(self, input_dim):
+      super(ComputeSum, self).__init__()
+      # Create a non-trainable weight.
+      self.total = self.add_weight(
+        shape=(),
+        initializer=&quot;zeros&quot;,
+        trainable=False,
+        name=&quot;total&quot;,
+      )
+
+  def call(self, inputs):
+      self.total.assign(self.total + ops.sum(inputs))
+      return self.total
+
+my_sum = ComputeSum(2)
+x = ops.ones((2, 2))
+y = my_sum(x)
+
+assert my_sum.weights == [my_sum.total]
+assert my_sum.non_trainable_weights == [my_sum.total]
+assert my_sum.trainable_weights == []
+</code></pre></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>keras.src.layers.layer.Layer</li>
+<li>keras.src.backend.tensorflow.layer.TFLayer</li>
+<li>keras.src.backend.tensorflow.trackable.KerasAutoTrackable</li>
+<li>tensorflow.python.trackable.autotrackable.AutoTrackable</li>
+<li>tensorflow.python.trackable.base.Trackable</li>
+<li>keras.src.ops.operation.Operation</li>
+<li>keras.src.saving.keras_saveable.KerasSaveable</li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="likelihood.tools.models_tools.LoRALayer.build"><code class="name flex">
+<span>def <span class="ident">build</span></span>(<span>self, input_shape)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def build(self, input_shape):
+    input_dim = input_shape[-1]
+    print(f&#34;Input shape: {input_shape}&#34;)
+
+    if self.rank &gt; input_dim:
+        raise ValueError(
+            f&#34;Rank ({self.rank}) cannot be greater than input dimension ({input_dim}).&#34;
+        )
+    if self.rank &gt; self.units:
+        raise ValueError(
+            f&#34;Rank ({self.rank}) cannot be greater than number of units ({self.units}).&#34;
+        )
+
+    self.A = self.add_weight(
+        shape=(input_dim, self.rank), initializer=&#34;random_normal&#34;, trainable=True, name=&#34;A&#34;
+    )
+    self.B = self.add_weight(
+        shape=(self.rank, self.units), initializer=&#34;random_normal&#34;, trainable=True, name=&#34;B&#34;
+    )
+    print(f&#34;Dense weights shape: {input_dim}x{self.units}&#34;)
+    print(f&#34;LoRA weights shape: A{self.A.shape}, B{self.B.shape}&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="likelihood.tools.models_tools.LoRALayer.call"><code class="name flex">
+<span>def <span class="ident">call</span></span>(<span>self, inputs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def call(self, inputs):
+    lora_output = tf.matmul(tf.matmul(inputs, self.A), self.B)
+    return lora_output</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="likelihood.tools" href="index.html">likelihood.tools</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="likelihood.tools.models_tools.apply_lora" href="#likelihood.tools.models_tools.apply_lora">apply_lora</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.graph_metrics" href="#likelihood.tools.models_tools.graph_metrics">graph_metrics</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="likelihood.tools.models_tools.LoRALayer" href="#likelihood.tools.models_tools.LoRALayer">LoRALayer</a></code></h4>
+<ul class="">
+<li><code><a title="likelihood.tools.models_tools.LoRALayer.build" href="#likelihood.tools.models_tools.LoRALayer.build">build</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.LoRALayer.call" href="#likelihood.tools.models_tools.LoRALayer.call">call</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+</footer>
+</body>
+</html>

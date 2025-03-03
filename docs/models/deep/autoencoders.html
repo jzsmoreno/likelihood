@@ -821,6 +821,10 @@ class AutoClassifier(tf.keras.Model):
         Whether to use variational autoencoder mode. Default is False.
     vae_units : `int`
         The number of units in the variational autoencoder. Default is 2.
+    lora_mode : `bool`
+        Whether to use LoRA layers. Default is False.
+    lora_rank : `int`
+        The rank of the LoRA layer. Default is 4.
     &#34;&#34;&#34;
 
     def __init__(self, input_shape_parm, num_classes, units, activation, **kwargs):
@@ -839,6 +843,8 @@ class AutoClassifier(tf.keras.Model):
         self.l2_reg = kwargs.get(&#34;l2_reg&#34;, 0.0)
         self.vae_mode = kwargs.get(&#34;vae_mode&#34;, False)
         self.vae_units = kwargs.get(&#34;vae_units&#34;, 2)
+        self.lora_mode = kwargs.get(&#34;lora_mode&#34;, False)
+        self.lora_rank = kwargs.get(&#34;lora_rank&#34;, 4)
 
     def build_encoder_decoder(self, input_shape):
         self.encoder = (
@@ -933,7 +939,7 @@ class AutoClassifier(tf.keras.Model):
 
         # Classifier with L2 regularization
         self.classifier = tf.keras.Sequential()
-        if self.num_layers &gt; 1:
+        if self.num_layers &gt; 1 and not self.lora_mode:
             for _ in range(self.num_layers - 1):
                 self.classifier.add(
                     tf.keras.layers.Dense(
@@ -944,13 +950,36 @@ class AutoClassifier(tf.keras.Model):
                 )
                 if self.dropout:
                     self.classifier.add(tf.keras.layers.Dropout(self.dropout))
-        self.classifier.add(
-            tf.keras.layers.Dense(
-                units=self.num_classes,
-                activation=self.classifier_activation,
-                kernel_regularizer=l2(self.l2_reg),
+            self.classifier.add(
+                tf.keras.layers.Dense(
+                    units=self.num_classes,
+                    activation=self.classifier_activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                )
             )
-        )
+        elif self.lora_mode:
+            for _ in range(self.num_layers - 1):
+                self.classifier.add(
+                    LoRALayer(units=self.units, rank=self.lora_rank, name=f&#34;LoRA_{_}&#34;)
+                )
+                self.classifier.add(tf.keras.layers.Activation(self.activation))
+                if self.dropout:
+                    self.classifier.add(tf.keras.layers.Dropout(self.dropout))
+            self.classifier.add(
+                tf.keras.layers.Dense(
+                    units=self.num_classes,
+                    activation=self.classifier_activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                )
+            )
+        else:
+            self.classifier.add(
+                tf.keras.layers.Dense(
+                    units=self.num_classes,
+                    activation=self.classifier_activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                )
+            )
 
     def train_encoder_decoder(
         self, data, epochs, batch_size, validation_split=0.2, patience=10, **kwargs
@@ -1116,6 +1145,8 @@ class AutoClassifier(tf.keras.Model):
             &#34;l2_reg&#34;: self.l2_reg,
             &#34;vae_mode&#34;: self.vae_mode,
             &#34;vae_units&#34;: self.vae_units,
+            &#34;lora_mode&#34;: self.lora_mode,
+            &#34;lora_rank&#34;: self.lora_rank,
         }
         base_config = super(AutoClassifier, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -1133,6 +1164,8 @@ class AutoClassifier(tf.keras.Model):
             l2_reg=config[&#34;l2_reg&#34;],
             vae_mode=config[&#34;vae_mode&#34;],
             vae_units=config[&#34;vae_units&#34;],
+            lora_mode=config[&#34;lora_mode&#34;],
+            lora_rank=config[&#34;lora_rank&#34;],
         )</code></pre>
 </details>
 <div class="desc"><p>An auto-classifier model that automatically determines the best classification strategy based on the input data.</p>
@@ -1160,7 +1193,11 @@ The L2 regularization parameter. Default is 0.0.
 vae_mode : <code>bool</code>
 Whether to use variational autoencoder mode. Default is False.
 vae_units : <code>int</code>
-The number of units in the variational autoencoder. Default is 2.</p></div>
+The number of units in the variational autoencoder. Default is 2.
+lora_mode : <code>bool</code>
+Whether to use LoRA layers. Default is False.
+lora_rank : <code>int</code>
+The rank of the LoRA layer. Default is 4.</p></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li>keras.src.models.model.Model</li>
@@ -1261,7 +1298,7 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 
     # Classifier with L2 regularization
     self.classifier = tf.keras.Sequential()
-    if self.num_layers &gt; 1:
+    if self.num_layers &gt; 1 and not self.lora_mode:
         for _ in range(self.num_layers - 1):
             self.classifier.add(
                 tf.keras.layers.Dense(
@@ -1272,13 +1309,36 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
             )
             if self.dropout:
                 self.classifier.add(tf.keras.layers.Dropout(self.dropout))
-    self.classifier.add(
-        tf.keras.layers.Dense(
-            units=self.num_classes,
-            activation=self.classifier_activation,
-            kernel_regularizer=l2(self.l2_reg),
+        self.classifier.add(
+            tf.keras.layers.Dense(
+                units=self.num_classes,
+                activation=self.classifier_activation,
+                kernel_regularizer=l2(self.l2_reg),
+            )
         )
-    )</code></pre>
+    elif self.lora_mode:
+        for _ in range(self.num_layers - 1):
+            self.classifier.add(
+                LoRALayer(units=self.units, rank=self.lora_rank, name=f&#34;LoRA_{_}&#34;)
+            )
+            self.classifier.add(tf.keras.layers.Activation(self.activation))
+            if self.dropout:
+                self.classifier.add(tf.keras.layers.Dropout(self.dropout))
+        self.classifier.add(
+            tf.keras.layers.Dense(
+                units=self.num_classes,
+                activation=self.classifier_activation,
+                kernel_regularizer=l2(self.l2_reg),
+            )
+        )
+    else:
+        self.classifier.add(
+            tf.keras.layers.Dense(
+                units=self.num_classes,
+                activation=self.classifier_activation,
+                kernel_regularizer=l2(self.l2_reg),
+            )
+        )</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -1391,6 +1451,8 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
         &#34;l2_reg&#34;: self.l2_reg,
         &#34;vae_mode&#34;: self.vae_mode,
         &#34;vae_units&#34;: self.vae_units,
+        &#34;lora_mode&#34;: self.lora_mode,
+        &#34;lora_rank&#34;: self.lora_rank,
     }
     base_config = super(AutoClassifier, self).get_config()
     return dict(list(base_config.items()) + list(config.items()))</code></pre>
