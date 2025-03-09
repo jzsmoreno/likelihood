@@ -66,7 +66,6 @@ el.replaceWith(d);
     -------
     average : `float`
         The average of the data.
-
     &#34;&#34;&#34;
 
     n = int(alpha * len(y))
@@ -106,8 +105,7 @@ el.replaceWith(d);
 
     Returns
     -------
-    `None`
-        Prints out a table with columns as index and percentages of missing values as data.
+    `None` : Prints out a table with columns as index and percentages of missing values as data.
     &#34;&#34;&#34;
 
     col = df.columns
@@ -124,8 +122,7 @@ el.replaceWith(d);
 <dd>The input dataframe.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p><code>None</code>
-Prints out a table with columns as index and percentages of missing values as data.</p></div>
+<p><code>None</code> : Prints out a table with columns as index and percentages of missing values as data.</p></div>
 </dd>
 <dt id="likelihood.tools.tools.calculate_probability"><code class="name flex">
 <span>def <span class="ident">calculate_probability</span></span>(<span>x: numpy.ndarray, points: int = 1, cond: bool = True) ‑> numpy.ndarray</span>
@@ -159,7 +156,6 @@ Prints out a table with columns as index and percentages of missing values as da
     fit, _, sorted_x = cdf(x)
     p = fit(x)
 
-    # Validate probability values
     if cond:
         prob_value = np.prod(p[-points])
         message = &#34;product&#34;
@@ -232,7 +228,6 @@ Prints out a table with columns as index and percentages of missing values as da
     cdf_values = np.cumsum(x) / np.sum(x)
     sorted_x = np.sort(x)
 
-    # Calculate the CDF or inverse CDF (quantile function)
     probabilities = np.linspace(0, 1, len(sorted_x))
 
     if inv:
@@ -298,11 +293,15 @@ Prints out a table with columns as index and percentages of missing values as da
     &#34;&#34;&#34;
     Checks for NaN and Inf values in the DataFrame. If any are found, they will be removed.
 
-    Parameters:
-        df (DataFrame): The input DataFrame to be checked.
+    Parameters
+    ----------
+    df : DataFrame
+        The input DataFrame to be checked.
 
-    Returns:
-        DataFrame: A new DataFrame with NaN and Inf values removed.
+    Returns
+    ----------
+    DataFrame
+        A new DataFrame with NaN and Inf values removed.
     &#34;&#34;&#34;
 
     nan_values = df.isnull().values.any()
@@ -327,7 +326,10 @@ Prints out a table with columns as index and percentages of missing values as da
 </details>
 <div class="desc"><p>Checks for NaN and Inf values in the DataFrame. If any are found, they will be removed.</p>
 <h2 id="parameters">Parameters</h2>
-<p>df (DataFrame): The input DataFrame to be checked.</p>
+<dl>
+<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dd>The input DataFrame to be checked.</dd>
+</dl>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><code>DataFrame</code></dt>
@@ -457,7 +459,6 @@ Difference quotient of <code>f</code> evaluated at <code>x</code>.</p></div>
     denoised_dataset = np.zeros_like(dataset)
     periods = np.zeros(num_samples)
 
-    # Precompute values that do not change within the loop
     freq = (1 / n_points) * np.arange(n_points)
     L = np.arange(1, np.floor(n_points / 2), dtype=int)
 
@@ -467,15 +468,12 @@ Difference quotient of <code>f</code> evaluated at <code>x</code>.</p></div>
         threshold = np.mean(PSD) + sigma * np.std(PSD)
         indices = PSD &gt; threshold
 
-        # Zero out all others in frequency domain
         PSDclean = PSD * indices
         fhat_cleaned = fhat * indices
 
-        # Inverse FFT for filtered time signal
         denoised_signal = np.fft.ifft(fhat_cleaned).real
         denoised_dataset[i, :] = denoised_signal
 
-        # Calculate the period of the signal
         peak_index = L[np.argmax(np.abs(fhat[L]))]
         periods[i] = 1 / (2 * freq[peak_index])
 
@@ -620,33 +618,27 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
     Parameters
     ----------
     dataset : `ndarray`
-        the `dataset` describing the function over which the period is calculated
+        the `dataset` describing the function over which the period is calculated.
 
     Returns
     -------
     period : `float`
-        period of the function described by the `dataset`
+        period of the function described by the `dataset`.
     &#34;&#34;&#34;
     n = dataset.size
 
-    # Ensure there are enough points for FFT analysis
     if n &lt; 2:
         raise ValueError(&#34;Dataset must contain at least two points.&#34;)
 
-    # Compute the FFT and PSD
-    fhat = np.fft.rfft(dataset)  # Use rfft for real-valued input to save computation
-    freqs = np.fft.rfftfreq(n)  # Get only positive frequencies
+    fhat = np.fft.rfft(dataset)
+    freqs = np.fft.rfftfreq(n)
 
-    # Calculate the Power Spectral Density (PSD)
     PSD = np.abs(fhat) ** 2 / n
 
-    # Remove the first frequency component (DC component)
     PSD[0] = 0
 
-    # Find the index of the maximum PSD value, excluding the DC component
     max_psd_index = np.argmax(PSD)
 
-    # Calculate the period based on the corresponding frequency
     dominant_freq = freqs[max_psd_index]
     if dominant_freq == 0:
         raise ValueError(&#34;No significant periodic component found in the dataset.&#34;)
@@ -659,12 +651,12 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>dataset</code></strong> :&ensp;<code>ndarray</code></dt>
-<dd>the <code>dataset</code> describing the function over which the period is calculated</dd>
+<dd>the <code>dataset</code> describing the function over which the period is calculated.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><strong><code>period</code></strong> :&ensp;<code>float</code></dt>
-<dd>period of the function described by the <code>dataset</code></dd>
+<dd>period of the function described by the <code>dataset</code>.</dd>
 </dl></div>
 </dd>
 <dt id="likelihood.tools.tools.mean_square_error"><code class="name flex">
@@ -689,7 +681,6 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
     -------
     RMSE : `float`
         The Root Mean Squared Error.
-
     &#34;&#34;&#34;
     if print_error:
         print(f&#34;The RMSE is {np.sqrt(np.mean((y_true - y_pred)**2))}&#34;)
@@ -834,12 +825,12 @@ the <code>i-th</code> partial difference quotient of <code>f</code> at <code>v</
     Parameters
     ----------
     y : `float`
-        the number to evaluate the function
+        the number to evaluate the function.
 
     Returns
     -------
     `float`
-        value of evaluated function
+        value of evaluated function.
     &#34;&#34;&#34;
 
     return math.log(y / (1 - y))</code></pre>
@@ -848,11 +839,11 @@ the <code>i-th</code> partial difference quotient of <code>f</code> at <code>v</
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>y</code></strong> :&ensp;<code>float</code></dt>
-<dd>the number to evaluate the function</dd>
+<dd>the number to evaluate the function.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <p><code>float</code>
-value of evaluated function</p></div>
+value of evaluated function.</p></div>
 </dd>
 </dl>
 </section>
@@ -980,7 +971,7 @@ value of evaluated function</p></div>
 
     def __init__(self, x: np.ndarray, y: Union[np.ndarray, None] = None):
         self.x = x
-        self.y = y if y is not None else x  # Default to autocorrelation if y is not provided
+        self.y = y if y is not None else x
         self._compute_correlation()
         self.z = self.result[self.result.size // 2 :]
         self.z /= np.abs(self.z).max()
@@ -1023,7 +1014,7 @@ value of evaluated function</p></div>
 
     def __init__(self, x: np.ndarray, y: Union[np.ndarray, None] = None):
         self.x = x
-        self.y = y if y is not None else x  # Default to autocorrelation if y is not provided
+        self.y = y if y is not None else x
         self._compute_correlation()
         self.z = self.result[self.result.size // 2 :]
         self.z /= np.abs(self.z).max()
@@ -1060,7 +1051,7 @@ value of evaluated function</p></div>
 
     def __init__(self, x: np.ndarray, y: Union[np.ndarray, None] = None):
         self.x = x
-        self.y = y if y is not None else x  # Default to autocorrelation if y is not provided
+        self.y = y if y is not None else x
         self._compute_correlation()
         self.z = self.result[self.result.size // 2 :]
         self.z /= np.abs(self.z).max()
@@ -1097,7 +1088,7 @@ value of evaluated function</p></div>
 
     def __init__(self, x: np.ndarray, y: Union[np.ndarray, None] = None):
         self.x = x
-        self.y = y if y is not None else x  # Default to autocorrelation if y is not provided
+        self.y = y if y is not None else x
         self._compute_correlation()
         self.z = self.result[self.result.size // 2 :]
         self.z /= np.abs(self.z).max()
@@ -1134,7 +1125,7 @@ value of evaluated function</p></div>
 
     def __init__(self, x: np.ndarray, y: Union[np.ndarray, None] = None):
         self.x = x
-        self.y = y if y is not None else x  # Default to autocorrelation if y is not provided
+        self.y = y if y is not None else x
         self._compute_correlation()
         self.z = self.result[self.result.size // 2 :]
         self.z /= np.abs(self.z).max()
@@ -2848,13 +2839,11 @@ value of evaluated function</p></div>
         `str`
             A string representation of the directed graph.
         &#34;&#34;&#34;
-        # Assign and clean dataset
         self._load_data(dataset)
 
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
-        # We construct string from causal_graph
         feature_string = &#34; digraph { &#34;
         for column in columns:
             feature_string += column + &#34;; &#34;
@@ -2866,85 +2855,53 @@ value of evaluated function</p></div>
             numeric_df = pd.DataFrame(numeric_scaled.T, columns=numeric_df.columns)
             curr_dataset[numeric_df.columns] = numeric_df
 
-        # We construct dictionary to save index for scaling
         numeric_dict = dict(zip(list(numeric_df.columns), range(len(list(numeric_df.columns)))))
 
-        # Iterate over all the columns to obtain their importances.
         for index_column, column in enumerate(columns):
-
-            # Variable to predict
             Y = curr_dataset[column]
-
-            # We check whether it is numerical or categorical.
             column_type = Y.dtype
             if column_type != &#34;object&#34;:
-                # Linear regression model
                 Model = LinearRegression()
-
-                # Auxiliary dataset without the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
-
-                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-                # We train
                 Model.fit(encoded_df.to_numpy().T, Y.to_numpy().T)
-                # We obtain importance
                 importance = Model.get_importances()
                 w = Model.w
             else:
                 Model = LogisticRegression()
                 num_unique_entries = curr_dataset[column].nunique()
-
                 quick_encoder = DataFrameEncoder(Y.to_frame())
                 encoded_Y = quick_encoder.encode(save_mode=False)
-
-                # Mapping to one-hot
                 one_hot = OneHotEncoder()
                 train_y = one_hot.encode(encoded_Y[column])
-                # PASSING 0 -&gt; 0.5 and 1 -&gt; 0.73105
                 for i in range(len(train_y)):
                     for j in range(num_unique_entries):
                         if train_y[i][j] == 1.0:
                             train_y[i][j] = 0.73105
                         else:
                             train_y[i][j] = 0.5
-
-                # Delete the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
-
-                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-
-                # We train
                 Model.fit(encoded_df.to_numpy().T, train_y)
-
-                # We obtain importance
                 importance = Model.get_importances()
                 w = Model.w
-
-            # We obtain the $n$ most important ones
             top_n_indexes = sorted(
                 range(len(importance)), key=lambda i: importance[i], reverse=True
             )[:n_importances]
 
-            # We build the string for the column in question
             names_cols = list(X_aux.columns)
-            # We store the indices, values and column names in a list of tuples.
             features_imp_node = [
                 (names_cols[top_n_indexes[i]], importance[top_n_indexes[i]])
                 for i in range(n_importances)
             ]
-            # We store w&#39;s for predictions
 
             if column_type != &#34;object&#34;:
                 self.w_dict[column] = (w, None, names_cols, dfe, numeric_dict)
             else:
                 self.w_dict[column] = (w, quick_encoder, names_cols, dfe, numeric_dict)
-            # Add to general list
             self.all_features_imp_graph.append((column, features_imp_node))
-            # We format it
             for i in top_n_indexes:
                 feature_string += names_cols[i] + &#34; -&gt; &#34;
 
@@ -2953,10 +2910,8 @@ value of evaluated function</p></div>
         return feature_string + &#34;} &#34;
 
     def _load_data(self, dataset: DataFrame):
-        # Assign data and clean dataset of unneeded columns
 
         if len(self.not_features) &gt; 0:
-            # We remove unnecessary columns
             self.X = dataset.drop(columns=self.not_features)
 
         else:
@@ -3017,13 +2972,11 @@ value of evaluated function</p></div>
         `str`
             A string representation of the directed graph.
         &#34;&#34;&#34;
-        # Assign and clean dataset
         self._load_data(dataset)
 
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
-        # We construct string from causal_graph
         feature_string = &#34; digraph { &#34;
         for column in columns:
             feature_string += column + &#34;; &#34;
@@ -3035,85 +2988,53 @@ value of evaluated function</p></div>
             numeric_df = pd.DataFrame(numeric_scaled.T, columns=numeric_df.columns)
             curr_dataset[numeric_df.columns] = numeric_df
 
-        # We construct dictionary to save index for scaling
         numeric_dict = dict(zip(list(numeric_df.columns), range(len(list(numeric_df.columns)))))
 
-        # Iterate over all the columns to obtain their importances.
         for index_column, column in enumerate(columns):
-
-            # Variable to predict
             Y = curr_dataset[column]
-
-            # We check whether it is numerical or categorical.
             column_type = Y.dtype
             if column_type != &#34;object&#34;:
-                # Linear regression model
                 Model = LinearRegression()
-
-                # Auxiliary dataset without the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
-
-                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-                # We train
                 Model.fit(encoded_df.to_numpy().T, Y.to_numpy().T)
-                # We obtain importance
                 importance = Model.get_importances()
                 w = Model.w
             else:
                 Model = LogisticRegression()
                 num_unique_entries = curr_dataset[column].nunique()
-
                 quick_encoder = DataFrameEncoder(Y.to_frame())
                 encoded_Y = quick_encoder.encode(save_mode=False)
-
-                # Mapping to one-hot
                 one_hot = OneHotEncoder()
                 train_y = one_hot.encode(encoded_Y[column])
-                # PASSING 0 -&gt; 0.5 and 1 -&gt; 0.73105
                 for i in range(len(train_y)):
                     for j in range(num_unique_entries):
                         if train_y[i][j] == 1.0:
                             train_y[i][j] = 0.73105
                         else:
                             train_y[i][j] = 0.5
-
-                # Delete the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
-
-                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-
-                # We train
                 Model.fit(encoded_df.to_numpy().T, train_y)
-
-                # We obtain importance
                 importance = Model.get_importances()
                 w = Model.w
-
-            # We obtain the $n$ most important ones
             top_n_indexes = sorted(
                 range(len(importance)), key=lambda i: importance[i], reverse=True
             )[:n_importances]
 
-            # We build the string for the column in question
             names_cols = list(X_aux.columns)
-            # We store the indices, values and column names in a list of tuples.
             features_imp_node = [
                 (names_cols[top_n_indexes[i]], importance[top_n_indexes[i]])
                 for i in range(n_importances)
             ]
-            # We store w&#39;s for predictions
 
             if column_type != &#34;object&#34;:
                 self.w_dict[column] = (w, None, names_cols, dfe, numeric_dict)
             else:
                 self.w_dict[column] = (w, quick_encoder, names_cols, dfe, numeric_dict)
-            # Add to general list
             self.all_features_imp_graph.append((column, features_imp_node))
-            # We format it
             for i in top_n_indexes:
                 feature_string += names_cols[i] + &#34; -&gt; &#34;
 
@@ -3122,10 +3043,8 @@ value of evaluated function</p></div>
         return feature_string + &#34;} &#34;
 
     def _load_data(self, dataset: DataFrame):
-        # Assign data and clean dataset of unneeded columns
 
         if len(self.not_features) &gt; 0:
-            # We remove unnecessary columns
             self.X = dataset.drop(columns=self.not_features)
 
         else:
@@ -3176,13 +3095,11 @@ value of evaluated function</p></div>
         `str`
             A string representation of the directed graph.
         &#34;&#34;&#34;
-        # Assign and clean dataset
         self._load_data(dataset)
 
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
-        # We construct string from causal_graph
         feature_string = &#34; digraph { &#34;
         for column in columns:
             feature_string += column + &#34;; &#34;
@@ -3194,85 +3111,53 @@ value of evaluated function</p></div>
             numeric_df = pd.DataFrame(numeric_scaled.T, columns=numeric_df.columns)
             curr_dataset[numeric_df.columns] = numeric_df
 
-        # We construct dictionary to save index for scaling
         numeric_dict = dict(zip(list(numeric_df.columns), range(len(list(numeric_df.columns)))))
 
-        # Iterate over all the columns to obtain their importances.
         for index_column, column in enumerate(columns):
-
-            # Variable to predict
             Y = curr_dataset[column]
-
-            # We check whether it is numerical or categorical.
             column_type = Y.dtype
             if column_type != &#34;object&#34;:
-                # Linear regression model
                 Model = LinearRegression()
-
-                # Auxiliary dataset without the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
-
-                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-                # We train
                 Model.fit(encoded_df.to_numpy().T, Y.to_numpy().T)
-                # We obtain importance
                 importance = Model.get_importances()
                 w = Model.w
             else:
                 Model = LogisticRegression()
                 num_unique_entries = curr_dataset[column].nunique()
-
                 quick_encoder = DataFrameEncoder(Y.to_frame())
                 encoded_Y = quick_encoder.encode(save_mode=False)
-
-                # Mapping to one-hot
                 one_hot = OneHotEncoder()
                 train_y = one_hot.encode(encoded_Y[column])
-                # PASSING 0 -&gt; 0.5 and 1 -&gt; 0.73105
                 for i in range(len(train_y)):
                     for j in range(num_unique_entries):
                         if train_y[i][j] == 1.0:
                             train_y[i][j] = 0.73105
                         else:
                             train_y[i][j] = 0.5
-
-                # Delete the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
-
-                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-
-                # We train
                 Model.fit(encoded_df.to_numpy().T, train_y)
-
-                # We obtain importance
                 importance = Model.get_importances()
                 w = Model.w
-
-            # We obtain the $n$ most important ones
             top_n_indexes = sorted(
                 range(len(importance)), key=lambda i: importance[i], reverse=True
             )[:n_importances]
 
-            # We build the string for the column in question
             names_cols = list(X_aux.columns)
-            # We store the indices, values and column names in a list of tuples.
             features_imp_node = [
                 (names_cols[top_n_indexes[i]], importance[top_n_indexes[i]])
                 for i in range(n_importances)
             ]
-            # We store w&#39;s for predictions
 
             if column_type != &#34;object&#34;:
                 self.w_dict[column] = (w, None, names_cols, dfe, numeric_dict)
             else:
                 self.w_dict[column] = (w, quick_encoder, names_cols, dfe, numeric_dict)
-            # Add to general list
             self.all_features_imp_graph.append((column, features_imp_node))
-            # We format it
             for i in top_n_indexes:
                 feature_string += names_cols[i] + &#34; -&gt; &#34;
 
@@ -3281,10 +3166,8 @@ value of evaluated function</p></div>
         return feature_string + &#34;} &#34;
 
     def _load_data(self, dataset: DataFrame):
-        # Assign data and clean dataset of unneeded columns
 
         if len(self.not_features) &gt; 0:
-            # We remove unnecessary columns
             self.X = dataset.drop(columns=self.not_features)
 
         else:
@@ -3335,13 +3218,11 @@ value of evaluated function</p></div>
         `str`
             A string representation of the directed graph.
         &#34;&#34;&#34;
-        # Assign and clean dataset
         self._load_data(dataset)
 
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
-        # We construct string from causal_graph
         feature_string = &#34; digraph { &#34;
         for column in columns:
             feature_string += column + &#34;; &#34;
@@ -3353,85 +3234,53 @@ value of evaluated function</p></div>
             numeric_df = pd.DataFrame(numeric_scaled.T, columns=numeric_df.columns)
             curr_dataset[numeric_df.columns] = numeric_df
 
-        # We construct dictionary to save index for scaling
         numeric_dict = dict(zip(list(numeric_df.columns), range(len(list(numeric_df.columns)))))
 
-        # Iterate over all the columns to obtain their importances.
         for index_column, column in enumerate(columns):
-
-            # Variable to predict
             Y = curr_dataset[column]
-
-            # We check whether it is numerical or categorical.
             column_type = Y.dtype
             if column_type != &#34;object&#34;:
-                # Linear regression model
                 Model = LinearRegression()
-
-                # Auxiliary dataset without the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
-
-                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-                # We train
                 Model.fit(encoded_df.to_numpy().T, Y.to_numpy().T)
-                # We obtain importance
                 importance = Model.get_importances()
                 w = Model.w
             else:
                 Model = LogisticRegression()
                 num_unique_entries = curr_dataset[column].nunique()
-
                 quick_encoder = DataFrameEncoder(Y.to_frame())
                 encoded_Y = quick_encoder.encode(save_mode=False)
-
-                # Mapping to one-hot
                 one_hot = OneHotEncoder()
                 train_y = one_hot.encode(encoded_Y[column])
-                # PASSING 0 -&gt; 0.5 and 1 -&gt; 0.73105
                 for i in range(len(train_y)):
                     for j in range(num_unique_entries):
                         if train_y[i][j] == 1.0:
                             train_y[i][j] = 0.73105
                         else:
                             train_y[i][j] = 0.5
-
-                # Delete the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
-
-                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-
-                # We train
                 Model.fit(encoded_df.to_numpy().T, train_y)
-
-                # We obtain importance
                 importance = Model.get_importances()
                 w = Model.w
-
-            # We obtain the $n$ most important ones
             top_n_indexes = sorted(
                 range(len(importance)), key=lambda i: importance[i], reverse=True
             )[:n_importances]
 
-            # We build the string for the column in question
             names_cols = list(X_aux.columns)
-            # We store the indices, values and column names in a list of tuples.
             features_imp_node = [
                 (names_cols[top_n_indexes[i]], importance[top_n_indexes[i]])
                 for i in range(n_importances)
             ]
-            # We store w&#39;s for predictions
 
             if column_type != &#34;object&#34;:
                 self.w_dict[column] = (w, None, names_cols, dfe, numeric_dict)
             else:
                 self.w_dict[column] = (w, quick_encoder, names_cols, dfe, numeric_dict)
-            # Add to general list
             self.all_features_imp_graph.append((column, features_imp_node))
-            # We format it
             for i in top_n_indexes:
                 feature_string += names_cols[i] + &#34; -&gt; &#34;
 
@@ -3440,10 +3289,8 @@ value of evaluated function</p></div>
         return feature_string + &#34;} &#34;
 
     def _load_data(self, dataset: DataFrame):
-        # Assign data and clean dataset of unneeded columns
 
         if len(self.not_features) &gt; 0:
-            # We remove unnecessary columns
             self.X = dataset.drop(columns=self.not_features)
 
         else:
@@ -3494,13 +3341,11 @@ value of evaluated function</p></div>
         `str`
             A string representation of the directed graph.
         &#34;&#34;&#34;
-        # Assign and clean dataset
         self._load_data(dataset)
 
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
-        # We construct string from causal_graph
         feature_string = &#34; digraph { &#34;
         for column in columns:
             feature_string += column + &#34;; &#34;
@@ -3512,85 +3357,53 @@ value of evaluated function</p></div>
             numeric_df = pd.DataFrame(numeric_scaled.T, columns=numeric_df.columns)
             curr_dataset[numeric_df.columns] = numeric_df
 
-        # We construct dictionary to save index for scaling
         numeric_dict = dict(zip(list(numeric_df.columns), range(len(list(numeric_df.columns)))))
 
-        # Iterate over all the columns to obtain their importances.
         for index_column, column in enumerate(columns):
-
-            # Variable to predict
             Y = curr_dataset[column]
-
-            # We check whether it is numerical or categorical.
             column_type = Y.dtype
             if column_type != &#34;object&#34;:
-                # Linear regression model
                 Model = LinearRegression()
-
-                # Auxiliary dataset without the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
-
-                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-                # We train
                 Model.fit(encoded_df.to_numpy().T, Y.to_numpy().T)
-                # We obtain importance
                 importance = Model.get_importances()
                 w = Model.w
             else:
                 Model = LogisticRegression()
                 num_unique_entries = curr_dataset[column].nunique()
-
                 quick_encoder = DataFrameEncoder(Y.to_frame())
                 encoded_Y = quick_encoder.encode(save_mode=False)
-
-                # Mapping to one-hot
                 one_hot = OneHotEncoder()
                 train_y = one_hot.encode(encoded_Y[column])
-                # PASSING 0 -&gt; 0.5 and 1 -&gt; 0.73105
                 for i in range(len(train_y)):
                     for j in range(num_unique_entries):
                         if train_y[i][j] == 1.0:
                             train_y[i][j] = 0.73105
                         else:
                             train_y[i][j] = 0.5
-
-                # Delete the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
-
-                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-
-                # We train
                 Model.fit(encoded_df.to_numpy().T, train_y)
-
-                # We obtain importance
                 importance = Model.get_importances()
                 w = Model.w
-
-            # We obtain the $n$ most important ones
             top_n_indexes = sorted(
                 range(len(importance)), key=lambda i: importance[i], reverse=True
             )[:n_importances]
 
-            # We build the string for the column in question
             names_cols = list(X_aux.columns)
-            # We store the indices, values and column names in a list of tuples.
             features_imp_node = [
                 (names_cols[top_n_indexes[i]], importance[top_n_indexes[i]])
                 for i in range(n_importances)
             ]
-            # We store w&#39;s for predictions
 
             if column_type != &#34;object&#34;:
                 self.w_dict[column] = (w, None, names_cols, dfe, numeric_dict)
             else:
                 self.w_dict[column] = (w, quick_encoder, names_cols, dfe, numeric_dict)
-            # Add to general list
             self.all_features_imp_graph.append((column, features_imp_node))
-            # We format it
             for i in top_n_indexes:
                 feature_string += names_cols[i] + &#34; -&gt; &#34;
 
@@ -3599,10 +3412,8 @@ value of evaluated function</p></div>
         return feature_string + &#34;} &#34;
 
     def _load_data(self, dataset: DataFrame):
-        # Assign data and clean dataset of unneeded columns
 
         if len(self.not_features) &gt; 0:
-            # We remove unnecessary columns
             self.X = dataset.drop(columns=self.not_features)
 
         else:
@@ -3653,13 +3464,11 @@ value of evaluated function</p></div>
         `str`
             A string representation of the directed graph.
         &#34;&#34;&#34;
-        # Assign and clean dataset
         self._load_data(dataset)
 
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
-        # We construct string from causal_graph
         feature_string = &#34; digraph { &#34;
         for column in columns:
             feature_string += column + &#34;; &#34;
@@ -3671,85 +3480,53 @@ value of evaluated function</p></div>
             numeric_df = pd.DataFrame(numeric_scaled.T, columns=numeric_df.columns)
             curr_dataset[numeric_df.columns] = numeric_df
 
-        # We construct dictionary to save index for scaling
         numeric_dict = dict(zip(list(numeric_df.columns), range(len(list(numeric_df.columns)))))
 
-        # Iterate over all the columns to obtain their importances.
         for index_column, column in enumerate(columns):
-
-            # Variable to predict
             Y = curr_dataset[column]
-
-            # We check whether it is numerical or categorical.
             column_type = Y.dtype
             if column_type != &#34;object&#34;:
-                # Linear regression model
                 Model = LinearRegression()
-
-                # Auxiliary dataset without the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
-
-                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-                # We train
                 Model.fit(encoded_df.to_numpy().T, Y.to_numpy().T)
-                # We obtain importance
                 importance = Model.get_importances()
                 w = Model.w
             else:
                 Model = LogisticRegression()
                 num_unique_entries = curr_dataset[column].nunique()
-
                 quick_encoder = DataFrameEncoder(Y.to_frame())
                 encoded_Y = quick_encoder.encode(save_mode=False)
-
-                # Mapping to one-hot
                 one_hot = OneHotEncoder()
                 train_y = one_hot.encode(encoded_Y[column])
-                # PASSING 0 -&gt; 0.5 and 1 -&gt; 0.73105
                 for i in range(len(train_y)):
                     for j in range(num_unique_entries):
                         if train_y[i][j] == 1.0:
                             train_y[i][j] = 0.73105
                         else:
                             train_y[i][j] = 0.5
-
-                # Delete the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
-
-                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-
-                # We train
                 Model.fit(encoded_df.to_numpy().T, train_y)
-
-                # We obtain importance
                 importance = Model.get_importances()
                 w = Model.w
-
-            # We obtain the $n$ most important ones
             top_n_indexes = sorted(
                 range(len(importance)), key=lambda i: importance[i], reverse=True
             )[:n_importances]
 
-            # We build the string for the column in question
             names_cols = list(X_aux.columns)
-            # We store the indices, values and column names in a list of tuples.
             features_imp_node = [
                 (names_cols[top_n_indexes[i]], importance[top_n_indexes[i]])
                 for i in range(n_importances)
             ]
-            # We store w&#39;s for predictions
 
             if column_type != &#34;object&#34;:
                 self.w_dict[column] = (w, None, names_cols, dfe, numeric_dict)
             else:
                 self.w_dict[column] = (w, quick_encoder, names_cols, dfe, numeric_dict)
-            # Add to general list
             self.all_features_imp_graph.append((column, features_imp_node))
-            # We format it
             for i in top_n_indexes:
                 feature_string += names_cols[i] + &#34; -&gt; &#34;
 
@@ -3758,10 +3535,8 @@ value of evaluated function</p></div>
         return feature_string + &#34;} &#34;
 
     def _load_data(self, dataset: DataFrame):
-        # Assign data and clean dataset of unneeded columns
 
         if len(self.not_features) &gt; 0:
-            # We remove unnecessary columns
             self.X = dataset.drop(columns=self.not_features)
 
         else:
@@ -3802,13 +3577,11 @@ value of evaluated function</p></div>
     `str`
         A string representation of the directed graph.
     &#34;&#34;&#34;
-    # Assign and clean dataset
     self._load_data(dataset)
 
     curr_dataset = self.X
     columns = list(curr_dataset.columns)
 
-    # We construct string from causal_graph
     feature_string = &#34; digraph { &#34;
     for column in columns:
         feature_string += column + &#34;; &#34;
@@ -3820,85 +3593,53 @@ value of evaluated function</p></div>
         numeric_df = pd.DataFrame(numeric_scaled.T, columns=numeric_df.columns)
         curr_dataset[numeric_df.columns] = numeric_df
 
-    # We construct dictionary to save index for scaling
     numeric_dict = dict(zip(list(numeric_df.columns), range(len(list(numeric_df.columns)))))
 
-    # Iterate over all the columns to obtain their importances.
     for index_column, column in enumerate(columns):
-
-        # Variable to predict
         Y = curr_dataset[column]
-
-        # We check whether it is numerical or categorical.
         column_type = Y.dtype
         if column_type != &#34;object&#34;:
-            # Linear regression model
             Model = LinearRegression()
-
-            # Auxiliary dataset without the column in question
             X_aux = curr_dataset.drop([column], axis=1)
-
-            # We encode
             dfe = DataFrameEncoder(X_aux)
             encoded_df = dfe.encode(save_mode=False)
-            # We train
             Model.fit(encoded_df.to_numpy().T, Y.to_numpy().T)
-            # We obtain importance
             importance = Model.get_importances()
             w = Model.w
         else:
             Model = LogisticRegression()
             num_unique_entries = curr_dataset[column].nunique()
-
             quick_encoder = DataFrameEncoder(Y.to_frame())
             encoded_Y = quick_encoder.encode(save_mode=False)
-
-            # Mapping to one-hot
             one_hot = OneHotEncoder()
             train_y = one_hot.encode(encoded_Y[column])
-            # PASSING 0 -&gt; 0.5 and 1 -&gt; 0.73105
             for i in range(len(train_y)):
                 for j in range(num_unique_entries):
                     if train_y[i][j] == 1.0:
                         train_y[i][j] = 0.73105
                     else:
                         train_y[i][j] = 0.5
-
-            # Delete the column in question
             X_aux = curr_dataset.drop([column], axis=1)
-
-            # We encode
             dfe = DataFrameEncoder(X_aux)
             encoded_df = dfe.encode(save_mode=False)
-
-            # We train
             Model.fit(encoded_df.to_numpy().T, train_y)
-
-            # We obtain importance
             importance = Model.get_importances()
             w = Model.w
-
-        # We obtain the $n$ most important ones
         top_n_indexes = sorted(
             range(len(importance)), key=lambda i: importance[i], reverse=True
         )[:n_importances]
 
-        # We build the string for the column in question
         names_cols = list(X_aux.columns)
-        # We store the indices, values and column names in a list of tuples.
         features_imp_node = [
             (names_cols[top_n_indexes[i]], importance[top_n_indexes[i]])
             for i in range(n_importances)
         ]
-        # We store w&#39;s for predictions
 
         if column_type != &#34;object&#34;:
             self.w_dict[column] = (w, None, names_cols, dfe, numeric_dict)
         else:
             self.w_dict[column] = (w, quick_encoder, names_cols, dfe, numeric_dict)
-        # Add to general list
         self.all_features_imp_graph.append((column, features_imp_node))
-        # We format it
         for i in top_n_indexes:
             feature_string += names_cols[i] + &#34; -&gt; &#34;
 
@@ -3950,9 +3691,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
-            An array containing the importance of each feature.
-
+        `None` : The function doesn&#39;t return anything.
         &#34;&#34;&#34;
 
         self.X = dataset
@@ -3996,8 +3735,6 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.array`
             An array containing the importance of each feature.
-
-
         &#34;&#34;&#34;
         if print_important_features:
             for i, a in enumerate(self.importance):
@@ -4036,9 +3773,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
-            An array containing the importance of each feature.
-
+        `None` : The function doesn&#39;t return anything.
         &#34;&#34;&#34;
 
         self.X = dataset
@@ -4082,8 +3817,6 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.array`
             An array containing the importance of each feature.
-
-
         &#34;&#34;&#34;
         if print_important_features:
             for i, a in enumerate(self.importance):
@@ -4120,9 +3853,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
-            An array containing the importance of each feature.
-
+        `None` : The function doesn&#39;t return anything.
         &#34;&#34;&#34;
 
         self.X = dataset
@@ -4166,8 +3897,6 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.array`
             An array containing the importance of each feature.
-
-
         &#34;&#34;&#34;
         if print_important_features:
             for i, a in enumerate(self.importance):
@@ -4204,9 +3933,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
-            An array containing the importance of each feature.
-
+        `None` : The function doesn&#39;t return anything.
         &#34;&#34;&#34;
 
         self.X = dataset
@@ -4250,8 +3977,6 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.array`
             An array containing the importance of each feature.
-
-
         &#34;&#34;&#34;
         if print_important_features:
             for i, a in enumerate(self.importance):
@@ -4288,9 +4013,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
-            An array containing the importance of each feature.
-
+        `None` : The function doesn&#39;t return anything.
         &#34;&#34;&#34;
 
         self.X = dataset
@@ -4334,8 +4057,6 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.array`
             An array containing the importance of each feature.
-
-
         &#34;&#34;&#34;
         if print_important_features:
             for i, a in enumerate(self.importance):
@@ -4367,9 +4088,7 @@ A string representation of the directed graph.</p></div>
 
     Returns
     -------
-    importance : `np.array`
-        An array containing the importance of each feature.
-
+    `None` : The function doesn&#39;t return anything.
     &#34;&#34;&#34;
 
     self.X = dataset
@@ -4397,10 +4116,7 @@ A string representation of the directed graph.</p></div>
 <dd>A set of values returned by the linear function.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<dl>
-<dt><strong><code>importance</code></strong> :&ensp;<code>np.array</code></dt>
-<dd>An array containing the importance of each feature.</dd>
-</dl></div>
+<p><code>None</code> : The function doesn't return anything.</p></div>
 </dd>
 <dt id="likelihood.tools.tools.LinearRegression.get_importances"><code class="name flex">
 <span>def <span class="ident">get_importances</span></span>(<span>self, print_important_features: bool = False) ‑> numpy.ndarray</span>
@@ -4423,8 +4139,6 @@ A string representation of the directed graph.</p></div>
     -------
     importance : `np.array`
         An array containing the importance of each feature.
-
-
     &#34;&#34;&#34;
     if print_important_features:
         for i, a in enumerate(self.importance):
@@ -4532,6 +4246,10 @@ A string representation of the directed graph.</p></div>
         datapoints : `np.array`
             An array containing the values of the independent variable.
 
+        Returns
+        -------
+        `np.array`
+
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
 
@@ -4550,8 +4268,6 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.array`
             An array containing the importance of each feature.
-
-
         &#34;&#34;&#34;
         if print_important_features:
             for i, a in enumerate(self.importance):
@@ -4620,6 +4336,10 @@ A string representation of the directed graph.</p></div>
         datapoints : `np.array`
             An array containing the values of the independent variable.
 
+        Returns
+        -------
+        `np.array`
+
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
 
@@ -4638,8 +4358,6 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.array`
             An array containing the importance of each feature.
-
-
         &#34;&#34;&#34;
         if print_important_features:
             for i, a in enumerate(self.importance):
@@ -4706,6 +4424,10 @@ A string representation of the directed graph.</p></div>
         datapoints : `np.array`
             An array containing the values of the independent variable.
 
+        Returns
+        -------
+        `np.array`
+
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
 
@@ -4724,8 +4446,6 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.array`
             An array containing the importance of each feature.
-
-
         &#34;&#34;&#34;
         if print_important_features:
             for i, a in enumerate(self.importance):
@@ -4792,6 +4512,10 @@ A string representation of the directed graph.</p></div>
         datapoints : `np.array`
             An array containing the values of the independent variable.
 
+        Returns
+        -------
+        `np.array`
+
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
 
@@ -4810,8 +4534,6 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.array`
             An array containing the importance of each feature.
-
-
         &#34;&#34;&#34;
         if print_important_features:
             for i, a in enumerate(self.importance):
@@ -4878,6 +4600,10 @@ A string representation of the directed graph.</p></div>
         datapoints : `np.array`
             An array containing the values of the independent variable.
 
+        Returns
+        -------
+        `np.array`
+
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
 
@@ -4896,8 +4622,6 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.array`
             An array containing the importance of each feature.
-
-
         &#34;&#34;&#34;
         if print_important_features:
             for i, a in enumerate(self.importance):
@@ -4985,8 +4709,6 @@ A string representation of the directed graph.</p></div>
     -------
     importance : `np.array`
         An array containing the importance of each feature.
-
-
     &#34;&#34;&#34;
     if print_important_features:
         for i, a in enumerate(self.importance):
@@ -5022,6 +4744,10 @@ A string representation of the directed graph.</p></div>
     datapoints : `np.array`
         An array containing the values of the independent variable.
 
+    Returns
+    -------
+    `np.array`
+
     &#34;&#34;&#34;
     sig = np.vectorize(sigmoide)
 
@@ -5032,7 +4758,9 @@ A string representation of the directed graph.</p></div>
 <dl>
 <dt><strong><code>datapoints</code></strong> :&ensp;<code>np.array</code></dt>
 <dd>An array containing the values of the independent variable.</dd>
-</dl></div>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>np.array</code></p></div>
 </dd>
 </dl>
 </dd>
@@ -5059,21 +4787,18 @@ A string representation of the directed graph.</p></div>
         self.x = x
 
         if not isinstance(self.x, np.ndarray):
-            self.x = np.array(self.x)  # If not numpy array then convert it
+            self.x = np.array(self.x)
 
-        y = np.zeros(
-            (self.x.size, self.x.max() + 1)
-        )  # Build matrix of (size num of entries) x (max value + 1)
+        y = np.zeros((self.x.size, self.x.max() + 1))
 
-        y[np.arange(self.x.size), self.x] = 1  # Label with ones
+        y[np.arange(self.x.size), self.x] = 1
 
         return y
 
     def decode(self, x: np.ndarray | list) -&gt; np.ndarray:
         if not isinstance(x, np.ndarray):
-            x = np.array(x)  # If not numpy array then convert it
+            x = np.array(x)
 
-        # We return the max values of each row
         y = np.argmax(x, axis=1)
 
         return y</code></pre>
@@ -5103,21 +4828,18 @@ It receives an array of integers and returns a binary array using the one-hot en
         self.x = x
 
         if not isinstance(self.x, np.ndarray):
-            self.x = np.array(self.x)  # If not numpy array then convert it
+            self.x = np.array(self.x)
 
-        y = np.zeros(
-            (self.x.size, self.x.max() + 1)
-        )  # Build matrix of (size num of entries) x (max value + 1)
+        y = np.zeros((self.x.size, self.x.max() + 1))
 
-        y[np.arange(self.x.size), self.x] = 1  # Label with ones
+        y[np.arange(self.x.size), self.x] = 1
 
         return y
 
     def decode(self, x: np.ndarray | list) -&gt; np.ndarray:
         if not isinstance(x, np.ndarray):
-            x = np.array(x)  # If not numpy array then convert it
+            x = np.array(x)
 
-        # We return the max values of each row
         y = np.argmax(x, axis=1)
 
         return y</code></pre>
@@ -5137,9 +4859,8 @@ It receives an array of integers and returns a binary array using the one-hot en
 </summary>
 <pre><code class="python">def decode(self, x: np.ndarray | list) -&gt; np.ndarray:
     if not isinstance(x, np.ndarray):
-        x = np.array(x)  # If not numpy array then convert it
+        x = np.array(x)
 
-    # We return the max values of each row
     y = np.argmax(x, axis=1)
 
     return y</code></pre>
@@ -5158,13 +4879,11 @@ It receives an array of integers and returns a binary array using the one-hot en
     self.x = x
 
     if not isinstance(self.x, np.ndarray):
-        self.x = np.array(self.x)  # If not numpy array then convert it
+        self.x = np.array(self.x)
 
-    y = np.zeros(
-        (self.x.size, self.x.max() + 1)
-    )  # Build matrix of (size num of entries) x (max value + 1)
+    y = np.zeros((self.x.size, self.x.max() + 1))
 
-    y[np.arange(self.x.size), self.x] = 1  # Label with ones
+    y[np.arange(self.x.size), self.x] = 1
 
     return y</code></pre>
 </details>
@@ -5186,7 +4905,6 @@ It receives an array of integers and returns a binary array using the one-hot en
     def __init__(self) -&gt; None:
         pass
 
-    # Performance measure Res_T
     def f_mean(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -&gt; float:
         F_vec = self._f1_score(y_true, y_pred, labels)
         mean_f_measure = np.mean(F_vec)
@@ -5199,7 +4917,6 @@ It receives an array of integers and returns a binary array using the one-hot en
 
         return mean_f_measure
 
-    # Performance measure Res_P
     def resp(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -&gt; float:
         T_C = len(y_true)
         sum1, sum2 = 0.0, 0.0
@@ -5210,7 +4927,7 @@ It receives an array of integers and returns a binary array using the one-hot en
             sum1 += (1 - class_instances) * F_vec[label_idx]
             sum2 += 1 - class_instances
 
-        res_p = sum1 / sum2 if sum2 != 0 else 0.0  # Avoid division by zero
+        res_p = sum1 / sum2 if sum2 != 0 else 0.0
         print(f&#34;Metric Res_p -&gt; {res_p}&#34;)
 
         return res_p
@@ -5227,7 +4944,6 @@ It receives an array of integers and returns a binary array using the one-hot en
         sum_cols = np.sum(count_mat, axis=0)
         sum_rows = np.sum(count_mat, axis=1)
 
-        # Avoid division by zero
         precision = np.divide(
             count_mat.diagonal(), sum_cols, out=np.zeros_like(sum_cols), where=sum_cols != 0
         )
@@ -5239,7 +4955,6 @@ It receives an array of integers and returns a binary array using the one-hot en
 
         return f1_vec
 
-    # Returns confusion matrix of predictions
     def _confu_mat(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -&gt; np.ndarray:
         num_classes = len(labels)
         label_mapping = {label: idx for idx, label in enumerate(labels)}
@@ -5294,7 +5009,7 @@ It receives an array of integers and returns a binary array using the one-hot en
         sum1 += (1 - class_instances) * F_vec[label_idx]
         sum2 += 1 - class_instances
 
-    res_p = sum1 / sum2 if sum2 != 0 else 0.0  # Avoid division by zero
+    res_p = sum1 / sum2 if sum2 != 0 else 0.0
     print(f&#34;Metric Res_p -&gt; {res_p}&#34;)
 
     return res_p</code></pre>

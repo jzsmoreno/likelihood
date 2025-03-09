@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.5">
+<title>likelihood.tools.figures API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>likelihood.tools.figures</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="likelihood.tools.figures.act_pred"><code class="name flex">
+<span>def <span class="ident">act_pred</span></span>(<span>y_act: numpy.ndarray,<br>y_pred: numpy.ndarray,<br>name: str = 'example',<br>x_hist: bool = True,<br>y_hist: bool = True,<br>reg_line: bool = True,<br>save_dir: str | None = None) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def act_pred(
+    y_act: np.ndarray,
+    y_pred: np.ndarray,
+    name: str = &#34;example&#34;,
+    x_hist: bool = True,
+    y_hist: bool = True,
+    reg_line: bool = True,
+    save_dir: Optional[str] = None,
+) -&gt; None:
+    &#34;&#34;&#34;
+    Creates a scatter plot of actual vs predicted values along with histograms and a regression line.
+
+    Parameters
+    ----------
+    y_act : `np.ndarray`
+        The actual values (ground truth) as a 1D numpy array.
+    y_pred : `np.ndarray`
+        The predicted values as a 1D numpy array.
+    name : `str`, optional
+        The name for saving the plot. Default is &#34;example&#34;.
+    x_hist : `bool`, optional
+        Whether to display the histogram for the actual values (y_act). Default is True.
+    y_hist : `bool`, optional
+        Whether to display the histogram for the predicted values (y_pred). Default is True.
+    reg_line : `bool`, optional
+        Whether to plot a regression line (best-fit line) in the scatter plot. Default is True.
+    save_dir : `Optional[str]`, optional
+        The directory to save the figure. If None, the figure will not be saved. Default is None.
+
+    Returns
+    -------
+    `None` : The function doesn&#39;t return anything. It generates and optionally saves a plot.
+    &#34;&#34;&#34;
+
+    y_pred, y_act = y_pred.flatten(), y_act.flatten()
+
+    if not isinstance(y_act, np.ndarray) or not isinstance(y_pred, np.ndarray):
+        raise ValueError(&#34;y_act and y_pred must be numpy arrays.&#34;)
+    if y_act.shape != y_pred.shape:
+        raise ValueError(&#34;y_act and y_pred must have the same shape.&#34;)
+
+    mec = &#34;#2F4F4F&#34;
+    mfc = &#34;#C0C0C0&#34;
+
+    fig = plt.figure(figsize=(6, 6))
+
+    left, width = 0.1, 0.65
+    bottom, height = 0.1, 0.65
+    bottom_h = left + width
+    left_h = left + width + 0.05
+
+    ax2 = fig.add_axes([left, bottom, width, height])
+    ax2.tick_params(direction=&#34;in&#34;, length=7, top=True, right=True)
+    ax2.xaxis.set_minor_locator(AutoMinorLocator(2))
+    ax2.yaxis.set_minor_locator(AutoMinorLocator(2))
+
+    ax2.scatter(y_act, y_pred, color=mfc, edgecolor=mec, alpha=0.5, s=35, lw=1.2)
+    ax2.plot(
+        [y_act.min(), y_act.max()], [y_act.min(), y_act.max()], &#34;k--&#34;, alpha=0.8, label=&#34;Ideal&#34;
+    )
+
+    ax2.set_xlabel(&#34;Actual value&#34;)
+    ax2.set_ylabel(&#34;Predicted value&#34;)
+    ax2.set_xlim([y_act.min() * 1.05, y_act.max() * 1.05])
+    ax2.set_ylim([y_act.min() * 1.05, y_act.max() * 1.05])
+
+    ax1 = fig.add_axes([left, bottom_h, width, 0.15])
+    ax1.hist(y_act, bins=31, density=True, color=mfc, edgecolor=mec, alpha=0.6)
+    ax1.set_xticks([])
+    ax1.set_yticks([])
+    ax1.set_xlim(ax2.get_xlim())
+
+    if x_hist:
+        ax1.set_alpha(1.0)
+
+    ax3 = fig.add_axes([left_h, bottom, 0.15, height])
+    ax3.hist(
+        y_pred, bins=31, density=True, color=mfc, edgecolor=mec, orientation=&#34;horizontal&#34;, alpha=0.6
+    )
+    ax3.set_xticks([])
+    ax3.set_yticks([])
+    ax3.set_ylim(ax2.get_ylim())
+
+    if y_hist:
+        ax3.set_alpha(1.0)
+
+    if reg_line:
+        polyfit = np.polyfit(y_act, y_pred, deg=1)
+        reg_line_vals = np.poly1d(polyfit)(np.unique(y_act))
+        ax2.plot(np.unique(y_act), reg_line_vals, &#34;r-&#34;, label=&#34;Regression Line&#34;, alpha=0.8)
+
+    ax2.legend(loc=&#34;upper left&#34;, framealpha=0.35, handlelength=1.5)
+
+    plt.tight_layout()
+
+    if save_dir is not None:
+        os.makedirs(save_dir, exist_ok=True)
+        fig_name = os.path.join(save_dir, f&#34;{name}_act_pred.png&#34;)
+        plt.savefig(fig_name, bbox_inches=&#34;tight&#34;, dpi=300)
+
+    plt.show()
+    plt.close(fig)</code></pre>
+</details>
+<div class="desc"><p>Creates a scatter plot of actual vs predicted values along with histograms and a regression line.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>y_act</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The actual values (ground truth) as a 1D numpy array.</dd>
+<dt><strong><code>y_pred</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The predicted values as a 1D numpy array.</dd>
+<dt><strong><code>name</code></strong> :&ensp;<code>str</code>, optional</dt>
+<dd>The name for saving the plot. Default is "example".</dd>
+<dt><strong><code>x_hist</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Whether to display the histogram for the actual values (y_act). Default is True.</dd>
+<dt><strong><code>y_hist</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Whether to display the histogram for the predicted values (y_pred). Default is True.</dd>
+<dt><strong><code>reg_line</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Whether to plot a regression line (best-fit line) in the scatter plot. Default is True.</dd>
+<dt><strong><code>save_dir</code></strong> :&ensp;<code>Optional[str]</code>, optional</dt>
+<dd>The directory to save the figure. If None, the figure will not be saved. Default is None.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>None</code> : The function doesn't return anything. It generates and optionally saves a plot.</p></div>
+</dd>
+<dt id="likelihood.tools.figures.loss_curve"><code class="name flex">
+<span>def <span class="ident">loss_curve</span></span>(<span>x_data: numpy.ndarray,<br>train_err: numpy.ndarray,<br>val_err: numpy.ndarray,<br>name: str = 'example',<br>save_dir: str | None = None) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def loss_curve(
+    x_data: np.ndarray,
+    train_err: np.ndarray,
+    val_err: np.ndarray,
+    name: str = &#34;example&#34;,
+    save_dir: Optional[str] = None,
+) -&gt; None:
+    &#34;&#34;&#34;
+    Plots the loss curve for both training and validation errors over epochs,
+    and optionally saves the plot as an image.
+
+    Parameters
+    ----------
+    x_data : `np.ndarray`
+        Array of x-values (usually epochs) for the plot.
+    train_err : `np.ndarray`
+        Array of training error values.
+    val_err : `np.ndarray`
+        Array of validation error values.
+    name : `str`, optional
+        The name to use when saving the plot. Default is &#34;example&#34;.
+    save_dir : `Optional[str]`, optional
+        Directory where the plot should be saved. If None, the plot is not saved. Default is None.
+
+    Returns
+    -------
+    `None` : This function does not return any value. It generates and optionally saves a plot.
+    &#34;&#34;&#34;
+    mec1 = &#34;#2F4F4F&#34;
+    mfc1 = &#34;#C0C0C0&#34;
+    mec2 = &#34;maroon&#34;
+    mfc2 = &#34;pink&#34;
+
+    fig, ax = plt.subplots(figsize=(4, 4))
+
+    ax.plot(
+        x_data,
+        train_err,
+        &#34;-&#34;,
+        color=mec1,
+        marker=&#34;o&#34;,
+        mec=mec1,
+        mfc=mfc1,
+        ms=4,
+        alpha=0.5,
+        label=&#34;train&#34;,
+    )
+
+    ax.plot(
+        x_data,
+        val_err,
+        &#34;--&#34;,
+        color=mec2,
+        marker=&#34;s&#34;,
+        mec=mec2,
+        mfc=mfc2,
+        ms=4,
+        alpha=0.5,
+        label=&#34;validation&#34;,
+    )
+
+    max_val_err = max(val_err)
+    ax.axhline(max_val_err, color=&#34;b&#34;, linestyle=&#34;--&#34;, alpha=0.3)
+
+    ax.set_xlabel(&#34;Number of training epochs&#34;)
+    ax.set_ylabel(&#34;Loss (Units)&#34;)
+    ax.set_ylim(0, 2 * np.mean(val_err))
+
+    ax.legend(loc=1, framealpha=0.35, handlelength=1.5)
+
+    minor_locator_x = AutoMinorLocator(2)
+    minor_locator_y = AutoMinorLocator(2)
+    ax.get_xaxis().set_minor_locator(minor_locator_x)
+    ax.get_yaxis().set_minor_locator(minor_locator_y)
+
+    ax.tick_params(right=True, top=True, direction=&#34;in&#34;, length=7)
+    ax.tick_params(which=&#34;minor&#34;, right=True, top=True, direction=&#34;in&#34;, length=4)
+
+    if save_dir is not None:
+        fig_name = f&#34;{save_dir}/{name}_loss_curve.png&#34;
+        os.makedirs(save_dir, exist_ok=True)
+        plt.savefig(fig_name, bbox_inches=&#34;tight&#34;, dpi=300)
+
+    plt.draw()
+    plt.pause(0.001)
+    plt.close()</code></pre>
+</details>
+<div class="desc"><p>Plots the loss curve for both training and validation errors over epochs,
+and optionally saves the plot as an image.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>x_data</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Array of x-values (usually epochs) for the plot.</dd>
+<dt><strong><code>train_err</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Array of training error values.</dd>
+<dt><strong><code>val_err</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Array of validation error values.</dd>
+<dt><strong><code>name</code></strong> :&ensp;<code>str</code>, optional</dt>
+<dd>The name to use when saving the plot. Default is "example".</dd>
+<dt><strong><code>save_dir</code></strong> :&ensp;<code>Optional[str]</code>, optional</dt>
+<dd>Directory where the plot should be saved. If None, the plot is not saved. Default is None.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>None</code> : This function does not return any value. It generates and optionally saves a plot.</p></div>
+</dd>
+<dt id="likelihood.tools.figures.residual"><code class="name flex">
+<span>def <span class="ident">residual</span></span>(<span>y_act: numpy.ndarray,<br>y_pred: numpy.ndarray,<br>name: str = 'example',<br>save_dir: str = None) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def residual(
+    y_act: np.ndarray, y_pred: np.ndarray, name: str = &#34;example&#34;, save_dir: str = None
+) -&gt; None:
+    &#34;&#34;&#34;
+    Plots the residual errors between the actual and predicted values.
+
+    This function generates a residual plot by calculating the difference between the
+    actual values (y_act) and predicted values (y_pred). The plot shows the residuals
+    (y_pred - y_act) against the actual values. Optionally, the plot can be saved to a file.
+
+    Parameters
+    ----------
+    y_act : `np.ndarray`
+        The actual values, typically the ground truth values.
+    y_pred : `np.ndarray`
+        The predicted values that are compared against the actual values.
+    name : `str`, optional
+        The name of the plot file (without extension) used when saving the plot. Default is &#34;example&#34;.
+    save_dir : `str`, optional
+        The directory where the plot will be saved. If None, the plot is not saved. Default is None.
+
+    Returns
+    -------
+    `None` : This function does not return any value. It generates and optionally saves a plot.
+
+    Notes
+    -----
+    - The plot is shown with the residuals (y_pred - y_act) on the y-axis and the actual values (y_act)
+      on the x-axis. The plot includes a horizontal line representing the ideal case where the residual
+      is zero (i.e., perfect predictions).
+    - The plot will be saved as a PNG image if a valid `save_dir` is provided.
+    &#34;&#34;&#34;
+
+    mec = &#34;#2F4F4F&#34;
+    mfc = &#34;#C0C0C0&#34;
+
+    y_act = np.array(y_act)
+    y_pred = np.array(y_pred)
+
+    xmin = np.min([y_act]) * 0.9
+    xmax = np.max([y_act]) / 0.9
+    y_err = y_pred - y_act
+    ymin = np.min([y_err]) * 0.9
+    ymax = np.max([y_err]) / 0.9
+
+    fig, ax = plt.subplots(figsize=(4, 4))
+
+    ax.plot(y_act, y_err, &#34;o&#34;, mec=mec, mfc=mfc, alpha=0.5, label=None, mew=1.2, ms=5.2)
+    ax.plot([xmin, xmax], [0, 0], &#34;k--&#34;, alpha=0.8, label=&#34;ideal&#34;)
+
+    ax.set_ylabel(&#34;Residual error&#34;)
+    ax.set_xlabel(&#34;Actual value&#34;)
+    ax.legend(loc=&#34;lower right&#34;)
+
+    minor_locator_x = AutoMinorLocator(2)
+    minor_locator_y = AutoMinorLocator(2)
+    ax.get_xaxis().set_minor_locator(minor_locator_x)
+    ax.get_yaxis().set_minor_locator(minor_locator_y)
+
+    ax.tick_params(right=True, top=True, direction=&#34;in&#34;, length=7)
+    ax.tick_params(which=&#34;minor&#34;, right=True, top=True, direction=&#34;in&#34;, length=4)
+
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+
+    if save_dir is not None:
+        fig_name = f&#34;{save_dir}/{name}_residual.png&#34;
+        os.makedirs(save_dir, exist_ok=True)
+        plt.savefig(fig_name, bbox_inches=&#34;tight&#34;, dpi=300)
+
+    plt.draw()
+    plt.pause(0.001)
+
+    plt.close()</code></pre>
+</details>
+<div class="desc"><p>Plots the residual errors between the actual and predicted values.</p>
+<p>This function generates a residual plot by calculating the difference between the
+actual values (y_act) and predicted values (y_pred). The plot shows the residuals
+(y_pred - y_act) against the actual values. Optionally, the plot can be saved to a file.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>y_act</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The actual values, typically the ground truth values.</dd>
+<dt><strong><code>y_pred</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The predicted values that are compared against the actual values.</dd>
+<dt><strong><code>name</code></strong> :&ensp;<code>str</code>, optional</dt>
+<dd>The name of the plot file (without extension) used when saving the plot. Default is "example".</dd>
+<dt><strong><code>save_dir</code></strong> :&ensp;<code>str</code>, optional</dt>
+<dd>The directory where the plot will be saved. If None, the plot is not saved. Default is None.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>None</code> : This function does not return any value. It generates and optionally saves a plot.</p>
+<h2 id="notes">Notes</h2>
+<ul>
+<li>The plot is shown with the residuals (y_pred - y_act) on the y-axis and the actual values (y_act)
+on the x-axis. The plot includes a horizontal line representing the ideal case where the residual
+is zero (i.e., perfect predictions).</li>
+<li>The plot will be saved as a PNG image if a valid <code>save_dir</code> is provided.</li>
+</ul></div>
+</dd>
+<dt id="likelihood.tools.figures.residual_hist"><code class="name flex">
+<span>def <span class="ident">residual_hist</span></span>(<span>y_act: numpy.ndarray,<br>y_pred: numpy.ndarray,<br>name: str = 'example',<br>save_dir: str | None = None) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def residual_hist(
+    y_act: np.ndarray, y_pred: np.ndarray, name: str = &#34;example&#34;, save_dir: Optional[str] = None
+) -&gt; None:
+    &#34;&#34;&#34;
+    Generates a residual error histogram with kernel density estimate (KDE) for the given true and predicted values.
+    Optionally saves the plot to a specified directory.
+
+    Parameters
+    ----------
+    y_act : `np.ndarray`
+        Array of true (actual) values.
+
+    y_pred : `np.ndarray`
+        Array of predicted values.
+
+    name : `str`, optional, default=&#34;example&#34;
+        The name used for the saved plot filename.
+
+    save_dir : `str`, optional, default=None
+        Directory path to save the generated plot. If None, the plot is not saved.
+
+    Returns
+    --------
+    `None` : This function generates and optionally saves a plot but does not return any value.
+
+    Raises
+    -------
+    `UserWarning` : If the data has high correlation among variables, suggesting dimensionality reduction.
+    &#34;&#34;&#34;
+    mec = &#34;#2F4F4F&#34;
+    mfc = &#34;#C0C0C0&#34;
+    y_pred, y_act = y_pred.flatten(), y_act.flatten()
+
+    fig, ax = plt.subplots(figsize=(4, 4))
+    y_err = y_pred - y_act
+    x_range = np.linspace(min(y_err), max(y_err), 1000)
+
+    try:
+        kde_act = stats.gaussian_kde(y_err)
+        ax.plot(x_range, kde_act(x_range), &#34;-&#34;, lw=1.2, color=&#34;k&#34;, label=&#34;kde&#34;)
+    except np.linalg.LinAlgError as e:
+        warnings.warn(
+            &#34;The data has very high correlation among variables. Consider dimensionality reduction.&#34;,
+            UserWarning,
+        )
+
+    ax.hist(y_err, color=mfc, bins=35, alpha=1, edgecolor=mec, density=True)
+
+    ax.set_xlabel(&#34;Residual error&#34;)
+    ax.set_ylabel(&#34;Relative frequency&#34;)
+    plt.legend(loc=2, framealpha=0.35, handlelength=1.5)
+
+    ax.tick_params(direction=&#34;in&#34;, length=7, top=True, right=True)
+
+    minor_locator_x = AutoMinorLocator(2)
+    minor_locator_y = AutoMinorLocator(2)
+    ax.get_xaxis().set_minor_locator(minor_locator_x)
+    ax.get_yaxis().set_minor_locator(minor_locator_y)
+    plt.tick_params(which=&#34;minor&#34;, direction=&#34;in&#34;, length=4, right=True, top=True)
+
+    if save_dir is not None:
+        fig_name = f&#34;{save_dir}/{name}_residual_hist.png&#34;
+        os.makedirs(save_dir, exist_ok=True)
+        plt.savefig(fig_name, bbox_inches=&#34;tight&#34;, dpi=300)
+
+    plt.draw()
+    plt.pause(0.001)
+    plt.close()</code></pre>
+</details>
+<div class="desc"><p>Generates a residual error histogram with kernel density estimate (KDE) for the given true and predicted values.
+Optionally saves the plot to a specified directory.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>y_act</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Array of true (actual) values.</dd>
+<dt><strong><code>y_pred</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Array of predicted values.</dd>
+<dt><strong><code>name</code></strong> :&ensp;<code>str</code>, optional, default=<code>"example"</code></dt>
+<dd>The name used for the saved plot filename.</dd>
+<dt><strong><code>save_dir</code></strong> :&ensp;<code>str</code>, optional, default=<code>None</code></dt>
+<dd>Directory path to save the generated plot. If None, the plot is not saved.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>None</code> : This function generates and optionally saves a plot but does not return any value.</p>
+<h2 id="raises">Raises</h2>
+<p><code>UserWarning</code> : If the data has high correlation among variables, suggesting dimensionality reduction.</p></div>
+</dd>
+</dl>
+</section>
+<section>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="likelihood.tools" href="index.html">likelihood.tools</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="likelihood.tools.figures.act_pred" href="#likelihood.tools.figures.act_pred">act_pred</a></code></li>
+<li><code><a title="likelihood.tools.figures.loss_curve" href="#likelihood.tools.figures.loss_curve">loss_curve</a></code></li>
+<li><code><a title="likelihood.tools.figures.residual" href="#likelihood.tools.figures.residual">residual</a></code></li>
+<li><code><a title="likelihood.tools.figures.residual_hist" href="#likelihood.tools.figures.residual_hist">residual_hist</a></code></li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+</footer>
+</body>
+</html>

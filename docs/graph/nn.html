@@ -75,6 +75,8 @@ el.replaceWith(d);
     ----------
     similarity: `int`
         The minimum number of features that must be the same in both arrays to be considered similar.
+    threshold : `float`
+        The threshold value used in the `compare_similarity` function. Default is 0.05.
 
     Returns
     -------
@@ -93,6 +95,7 @@ el.replaceWith(d);
     assert len(df_) &gt; 0
 
     similarity = kwargs.get(&#34;similarity&#34;, len(df_.columns) - 1)
+    threshold = kwargs.get(&#34;threshold&#34;, 0.05)
     assert similarity &lt;= df_.shape[1]
 
     adj_dict = {index: row.tolist() for index, row in df_.iterrows()}
@@ -101,7 +104,7 @@ el.replaceWith(d);
 
     for i in range(len(df_)):
         for j in range(len(df_)):
-            if compare_similarity(adj_dict[i], adj_dict[j]) &gt;= similarity:
+            if compare_similarity(adj_dict[i], adj_dict[j], threshold=threshold) &gt;= similarity:
                 adjacency_matrix[i][j] = 1
 
     if sparse:
@@ -135,7 +138,9 @@ The resulting matrix is a square matrix with the same number of rows and columns
 </dl>
 <h2 id="keyword-arguments">Keyword Arguments:</h2>
 <p>similarity: <code>int</code>
-The minimum number of features that must be the same in both arrays to be considered similar.</p>
+The minimum number of features that must be the same in both arrays to be considered similar.
+threshold : <code>float</code>
+The threshold value used in the <code><a title="likelihood.graph.nn.compare_similarity" href="#likelihood.graph.nn.compare_similarity">compare_similarity()</a></code> function. Default is 0.05.</p>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><strong><code>adj_dict</code></strong> :&ensp;<code>dict</code></dt>
@@ -194,7 +199,10 @@ The minimum number of features that must be the same in both arrays to be consid
         **kwargs,
     ):
         sparse = kwargs.get(&#34;sparse&#34;, True)
-        _, adjacency = cal_adjacency_matrix(df, exclude_subset=exclude_subset, sparse=sparse)
+        threshold = kwargs.get(&#34;threshold&#34;, 0.05)
+        _, adjacency = cal_adjacency_matrix(
+            df, exclude_subset=exclude_subset, sparse=sparse, threshold=threshold
+        )
         if target is not None:
             X = df.drop(columns=[target] + exclude_subset)
         else:
@@ -1055,12 +1063,10 @@ created by the inner layer. Nested layers should be instantiated in the
 <dd>String name of the layer.</dd>
 <dt><strong><code>dtype</code></strong></dt>
 <dd>The dtype of the layer's computations and weights. Can also be a
-<code>keras.DTypePolicy</code>,
-which allows the computation and
-weight dtype to differ. Defaults to <code>None</code>. <code>None</code> means to use
-<code>keras.config.dtype_policy()</code>,
-which is a <code>float32</code> policy unless set to different value
-(via <code>keras.config.set_dtype_policy()</code>).</dd>
+<code>keras.DTypePolicy</code>, which allows the computation and weight dtype
+to differ. Defaults to <code>None</code>. <code>None</code> means to use
+<code>keras.config.dtype_policy()</code>, which is a <code>float32</code> policy unless
+set to different value (via <code>keras.config.set_dtype_policy()</code>).</dd>
 </dl>
 <h2 id="attributes">Attributes</h2>
 <dl>

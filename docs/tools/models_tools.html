@@ -68,23 +68,38 @@ el.replaceWith(d);
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.tools.models_tools.graph_metrics"><code class="name flex">
-<span>def <span class="ident">graph_metrics</span></span>(<span>adj_matrix, eigenvector_threshold=1e-06)</span>
+<span>def <span class="ident">graph_metrics</span></span>(<span>adj_matrix: numpy.ndarray, eigenvector_threshold: float = 1e-06) ‑> pandas.core.frame.DataFrame</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def graph_metrics(adj_matrix, eigenvector_threshold=1e-6):
+<pre><code class="python">def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -&gt; DataFrame:
     &#34;&#34;&#34;
-    This function calculates the following graph metrics using the adjacency matrix:
-    1. Degree Centrality
-    2. Clustering Coefficient
-    3. Eigenvector Centrality
-    4. Degree
-    5. Betweenness Centrality
-    6. Closeness Centrality
-    7. Assortativity
+    Calculate various graph metrics based on the given adjacency matrix and return them in a single DataFrame.
+
+    Parameters
+    ----------
+    adj_matrix : `np.ndarray`
+        The adjacency matrix representing the graph, where each element denotes the presence/weight of an edge between nodes.
+    eigenvector_threshold : `float`
+        A threshold for the eigenvector centrality calculation, used to determine the cutoff for small eigenvalues. Default is `1e-6`.
+
+    Returns
+    ----------
+    DataFrame : A DataFrame containing the following graph metrics as columns.
+        - `Degree Centrality`: Degree centrality values for each node, indicating the number of direct connections each node has.
+        - `Clustering Coefficient`: Clustering coefficient values for each node, representing the degree to which nodes cluster together.
+        - `Eigenvector Centrality`: Eigenvector centrality values, indicating the influence of a node in the graph based on the eigenvectors of the adjacency matrix.
+        - `Degree`: The degree of each node, representing the number of edges connected to each node.
+        - `Betweenness Centrality`: Betweenness centrality values, representing the extent to which a node lies on the shortest paths between other nodes.
+        - `Closeness Centrality`: Closeness centrality values, indicating the inverse of the average shortest path distance from a node to all other nodes in the graph.
+        - `Assortativity`: The assortativity coefficient of the graph, measuring the tendency of nodes to connect to similar nodes.
+
+    Notes
+    ----------
+    The returned DataFrame will have one row for each node and one column for each of the computed metrics.
     &#34;&#34;&#34;
     adj_matrix = adj_matrix.astype(int)
     G = nx.from_numpy_array(adj_matrix)
@@ -117,14 +132,202 @@ el.replaceWith(d);
 
     return metrics_df</code></pre>
 </details>
-<div class="desc"><p>This function calculates the following graph metrics using the adjacency matrix:
-1. Degree Centrality
-2. Clustering Coefficient
-3. Eigenvector Centrality
-4. Degree
-5. Betweenness Centrality
-6. Closeness Centrality
-7. Assortativity</p></div>
+<div class="desc"><p>Calculate various graph metrics based on the given adjacency matrix and return them in a single DataFrame.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>adj_matrix</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The adjacency matrix representing the graph, where each element denotes the presence/weight of an edge between nodes.</dd>
+<dt><strong><code>eigenvector_threshold</code></strong> :&ensp;<code>float</code></dt>
+<dd>A threshold for the eigenvector centrality calculation, used to determine the cutoff for small eigenvalues. Default is <code>1e-6</code>.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>DataFrame : A DataFrame containing the following graph metrics as columns.
+- <code>Degree Centrality</code>: Degree centrality values for each node, indicating the number of direct connections each node has.
+- <code>Clustering Coefficient</code>: Clustering coefficient values for each node, representing the degree to which nodes cluster together.
+- <code>Eigenvector Centrality</code>: Eigenvector centrality values, indicating the influence of a node in the graph based on the eigenvectors of the adjacency matrix.
+- <code>Degree</code>: The degree of each node, representing the number of edges connected to each node.
+- <code>Betweenness Centrality</code>: Betweenness centrality values, representing the extent to which a node lies on the shortest paths between other nodes.
+- <code>Closeness Centrality</code>: Closeness centrality values, indicating the inverse of the average shortest path distance from a node to all other nodes in the graph.
+- <code>Assortativity</code>: The assortativity coefficient of the graph, measuring the tendency of nodes to connect to similar nodes.</p>
+<h2 id="notes">Notes</h2>
+<p>The returned DataFrame will have one row for each node and one column for each of the computed metrics.</p></div>
+</dd>
+<dt id="likelihood.tools.models_tools.remove_collinearity"><code class="name flex">
+<span>def <span class="ident">remove_collinearity</span></span>(<span>df: pandas.core.frame.DataFrame, threshold: float = 0.9)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def remove_collinearity(df: DataFrame, threshold: float = 0.9):
+    &#34;&#34;&#34;
+    Removes highly collinear features from the DataFrame based on a correlation threshold.
+
+    This function calculates the correlation matrix of the DataFrame and removes columns
+    that are highly correlated with any other column in the DataFrame. It uses an absolute
+    correlation value greater than the specified threshold to identify which columns to drop.
+
+    Parameters
+    ----------
+    df : `DataFrame`
+        The input DataFrame containing numerical data.
+    threshold : `float`
+        The correlation threshold above which features will be removed. Default is `0.9`.
+
+    Returns
+    ----------
+        DataFrame: A DataFrame with highly collinear features removed.
+    &#34;&#34;&#34;
+    corr_matrix = df.corr().abs()
+    upper_triangle = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
+    to_drop = [
+        column for column in upper_triangle.columns if any(upper_triangle[column] &gt; threshold)
+    ]
+    df_reduced = df.drop(columns=to_drop)
+
+    return df_reduced</code></pre>
+</details>
+<div class="desc"><p>Removes highly collinear features from the DataFrame based on a correlation threshold.</p>
+<p>This function calculates the correlation matrix of the DataFrame and removes columns
+that are highly correlated with any other column in the DataFrame. It uses an absolute
+correlation value greater than the specified threshold to identify which columns to drop.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dd>The input DataFrame containing numerical data.</dd>
+<dt><strong><code>threshold</code></strong> :&ensp;<code>float</code></dt>
+<dd>The correlation threshold above which features will be removed. Default is <code>0.9</code>.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<pre><code>DataFrame: A DataFrame with highly collinear features removed.
+</code></pre></div>
+</dd>
+<dt id="likelihood.tools.models_tools.suppress_warnings"><code class="name flex">
+<span>def <span class="ident">suppress_warnings</span></span>(<span>func)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def suppress_warnings(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        with warnings.catch_warnings():
+            warnings.simplefilter(&#34;ignore&#34;)
+            return func(*args, **kwargs)
+
+    return wrapper</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="likelihood.tools.models_tools.train_and_insights"><code class="name flex">
+<span>def <span class="ident">train_and_insights</span></span>(<span>x_data: numpy.ndarray,<br>y_act: numpy.ndarray,<br>model: keras.src.models.model.Model,<br>patience: int = 3,<br>reg: bool = False,<br>frac: float = 1.0,<br>**kwargs: Dict | None) ‑> keras.src.models.model.Model</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def train_and_insights(
+    x_data: np.ndarray,
+    y_act: np.ndarray,
+    model: tf.keras.Model,
+    patience: int = 3,
+    reg: bool = False,
+    frac: float = 1.0,
+    **kwargs: Optional[Dict],
+) -&gt; tf.keras.Model:
+    &#34;&#34;&#34;
+    Train a Keras model and provide insights on the training and validation metrics.
+
+    Parameters
+    ----------
+    x_data : `np.ndarray`
+        Input data for training the model.
+    y_act : `np.ndarray`
+        Actual labels corresponding to x_data.
+    model : `tf.keras.Model`
+        The Keras model to train.
+    patience : `int`
+        The patience parameter for early stopping callback (default is 3).
+    reg : `bool`
+        Flag to determine if residual analysis should be performed (default is `False`).
+    frac : `float`
+        Fraction of data to use (default is 1.0).
+
+    Keyword Arguments:
+    ----------
+    Additional keyword arguments passed to the `model.fit` function, such as validation split and callbacks.
+
+    Returns
+    ----------
+    `tf.keras.Model`
+        The trained model after fitting.
+    &#34;&#34;&#34;
+
+    validation_split = kwargs.get(&#34;validation_split&#34;, 0.2)
+    callback = kwargs.get(
+        &#34;callback&#34;, [tf.keras.callbacks.EarlyStopping(monitor=&#34;val_loss&#34;, patience=patience)]
+    )
+
+    for key in [&#34;validation_split&#34;, &#34;callback&#34;]:
+        if key in kwargs:
+            del kwargs[key]
+
+    history = model.fit(
+        x_data,
+        y_act,
+        validation_split=validation_split,
+        verbose=False,
+        callbacks=callback,
+        **kwargs,
+    )
+
+    hist = pd.DataFrame(history.history)
+    hist[&#34;epoch&#34;] = history.epoch
+
+    columns = hist.columns
+    train_err, train_metric = columns[0], columns[1]
+    val_err, val_metric = columns[2], columns[3]
+    train_err, val_err = hist[train_err].values, hist[val_err].values
+
+    with suppress_prints():
+        n = int(len(x_data) * frac)
+        y_pred = model.predict(x_data[:n])
+        y_act = y_act[:n]
+
+    if reg:
+        residual(y_act, y_pred)
+        residual_hist(y_act, y_pred)
+        act_pred(y_act, y_pred)
+
+    loss_curve(hist[&#34;epoch&#34;].values, train_err, val_err)
+
+    return model</code></pre>
+</details>
+<div class="desc"><p>Train a Keras model and provide insights on the training and validation metrics.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>x_data</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Input data for training the model.</dd>
+<dt><strong><code>y_act</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Actual labels corresponding to x_data.</dd>
+<dt><strong><code>model</code></strong> :&ensp;<code>tf.keras.Model</code></dt>
+<dd>The Keras model to train.</dd>
+<dt><strong><code>patience</code></strong> :&ensp;<code>int</code></dt>
+<dd>The patience parameter for early stopping callback (default is 3).</dd>
+<dt><strong><code>reg</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Flag to determine if residual analysis should be performed (default is <code>False</code>).</dd>
+<dt><strong><code>frac</code></strong> :&ensp;<code>float</code></dt>
+<dd>Fraction of data to use (default is 1.0).</dd>
+</dl>
+<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<p>Additional keyword arguments passed to the <code>model.fit</code> function, such as validation split and callbacks.</p>
+<h2 id="returns">Returns</h2>
+<p><code>tf.keras.Model</code>
+The trained model after fitting.</p></div>
 </dd>
 </dl>
 </section>
@@ -197,12 +400,10 @@ created by the inner layer. Nested layers should be instantiated in the
 <dd>String name of the layer.</dd>
 <dt><strong><code>dtype</code></strong></dt>
 <dd>The dtype of the layer's computations and weights. Can also be a
-<code>keras.DTypePolicy</code>,
-which allows the computation and
-weight dtype to differ. Defaults to <code>None</code>. <code>None</code> means to use
-<code>keras.config.dtype_policy()</code>,
-which is a <code>float32</code> policy unless set to different value
-(via <code>keras.config.set_dtype_policy()</code>).</dd>
+<code>keras.DTypePolicy</code>, which allows the computation and weight dtype
+to differ. Defaults to <code>None</code>. <code>None</code> means to use
+<code>keras.config.dtype_policy()</code>, which is a <code>float32</code> policy unless
+set to different value (via <code>keras.config.set_dtype_policy()</code>).</dd>
 </dl>
 <h2 id="attributes">Attributes</h2>
 <dl>
@@ -388,6 +589,25 @@ assert my_sum.trainable_weights == []
 </dd>
 </dl>
 </dd>
+<dt id="likelihood.tools.models_tools.suppress_prints"><code class="flex name class">
+<span>class <span class="ident">suppress_prints</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class suppress_prints:
+    def __enter__(self):
+        self.original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, &#34;w&#34;)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        sys.stdout.close()
+        sys.stdout = self.original_stdout</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 </dl>
 </section>
 </article>
@@ -405,6 +625,9 @@ assert my_sum.trainable_weights == []
 <ul class="">
 <li><code><a title="likelihood.tools.models_tools.apply_lora" href="#likelihood.tools.models_tools.apply_lora">apply_lora</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.graph_metrics" href="#likelihood.tools.models_tools.graph_metrics">graph_metrics</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.remove_collinearity" href="#likelihood.tools.models_tools.remove_collinearity">remove_collinearity</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.suppress_warnings" href="#likelihood.tools.models_tools.suppress_warnings">suppress_warnings</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.train_and_insights" href="#likelihood.tools.models_tools.train_and_insights">train_and_insights</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
@@ -415,6 +638,9 @@ assert my_sum.trainable_weights == []
 <li><code><a title="likelihood.tools.models_tools.LoRALayer.build" href="#likelihood.tools.models_tools.LoRALayer.build">build</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.LoRALayer.call" href="#likelihood.tools.models_tools.LoRALayer.call">call</a></code></li>
 </ul>
+</li>
+<li>
+<h4><code><a title="likelihood.tools.models_tools.suppress_prints" href="#likelihood.tools.models_tools.suppress_prints">suppress_prints</a></code></h4>
 </li>
 </ul>
 </li>
