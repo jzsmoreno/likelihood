@@ -169,7 +169,6 @@ def generate_feature_yaml(
     return feature_info
 
 
-# a function that calculates the percentage of missing values per column is defined
 def cal_missing_values(df: DataFrame) -> None:
     """Calculate the percentage of missing (`NaN`/`NaT`) values per column in a dataframe.
 
@@ -180,8 +179,7 @@ def cal_missing_values(df: DataFrame) -> None:
 
     Returns
     -------
-    `None`
-        Prints out a table with columns as index and percentages of missing values as data.
+    `None` : Prints out a table with columns as index and percentages of missing values as data.
     """
 
     col = df.columns
@@ -226,7 +224,6 @@ def cdf(
     cdf_values = np.cumsum(x) / np.sum(x)
     sorted_x = np.sort(x)
 
-    # Calculate the CDF or inverse CDF (quantile function)
     probabilities = np.linspace(0, 1, len(sorted_x))
 
     if inv:
@@ -281,7 +278,6 @@ def calculate_probability(x: np.ndarray, points: int = 1, cond: bool = True) -> 
     fit, _, sorted_x = cdf(x)
     p = fit(x)
 
-    # Validate probability values
     if cond:
         prob_value = np.prod(p[-points])
         message = "product"
@@ -304,7 +300,7 @@ class CorrelationBase:
 
     def __init__(self, x: np.ndarray, y: Union[np.ndarray, None] = None):
         self.x = x
-        self.y = y if y is not None else x  # Default to autocorrelation if y is not provided
+        self.y = y if y is not None else x
         self._compute_correlation()
         self.z = self.result[self.result.size // 2 :]
         self.z /= np.abs(self.z).max()
@@ -395,7 +391,6 @@ def fft_denoise(
     denoised_dataset = np.zeros_like(dataset)
     periods = np.zeros(num_samples)
 
-    # Precompute values that do not change within the loop
     freq = (1 / n_points) * np.arange(n_points)
     L = np.arange(1, np.floor(n_points / 2), dtype=int)
 
@@ -405,15 +400,12 @@ def fft_denoise(
         threshold = np.mean(PSD) + sigma * np.std(PSD)
         indices = PSD > threshold
 
-        # Zero out all others in frequency domain
         PSDclean = PSD * indices
         fhat_cleaned = fhat * indices
 
-        # Inverse FFT for filtered time signal
         denoised_signal = np.fft.ifft(fhat_cleaned).real
         denoised_dataset[i, :] = denoised_signal
 
-        # Calculate the period of the signal
         peak_index = L[np.argmax(np.abs(fhat[L]))]
         periods[i] = 1 / (2 * freq[peak_index])
 
@@ -430,33 +422,27 @@ def get_period(dataset: np.ndarray) -> float:
     Parameters
     ----------
     dataset : `ndarray`
-        the `dataset` describing the function over which the period is calculated
+        the `dataset` describing the function over which the period is calculated.
 
     Returns
     -------
     period : `float`
-        period of the function described by the `dataset`
+        period of the function described by the `dataset`.
     """
     n = dataset.size
 
-    # Ensure there are enough points for FFT analysis
     if n < 2:
         raise ValueError("Dataset must contain at least two points.")
 
-    # Compute the FFT and PSD
-    fhat = np.fft.rfft(dataset)  # Use rfft for real-valued input to save computation
-    freqs = np.fft.rfftfreq(n)  # Get only positive frequencies
+    fhat = np.fft.rfft(dataset)
+    freqs = np.fft.rfftfreq(n)
 
-    # Calculate the Power Spectral Density (PSD)
     PSD = np.abs(fhat) ** 2 / n
 
-    # Remove the first frequency component (DC component)
     PSD[0] = 0
 
-    # Find the index of the maximum PSD value, excluding the DC component
     max_psd_index = np.argmax(PSD)
 
-    # Calculate the period based on the corresponding frequency
     dominant_freq = freqs[max_psd_index]
     if dominant_freq == 0:
         raise ValueError("No significant periodic component found in the dataset.")
@@ -472,12 +458,12 @@ def sigmoide_inv(y: float) -> float:
     Parameters
     ----------
     y : `float`
-        the number to evaluate the function
+        the number to evaluate the function.
 
     Returns
     -------
     `float`
-        value of evaluated function
+        value of evaluated function.
     """
 
     return math.log(y / (1 - y))
@@ -540,6 +526,10 @@ class LogisticRegression:
         datapoints : `np.array`
             An array containing the values of the independent variable.
 
+        Returns
+        -------
+        `np.array`
+
         """
         sig = np.vectorize(sigmoide)
 
@@ -558,8 +548,6 @@ class LogisticRegression:
         -------
         importance : `np.array`
             An array containing the importance of each feature.
-
-
         """
         if print_important_features:
             for i, a in enumerate(self.importance):
@@ -589,9 +577,7 @@ class LinearRegression:
 
         Returns
         -------
-        importance : `np.array`
-            An array containing the importance of each feature.
-
+        `None` : The function doesn't return anything.
         """
 
         self.X = dataset
@@ -635,8 +621,6 @@ class LinearRegression:
         -------
         importance : `np.array`
             An array containing the importance of each feature.
-
-
         """
         if print_important_features:
             for i, a in enumerate(self.importance):
@@ -658,7 +642,6 @@ def cal_average(y: np.ndarray, alpha: float = 1):
     -------
     average : `float`
         The average of the data.
-
     """
 
     n = int(alpha * len(y))
@@ -799,7 +782,6 @@ def mean_square_error(y_true: np.ndarray, y_pred: np.ndarray, print_error: bool 
     -------
     RMSE : `float`
         The Root Mean Squared Error.
-
     """
     if print_error:
         print(f"The RMSE is {np.sqrt(np.mean((y_true - y_pred)**2))}")
@@ -975,7 +957,6 @@ class PerformanceMeasures:
     def __init__(self) -> None:
         pass
 
-    # Performance measure Res_T
     def f_mean(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> float:
         F_vec = self._f1_score(y_true, y_pred, labels)
         mean_f_measure = np.mean(F_vec)
@@ -988,7 +969,6 @@ class PerformanceMeasures:
 
         return mean_f_measure
 
-    # Performance measure Res_P
     def resp(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> float:
         T_C = len(y_true)
         sum1, sum2 = 0.0, 0.0
@@ -999,7 +979,7 @@ class PerformanceMeasures:
             sum1 += (1 - class_instances) * F_vec[label_idx]
             sum2 += 1 - class_instances
 
-        res_p = sum1 / sum2 if sum2 != 0 else 0.0  # Avoid division by zero
+        res_p = sum1 / sum2 if sum2 != 0 else 0.0
         print(f"Metric Res_p -> {res_p}")
 
         return res_p
@@ -1016,7 +996,6 @@ class PerformanceMeasures:
         sum_cols = np.sum(count_mat, axis=0)
         sum_rows = np.sum(count_mat, axis=1)
 
-        # Avoid division by zero
         precision = np.divide(
             count_mat.diagonal(), sum_cols, out=np.zeros_like(sum_cols), where=sum_cols != 0
         )
@@ -1028,7 +1007,6 @@ class PerformanceMeasures:
 
         return f1_vec
 
-    # Returns confusion matrix of predictions
     def _confu_mat(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> np.ndarray:
         num_classes = len(labels)
         label_mapping = {label: idx for idx, label in enumerate(labels)}
@@ -1056,21 +1034,18 @@ class OneHotEncoder:
         self.x = x
 
         if not isinstance(self.x, np.ndarray):
-            self.x = np.array(self.x)  # If not numpy array then convert it
+            self.x = np.array(self.x)
 
-        y = np.zeros(
-            (self.x.size, self.x.max() + 1)
-        )  # Build matrix of (size num of entries) x (max value + 1)
+        y = np.zeros((self.x.size, self.x.max() + 1))
 
-        y[np.arange(self.x.size), self.x] = 1  # Label with ones
+        y[np.arange(self.x.size), self.x] = 1
 
         return y
 
     def decode(self, x: np.ndarray | list) -> np.ndarray:
         if not isinstance(x, np.ndarray):
-            x = np.array(x)  # If not numpy array then convert it
+            x = np.array(x)
 
-        # We return the max values of each row
         y = np.argmax(x, axis=1)
 
         return y
@@ -1107,13 +1082,11 @@ class FeatureSelection:
         `str`
             A string representation of the directed graph.
         """
-        # Assign and clean dataset
         self._load_data(dataset)
 
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
-        # We construct string from causal_graph
         feature_string = " digraph { "
         for column in columns:
             feature_string += column + "; "
@@ -1125,85 +1098,53 @@ class FeatureSelection:
             numeric_df = pd.DataFrame(numeric_scaled.T, columns=numeric_df.columns)
             curr_dataset[numeric_df.columns] = numeric_df
 
-        # We construct dictionary to save index for scaling
         numeric_dict = dict(zip(list(numeric_df.columns), range(len(list(numeric_df.columns)))))
 
-        # Iterate over all the columns to obtain their importances.
         for index_column, column in enumerate(columns):
-
-            # Variable to predict
             Y = curr_dataset[column]
-
-            # We check whether it is numerical or categorical.
             column_type = Y.dtype
             if column_type != "object":
-                # Linear regression model
                 Model = LinearRegression()
-
-                # Auxiliary dataset without the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
-
-                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-                # We train
                 Model.fit(encoded_df.to_numpy().T, Y.to_numpy().T)
-                # We obtain importance
                 importance = Model.get_importances()
                 w = Model.w
             else:
                 Model = LogisticRegression()
                 num_unique_entries = curr_dataset[column].nunique()
-
                 quick_encoder = DataFrameEncoder(Y.to_frame())
                 encoded_Y = quick_encoder.encode(save_mode=False)
-
-                # Mapping to one-hot
                 one_hot = OneHotEncoder()
                 train_y = one_hot.encode(encoded_Y[column])
-                # PASSING 0 -> 0.5 and 1 -> 0.73105
                 for i in range(len(train_y)):
                     for j in range(num_unique_entries):
                         if train_y[i][j] == 1.0:
                             train_y[i][j] = 0.73105
                         else:
                             train_y[i][j] = 0.5
-
-                # Delete the column in question
                 X_aux = curr_dataset.drop([column], axis=1)
-
-                # We encode
                 dfe = DataFrameEncoder(X_aux)
                 encoded_df = dfe.encode(save_mode=False)
-
-                # We train
                 Model.fit(encoded_df.to_numpy().T, train_y)
-
-                # We obtain importance
                 importance = Model.get_importances()
                 w = Model.w
-
-            # We obtain the $n$ most important ones
             top_n_indexes = sorted(
                 range(len(importance)), key=lambda i: importance[i], reverse=True
             )[:n_importances]
 
-            # We build the string for the column in question
             names_cols = list(X_aux.columns)
-            # We store the indices, values and column names in a list of tuples.
             features_imp_node = [
                 (names_cols[top_n_indexes[i]], importance[top_n_indexes[i]])
                 for i in range(n_importances)
             ]
-            # We store w's for predictions
 
             if column_type != "object":
                 self.w_dict[column] = (w, None, names_cols, dfe, numeric_dict)
             else:
                 self.w_dict[column] = (w, quick_encoder, names_cols, dfe, numeric_dict)
-            # Add to general list
             self.all_features_imp_graph.append((column, features_imp_node))
-            # We format it
             for i in top_n_indexes:
                 feature_string += names_cols[i] + " -> "
 
@@ -1212,10 +1153,8 @@ class FeatureSelection:
         return feature_string + "} "
 
     def _load_data(self, dataset: DataFrame):
-        # Assign data and clean dataset of unneeded columns
 
         if len(self.not_features) > 0:
-            # We remove unnecessary columns
             self.X = dataset.drop(columns=self.not_features)
 
         else:
@@ -1232,11 +1171,15 @@ def check_nan_inf(df: DataFrame) -> DataFrame:
     """
     Checks for NaN and Inf values in the DataFrame. If any are found, they will be removed.
 
-    Parameters:
-        df (DataFrame): The input DataFrame to be checked.
+    Parameters
+    ----------
+    df : DataFrame
+        The input DataFrame to be checked.
 
-    Returns:
-        DataFrame: A new DataFrame with NaN and Inf values removed.
+    Returns
+    ----------
+    DataFrame
+        A new DataFrame with NaN and Inf values removed.
     """
 
     nan_values = df.isnull().values.any()
@@ -1272,7 +1215,6 @@ if __name__ == "__main__":
     print(helper.f_mean(y_true, y_pred, labels))
 
     # Use DataFrameEncoder
-    # Create a DataFrame
     data = {"Name": ["John", "Alice", "Bob", "Jafet", "Beto"], "Age": [25, 30, 35, 21, 28]}
     import pandas as pd
 

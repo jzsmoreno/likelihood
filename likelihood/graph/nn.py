@@ -61,6 +61,8 @@ def cal_adjacency_matrix(
     ----------
     similarity: `int`
         The minimum number of features that must be the same in both arrays to be considered similar.
+    threshold : `float`
+        The threshold value used in the `compare_similarity` function. Default is 0.05.
 
     Returns
     -------
@@ -68,8 +70,6 @@ def cal_adjacency_matrix(
         A dictionary containing the features.
     adjacency_matrix : `ndarray`
         The adjacency matrix.
-    threshold : `float`
-        The threshold value used in the `compare_similarity` function. Default is 0.05.
     """
 
     if len(exclude_subset) > 0:
