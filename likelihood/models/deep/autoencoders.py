@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+import warnings
 from functools import partial
 from shutil import rmtree
 
@@ -14,8 +15,8 @@ from pandas.plotting import radviz
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
-import warnings
-from functools import wraps
+
+from typing import List
 
 import keras_tuner
 import tensorflow as tf
@@ -24,19 +25,9 @@ from sklearn.manifold import TSNE
 from tensorflow.keras.layers import InputLayer
 from tensorflow.keras.regularizers import l2
 
-from likelihood.tools import LoRALayer, OneHotEncoder
+from likelihood.tools import LoRALayer, OneHotEncoder, suppress_warnings
 
 tf.get_logger().setLevel("ERROR")
-
-
-def suppress_warnings(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            return func(*args, **kwargs)
-
-    return wrapper
 
 
 class EarlyStopping:
@@ -246,7 +237,7 @@ class AutoClassifier(tf.keras.Model):
     Additional keyword arguments to pass to the model.
 
     classifier_activation : `str`
-        The activation function to use for the classifier layer. Default is "softmax". If the activation function is not a classification function, the model can be used in regression problems.
+        The activation function to use for the classifier layer. Default is `softmax`. If the activation function is not a classification function, the model can be used in regression problems.
     num_layers : `int`
         The number of hidden layers in the classifier. Default is 1.
     dropout : `float`
@@ -373,7 +364,6 @@ class AutoClassifier(tf.keras.Model):
         else:
             self.build_encoder_decoder(input_shape)
 
-        # Classifier with L2 regularization
         self.classifier = tf.keras.Sequential()
         if self.num_layers > 1 and not self.lora_mode:
             for _ in range(self.num_layers - 1):
@@ -527,7 +517,6 @@ class AutoClassifier(tf.keras.Model):
         if not isinstance(source_model, AutoClassifier):
             raise ValueError("Source model must be an instance of AutoClassifier.")
 
-        # Check compatibility in input shape and units
         if self.input_shape_parm != source_model.input_shape_parm:
             raise ValueError(
                 f"Incompatible input shape. Expected {self.input_shape_parm}, got {source_model.input_shape_parm}."
@@ -537,9 +526,8 @@ class AutoClassifier(tf.keras.Model):
                 f"Incompatible number of units. Expected {self.units}, got {source_model.units}."
             )
         self.encoder, self.decoder = tf.keras.Sequential(), tf.keras.Sequential()
-        # Copy the encoder layers
         for i, layer in enumerate(source_model.encoder.layers):
-            if isinstance(layer, tf.keras.layers.Dense):  # Make sure it's a Dense layer
+            if isinstance(layer, tf.keras.layers.Dense):
                 dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
                 dense_layer = tf.keras.layers.Dense(
                     units=layer.units,
@@ -548,14 +536,12 @@ class AutoClassifier(tf.keras.Model):
                 )
                 dense_layer.build(dummy_input.shape)
                 self.encoder.add(dense_layer)
-                # Set the weights correctly
                 self.encoder.layers[i].set_weights(layer.get_weights())
             elif not isinstance(layer, InputLayer):
                 raise ValueError(f"Layer type {type(layer)} not supported for copying.")
 
-        # Copy the decoder layers
         for i, layer in enumerate(source_model.decoder.layers):
-            if isinstance(layer, tf.keras.layers.Dense):  # Ensure it's a Dense layer
+            if isinstance(layer, tf.keras.layers.Dense):
                 dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
                 dense_layer = tf.keras.layers.Dense(
                     units=layer.units,
@@ -564,7 +550,6 @@ class AutoClassifier(tf.keras.Model):
                 )
                 dense_layer.build(dummy_input.shape)
                 self.decoder.add(dense_layer)
-                # Set the weights correctly
                 self.decoder.layers[i].set_weights(layer.get_weights())
             elif not isinstance(layer, InputLayer):
                 raise ValueError(f"Layer type {type(layer)} not supported for copying.")
@@ -907,62 +892,220 @@ def setup_model(
 
 
 class GetInsights:
+    """
+    A class to analyze the output of a neural network model, including visualizations
+    of the weights, t-SNE representation, and feature statistics.
+
+    Parameters
+    ----------
+    model : `AutoClassifier`
+        The trained model to analyze.
+    inputs : `np.ndarray`
+        The input data for analysis.
+    """
+
     def __init__(self, model: AutoClassifier, inputs: np.ndarray) -> None:
+        """
+        Initializes the GetInsights class.
+
+        Parameters
+        ----------
+        model : `AutoClassifier`
+            The trained model to analyze.
+        inputs : `np.ndarray`
+            The input data for analysis.
+        """
         self.inputs = inputs
         self.model = model
-        if isinstance(self.model.encoder.layers[0], InputLayer):
-            self.encoder_layer = self.model.encoder.layers[1]
-        else:
-            self.encoder_layer = self.model.encoder.layers[0]
+
+        self.encoder_layer = (
+            self.model.encoder.layers[1]
+            if isinstance(self.model.encoder.layers[0], InputLayer)
+            else self.model.encoder.layers[0]
+        )
         self.decoder_layer = self.model.decoder.layers[0]
+
         self.encoder_weights = self.encoder_layer.get_weights()[0]
         self.decoder_weights = self.decoder_layer.get_weights()[0]
-        colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 
+        self.sorted_names = self._generate_sorted_color_names()
+
+    def _generate_sorted_color_names(self) -> list:
+        """
+        Generate sorted color names based on their HSV values.
+
+        Parameters
+        ----------
+        `None`
+
+        Returns
+        -------
+        `list` : Sorted color names.
+        """
+        colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
         by_hsv = sorted(
             (tuple(mcolors.rgb_to_hsv(mcolors.to_rgba(color)[:3])), name)
             for name, color in colors.items()
         )
-        self.sorted_names = [name for hsv, name in by_hsv if hsv[1] > 0.4 and hsv[2] >= 0.4]
-        random.shuffle(self.sorted_names)
+        sorted_names = [name for hsv, name in by_hsv if hsv[1] > 0.4 and hsv[2] >= 0.4]
+        random.shuffle(sorted_names)
+        return sorted_names
 
     def predictor_analyzer(
         self,
-        frac=None,
+        frac: float = None,
         cmap: str = "viridis",
         aspect: str = "auto",
         highlight: bool = True,
         **kwargs,
     ) -> None:
+        """
+        Analyze the model's predictions and visualize data.
+
+        Parameters
+        ----------
+        frac : `float`, optional
+            Fraction of data to use for analysis (default is `None`).
+        cmap : `str`, optional
+            The colormap for visualization (default is `"viridis"`).
+        aspect : `str`, optional
+            Aspect ratio for the visualization (default is `"auto"`).
+        highlight : `bool`, optional
+            Whether to highlight the maximum weights (default is `True`).
+        **kwargs : `dict`, optional
+            Additional keyword arguments for customization.
+
+        Returns
+        -------
+        `DataFrame` : The statistical summary of the input data.
+        """
         self._viz_weights(cmap=cmap, aspect=aspect, highlight=highlight, **kwargs)
         inputs = self.inputs.copy()
+        inputs = self._prepare_inputs(inputs, frac)
         y_labels = kwargs.get("y_labels", None)
+        encoded, reconstructed = self._encode_decode(inputs)
+        self._visualize_data(inputs, reconstructed, cmap, aspect)
+        self._prepare_data_for_analysis(inputs, reconstructed, encoded, y_labels)
+
+        try:
+            self._get_tsne_repr(inputs, frac)
+            self._viz_tsne_repr(c=self.classification)
+
+            self._viz_radviz(self.data, "class", "Radviz Visualization of Latent Space")
+            self._viz_radviz(self.data_input, "class", "Radviz Visualization of Input Data")
+        except ValueError:
+            warnings.warn(
+                "Some functions or processes will not be executed for regression problems.",
+                UserWarning,
+            )
+
+        return self._statistics(self.data_input)
+
+    def _prepare_inputs(self, inputs: np.ndarray, frac: float) -> np.ndarray:
+        """
+        Prepare the input data, possibly selecting a fraction of it.
+
+        Parameters
+        ----------
+        inputs : `np.ndarray`
+            The input data.
+        frac : `float`
+            Fraction of data to use.
+
+        Returns
+        -------
+        `np.ndarray` : The prepared input data.
+        """
         if frac:
             n = int(frac * self.inputs.shape[0])
             indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
             inputs = inputs[indexes]
         inputs[np.isnan(inputs)] = 0.0
-        # check if self.model.encoder(inputs) has two outputs
+        return inputs
+
+    def _encode_decode(self, inputs: np.ndarray) -> tuple:
+        """
+        Perform encoding and decoding on the input data.
+
+        Parameters
+        ----------
+        inputs : `np.ndarray`
+            The input data.
+
+        Returns
+        -------
+        `tuple` : The encoded and reconstructed data.
+        """
         try:
             mean, log_var = self.model.encoder(inputs)
             encoded = sampling(mean, log_var)
         except:
             encoded = self.model.encoder(inputs)
         reconstructed = self.model.decoder(encoded)
-        combined = tf.concat([reconstructed, encoded], axis=1)
-        self.classification = self.model.classifier(combined).numpy().argmax(axis=1)
+        return encoded, reconstructed
+
+    def _visualize_data(
+        self, inputs: np.ndarray, reconstructed: np.ndarray, cmap: str, aspect: str
+    ) -> None:
+        """
+        Visualize the original data and the reconstructed data.
+
+        Parameters
+        ----------
+        inputs : `np.ndarray`
+            The input data.
+        reconstructed : `np.ndarray`
+            The reconstructed data.
+        cmap : `str`
+            The colormap for visualization.
+        aspect : `str`
+            Aspect ratio for the visualization.
+
+        Returns
+        -------
+        `None`
+        """
         ax = plt.subplot(1, 2, 1)
-        plt.imshow(self.inputs, cmap=cmap, aspect=aspect)
+        plt.imshow(inputs, cmap=cmap, aspect=aspect)
         plt.colorbar()
         plt.title("Original Data")
+
         plt.subplot(1, 2, 2, sharex=ax, sharey=ax)
         plt.imshow(reconstructed, cmap=cmap, aspect=aspect)
         plt.colorbar()
         plt.title("Decoder Layer Reconstruction")
         plt.show()
 
-        self._get_tsne_repr(inputs=inputs, frac=frac)
-        self._viz_tsne_repr(c=self.classification)
+    def _prepare_data_for_analysis(
+        self,
+        inputs: np.ndarray,
+        reconstructed: np.ndarray,
+        encoded: np.ndarray,
+        y_labels: List[str],
+    ) -> None:
+        """
+        Prepare data for statistical analysis.
+
+        Parameters
+        ----------
+        inputs : `np.ndarray`
+            The input data.
+        reconstructed : `np.ndarray`
+            The reconstructed data.
+        encoded : `np.ndarray`
+            The encoded data.
+        y_labels : `List[str]`
+            The labels of features.
+
+        Returns
+        -------
+        `None`
+        """
+        self.classification = (
+            self.model.classifier(tf.concat([reconstructed, encoded], axis=1))
+            .numpy()
+            .argmax(axis=1)
+        )
 
         self.data = pd.DataFrame(encoded, columns=[f"Feature {i}" for i in range(encoded.shape[1])])
         self.data_input = pd.DataFrame(
@@ -971,62 +1114,122 @@ class GetInsights:
                 [f"Feature {i}" for i in range(inputs.shape[1])] if y_labels is None else y_labels
             ),
         )
+
         self.data["class"] = self.classification
         self.data_input["class"] = self.classification
 
-        self.data_normalized = self.data.copy(deep=True)
-        self.data_normalized.iloc[:, :-1] = (
+    def _get_tsne_repr(self, inputs: np.ndarray = None, frac: float = None) -> None:
+        """
+        Perform t-SNE dimensionality reduction on the input data.
+
+        Parameters
+        ----------
+        inputs : `np.ndarray`
+            The input data.
+        frac : `float`
+            Fraction of data to use.
+
+        Returns
+        -------
+        `None`
+        """
+        if inputs is None:
+            inputs = self.inputs.copy()
+            if frac:
+                n = int(frac * self.inputs.shape[0])
+                indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
+                inputs = inputs[indexes]
+            inputs[np.isnan(inputs)] = 0.0
+        self.latent_representations = inputs @ self.encoder_weights
+
+        tsne = TSNE(n_components=2)
+        self.reduced_data_tsne = tsne.fit_transform(self.latent_representations)
+
+    def _viz_tsne_repr(self, **kwargs) -> None:
+        """
+        Visualize the t-SNE representation of the latent space.
+
+        Parameters
+        ----------
+        **kwargs : `dict`
+            Additional keyword arguments for customization.
+
+        Returns
+        -------
+        `None`
+        """
+        c = kwargs.get("c", None)
+        self.colors = (
+            kwargs.get("colors", self.sorted_names[: len(np.unique(c))]) if c is not None else None
+        )
+
+        plt.scatter(
+            self.reduced_data_tsne[:, 0],
+            self.reduced_data_tsne[:, 1],
+            cmap=matplotlib.colors.ListedColormap(self.colors) if c is not None else None,
+            c=c,
+        )
+
+        if c is not None:
+            cb = plt.colorbar()
+            loc = np.arange(0, max(c), max(c) / float(len(self.colors)))
+            cb.set_ticks(loc)
+            cb.set_ticklabels(np.unique(c))
+
+        plt.title("t-SNE Visualization of Latent Space")
+        plt.xlabel("t-SNE 1")
+        plt.ylabel("t-SNE 2")
+        plt.show()
+
+    def _viz_radviz(self, data: pd.DataFrame, color_column: str, title: str) -> None:
+        """
+        Visualize the data using RadViz.
+
+        Parameters
+        ----------
+        data : `pd.DataFrame`
+            The data to visualize.
+        color_column : `str`
+            The column to use for coloring.
+        title : `str`
+            The title of the plot.
+
+        Returns
+        -------
+        `None`
+        """
+        data_normalized = data.copy(deep=True)
+        data_normalized.iloc[:, :-1] = (
             2.0
-            * (self.data_normalized.iloc[:, :-1] - self.data_normalized.iloc[:, :-1].min())
-            / (self.data_normalized.iloc[:, :-1].max() - self.data_normalized.iloc[:, :-1].min())
+            * (data_normalized.iloc[:, :-1] - data_normalized.iloc[:, :-1].min())
+            / (data_normalized.iloc[:, :-1].max() - data_normalized.iloc[:, :-1].min())
             - 1
         )
-        radviz(self.data_normalized, "class", color=self.colors)
-        plt.title("Radviz Visualization of Latent Space")
+        radviz(data_normalized, color_column, color=self.colors)
+        plt.title(title)
         plt.show()
-        self.data_input_normalized = self.data_input.copy(deep=True)
-        self.data_input_normalized.iloc[:, :-1] = (
-            2.0
-            * (
-                self.data_input_normalized.iloc[:, :-1]
-                - self.data_input_normalized.iloc[:, :-1].min()
-            )
-            / (
-                self.data_input_normalized.iloc[:, :-1].max()
-                - self.data_input_normalized.iloc[:, :-1].min()
-            )
-            - 1
-        )
-        radviz(self.data_input_normalized, "class", color=self.colors)
-        plt.title("Radviz Visualization of Input Data")
-        plt.show()
-        return self._statistics(self.data_input)
-
-    def _statistics(self, data_input: DataFrame, **kwargs) -> DataFrame:
-        data = data_input.copy(deep=True)
-
-        if not pd.api.types.is_string_dtype(data["class"]):
-            data["class"] = data["class"].astype(str)
-
-        data.ffill(inplace=True)
-        grouped_data = data.groupby("class")
-
-        numerical_stats = grouped_data.agg(["mean", "min", "max", "std", "median"])
-        numerical_stats.columns = ["_".join(col).strip() for col in numerical_stats.columns.values]
-
-        def get_mode(x):
-            mode_series = x.mode()
-            return mode_series.iloc[0] if not mode_series.empty else None
-
-        mode_stats = grouped_data.apply(get_mode, include_groups=False)
-        mode_stats.columns = [f"{col}_mode" for col in mode_stats.columns]
-        combined_stats = pd.concat([numerical_stats, mode_stats], axis=1)
-
-        return combined_stats.T
 
     def _viz_weights(
         self, cmap: str = "viridis", aspect: str = "auto", highlight: bool = True, **kwargs
     ) -> None:
+        """
+        Visualize the encoder layer weights of the model.
+
+        Parameters
+        ----------
+        cmap : `str`, optional
+            The colormap for visualization (default is `"viridis"`).
+        aspect : `str`, optional
+            Aspect ratio for the visualization (default is `"auto"`).
+        highlight : `bool`, optional
+            Whether to highlight the maximum weights (default is `True`).
+        **kwargs : `dict`, optional
+            Additional keyword arguments for customization.
+
+        Returns
+        -------
+        `None`
+        """
         title = kwargs.get("title", "Encoder Layer Weights (Dense Layer)")
         y_labels = kwargs.get("y_labels", None)
         cmap_highlight = kwargs.get("cmap_highlight", "Pastel1")
@@ -1048,39 +1251,39 @@ class GetInsights:
             )
         plt.show()
 
-    def _get_tsne_repr(self, inputs=None, frac=None) -> None:
-        if inputs is None:
-            inputs = self.inputs.copy()
-            if frac:
-                n = int(frac * self.inputs.shape[0])
-                indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
-                inputs = inputs[indexes]
-            inputs[np.isnan(inputs)] = 0.0
-        self.latent_representations = inputs @ self.encoder_weights
+    def _statistics(self, data_input: DataFrame) -> DataFrame:
+        """
+        Compute statistical summaries of the input data.
 
-        tsne = TSNE(n_components=2)
-        self.reduced_data_tsne = tsne.fit_transform(self.latent_representations)
+        Parameters
+        ----------
+        data_input : `DataFrame`
+            The data to compute statistics for.
 
-    def _viz_tsne_repr(self, **kwargs) -> None:
-        c = kwargs.get("c", None)
-        self.colors = (
-            kwargs.get("colors", self.sorted_names[: len(np.unique(c))]) if c is not None else None
-        )
-        plt.scatter(
-            self.reduced_data_tsne[:, 0],
-            self.reduced_data_tsne[:, 1],
-            cmap=matplotlib.colors.ListedColormap(self.colors) if c is not None else None,
-            c=c,
-        )
-        if c is not None:
-            cb = plt.colorbar()
-            loc = np.arange(0, max(c), max(c) / float(len(self.colors)))
-            cb.set_ticks(loc)
-            cb.set_ticklabels(np.unique(c))
-        plt.title("t-SNE Visualization of Latent Space")
-        plt.xlabel("t-SNE 1")
-        plt.ylabel("t-SNE 2")
-        plt.show()
+        Returns
+        -------
+        `DataFrame` : The statistical summary of the input data.
+        """
+        data = data_input.copy(deep=True)
+
+        if not pd.api.types.is_string_dtype(data["class"]):
+            data["class"] = data["class"].astype(str)
+
+        data.ffill(inplace=True)
+        grouped_data = data.groupby("class")
+
+        numerical_stats = grouped_data.agg(["mean", "min", "max", "std", "median"])
+        numerical_stats.columns = ["_".join(col).strip() for col in numerical_stats.columns.values]
+
+        def get_mode(x):
+            mode_series = x.mode()
+            return mode_series.iloc[0] if not mode_series.empty else None
+
+        mode_stats = grouped_data.apply(get_mode, include_groups=False)
+        mode_stats.columns = [f"{col}_mode" for col in mode_stats.columns]
+        combined_stats = pd.concat([numerical_stats, mode_stats], axis=1)
+
+        return combined_stats.T
 
 
 ########################################################################################
