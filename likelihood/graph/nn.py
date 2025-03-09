@@ -68,6 +68,8 @@ def cal_adjacency_matrix(
         A dictionary containing the features.
     adjacency_matrix : `ndarray`
         The adjacency matrix.
+    threshold : `float`
+        The threshold value used in the `compare_similarity` function. Default is 0.05.
     """
 
     if len(exclude_subset) > 0:
@@ -79,6 +81,7 @@ def cal_adjacency_matrix(
     assert len(df_) > 0
 
     similarity = kwargs.get("similarity", len(df_.columns) - 1)
+    threshold = kwargs.get("threshold", 0.05)
     assert similarity <= df_.shape[1]
 
     adj_dict = {index: row.tolist() for index, row in df_.iterrows()}
@@ -87,7 +90,7 @@ def cal_adjacency_matrix(
 
     for i in range(len(df_)):
         for j in range(len(df_)):
-            if compare_similarity(adj_dict[i], adj_dict[j]) >= similarity:
+            if compare_similarity(adj_dict[i], adj_dict[j], threshold=threshold) >= similarity:
                 adjacency_matrix[i][j] = 1
 
     if sparse:
@@ -114,7 +117,10 @@ class Data:
         **kwargs,
     ):
         sparse = kwargs.get("sparse", True)
-        _, adjacency = cal_adjacency_matrix(df, exclude_subset=exclude_subset, sparse=sparse)
+        threshold = kwargs.get("threshold", 0.05)
+        _, adjacency = cal_adjacency_matrix(
+            df, exclude_subset=exclude_subset, sparse=sparse, threshold=threshold
+        )
         if target is not None:
             X = df.drop(columns=[target] + exclude_subset)
         else:

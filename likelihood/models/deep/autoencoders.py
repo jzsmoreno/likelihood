@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+import warnings
 from functools import partial
 from shutil import rmtree
 
@@ -14,8 +15,6 @@ from pandas.plotting import radviz
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
-import warnings
-from functools import wraps
 
 import keras_tuner
 import tensorflow as tf
@@ -24,19 +23,9 @@ from sklearn.manifold import TSNE
 from tensorflow.keras.layers import InputLayer
 from tensorflow.keras.regularizers import l2
 
-from likelihood.tools import LoRALayer, OneHotEncoder
+from likelihood.tools import LoRALayer, OneHotEncoder, suppress_warnings
 
 tf.get_logger().setLevel("ERROR")
-
-
-def suppress_warnings(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            return func(*args, **kwargs)
-
-    return wrapper
 
 
 class EarlyStopping:
@@ -961,9 +950,6 @@ class GetInsights:
         plt.title("Decoder Layer Reconstruction")
         plt.show()
 
-        self._get_tsne_repr(inputs=inputs, frac=frac)
-        self._viz_tsne_repr(c=self.classification)
-
         self.data = pd.DataFrame(encoded, columns=[f"Feature {i}" for i in range(encoded.shape[1])])
         self.data_input = pd.DataFrame(
             inputs,
@@ -971,35 +957,52 @@ class GetInsights:
                 [f"Feature {i}" for i in range(inputs.shape[1])] if y_labels is None else y_labels
             ),
         )
+
         self.data["class"] = self.classification
         self.data_input["class"] = self.classification
 
-        self.data_normalized = self.data.copy(deep=True)
-        self.data_normalized.iloc[:, :-1] = (
-            2.0
-            * (self.data_normalized.iloc[:, :-1] - self.data_normalized.iloc[:, :-1].min())
-            / (self.data_normalized.iloc[:, :-1].max() - self.data_normalized.iloc[:, :-1].min())
-            - 1
-        )
-        radviz(self.data_normalized, "class", color=self.colors)
-        plt.title("Radviz Visualization of Latent Space")
-        plt.show()
-        self.data_input_normalized = self.data_input.copy(deep=True)
-        self.data_input_normalized.iloc[:, :-1] = (
-            2.0
-            * (
-                self.data_input_normalized.iloc[:, :-1]
-                - self.data_input_normalized.iloc[:, :-1].min()
+        try:
+            self._get_tsne_repr(inputs=inputs, frac=frac)
+            self._viz_tsne_repr(c=self.classification)
+
+            self.data_normalized = self.data.copy(deep=True)
+            self.data_normalized.iloc[:, :-1] = (
+                2.0
+                * (self.data_normalized.iloc[:, :-1] - self.data_normalized.iloc[:, :-1].min())
+                / (
+                    self.data_normalized.iloc[:, :-1].max()
+                    - self.data_normalized.iloc[:, :-1].min()
+                )
+                - 1
             )
-            / (
-                self.data_input_normalized.iloc[:, :-1].max()
-                - self.data_input_normalized.iloc[:, :-1].min()
+            radviz(self.data_normalized, "class", color=self.colors)
+            plt.title("Radviz Visualization of Latent Space")
+            plt.show()
+            self.data_input_normalized = self.data_input.copy(deep=True)
+            self.data_input_normalized.iloc[:, :-1] = (
+                2.0
+                * (
+                    self.data_input_normalized.iloc[:, :-1]
+                    - self.data_input_normalized.iloc[:, :-1].min()
+                )
+                / (
+                    self.data_input_normalized.iloc[:, :-1].max()
+                    - self.data_input_normalized.iloc[:, :-1].min()
+                )
+                - 1
             )
-            - 1
-        )
-        radviz(self.data_input_normalized, "class", color=self.colors)
-        plt.title("Radviz Visualization of Input Data")
-        plt.show()
+            radviz(self.data_input_normalized, "class", color=self.colors)
+            plt.title("Radviz Visualization of Input Data")
+            plt.show()
+        except ValueError as e:
+            plt.title("t-SNE Visualization of Latent Space")
+            plt.xlabel("t-SNE 1")
+            plt.ylabel("t-SNE 2")
+            plt.show()
+            warnings.warn(
+                "Some functions or processes will not be executed for regression problems.",
+                UserWarning,
+            )
         return self._statistics(self.data_input)
 
     def _statistics(self, data_input: DataFrame, **kwargs) -> DataFrame:
