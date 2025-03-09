@@ -985,7 +985,7 @@ class GetInsights:
         y_labels = kwargs.get("y_labels", None)
         encoded, reconstructed = self._encode_decode(inputs)
         self._visualize_data(inputs, reconstructed, cmap, aspect)
-        self._prepare_data_for_analysis(reconstructed, encoded, y_labels)
+        self._prepare_data_for_analysis(inputs, reconstructed, encoded, y_labels)
 
         try:
             self._get_tsne_repr(inputs, frac)
@@ -1077,7 +1077,11 @@ class GetInsights:
         plt.show()
 
     def _prepare_data_for_analysis(
-        self, inputs: np.ndarray, encoded: np.ndarray, y_labels: List[str]
+        self,
+        inputs: np.ndarray,
+        reconstructed: np.ndarray,
+        encoded: np.ndarray,
+        y_labels: List[str],
     ) -> None:
         """
         Prepare data for statistical analysis.
@@ -1086,6 +1090,8 @@ class GetInsights:
         ----------
         inputs : `np.ndarray`
             The input data.
+        reconstructed : `np.ndarray`
+            The reconstructed data.
         encoded : `np.ndarray`
             The encoded data.
         y_labels : `List[str]`
@@ -1096,7 +1102,9 @@ class GetInsights:
         `None`
         """
         self.classification = (
-            self.model.classifier(tf.concat([inputs, encoded], axis=1)).numpy().argmax(axis=1)
+            self.model.classifier(tf.concat([reconstructed, encoded], axis=1))
+            .numpy()
+            .argmax(axis=1)
         )
 
         self.data = pd.DataFrame(encoded, columns=[f"Feature {i}" for i in range(encoded.shape[1])])
@@ -1127,7 +1135,11 @@ class GetInsights:
         """
         if inputs is None:
             inputs = self.inputs.copy()
-        inputs = self._prepare_inputs(inputs, frac)
+            if frac:
+                n = int(frac * self.inputs.shape[0])
+                indexes = np.random.choice(np.arange(inputs.shape[0]), n, replace=False)
+                inputs = inputs[indexes]
+            inputs[np.isnan(inputs)] = 0.0
         self.latent_representations = inputs @ self.encoder_weights
 
         tsne = TSNE(n_components=2)
