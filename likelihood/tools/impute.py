@@ -1,7 +1,9 @@
+import pickle
+from typing import Union
+
 import pandas as pd
 
 from likelihood.models import SimulationEngine
-from typing import Union
 
 
 class SimpleImputer:
@@ -121,3 +123,20 @@ class SimpleImputer:
         if isinstance(to_compare, float) and isinstance(value, float):
             value = round(value, len(str(to_compare).split(".")[1]))
         return value
+
+    def save(self, filename: str = "./imputer") -> None:
+        """
+        Save the state of the SimpleImputer to a file.
+        """
+        filename = filename if filename.endswith(".pkl") else filename + ".pkl"
+        with open(filename, "wb") as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load(filename: str = "./imputer"):
+        """
+        Load the state of a SimpleImputer from a file.
+        """
+        filename = filename + ".pkl" if not filename.endswith(".pkl") else filename
+        with open(filename, "rb") as f:
+            return pickle.load(f)
