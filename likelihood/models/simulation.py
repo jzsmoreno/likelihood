@@ -1,6 +1,6 @@
 import pickle
 import warnings
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -106,7 +106,7 @@ class SimulationEngine(FeatureSelection):
 
         return y[:]
 
-    def _encode(self, df: DataFrame) -> np.ndarray | list:
+    def _encode(self, df: DataFrame) -> Dict[str, float]:
         df = df.copy()
         column = df.columns[0]
         frec = df[column].value_counts() / len(df)
