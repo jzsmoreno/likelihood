@@ -1167,7 +1167,7 @@ class FeatureSelection:
         self.X = self.X.drop(columns=["index"])
 
 
-def check_nan_inf(df: DataFrame) -> DataFrame:
+def check_nan_inf(df: DataFrame, verbose: bool = False) -> DataFrame:
     """
     Checks for NaN and Inf values in the DataFrame. If any are found, they will be removed.
 
@@ -1185,20 +1185,32 @@ def check_nan_inf(df: DataFrame) -> DataFrame:
     nan_values = df.isnull().values.any()
     inf_values = np.isinf(df.select_dtypes(include="number")).values.any()
 
-    if nan_values:
-        print("UserWarning: Some rows may have been deleted due to the existence of NaN values.")
-        df.dropna(inplace=True)
-
-    if inf_values:
-        print("UserWarning: Some rows may have been deleted due to the existence of Inf values.")
-        df.replace([np.inf, -np.inf], np.nan, inplace=True)
-        df.dropna(inplace=True)
-
     nan_count = df.isnull().values.sum()
     inf_count = np.isinf(df.select_dtypes(include="number")).values.sum()
 
-    print(f"NaN values removed: {nan_count}")
-    print(f"Infinite values removed: {inf_count}")
+    if nan_values:
+        (
+            print(
+                "UserWarning: Some rows may have been deleted due to the existence of NaN values."
+            )
+            if verbose
+            else None
+        )
+        df.dropna(inplace=True)
+
+    if inf_values:
+        (
+            print(
+                "UserWarning: Some rows may have been deleted due to the existence of Inf values."
+            )
+            if verbose
+            else None
+        )
+        df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        df.dropna(inplace=True)
+
+    print(f"NaN values removed: ", "{:,}".format(nan_count))
+    print(f"Infinite values removed: ", "{:,}".format(inf_count))
 
     return df
 
