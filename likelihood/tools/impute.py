@@ -55,8 +55,9 @@ class SimpleImputer:
         for column in X_impute.columns:
             if X_impute[column].isnull().sum() > 0:
                 to_compare = X_impute[column].dropna().sample().values[0]
-                min_value = X_impute[column].min()
-                max_value = X_impute[column].max()
+                if not X_impute[column].dtype == "object":
+                    min_value = X_impute[column].min()
+                    max_value = X_impute[column].max()
                 for row in X_impute.index:
                     if pd.isnull(X_impute.loc[row, column]):
                         value_impute = self._check_dtype_convert(
@@ -66,10 +67,11 @@ class SimpleImputer:
                             )[0],
                             to_compare,
                         )
-                        if value_impute < min_value:
-                            value_impute = min_value
-                        if value_impute > max_value:
-                            value_impute = max_value
+                        if not X_impute[column].dtype == "object":
+                            if value_impute < min_value:
+                                value_impute = min_value
+                            if value_impute > max_value:
+                                value_impute = max_value
                         X_impute.loc[row, column] = value_impute
         return X_impute
 
