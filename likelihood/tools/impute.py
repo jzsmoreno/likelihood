@@ -22,6 +22,7 @@ class SimpleImputer:
         """
         self.n_features = n_features
         self.sim = SimulationEngine(use_scaler=use_scaler)
+        self.params = {}
 
     def fit(self, X: pd.DataFrame) -> None:
         """
@@ -33,6 +34,7 @@ class SimpleImputer:
             Dataframe to fit the imputer to.
         """
         X_impute = X.copy()
+        self.params = self._get_dict_params(X_impute)
         X_impute = self.sim._clean_data(X_impute)
 
         if X_impute.empty:
@@ -42,7 +44,7 @@ class SimpleImputer:
         self.n_features = self.n_features or X_impute.shape[1] - 1
         self.sim.fit(X_impute, self.n_features)
 
-    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+    def transform(self, X: pd.DataFrame, boundary: bool = True) -> pd.DataFrame:
         """
         Impute missing values in the data.
 
@@ -50,14 +52,17 @@ class SimpleImputer:
         -----------
         X: pd.DataFrame
             Dataframe to impute missing values.
+        boundary: bool
+            Whether to use the boundaries of the data to impute missing values.
         """
         X_impute = X.copy()
         for column in X_impute.columns:
             if X_impute[column].isnull().sum() > 0:
-                to_compare = X_impute[column].dropna().sample().values[0]
+
                 if not X_impute[column].dtype == "object":
-                    min_value = X_impute[column].min()
-                    max_value = X_impute[column].max()
+                    min_value = self.params[column]["min"]
+                    max_value = self.params[column]["max"]
+                    to_compare = self.params[column]["to_compare"]
                 for row in X_impute.index:
                     if pd.isnull(X_impute.loc[row, column]):
                         value_impute = self._check_dtype_convert(
@@ -67,7 +72,7 @@ class SimpleImputer:
                             )[0],
                             to_compare,
                         )
-                        if not X_impute[column].dtype == "object":
+                        if not X_impute[column].dtype == "object" and boundary:
                             if value_impute < min_value:
                                 value_impute = min_value
                             if value_impute > max_value:
@@ -75,7 +80,7 @@ class SimpleImputer:
                         X_impute.loc[row, column] = value_impute
         return X_impute
 
-    def fit_transform(self, X: pd.DataFrame) -> pd.DataFrame:
+    def fit_transform(self, X: pd.DataFrame, boundary: bool = True) -> pd.DataFrame:
         """
         Fit and transform the data.
 
@@ -83,10 +88,12 @@ class SimpleImputer:
         -----------
         X: pd.DataFrame
             Dataframe to fit and transform.
+        boundary: bool
+            Whether to use the boundaries of the data to impute missing values.
         """
         X_train = X.copy()
         self.fit(X_train)
-        return self.transform(X)
+        return self.transform(X, boundary)
 
     def _set_zero(self, X: pd.Series, column_exception) -> pd.DataFrame:
         """
@@ -125,6 +132,27 @@ class SimpleImputer:
         if isinstance(to_compare, float) and isinstance(value, float):
             value = round(value, len(str(to_compare).split(".")[1]))
         return value
+
+    def _get_dict_params(self, df: pd.DataFrame) -> dict:
+        """
+        Get the parameters for the imputer.
+
+        Parameters
+        -----------
+        df: pd.DataFrame
+            Dataframe to get the parameters from.
+        """
+        params = {}
+        for column in df.columns:
+            if df[column].isnull().sum() > 0:
+                if not df[column].dtype == "object":
+                    to_compare = df[column].dropna().sample().values[0]
+                    params[column] = {
+                        "min": df[column].min(),
+                        "to_compare": to_compare,
+                        "max": df[column].max(),
+                    }
+        return params
 
     def save(self, filename: str = "./imputer") -> None:
         """
