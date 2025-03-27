@@ -1,9 +1,16 @@
 import pickle
+import warnings
 from typing import Union
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import seaborn as sns
 
 from likelihood.models import SimulationEngine
+from likelihood.tools.numeric_tools import find_multiples
+
+warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
 class SimpleImputer:
@@ -16,13 +23,14 @@ class SimpleImputer:
         Parameters
         ----------
         n_features: int | None
-            Number of features to impute.
+            Number of features to be used in the imputer. Default is None.
         use_scaler: bool
-            Whether to use a scaler.
+            Whether to use a scaler. Default is False.
         """
         self.n_features = n_features
         self.sim = SimulationEngine(use_scaler=use_scaler)
         self.params = {}
+        self.cols_transf = pd.Series([])
 
     def fit(self, X: pd.DataFrame) -> None:
         """
@@ -44,7 +52,9 @@ class SimpleImputer:
         self.n_features = self.n_features or X_impute.shape[1] - 1
         self.sim.fit(X_impute, self.n_features)
 
-    def transform(self, X: pd.DataFrame, boundary: bool = True) -> pd.DataFrame:
+    def transform(
+        self, X: pd.DataFrame, boundary: bool = True, inplace: bool = True
+    ) -> pd.DataFrame:
         """
         Impute missing values in the data.
 
@@ -53,9 +63,12 @@ class SimpleImputer:
         X: pd.DataFrame
             Dataframe to impute missing values.
         boundary: bool
-            Whether to use the boundaries of the data to impute missing values.
+            Whether to use the boundaries of the data to impute missing values. Default is True.
+        inplace: bool
+            Whether to modify the columns of the original dataframe or return new ones. Default is True.
         """
         X_impute = X.copy()
+        self.cols_transf = X_impute.columns
         for column in X_impute.columns:
             if X_impute[column].isnull().sum() > 0:
 
@@ -78,9 +91,27 @@ class SimpleImputer:
                             if value_impute > max_value:
                                 value_impute = max_value
                         X_impute.loc[row, column] = value_impute
+            else:
+                self.cols_transf = self.cols_transf.drop(column)
+        if not inplace:
+            X_impute = X_impute[self.cols_transf].copy()
+            X_impute = X_impute.rename(
+                columns={column: column + "_imputed" for column in self.cols_transf}
+            )
+            X_impute = X.join(X_impute, rsuffix="_imputed")
+            order_cols = []
+            for column in X.columns:
+                if column + "_imputed" in X_impute.columns:
+                    order_cols.append(column)
+                    order_cols.append(column + "_imputed")
+                else:
+                    order_cols.append(column)
+            X_impute = X_impute[order_cols]
         return X_impute
 
-    def fit_transform(self, X: pd.DataFrame, boundary: bool = True) -> pd.DataFrame:
+    def fit_transform(
+        self, X: pd.DataFrame, boundary: bool = True, inplace: bool = True
+    ) -> pd.DataFrame:
         """
         Fit and transform the data.
 
@@ -89,11 +120,13 @@ class SimpleImputer:
         X: pd.DataFrame
             Dataframe to fit and transform.
         boundary: bool
-            Whether to use the boundaries of the data to impute missing values.
+            Whether to use the boundaries of the data to impute missing values. Default is True.
+        inplace: bool
+            Whether to modify the columns of the original dataframe or return new ones. Default is True.
         """
         X_train = X.copy()
         self.fit(X_train)
-        return self.transform(X, boundary)
+        return self.transform(X, boundary, inplace)
 
     def _set_zero(self, X: pd.Series, column_exception) -> pd.DataFrame:
         """
@@ -122,12 +155,8 @@ class SimpleImputer:
         to_compare: Union[int, float]
             Value to compare to.
         """
-        if isinstance(to_compare, int) and isinstance(value, int):
-            value = float(value)
-
-        if isinstance(to_compare, float) and isinstance(value, float):
-            if to_compare.is_integer():
-                value = int(value)
+        if isinstance(to_compare, int) and isinstance(value, float):
+            value = int(round(value, 0))
 
         if isinstance(to_compare, float) and isinstance(value, float):
             value = round(value, len(str(to_compare).split(".")[1]))
@@ -154,9 +183,82 @@ class SimpleImputer:
                     }
         return params
 
+    def eval(self, X: pd.DataFrame) -> None:
+        """
+        Create a histogram of the imputed values.
+
+        Parameters
+        -----------
+        X: pd.DataFrame
+            Dataframe to create the histogram from.
+        """
+
+        if not isinstance(X, pd.DataFrame):
+            raise ValueError("Input X must be a pandas DataFrame.")
+
+        df = X.copy()
+
+        imputed_cols = [col for col in df.columns if col.endswith("_imputed")]
+        num_impute = len(imputed_cols)
+
+        if num_impute == 0:
+            print("No imputed columns found in the DataFrame.")
+            return
+
+        try:
+            ncols, nrows = find_multiples(num_impute)
+        except ValueError as e:
+            print(f"Error finding multiples for {num_impute}: {e}")
+            ncols = 1
+            nrows = num_impute
+
+        _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(12, 5 * nrows))
+        axes = axes.flatten() if isinstance(axes, np.ndarray) else [axes]
+
+        for i, col in enumerate(imputed_cols):
+            original_col = col.replace("_imputed", "")
+
+            if original_col in df.columns:
+                original_col_data = df[original_col].dropna()
+                ax = axes[i]
+
+                # Plot the original data
+                sns.histplot(
+                    original_col_data,
+                    kde=True,
+                    color="blue",
+                    label=f"Original",
+                    bins=10,
+                    ax=ax,
+                )
+
+                # Plot the imputed data
+                sns.histplot(
+                    df[col],
+                    kde=True,
+                    color="red",
+                    label=f"Imputed",
+                    bins=10,
+                    ax=ax,
+                )
+
+                ax.set_xlabel(original_col)
+                ax.set_ylabel("Frequency" if i % ncols == 0 else "")
+                ax.legend(loc="upper right")
+
+        plt.suptitle("Histogram Comparison", fontsize=16, fontweight="bold")
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.9)
+        plt.show()
+
     def save(self, filename: str = "./imputer") -> None:
         """
         Save the state of the SimpleImputer to a file.
+
+        Parameters
+        -----------
+        filename: str
+            Name of the file to save the imputer to. Default is "./imputer".
         """
         filename = filename if filename.endswith(".pkl") else filename + ".pkl"
         with open(filename, "wb") as f:
@@ -166,6 +268,11 @@ class SimpleImputer:
     def load(filename: str = "./imputer"):
         """
         Load the state of a SimpleImputer from a file.
+
+        Parameters
+        -----------
+        filename: str
+            Name of the file to load the imputer from. Default is "./imputer".
         """
         filename = filename + ".pkl" if not filename.endswith(".pkl") else filename
         with open(filename, "rb") as f:

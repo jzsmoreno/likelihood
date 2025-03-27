@@ -345,6 +345,27 @@ def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
     return X
 
 
+def find_multiples(target: int) -> tuple[int, int] | None:
+    """Find two factors of a given target number.
+
+    Parameters
+    ----------
+    target : int
+        The target number to find factors for.
+
+    Returns
+    -------
+    tuple[int, int] | None
+        A tuple containing two factors of the target number.
+        Returns None if no factors are found.
+    """
+    for i in range(2, target + 1):
+        if target % i == 0:
+            factor = target // i
+            return i, factor
+    return None
+
+
 # Example usage:
 if __name__ == "__main__":
     import pandas as pd
