@@ -1,6 +1,6 @@
 import pickle
 import warnings
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -106,7 +106,7 @@ class SimulationEngine(FeatureSelection):
 
         return y[:]
 
-    def _encode(self, df: DataFrame) -> np.ndarray | list:
+    def _encode(self, df: DataFrame) -> Dict[str, float]:
         df = df.copy()
         column = df.columns[0]
         frec = df[column].value_counts() / len(df)
@@ -132,9 +132,9 @@ class SimulationEngine(FeatureSelection):
             plot = kwargs.get("plot", False)
             if not x[1]:
                 media = self.df[key].mean()
-                desviacion_estandar = self.df[key].std()
-                cota_inferior = media - 1.5 * desviacion_estandar
-                cota_superior = media + 1.5 * desviacion_estandar
+                standard_deviation = self.df[key].std()
+                lower_limit = media - 1.5 * standard_deviation
+                upper_limit = media + 1.5 * standard_deviation
                 if plot:
                     print(f"Cumulative Distribution Function ({key})")
                 f, cdf_, ox = cdf(x[0].flatten(), poly=poly, plot=plot)
@@ -143,14 +143,14 @@ class SimulationEngine(FeatureSelection):
                 least_frequent_category, most_frequent_category = categories_by_quartile(
                     self.df[[key]], key
                 )
-                cota_inferior = x[1].get(least_frequent_category, 0)
-                cota_superior = x[1].get(most_frequent_category, 0)
+                lower_limit = x[1].get(least_frequent_category, 0)
+                upper_limit = x[1].get(most_frequent_category, 0)
             self.proba_dict[key] = (
                 f if f else None,
                 x[1],
                 (np.mean(np.abs(np.diff(ox))) / 2.0 if isinstance(ox, np.ndarray) else None),
-                f(cota_inferior) if f else cota_inferior,
-                f(cota_superior) if f else cota_superior,
+                f(lower_limit) if f else lower_limit,
+                f(upper_limit) if f else upper_limit,
             )
 
     def get_proba(self, value: Union[Union[float, int], str] | list, colname: str) -> List[float]:
