@@ -7,7 +7,7 @@
 <!-- Project description -->
 This repository contains the code to build the [likelihood package](./likelihood/) which contains tools for typical tasks in maintain machine learning models in production and the training of custom models, for more information review our [`documentation`](https://jzsmoreno.github.io/likelihood/).
 
-## Prerequisities
+## Prerequisites
 
 Before you begin, ensure you have met the following requirements:
 
