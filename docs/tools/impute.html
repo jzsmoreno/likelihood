@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>likelihood.tools.impute API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>likelihood.tools.impute</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="likelihood.tools.impute.SimpleImputer"><code class="flex name class">
+<span>class <span class="ident">SimpleImputer</span></span>
+<span>(</span><span>n_features: None | int = None, use_scaler: bool = False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class SimpleImputer:
+    &#34;&#34;&#34;Multiple imputation using simulation engine.&#34;&#34;&#34;
+
+    def __init__(self, n_features: int | None = None, use_scaler: bool = False):
+        &#34;&#34;&#34;
+        Initialize the imputer.
+
+        Parameters
+        ----------
+        n_features: int | None
+            Number of features to be used in the imputer. Default is None.
+        use_scaler: bool
+            Whether to use a scaler. Default is False.
+        &#34;&#34;&#34;
+        self.n_features = n_features
+        self.sim = SimulationEngine(use_scaler=use_scaler)
+        self.params = {}
+        self.cols_transf = pd.Series([])
+
+    def fit(self, X: pd.DataFrame) -&gt; None:
+        &#34;&#34;&#34;
+        Fit the imputer to the data.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            Dataframe to fit the imputer to.
+        &#34;&#34;&#34;
+        X_impute = X.copy()
+        self.params = self._get_dict_params(X_impute)
+        X_impute = self.sim._clean_data(X_impute)
+
+        if X_impute.empty:
+            raise ValueError(
+                &#34;The dataframe is empty after cleaning, it is not possible to train the imputer.&#34;
+            )
+        self.n_features = self.n_features or X_impute.shape[1] - 1
+        self.sim.fit(X_impute, self.n_features)
+
+    def transform(
+        self, X: pd.DataFrame, boundary: bool = True, inplace: bool = True
+    ) -&gt; pd.DataFrame:
+        &#34;&#34;&#34;
+        Impute missing values in the data.
+
+        Parameters
+        -----------
+        X: pd.DataFrame
+            Dataframe to impute missing values.
+        boundary: bool
+            Whether to use the boundaries of the data to impute missing values. Default is True.
+        inplace: bool
+            Whether to modify the columns of the original dataframe or return new ones. Default is True.
+        &#34;&#34;&#34;
+        X_impute = X.copy()
+        self.cols_transf = X_impute.columns
+        for column in X_impute.columns:
+            if X_impute[column].isnull().sum() &gt; 0:
+
+                if not X_impute[column].dtype == &#34;object&#34;:
+                    min_value = self.params[column][&#34;min&#34;]
+                    max_value = self.params[column][&#34;max&#34;]
+                    to_compare = self.params[column][&#34;to_compare&#34;]
+                for row in X_impute.index:
+                    if pd.isnull(X_impute.loc[row, column]):
+                        value_impute = self._check_dtype_convert(
+                            self.sim.predict(
+                                self._set_zero(X_impute.loc[row, :], column),
+                                column,
+                            )[0],
+                            to_compare,
+                        )
+                        if not X_impute[column].dtype == &#34;object&#34; and boundary:
+                            if value_impute &lt; min_value:
+                                value_impute = min_value
+                            if value_impute &gt; max_value:
+                                value_impute = max_value
+                        X_impute.loc[row, column] = value_impute
+            else:
+                self.cols_transf = self.cols_transf.drop(column)
+        if not inplace:
+            X_impute = X_impute[self.cols_transf].copy()
+            X_impute = X_impute.rename(
+                columns={column: column + &#34;_imputed&#34; for column in self.cols_transf}
+            )
+            X_impute = X.join(X_impute, rsuffix=&#34;_imputed&#34;)
+            order_cols = []
+            for column in X.columns:
+                if column + &#34;_imputed&#34; in X_impute.columns:
+                    order_cols.append(column)
+                    order_cols.append(column + &#34;_imputed&#34;)
+                else:
+                    order_cols.append(column)
+            X_impute = X_impute[order_cols]
+        return X_impute
+
+    def fit_transform(
+        self, X: pd.DataFrame, boundary: bool = True, inplace: bool = True
+    ) -&gt; pd.DataFrame:
+        &#34;&#34;&#34;
+        Fit and transform the data.
+
+        Parameters
+        -----------
+        X: pd.DataFrame
+            Dataframe to fit and transform.
+        boundary: bool
+            Whether to use the boundaries of the data to impute missing values. Default is True.
+        inplace: bool
+            Whether to modify the columns of the original dataframe or return new ones. Default is True.
+        &#34;&#34;&#34;
+        X_train = X.copy()
+        self.fit(X_train)
+        return self.transform(X, boundary, inplace)
+
+    def _set_zero(self, X: pd.Series, column_exception) -&gt; pd.DataFrame:
+        &#34;&#34;&#34;
+        Set missing values to zero, except for `column_exception`.
+
+        Parameters
+        -----------
+        X: pd.Series
+            Series to set missing values to zero.
+        &#34;&#34;&#34;
+        X = X.copy()
+        for column in X.index:
+            if pd.isnull(X[column]) and column != column_exception:
+                X[column] = 0
+        data = X.to_frame().T
+        return data
+
+    def _check_dtype_convert(self, value: Union[int, float], to_compare: Union[int, float]) -&gt; None:
+        &#34;&#34;&#34;
+        Check if the value is an integer and convert it to float if it is.
+
+        Parameters
+        -----------
+        value: Union[int, float]
+            Value to check and convert.
+        to_compare: Union[int, float]
+            Value to compare to.
+        &#34;&#34;&#34;
+        if isinstance(to_compare, int) and isinstance(value, float):
+            value = int(round(value, 0))
+
+        if isinstance(to_compare, float) and isinstance(value, float):
+            value = round(value, len(str(to_compare).split(&#34;.&#34;)[1]))
+        return value
+
+    def _get_dict_params(self, df: pd.DataFrame) -&gt; dict:
+        &#34;&#34;&#34;
+        Get the parameters for the imputer.
+
+        Parameters
+        -----------
+        df: pd.DataFrame
+            Dataframe to get the parameters from.
+        &#34;&#34;&#34;
+        params = {}
+        for column in df.columns:
+            if df[column].isnull().sum() &gt; 0:
+                if not df[column].dtype == &#34;object&#34;:
+                    to_compare = df[column].dropna().sample().values[0]
+                    params[column] = {
+                        &#34;min&#34;: df[column].min(),
+                        &#34;to_compare&#34;: to_compare,
+                        &#34;max&#34;: df[column].max(),
+                    }
+        return params
+
+    def eval(self, X: pd.DataFrame) -&gt; None:
+        &#34;&#34;&#34;
+        Create a histogram of the imputed values.
+
+        Parameters
+        -----------
+        X: pd.DataFrame
+            Dataframe to create the histogram from.
+        &#34;&#34;&#34;
+
+        if not isinstance(X, pd.DataFrame):
+            raise ValueError(&#34;Input X must be a pandas DataFrame.&#34;)
+
+        df = X.copy()
+
+        imputed_cols = [col for col in df.columns if col.endswith(&#34;_imputed&#34;)]
+        num_impute = len(imputed_cols)
+
+        if num_impute == 0:
+            print(&#34;No imputed columns found in the DataFrame.&#34;)
+            return
+
+        try:
+            ncols, nrows = find_multiples(num_impute)
+        except ValueError as e:
+            print(f&#34;Error finding multiples for {num_impute}: {e}&#34;)
+            ncols = 1
+            nrows = num_impute
+
+        _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(12, 5 * nrows))
+        axes = axes.flatten() if isinstance(axes, np.ndarray) else [axes]
+
+        for i, col in enumerate(imputed_cols):
+            original_col = col.replace(&#34;_imputed&#34;, &#34;&#34;)
+
+            if original_col in df.columns:
+                original_col_data = df[original_col].dropna()
+                ax = axes[i]
+
+                # Plot the original data
+                sns.histplot(
+                    original_col_data,
+                    kde=True,
+                    color=&#34;blue&#34;,
+                    label=f&#34;Original&#34;,
+                    bins=10,
+                    ax=ax,
+                )
+
+                # Plot the imputed data
+                sns.histplot(
+                    df[col],
+                    kde=True,
+                    color=&#34;red&#34;,
+                    label=f&#34;Imputed&#34;,
+                    bins=10,
+                    ax=ax,
+                )
+
+                ax.set_xlabel(original_col)
+                ax.set_ylabel(&#34;Frequency&#34; if i % ncols == 0 else &#34;&#34;)
+                ax.legend(loc=&#34;upper right&#34;)
+
+        plt.suptitle(&#34;Histogram Comparison&#34;, fontsize=16, fontweight=&#34;bold&#34;)
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.9)
+        plt.show()
+
+    def save(self, filename: str = &#34;./imputer&#34;) -&gt; None:
+        &#34;&#34;&#34;
+        Save the state of the SimpleImputer to a file.
+
+        Parameters
+        -----------
+        filename: str
+            Name of the file to save the imputer to. Default is &#34;./imputer&#34;.
+        &#34;&#34;&#34;
+        filename = filename if filename.endswith(&#34;.pkl&#34;) else filename + &#34;.pkl&#34;
+        with open(filename, &#34;wb&#34;) as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load(filename: str = &#34;./imputer&#34;):
+        &#34;&#34;&#34;
+        Load the state of a SimpleImputer from a file.
+
+        Parameters
+        -----------
+        filename: str
+            Name of the file to load the imputer from. Default is &#34;./imputer&#34;.
+        &#34;&#34;&#34;
+        filename = filename + &#34;.pkl&#34; if not filename.endswith(&#34;.pkl&#34;) else filename
+        with open(filename, &#34;rb&#34;) as f:
+            return pickle.load(f)</code></pre>
+</details>
+<div class="desc"><p>Multiple imputation using simulation engine.</p>
+<p>Initialize the imputer.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>n_features</code></strong> :&ensp;<code>int | None</code></dt>
+<dd>Number of features to be used in the imputer. Default is None.</dd>
+<dt><strong><code>use_scaler</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether to use a scaler. Default is False.</dd>
+</dl></div>
+<h3>Static methods</h3>
+<dl>
+<dt id="likelihood.tools.impute.SimpleImputer.load"><code class="name flex">
+<span>def <span class="ident">load</span></span>(<span>filename: str = './imputer')</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@staticmethod
+def load(filename: str = &#34;./imputer&#34;):
+    &#34;&#34;&#34;
+    Load the state of a SimpleImputer from a file.
+
+    Parameters
+    -----------
+    filename: str
+        Name of the file to load the imputer from. Default is &#34;./imputer&#34;.
+    &#34;&#34;&#34;
+    filename = filename + &#34;.pkl&#34; if not filename.endswith(&#34;.pkl&#34;) else filename
+    with open(filename, &#34;rb&#34;) as f:
+        return pickle.load(f)</code></pre>
+</details>
+<div class="desc"><p>Load the state of a SimpleImputer from a file.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>filename</code></strong> :&ensp;<code>str</code></dt>
+<dd>Name of the file to load the imputer from. Default is "./imputer".</dd>
+</dl></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="likelihood.tools.impute.SimpleImputer.eval"><code class="name flex">
+<span>def <span class="ident">eval</span></span>(<span>self, X: pandas.core.frame.DataFrame) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def eval(self, X: pd.DataFrame) -&gt; None:
+    &#34;&#34;&#34;
+    Create a histogram of the imputed values.
+
+    Parameters
+    -----------
+    X: pd.DataFrame
+        Dataframe to create the histogram from.
+    &#34;&#34;&#34;
+
+    if not isinstance(X, pd.DataFrame):
+        raise ValueError(&#34;Input X must be a pandas DataFrame.&#34;)
+
+    df = X.copy()
+
+    imputed_cols = [col for col in df.columns if col.endswith(&#34;_imputed&#34;)]
+    num_impute = len(imputed_cols)
+
+    if num_impute == 0:
+        print(&#34;No imputed columns found in the DataFrame.&#34;)
+        return
+
+    try:
+        ncols, nrows = find_multiples(num_impute)
+    except ValueError as e:
+        print(f&#34;Error finding multiples for {num_impute}: {e}&#34;)
+        ncols = 1
+        nrows = num_impute
+
+    _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(12, 5 * nrows))
+    axes = axes.flatten() if isinstance(axes, np.ndarray) else [axes]
+
+    for i, col in enumerate(imputed_cols):
+        original_col = col.replace(&#34;_imputed&#34;, &#34;&#34;)
+
+        if original_col in df.columns:
+            original_col_data = df[original_col].dropna()
+            ax = axes[i]
+
+            # Plot the original data
+            sns.histplot(
+                original_col_data,
+                kde=True,
+                color=&#34;blue&#34;,
+                label=f&#34;Original&#34;,
+                bins=10,
+                ax=ax,
+            )
+
+            # Plot the imputed data
+            sns.histplot(
+                df[col],
+                kde=True,
+                color=&#34;red&#34;,
+                label=f&#34;Imputed&#34;,
+                bins=10,
+                ax=ax,
+            )
+
+            ax.set_xlabel(original_col)
+            ax.set_ylabel(&#34;Frequency&#34; if i % ncols == 0 else &#34;&#34;)
+            ax.legend(loc=&#34;upper right&#34;)
+
+    plt.suptitle(&#34;Histogram Comparison&#34;, fontsize=16, fontweight=&#34;bold&#34;)
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.9)
+    plt.show()</code></pre>
+</details>
+<div class="desc"><p>Create a histogram of the imputed values.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>X</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>Dataframe to create the histogram from.</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.tools.impute.SimpleImputer.fit"><code class="name flex">
+<span>def <span class="ident">fit</span></span>(<span>self, X: pandas.core.frame.DataFrame) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def fit(self, X: pd.DataFrame) -&gt; None:
+    &#34;&#34;&#34;
+    Fit the imputer to the data.
+
+    Parameters
+    ----------
+    X: pd.DataFrame
+        Dataframe to fit the imputer to.
+    &#34;&#34;&#34;
+    X_impute = X.copy()
+    self.params = self._get_dict_params(X_impute)
+    X_impute = self.sim._clean_data(X_impute)
+
+    if X_impute.empty:
+        raise ValueError(
+            &#34;The dataframe is empty after cleaning, it is not possible to train the imputer.&#34;
+        )
+    self.n_features = self.n_features or X_impute.shape[1] - 1
+    self.sim.fit(X_impute, self.n_features)</code></pre>
+</details>
+<div class="desc"><p>Fit the imputer to the data.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>X</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>Dataframe to fit the imputer to.</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.tools.impute.SimpleImputer.fit_transform"><code class="name flex">
+<span>def <span class="ident">fit_transform</span></span>(<span>self, X: pandas.core.frame.DataFrame, boundary: bool = True, inplace: bool = True) ‑> pandas.core.frame.DataFrame</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def fit_transform(
+    self, X: pd.DataFrame, boundary: bool = True, inplace: bool = True
+) -&gt; pd.DataFrame:
+    &#34;&#34;&#34;
+    Fit and transform the data.
+
+    Parameters
+    -----------
+    X: pd.DataFrame
+        Dataframe to fit and transform.
+    boundary: bool
+        Whether to use the boundaries of the data to impute missing values. Default is True.
+    inplace: bool
+        Whether to modify the columns of the original dataframe or return new ones. Default is True.
+    &#34;&#34;&#34;
+    X_train = X.copy()
+    self.fit(X_train)
+    return self.transform(X, boundary, inplace)</code></pre>
+</details>
+<div class="desc"><p>Fit and transform the data.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>X</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>Dataframe to fit and transform.</dd>
+<dt><strong><code>boundary</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether to use the boundaries of the data to impute missing values. Default is True.</dd>
+<dt><strong><code>inplace</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether to modify the columns of the original dataframe or return new ones. Default is True.</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.tools.impute.SimpleImputer.save"><code class="name flex">
+<span>def <span class="ident">save</span></span>(<span>self, filename: str = './imputer') ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def save(self, filename: str = &#34;./imputer&#34;) -&gt; None:
+    &#34;&#34;&#34;
+    Save the state of the SimpleImputer to a file.
+
+    Parameters
+    -----------
+    filename: str
+        Name of the file to save the imputer to. Default is &#34;./imputer&#34;.
+    &#34;&#34;&#34;
+    filename = filename if filename.endswith(&#34;.pkl&#34;) else filename + &#34;.pkl&#34;
+    with open(filename, &#34;wb&#34;) as f:
+        pickle.dump(self, f)</code></pre>
+</details>
+<div class="desc"><p>Save the state of the SimpleImputer to a file.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>filename</code></strong> :&ensp;<code>str</code></dt>
+<dd>Name of the file to save the imputer to. Default is "./imputer".</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.tools.impute.SimpleImputer.transform"><code class="name flex">
+<span>def <span class="ident">transform</span></span>(<span>self, X: pandas.core.frame.DataFrame, boundary: bool = True, inplace: bool = True) ‑> pandas.core.frame.DataFrame</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def transform(
+    self, X: pd.DataFrame, boundary: bool = True, inplace: bool = True
+) -&gt; pd.DataFrame:
+    &#34;&#34;&#34;
+    Impute missing values in the data.
+
+    Parameters
+    -----------
+    X: pd.DataFrame
+        Dataframe to impute missing values.
+    boundary: bool
+        Whether to use the boundaries of the data to impute missing values. Default is True.
+    inplace: bool
+        Whether to modify the columns of the original dataframe or return new ones. Default is True.
+    &#34;&#34;&#34;
+    X_impute = X.copy()
+    self.cols_transf = X_impute.columns
+    for column in X_impute.columns:
+        if X_impute[column].isnull().sum() &gt; 0:
+
+            if not X_impute[column].dtype == &#34;object&#34;:
+                min_value = self.params[column][&#34;min&#34;]
+                max_value = self.params[column][&#34;max&#34;]
+                to_compare = self.params[column][&#34;to_compare&#34;]
+            for row in X_impute.index:
+                if pd.isnull(X_impute.loc[row, column]):
+                    value_impute = self._check_dtype_convert(
+                        self.sim.predict(
+                            self._set_zero(X_impute.loc[row, :], column),
+                            column,
+                        )[0],
+                        to_compare,
+                    )
+                    if not X_impute[column].dtype == &#34;object&#34; and boundary:
+                        if value_impute &lt; min_value:
+                            value_impute = min_value
+                        if value_impute &gt; max_value:
+                            value_impute = max_value
+                    X_impute.loc[row, column] = value_impute
+        else:
+            self.cols_transf = self.cols_transf.drop(column)
+    if not inplace:
+        X_impute = X_impute[self.cols_transf].copy()
+        X_impute = X_impute.rename(
+            columns={column: column + &#34;_imputed&#34; for column in self.cols_transf}
+        )
+        X_impute = X.join(X_impute, rsuffix=&#34;_imputed&#34;)
+        order_cols = []
+        for column in X.columns:
+            if column + &#34;_imputed&#34; in X_impute.columns:
+                order_cols.append(column)
+                order_cols.append(column + &#34;_imputed&#34;)
+            else:
+                order_cols.append(column)
+        X_impute = X_impute[order_cols]
+    return X_impute</code></pre>
+</details>
+<div class="desc"><p>Impute missing values in the data.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>X</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>Dataframe to impute missing values.</dd>
+<dt><strong><code>boundary</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether to use the boundaries of the data to impute missing values. Default is True.</dd>
+<dt><strong><code>inplace</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether to modify the columns of the original dataframe or return new ones. Default is True.</dd>
+</dl></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="likelihood.tools" href="index.html">likelihood.tools</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="likelihood.tools.impute.SimpleImputer" href="#likelihood.tools.impute.SimpleImputer">SimpleImputer</a></code></h4>
+<ul class="two-column">
+<li><code><a title="likelihood.tools.impute.SimpleImputer.eval" href="#likelihood.tools.impute.SimpleImputer.eval">eval</a></code></li>
+<li><code><a title="likelihood.tools.impute.SimpleImputer.fit" href="#likelihood.tools.impute.SimpleImputer.fit">fit</a></code></li>
+<li><code><a title="likelihood.tools.impute.SimpleImputer.fit_transform" href="#likelihood.tools.impute.SimpleImputer.fit_transform">fit_transform</a></code></li>
+<li><code><a title="likelihood.tools.impute.SimpleImputer.load" href="#likelihood.tools.impute.SimpleImputer.load">load</a></code></li>
+<li><code><a title="likelihood.tools.impute.SimpleImputer.save" href="#likelihood.tools.impute.SimpleImputer.save">save</a></code></li>
+<li><code><a title="likelihood.tools.impute.SimpleImputer.transform" href="#likelihood.tools.impute.SimpleImputer.transform">transform</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>
