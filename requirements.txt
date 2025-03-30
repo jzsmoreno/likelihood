@@ -9,6 +9,7 @@ numpy<2.0.0
 pydot==2.0.0
 matplotlib
 graphviz
+seaborn
 pyyaml
 pandas 
 corner
