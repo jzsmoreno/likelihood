@@ -13,3 +13,4 @@ seaborn
 pyyaml
 pandas 
 corner
+tqdm
