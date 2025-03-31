@@ -12,6 +12,10 @@ from likelihood.tools import get_metrics
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="GANRegressor")
 class GANRegressor(tf.keras.Model):
+    """
+    GANRegressor is a custom Keras model that combines a generator and a discriminator
+    """
+
     def __init__(
         self,
         input_shape_parm,
@@ -96,6 +100,29 @@ class GANRegressor(tf.keras.Model):
         validation_split=0.2,
         verbose=1,
     ):
+        """
+        Train the GAN model.
+
+        Parameters
+        --------
+        X : array-like
+            Input data.
+        y : array-like
+            Target data.
+        batch_size : int
+            Number of samples in each batch.
+        n_epochs : int
+            Number of training epochs.
+        validation_split : float, optional
+            Fraction of the data to be used for validation.
+        verbose : int, optional
+            Verbosity level. Default is 1.
+
+        Returns
+        --------
+        history : pd.DataFrame
+            Training history.
+        """
         loss_history = []
         for epoch in tqdm(range(n_epochs)):
             batch_starts = np.arange(0, len(X), batch_size)
@@ -205,6 +232,29 @@ class GANRegressor(tf.keras.Model):
         validation_split=0.2,
         patience=3,
     ):
+        """
+        Train the generator model.
+
+        Parameters
+        --------
+        X_train : array-like
+            Training data.
+        y_train : array-like
+            Training target data.
+        batch_size : int
+            Batch size for training.
+        n_epochs : int
+            Number of epochs for training.
+        validation_split : float, optional
+            Fraction of data to use for validation. Default is 0.2.
+        patience : int, optional
+            Number of epochs to wait before early stopping. Default is 3.
+
+        Returns
+        --------
+        history : pd.DataFrame
+            Training history.
+        """
         callback = tf.keras.callbacks.EarlyStopping(monitor="loss", patience=patience)
         # Prepare the target by extending it with its square
         self.discriminator.trainable = False
