@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>likelihood.models.deep.gan API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>likelihood.models.deep.gan</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="likelihood.models.deep.gan.GANRegressor"><code class="flex name class">
+<span>class <span class="ident">GANRegressor</span></span>
+<span>(</span><span>input_shape_parm,<br>output_shape_parm,<br>num_neurons=128,<br>activation='linear',<br>depth=5,<br>dropout=0.2,<br>l2_reg=0.0,<br>**kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@tf.keras.utils.register_keras_serializable(package=&#34;Custom&#34;, name=&#34;GANRegressor&#34;)
+class GANRegressor(tf.keras.Model):
+    &#34;&#34;&#34;
+    GANRegressor is a custom Keras model that combines a generator and a discriminator
+    &#34;&#34;&#34;
+
+    def __init__(
+        self,
+        input_shape_parm,
+        output_shape_parm,
+        num_neurons=128,
+        activation=&#34;linear&#34;,
+        depth=5,
+        dropout=0.2,
+        l2_reg=0.0,
+        **kwargs,
+    ):
+        super(GANRegressor, self).__init__()
+        self.input_shape_parm = input_shape_parm
+        self.output_shape_parm = output_shape_parm
+        self.num_neurons = num_neurons
+        self.activation = activation
+        self.depth = depth
+        self.dropout = dropout
+        self.l2_reg = l2_reg
+        self.optimizer = kwargs.get(&#34;optimizer&#34;, &#34;adam&#34;)
+
+        self.generator = self._build_generator()
+        self.discriminator = self._build_discriminator()
+        dummy_input = tf.convert_to_tensor(tf.random.normal([1, self.input_shape_parm]))
+        self.build(dummy_input.shape)
+
+    def build(self, input_shape):
+        self.gan = tf.keras.models.Sequential([self.generator, self.discriminator])
+
+        self.generator.compile(
+            optimizer=self.optimizer,
+            loss=tf.keras.losses.MeanAbsolutePercentageError(),
+            metrics=[tf.keras.metrics.MeanAbsolutePercentageError()],
+        )
+
+        self.discriminator.compile(
+            optimizer=self.optimizer, loss=&#34;binary_crossentropy&#34;, metrics=[&#34;accuracy&#34;]
+        )
+
+        self.gan.compile(optimizer=self.optimizer, loss=&#34;binary_crossentropy&#34;)
+        super(GANRegressor, self).build(input_shape)
+
+    def _build_generator(self):
+        generator = tf.keras.Sequential()
+        generator.add(
+            tf.keras.layers.Dense(
+                self.num_neurons,
+                activation=&#34;selu&#34;,
+                input_shape=[self.input_shape_parm],
+                kernel_regularizer=l2(self.l2_reg),
+            )
+        )
+        generator.add(tf.keras.layers.Dropout(self.dropout))
+        for _ in range(self.depth - 1):
+            generator.add(
+                tf.keras.layers.Dense(
+                    self.num_neurons, activation=&#34;selu&#34;, kernel_regularizer=l2(self.l2_reg)
+                ),
+            )
+            generator.add(tf.keras.layers.Dropout(self.dropout))
+        generator.add(tf.keras.layers.Dense(2 * self.output_shape_parm, activation=self.activation))
+        return generator
+
+    def _build_discriminator(self):
+        discriminator = tf.keras.Sequential()
+        for _ in range(self.depth):
+            discriminator.add(
+                tf.keras.layers.Dense(
+                    self.num_neurons, activation=&#34;selu&#34;, kernel_regularizer=l2(self.l2_reg)
+                ),
+            )
+            discriminator.add(tf.keras.layers.Dropout(self.dropout))
+        discriminator.add(tf.keras.layers.Dense(2, activation=&#34;softmax&#34;))
+        return discriminator
+
+    def train_gan(
+        self,
+        X,
+        y,
+        batch_size,
+        n_epochs,
+        validation_split=0.2,
+        verbose=1,
+    ):
+        &#34;&#34;&#34;
+        Train the GAN model.
+
+        Parameters
+        --------
+        X : array-like
+            Input data.
+        y : array-like
+            Target data.
+        batch_size : int
+            Number of samples in each batch.
+        n_epochs : int
+            Number of training epochs.
+        validation_split : float, optional
+            Fraction of the data to be used for validation.
+        verbose : int, optional
+            Verbosity level. Default is 1.
+
+        Returns
+        --------
+        history : pd.DataFrame
+            Training history.
+        &#34;&#34;&#34;
+        loss_history = []
+        for epoch in tqdm(range(n_epochs)):
+            batch_starts = np.arange(0, len(X), batch_size)
+            for start in batch_starts:
+                np.random.shuffle(batch_starts)
+                end = start + batch_size
+                X_batch = X[start:end]
+                y_batch = y[start:end].reshape(-1, self.output_shape_parm)
+                y_batch = np.concatenate((y_batch, y_batch**2), axis=1)
+                X_batch = tf.cast(X_batch, &#34;float32&#34;)
+                noise = tf.random.normal(
+                    shape=X_batch.shape, stddev=tf.math.reduce_std(X_batch, keepdims=False)
+                )
+
+                # Phase 1 - training the generator
+                self.generator.train_on_batch(X_batch, y_batch)
+
+                # Phase 2 - training the discriminator
+                generated_y_fake = self.generator(noise)
+                generated_y_real = self.generator(X_batch)
+                fake_and_real = tf.concat([generated_y_fake, generated_y_real], axis=0)
+                X_fake_and_real = tf.concat([noise, X_batch], axis=0)
+                batch_size = int(fake_and_real.shape[0] / 2)
+                indices_ = tf.constant([[0.0]] * batch_size + [[1.0]] * batch_size)[:, 0]
+                indices_ = tf.cast(indices_, &#34;int32&#34;)
+                y1 = tf.one_hot(indices_, 2)
+                self.gan.train_on_batch(X_fake_and_real, y1)
+
+            loss = self._cal_loss(generated_y_real, y_batch)
+            loss_history.append([epoch, loss])
+
+        if verbose:
+            X_batch, y_batch, X_batch_val, y_batch_val = self._train_and_val(
+                X_batch, y_batch, validation_split=validation_split
+            )
+            generated_y = self.generator(X_batch)
+            generated_y_val = self.generator(X_batch_val)
+            y_pred = self.discriminator.predict(fake_and_real, verbose=0)
+            y_pred = list(np.argmax(y_pred, axis=1))
+
+            metrics = get_metrics(self._get_frame(indices_.numpy().tolist(), y_pred), &#34;y&#34;, &#34;y_pred&#34;)
+            loss = self._cal_loss(generated_y, y_batch)
+            loss_val = self._cal_loss(generated_y_val, y_batch_val)
+            clear_output(wait=True)
+            metrics_list = [
+                (&#34;Epoch&#34;, f&#34;{epoch}&#34;),
+                (&#34;Loss&#34;, f&#34;{loss:.2f} / {loss_val:.2f}&#34;),
+                (&#34;Accuracy&#34;, f&#34;{metrics[&#39;accuracy&#39;]:.2f} / {metrics[&#39;accuracy&#39;]:.2f}&#34;),
+                (&#34;Precision&#34;, f&#34;{metrics[&#39;precision&#39;]:.2f} / {metrics[&#39;precision&#39;]:.2f}&#34;),
+                (&#34;Recall&#34;, f&#34;{metrics[&#39;recall&#39;]:.2f} / {metrics[&#39;recall&#39;]:.2f}&#34;),
+                (&#34;F1 Score&#34;, f&#34;{metrics[&#39;f1_score&#39;]:.2f} / {metrics[&#39;f1_score&#39;]:.2f}&#34;),
+                (&#34;Kappa&#34;, f&#34;{metrics[&#39;kappa&#39;]:.2f} / {metrics[&#39;kappa&#39;]:.2f}&#34;),
+            ]
+
+            metric_width = 15
+            value_width = 30
+
+            header = f&#34;| {&#39;Metric&#39;:&lt;{metric_width}} | {&#39;Value&#39;:&lt;{value_width}} |&#34;
+            separator = &#34;+&#34; + &#34;-&#34; * (len(header) - 2) + &#34;+&#34;
+
+            print(separator)
+            print(header)
+            print(separator)
+
+            for metric_name, metric_values in metrics_list:
+                data_row = f&#34;| {metric_name:&lt;{metric_width}} | {metric_values:&lt;{value_width}} |&#34;
+                print(data_row)
+
+            print(separator)
+
+        return pd.DataFrame(loss_history, columns=[&#34;epoch&#34;, &#34;loss&#34;])
+
+    def _get_frame(self, y, y_pred):
+        df = pd.DataFrame()
+        df[&#34;y&#34;] = y
+        df[&#34;y_pred&#34;] = y_pred
+        return df
+
+    def _train_and_val(self, X, y, validation_split):
+        split = int((1 - validation_split) * len(X))
+
+        if len(X) &gt; split and split &gt; 0:
+            X_train = X[:split]
+            y_train = y[:split]
+            X_val = X[split:]
+            y_val = y[split:]
+        else:
+            X_train = X
+            y_train = y
+            X_val = X
+            y_val = y
+
+        X_train = tf.cast(X_train, &#34;float32&#34;)
+        X_val = tf.cast(X_val, &#34;float32&#34;)
+
+        return X_train, y_train, X_val, y_val
+
+    def _cal_loss(self, generated, y):
+        return tf.math.reduce_mean(100 * abs((y - generated) / y), keepdims=False).numpy()
+
+    def train_gen(
+        self,
+        X_train,
+        y_train,
+        batch_size,
+        n_epochs,
+        validation_split=0.2,
+        patience=3,
+    ):
+        &#34;&#34;&#34;
+        Train the generator model.
+
+        Parameters
+        --------
+        X_train : array-like
+            Training data.
+        y_train : array-like
+            Training target data.
+        batch_size : int
+            Batch size for training.
+        n_epochs : int
+            Number of epochs for training.
+        validation_split : float, optional
+            Fraction of data to use for validation. Default is 0.2.
+        patience : int, optional
+            Number of epochs to wait before early stopping. Default is 3.
+
+        Returns
+        --------
+        history : pd.DataFrame
+            Training history.
+        &#34;&#34;&#34;
+        callback = tf.keras.callbacks.EarlyStopping(monitor=&#34;val_loss&#34;, patience=patience)
+        # Prepare the target by extending it with its square
+        self.discriminator.trainable = False
+        y_train_extended = np.concatenate(
+            (
+                y_train.reshape(-1, self.output_shape_parm),
+                y_train.reshape(-1, self.output_shape_parm) ** 2,
+            ),
+            axis=1,
+        )
+
+        history = self.generator.fit(
+            X_train,
+            y_train_extended,
+            epochs=n_epochs,
+            batch_size=batch_size,
+            verbose=0,
+            validation_split=validation_split,
+            callbacks=[callback],
+        )
+
+        return pd.DataFrame(history.history)
+
+    def call(self, inputs):
+        return self.generator(inputs)[:, 0]
+
+    def get_config(self):
+        config = {
+            &#34;input_shape_parm&#34;: self.input_shape_parm,
+            &#34;output_shape_parm&#34;: self.output_shape_parm,
+            &#34;num_neurons&#34;: self.num_neurons,
+            &#34;activation&#34;: self.activation,
+            &#34;depth&#34;: self.depth,
+            &#34;dropout&#34;: self.dropout,
+            &#34;generator&#34;: self.generator,
+            &#34;discriminator&#34;: self.discriminator,
+            &#34;gan&#34;: self.gan,
+            &#34;l2_reg&#34;: self.l2_reg,
+            &#34;optimizer&#34;: self.optimizer,
+        }
+        base_config = super(GANRegressor, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(
+            input_shape_parm=config[&#34;input_shape_parm&#34;],
+            output_shape_parm=config[&#34;output_shape_parm&#34;],
+            num_neurons=config[&#34;num_neurons&#34;],
+            activation=config[&#34;activation&#34;],
+            depth=config[&#34;depth&#34;],
+            dropout=config[&#34;dropout&#34;],
+            generator=config[&#34;generator&#34;],
+            discriminator=config[&#34;discriminator&#34;],
+            gan=config[&#34;gan&#34;],
+            l2_reg=config[&#34;l2_reg&#34;],
+            optimizer=config[&#34;optimizer&#34;],
+        )</code></pre>
+</details>
+<div class="desc"><p>GANRegressor is a custom Keras model that combines a generator and a discriminator</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>keras.src.models.model.Model</li>
+<li>keras.src.backend.tensorflow.trainer.TensorFlowTrainer</li>
+<li>keras.src.trainers.trainer.Trainer</li>
+<li>keras.src.layers.layer.Layer</li>
+<li>keras.src.backend.tensorflow.layer.TFLayer</li>
+<li>keras.src.backend.tensorflow.trackable.KerasAutoTrackable</li>
+<li>tensorflow.python.trackable.autotrackable.AutoTrackable</li>
+<li>tensorflow.python.trackable.base.Trackable</li>
+<li>keras.src.ops.operation.Operation</li>
+<li>keras.src.saving.keras_saveable.KerasSaveable</li>
+</ul>
+<h3>Static methods</h3>
+<dl>
+<dt id="likelihood.models.deep.gan.GANRegressor.from_config"><code class="name flex">
+<span>def <span class="ident">from_config</span></span>(<span>config)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Creates an operation from its config.</p>
+<p>This method is the reverse of <code>get_config</code>, capable of instantiating the
+same operation from the config dictionary.</p>
+<p>Note: If you override this method, you might receive a serialized dtype
+config, which is a <code>dict</code>. You can deserialize it as follows:</p>
+<pre><code class="language-python">if &quot;dtype&quot; in config and isinstance(config[&quot;dtype&quot;], dict):
+    policy = dtype_policies.deserialize(config[&quot;dtype&quot;])
+</code></pre>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>config</code></strong></dt>
+<dd>A Python dictionary, typically the output of <code>get_config</code>.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>An operation instance.</p></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="likelihood.models.deep.gan.GANRegressor.build"><code class="name flex">
+<span>def <span class="ident">build</span></span>(<span>self, input_shape)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def build(self, input_shape):
+    self.gan = tf.keras.models.Sequential([self.generator, self.discriminator])
+
+    self.generator.compile(
+        optimizer=self.optimizer,
+        loss=tf.keras.losses.MeanAbsolutePercentageError(),
+        metrics=[tf.keras.metrics.MeanAbsolutePercentageError()],
+    )
+
+    self.discriminator.compile(
+        optimizer=self.optimizer, loss=&#34;binary_crossentropy&#34;, metrics=[&#34;accuracy&#34;]
+    )
+
+    self.gan.compile(optimizer=self.optimizer, loss=&#34;binary_crossentropy&#34;)
+    super(GANRegressor, self).build(input_shape)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="likelihood.models.deep.gan.GANRegressor.call"><code class="name flex">
+<span>def <span class="ident">call</span></span>(<span>self, inputs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def call(self, inputs):
+    return self.generator(inputs)[:, 0]</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="likelihood.models.deep.gan.GANRegressor.get_config"><code class="name flex">
+<span>def <span class="ident">get_config</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_config(self):
+    config = {
+        &#34;input_shape_parm&#34;: self.input_shape_parm,
+        &#34;output_shape_parm&#34;: self.output_shape_parm,
+        &#34;num_neurons&#34;: self.num_neurons,
+        &#34;activation&#34;: self.activation,
+        &#34;depth&#34;: self.depth,
+        &#34;dropout&#34;: self.dropout,
+        &#34;generator&#34;: self.generator,
+        &#34;discriminator&#34;: self.discriminator,
+        &#34;gan&#34;: self.gan,
+        &#34;l2_reg&#34;: self.l2_reg,
+        &#34;optimizer&#34;: self.optimizer,
+    }
+    base_config = super(GANRegressor, self).get_config()
+    return dict(list(base_config.items()) + list(config.items()))</code></pre>
+</details>
+<div class="desc"><p>Returns the config of the object.</p>
+<p>An object config is a Python dictionary (serializable)
+containing the information needed to re-instantiate it.</p></div>
+</dd>
+<dt id="likelihood.models.deep.gan.GANRegressor.train_gan"><code class="name flex">
+<span>def <span class="ident">train_gan</span></span>(<span>self, X, y, batch_size, n_epochs, validation_split=0.2, verbose=1)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def train_gan(
+    self,
+    X,
+    y,
+    batch_size,
+    n_epochs,
+    validation_split=0.2,
+    verbose=1,
+):
+    &#34;&#34;&#34;
+    Train the GAN model.
+
+    Parameters
+    --------
+    X : array-like
+        Input data.
+    y : array-like
+        Target data.
+    batch_size : int
+        Number of samples in each batch.
+    n_epochs : int
+        Number of training epochs.
+    validation_split : float, optional
+        Fraction of the data to be used for validation.
+    verbose : int, optional
+        Verbosity level. Default is 1.
+
+    Returns
+    --------
+    history : pd.DataFrame
+        Training history.
+    &#34;&#34;&#34;
+    loss_history = []
+    for epoch in tqdm(range(n_epochs)):
+        batch_starts = np.arange(0, len(X), batch_size)
+        for start in batch_starts:
+            np.random.shuffle(batch_starts)
+            end = start + batch_size
+            X_batch = X[start:end]
+            y_batch = y[start:end].reshape(-1, self.output_shape_parm)
+            y_batch = np.concatenate((y_batch, y_batch**2), axis=1)
+            X_batch = tf.cast(X_batch, &#34;float32&#34;)
+            noise = tf.random.normal(
+                shape=X_batch.shape, stddev=tf.math.reduce_std(X_batch, keepdims=False)
+            )
+
+            # Phase 1 - training the generator
+            self.generator.train_on_batch(X_batch, y_batch)
+
+            # Phase 2 - training the discriminator
+            generated_y_fake = self.generator(noise)
+            generated_y_real = self.generator(X_batch)
+            fake_and_real = tf.concat([generated_y_fake, generated_y_real], axis=0)
+            X_fake_and_real = tf.concat([noise, X_batch], axis=0)
+            batch_size = int(fake_and_real.shape[0] / 2)
+            indices_ = tf.constant([[0.0]] * batch_size + [[1.0]] * batch_size)[:, 0]
+            indices_ = tf.cast(indices_, &#34;int32&#34;)
+            y1 = tf.one_hot(indices_, 2)
+            self.gan.train_on_batch(X_fake_and_real, y1)
+
+        loss = self._cal_loss(generated_y_real, y_batch)
+        loss_history.append([epoch, loss])
+
+    if verbose:
+        X_batch, y_batch, X_batch_val, y_batch_val = self._train_and_val(
+            X_batch, y_batch, validation_split=validation_split
+        )
+        generated_y = self.generator(X_batch)
+        generated_y_val = self.generator(X_batch_val)
+        y_pred = self.discriminator.predict(fake_and_real, verbose=0)
+        y_pred = list(np.argmax(y_pred, axis=1))
+
+        metrics = get_metrics(self._get_frame(indices_.numpy().tolist(), y_pred), &#34;y&#34;, &#34;y_pred&#34;)
+        loss = self._cal_loss(generated_y, y_batch)
+        loss_val = self._cal_loss(generated_y_val, y_batch_val)
+        clear_output(wait=True)
+        metrics_list = [
+            (&#34;Epoch&#34;, f&#34;{epoch}&#34;),
+            (&#34;Loss&#34;, f&#34;{loss:.2f} / {loss_val:.2f}&#34;),
+            (&#34;Accuracy&#34;, f&#34;{metrics[&#39;accuracy&#39;]:.2f} / {metrics[&#39;accuracy&#39;]:.2f}&#34;),
+            (&#34;Precision&#34;, f&#34;{metrics[&#39;precision&#39;]:.2f} / {metrics[&#39;precision&#39;]:.2f}&#34;),
+            (&#34;Recall&#34;, f&#34;{metrics[&#39;recall&#39;]:.2f} / {metrics[&#39;recall&#39;]:.2f}&#34;),
+            (&#34;F1 Score&#34;, f&#34;{metrics[&#39;f1_score&#39;]:.2f} / {metrics[&#39;f1_score&#39;]:.2f}&#34;),
+            (&#34;Kappa&#34;, f&#34;{metrics[&#39;kappa&#39;]:.2f} / {metrics[&#39;kappa&#39;]:.2f}&#34;),
+        ]
+
+        metric_width = 15
+        value_width = 30
+
+        header = f&#34;| {&#39;Metric&#39;:&lt;{metric_width}} | {&#39;Value&#39;:&lt;{value_width}} |&#34;
+        separator = &#34;+&#34; + &#34;-&#34; * (len(header) - 2) + &#34;+&#34;
+
+        print(separator)
+        print(header)
+        print(separator)
+
+        for metric_name, metric_values in metrics_list:
+            data_row = f&#34;| {metric_name:&lt;{metric_width}} | {metric_values:&lt;{value_width}} |&#34;
+            print(data_row)
+
+        print(separator)
+
+    return pd.DataFrame(loss_history, columns=[&#34;epoch&#34;, &#34;loss&#34;])</code></pre>
+</details>
+<div class="desc"><p>Train the GAN model.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>X</code></strong> :&ensp;<code>array-like</code></dt>
+<dd>Input data.</dd>
+<dt><strong><code>y</code></strong> :&ensp;<code>array-like</code></dt>
+<dd>Target data.</dd>
+<dt><strong><code>batch_size</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of samples in each batch.</dd>
+<dt><strong><code>n_epochs</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of training epochs.</dd>
+<dt><strong><code>validation_split</code></strong> :&ensp;<code>float</code>, optional</dt>
+<dd>Fraction of the data to be used for validation.</dd>
+<dt><strong><code>verbose</code></strong> :&ensp;<code>int</code>, optional</dt>
+<dd>Verbosity level. Default is 1.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>history</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>Training history.</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.models.deep.gan.GANRegressor.train_gen"><code class="name flex">
+<span>def <span class="ident">train_gen</span></span>(<span>self, X_train, y_train, batch_size, n_epochs, validation_split=0.2, patience=3)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def train_gen(
+    self,
+    X_train,
+    y_train,
+    batch_size,
+    n_epochs,
+    validation_split=0.2,
+    patience=3,
+):
+    &#34;&#34;&#34;
+    Train the generator model.
+
+    Parameters
+    --------
+    X_train : array-like
+        Training data.
+    y_train : array-like
+        Training target data.
+    batch_size : int
+        Batch size for training.
+    n_epochs : int
+        Number of epochs for training.
+    validation_split : float, optional
+        Fraction of data to use for validation. Default is 0.2.
+    patience : int, optional
+        Number of epochs to wait before early stopping. Default is 3.
+
+    Returns
+    --------
+    history : pd.DataFrame
+        Training history.
+    &#34;&#34;&#34;
+    callback = tf.keras.callbacks.EarlyStopping(monitor=&#34;val_loss&#34;, patience=patience)
+    # Prepare the target by extending it with its square
+    self.discriminator.trainable = False
+    y_train_extended = np.concatenate(
+        (
+            y_train.reshape(-1, self.output_shape_parm),
+            y_train.reshape(-1, self.output_shape_parm) ** 2,
+        ),
+        axis=1,
+    )
+
+    history = self.generator.fit(
+        X_train,
+        y_train_extended,
+        epochs=n_epochs,
+        batch_size=batch_size,
+        verbose=0,
+        validation_split=validation_split,
+        callbacks=[callback],
+    )
+
+    return pd.DataFrame(history.history)</code></pre>
+</details>
+<div class="desc"><p>Train the generator model.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>X_train</code></strong> :&ensp;<code>array-like</code></dt>
+<dd>Training data.</dd>
+<dt><strong><code>y_train</code></strong> :&ensp;<code>array-like</code></dt>
+<dd>Training target data.</dd>
+<dt><strong><code>batch_size</code></strong> :&ensp;<code>int</code></dt>
+<dd>Batch size for training.</dd>
+<dt><strong><code>n_epochs</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of epochs for training.</dd>
+<dt><strong><code>validation_split</code></strong> :&ensp;<code>float</code>, optional</dt>
+<dd>Fraction of data to use for validation. Default is 0.2.</dd>
+<dt><strong><code>patience</code></strong> :&ensp;<code>int</code>, optional</dt>
+<dd>Number of epochs to wait before early stopping. Default is 3.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>history</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>Training history.</dd>
+</dl></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="likelihood.models.deep" href="index.html">likelihood.models.deep</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="likelihood.models.deep.gan.GANRegressor" href="#likelihood.models.deep.gan.GANRegressor">GANRegressor</a></code></h4>
+<ul class="two-column">
+<li><code><a title="likelihood.models.deep.gan.GANRegressor.build" href="#likelihood.models.deep.gan.GANRegressor.build">build</a></code></li>
+<li><code><a title="likelihood.models.deep.gan.GANRegressor.call" href="#likelihood.models.deep.gan.GANRegressor.call">call</a></code></li>
+<li><code><a title="likelihood.models.deep.gan.GANRegressor.from_config" href="#likelihood.models.deep.gan.GANRegressor.from_config">from_config</a></code></li>
+<li><code><a title="likelihood.models.deep.gan.GANRegressor.get_config" href="#likelihood.models.deep.gan.GANRegressor.get_config">get_config</a></code></li>
+<li><code><a title="likelihood.models.deep.gan.GANRegressor.train_gan" href="#likelihood.models.deep.gan.GANRegressor.train_gan">train_gan</a></code></li>
+<li><code><a title="likelihood.models.deep.gan.GANRegressor.train_gen" href="#likelihood.models.deep.gan.GANRegressor.train_gen">train_gen</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>
