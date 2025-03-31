@@ -1,5 +1,3 @@
-import random
-
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -127,7 +125,7 @@ class GANRegressor(tf.keras.Model):
         for epoch in tqdm(range(n_epochs)):
             batch_starts = np.arange(0, len(X), batch_size)
             for start in batch_starts:
-
+                np.random.shuffle(batch_starts)
                 end = start + batch_size
                 X_batch = X[start:end]
                 y_batch = y[start:end].reshape(-1, self.output_shape_parm)
@@ -255,7 +253,7 @@ class GANRegressor(tf.keras.Model):
         history : pd.DataFrame
             Training history.
         """
-        callback = tf.keras.callbacks.EarlyStopping(monitor="loss", patience=patience)
+        callback = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=patience)
         # Prepare the target by extending it with its square
         self.discriminator.trainable = False
         y_train_extended = np.concatenate(
