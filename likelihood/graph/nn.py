@@ -5,6 +5,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 import warnings
+from multiprocessing import Pool, cpu_count
 from typing import Any, List, Tuple
 
 import numpy as np
@@ -38,40 +39,36 @@ def compare_similarity(arr1: List[Any], arr2: List[Any], threshold: float = 0.05
     return sum(is_similar(a, b) for a, b in zip(arr1, arr2))
 
 
+def compare_pair(pair, data, similarity, threshold):
+    i, j = pair
+    sim = compare_similarity(data[i], data[j], threshold=threshold)
+    return (i, j, 1 if sim >= similarity else 0)
+
+
 def cal_adjacency_matrix(
-    df: DataFrame, exclude_subset: List[str] = [], sparse: bool = True, **kwargs
+    df: pd.DataFrame, exclude_subset: List[str] = [], sparse: bool = True, **kwargs
 ) -> Tuple[dict, np.ndarray]:
-    """Calculates the adjacency matrix for a given DataFrame.
-    The adjacency matrix is a matrix that represents the similarity between each pair of features.
-    The similarity is calculated using the `compare_similarity` function.
-    The resulting matrix is a square matrix with the same number of rows and columns as the rows of the input DataFrame.
+    """
+    Calculates the adjacency matrix for a given DataFrame using parallel processing.
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : DataFrame
         The input DataFrame containing the features.
-    exclude_subset : `List[str]`, optional
+    exclude_subset : List[str], optional
         A list of features to exclude from the calculation of the adjacency matrix.
-    sparse : `bool`, optional
+    sparse : bool, optional
         Whether to return a sparse matrix or a dense matrix.
-    **kwargs : `dict`
+    **kwargs : dict
         Additional keyword arguments to pass to the `compare_similarity` function.
-
-    Keyword Arguments:
-    ----------
-    similarity: `int`
-        The minimum number of features that must be the same in both arrays to be considered similar.
-    threshold : `float`
-        The threshold value used in the `compare_similarity` function. Default is 0.05.
 
     Returns
     -------
-    adj_dict : `dict`
+    adj_dict : dict
         A dictionary containing the features.
-    adjacency_matrix : `ndarray`
+    adjacency_matrix : ndarray
         The adjacency matrix.
     """
-
     if len(exclude_subset) > 0:
         columns = [col for col in df.columns if col not in exclude_subset]
         df_ = df[columns].copy()
@@ -84,14 +81,23 @@ def cal_adjacency_matrix(
     threshold = kwargs.get("threshold", 0.05)
     assert similarity <= df_.shape[1]
 
-    adj_dict = {index: row.tolist() for index, row in df_.iterrows()}
+    data = df_.to_numpy()
+    n = len(data)
 
-    adjacency_matrix = np.zeros((len(df_), len(df_)))
+    adj_dict = {i: data[i].tolist() for i in range(n)}
 
-    for i in range(len(df_)):
-        for j in range(len(df_)):
-            if compare_similarity(adj_dict[i], adj_dict[j], threshold=threshold) >= similarity:
-                adjacency_matrix[i][j] = 1
+    pairs = [(i, j) for i in range(n) for j in range(i, n)]
+
+    with Pool(cpu_count()) as pool:
+        results = pool.starmap(
+            compare_pair, [(pair, data, similarity, threshold) for pair in pairs]
+        )
+
+    adjacency_matrix = np.zeros((n, n), dtype=np.uint8)
+    for i, j, val in results:
+        if val:
+            adjacency_matrix[i, j] = 1
+            adjacency_matrix[j, i] = 1
 
     if sparse:
         num_nodes = adjacency_matrix.shape[0]
