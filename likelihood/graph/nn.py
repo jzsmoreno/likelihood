@@ -53,21 +53,28 @@ def cal_adjacency_matrix(
 
     Parameters
     ----------
-    df : DataFrame
+    df : `DataFrame`
         The input DataFrame containing the features.
-    exclude_subset : List[str], optional
+    exclude_subset : `List[str]`, `optional`
         A list of features to exclude from the calculation of the adjacency matrix.
-    sparse : bool, optional
+    sparse : `bool`, `optional`
         Whether to return a sparse matrix or a dense matrix.
-    **kwargs : dict
+    **kwargs : `dict`
         Additional keyword arguments to pass to the `compare_similarity` function.
 
     Returns
     -------
-    adj_dict : dict
+    adj_dict : `dict`
         A dictionary containing the features.
-    adjacency_matrix : ndarray
+    adjacency_matrix : `ndarray`
         The adjacency matrix.
+
+    Keyword Arguments:
+    ----------
+    similarity: `int`
+        The minimum number of features that must be the same in both arrays to be considered similar.
+    threshold : `float`
+        The threshold value used in the `compare_similarity` function. Default is 0.0
     """
     if len(exclude_subset) > 0:
         columns = [col for col in df.columns if col not in exclude_subset]
