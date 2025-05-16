@@ -316,10 +316,6 @@ class VanillaGNN(tf.keras.Model):
 
             if epoch % 5 == 0:
                 clear_output(wait=True)
-                warnings.warn(
-                    "It is normal for validation metrics to underperform during training. Use the test method to validate after training.",
-                    UserWarning,
-                )
                 val_loss, val_f1 = self.evaluate(X_test, adjacency_test, y_test)
                 val_losses.append(val_loss)
                 val_f1_scores.append(val_f1)

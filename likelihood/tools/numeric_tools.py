@@ -356,13 +356,16 @@ def find_multiples(target: int) -> tuple[int, int] | None:
     Returns
     -------
     tuple[int, int] | None
-        A tuple containing two factors of the target number.
+        If i and i+1 both divide target, returns (i, i+1).
+        Otherwise, returns (i, target // i).
         Returns None if no factors are found.
     """
     for i in range(2, target + 1):
         if target % i == 0:
-            factor = target // i
-            return i, factor
+            if (i + 1) <= target and target % (i + 1) == 0:
+                return i + 1, target // (i + 1)
+            else:
+                return i, target // i
     return None
 
 
@@ -396,4 +399,9 @@ if __name__ == "__main__":
     df["index"] = ["A", "B", "C", "D"]
     print("New correlation coefficient test for pandas DataFrame")
     values_df = xi_corr(df)
+    print(find_multiples(30))
+    print(find_multiples(25))
+    print(find_multiples(49))
+    print(find_multiples(17))
+    print(find_multiples(24))
     breakpoint()
