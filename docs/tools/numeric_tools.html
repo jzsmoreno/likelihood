@@ -105,13 +105,16 @@ Prints the matrix to console.</p></div>
     Returns
     -------
     tuple[int, int] | None
-        A tuple containing two factors of the target number.
+        If i and i+1 both divide target, returns (i, i+1).
+        Otherwise, returns (i, target // i).
         Returns None if no factors are found.
     &#34;&#34;&#34;
     for i in range(2, target + 1):
         if target % i == 0:
-            factor = target // i
-            return i, factor
+            if (i + 1) &lt;= target and target % (i + 1) == 0:
+                return i + 1, target // (i + 1)
+            else:
+                return i, target // i
     return None</code></pre>
 </details>
 <div class="desc"><p>Find two factors of a given target number.</p>
@@ -123,7 +126,8 @@ Prints the matrix to console.</p></div>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><code>tuple[int, int] | None</code></dt>
-<dd>A tuple containing two factors of the target number.
+<dd>If i and i+1 both divide target, returns (i, i+1).
+Otherwise, returns (i, target // i).
 Returns None if no factors are found.</dd>
 </dl></div>
 </dd>

@@ -106,7 +106,6 @@ el.replaceWith(d);
     &#34;&#34;&#34;
 
     def __init__(self, use_scaler: bool = False, **kwargs):
-
         self.df = pd.DataFrame()
         self.n_importances = None
         self.use_scaler = use_scaler
@@ -146,7 +145,6 @@ el.replaceWith(d);
 
         # Categorical column
         if quick_encoder != None:
-
             one_hot = OneHotEncoder()
             y = one_hot.decode(y)
             encoding_dic = quick_encoder.decoding_list[0]
@@ -235,7 +233,6 @@ el.replaceWith(d);
         ]
 
     def _clean_data(self, df: DataFrame) -&gt; DataFrame:
-
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
         df.replace(&#34; &#34;, np.nan, inplace=True)
         df = check_nan_inf(df)
@@ -460,7 +457,6 @@ def load(filename: str = &#34;./simulation_model&#34;):
 
     # Categorical column
     if quick_encoder != None:
-
         one_hot = OneHotEncoder()
         y = one_hot.decode(y)
         encoding_dic = quick_encoder.decoding_list[0]

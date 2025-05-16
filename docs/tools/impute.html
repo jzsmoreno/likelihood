@@ -113,7 +113,6 @@ el.replaceWith(d);
         self.cols_transf = X_impute.columns
         for column in X_impute.columns:
             if X_impute[column].isnull().sum() &gt; 0:
-
                 if not X_impute[column].dtype == &#34;object&#34;:
                     min_value = self.params[column][&#34;min&#34;]
                     max_value = self.params[column][&#34;max&#34;]
@@ -574,7 +573,6 @@ def load(filename: str = &#34;./imputer&#34;):
     self.cols_transf = X_impute.columns
     for column in X_impute.columns:
         if X_impute[column].isnull().sum() &gt; 0:
-
             if not X_impute[column].dtype == &#34;object&#34;:
                 min_value = self.params[column][&#34;min&#34;]
                 max_value = self.params[column][&#34;max&#34;]

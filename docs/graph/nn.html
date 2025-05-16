@@ -53,30 +53,21 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def cal_adjacency_matrix(
-    df: DataFrame, exclude_subset: List[str] = [], sparse: bool = True, **kwargs
+    df: pd.DataFrame, exclude_subset: List[str] = [], sparse: bool = True, **kwargs
 ) -&gt; Tuple[dict, np.ndarray]:
-    &#34;&#34;&#34;Calculates the adjacency matrix for a given DataFrame.
-    The adjacency matrix is a matrix that represents the similarity between each pair of features.
-    The similarity is calculated using the `compare_similarity` function.
-    The resulting matrix is a square matrix with the same number of rows and columns as the rows of the input DataFrame.
+    &#34;&#34;&#34;
+    Calculates the adjacency matrix for a given DataFrame using parallel processing.
 
     Parameters
     ----------
     df : `DataFrame`
         The input DataFrame containing the features.
-    exclude_subset : `List[str]`, optional
+    exclude_subset : `List[str]`, `optional`
         A list of features to exclude from the calculation of the adjacency matrix.
-    sparse : `bool`, optional
+    sparse : `bool`, `optional`
         Whether to return a sparse matrix or a dense matrix.
     **kwargs : `dict`
         Additional keyword arguments to pass to the `compare_similarity` function.
-
-    Keyword Arguments:
-    ----------
-    similarity: `int`
-        The minimum number of features that must be the same in both arrays to be considered similar.
-    threshold : `float`
-        The threshold value used in the `compare_similarity` function. Default is 0.05.
 
     Returns
     -------
@@ -84,8 +75,14 @@ el.replaceWith(d);
         A dictionary containing the features.
     adjacency_matrix : `ndarray`
         The adjacency matrix.
-    &#34;&#34;&#34;
 
+    Keyword Arguments:
+    ----------
+    similarity: `int`
+        The minimum number of features that must be the same in both arrays to be considered similar.
+    threshold : `float`
+        The threshold value used in the `compare_similarity` function. Default is 0.0
+    &#34;&#34;&#34;
     if len(exclude_subset) &gt; 0:
         columns = [col for col in df.columns if col not in exclude_subset]
         df_ = df[columns].copy()
@@ -98,14 +95,26 @@ el.replaceWith(d);
     threshold = kwargs.get(&#34;threshold&#34;, 0.05)
     assert similarity &lt;= df_.shape[1]
 
-    adj_dict = {index: row.tolist() for index, row in df_.iterrows()}
+    data = df_.to_numpy()
+    n = len(data)
 
-    adjacency_matrix = np.zeros((len(df_), len(df_)))
+    adj_dict = {i: data[i].tolist() for i in range(n)}
 
-    for i in range(len(df_)):
-        for j in range(len(df_)):
-            if compare_similarity(adj_dict[i], adj_dict[j], threshold=threshold) &gt;= similarity:
-                adjacency_matrix[i][j] = 1
+    def pair_generator():
+        for i in range(n):
+            for j in range(i, n):
+                yield (i, j)
+
+    with Pool(cpu_count()) as pool:
+        results = pool.starmap(
+            compare_pair, ((pair, data, similarity, threshold) for pair in pair_generator())
+        )
+
+    adjacency_matrix = np.zeros((n, n), dtype=np.uint8)
+    for i, j, val in results:
+        if val:
+            adjacency_matrix[i, j] = 1
+            adjacency_matrix[j, i] = 1
 
     if sparse:
         num_nodes = adjacency_matrix.shape[0]
@@ -117,64 +126,86 @@ el.replaceWith(d);
             indices=indices, values=values, dense_shape=(num_nodes, num_nodes)
         )
 
-        return adj_dict, adjacency_matrix
-    else:
-        return adj_dict, adjacency_matrix</code></pre>
+    return adj_dict, adjacency_matrix</code></pre>
 </details>
-<div class="desc"><p>Calculates the adjacency matrix for a given DataFrame.
-The adjacency matrix is a matrix that represents the similarity between each pair of features.
-The similarity is calculated using the <code><a title="likelihood.graph.nn.compare_similarity" href="#likelihood.graph.nn.compare_similarity">compare_similarity()</a></code> function.
-The resulting matrix is a square matrix with the same number of rows and columns as the rows of the input DataFrame.</p>
+<div class="desc"><p>Calculates the adjacency matrix for a given DataFrame using parallel processing.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
 <dd>The input DataFrame containing the features.</dd>
-<dt><strong><code>exclude_subset</code></strong> :&ensp;<code>List[str]</code>, optional</dt>
+<dt><strong><code>exclude_subset</code></strong> :&ensp;<code>List[str]<code>,</code>optional</code></dt>
 <dd>A list of features to exclude from the calculation of the adjacency matrix.</dd>
-<dt><strong><code>sparse</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dt><strong><code>sparse</code></strong> :&ensp;<code>bool<code>,</code>optional</code></dt>
 <dd>Whether to return a sparse matrix or a dense matrix.</dd>
 <dt><strong><code>**kwargs</code></strong> :&ensp;<code>dict</code></dt>
-<dd>Additional keyword arguments to pass to the <code><a title="likelihood.graph.nn.compare_similarity" href="#likelihood.graph.nn.compare_similarity">compare_similarity()</a></code> function.</dd>
+<dd>Additional keyword arguments to pass to the <code>compare_similarity</code> function.</dd>
 </dl>
-<h2 id="keyword-arguments">Keyword Arguments:</h2>
-<p>similarity: <code>int</code>
-The minimum number of features that must be the same in both arrays to be considered similar.
-threshold : <code>float</code>
-The threshold value used in the <code><a title="likelihood.graph.nn.compare_similarity" href="#likelihood.graph.nn.compare_similarity">compare_similarity()</a></code> function. Default is 0.05.</p>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><strong><code>adj_dict</code></strong> :&ensp;<code>dict</code></dt>
 <dd>A dictionary containing the features.</dd>
 <dt><strong><code>adjacency_matrix</code></strong> :&ensp;<code>ndarray</code></dt>
 <dd>The adjacency matrix.</dd>
-</dl></div>
+</dl>
+<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<p>similarity: <code>int</code>
+The minimum number of features that must be the same in both arrays to be considered similar.
+threshold : <code>float</code>
+The threshold value used in the <code>compare_similarity</code> function. Default is 0.0</p></div>
 </dd>
-<dt id="likelihood.graph.nn.compare_similarity"><code class="name flex">
-<span>def <span class="ident">compare_similarity</span></span>(<span>arr1: List[Any], arr2: List[Any], threshold: float = 0.05) ‑> int</span>
+<dt id="likelihood.graph.nn.compare_pair"><code class="name flex">
+<span>def <span class="ident">compare_pair</span></span>(<span>pair, data, similarity, threshold)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def compare_similarity(arr1: List[Any], arr2: List[Any], threshold: float = 0.05) -&gt; int:
-    &#34;&#34;&#34;Calculate the similarity between two arrays considering numeric values near to 1 in ratio.&#34;&#34;&#34;
-
-    def is_similar(a: Any, b: Any) -&gt; bool:
-        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
-            if a == 0 and b == 0:
-                return True
-            if a == 0 or b == 0:
-                return False
-            # For numeric values, check if their ratio is within the threshold range
-            ratio = max(a, b) / min(a, b)
-            return 1 - threshold &lt;= ratio &lt;= 1 + threshold
-        else:
-            return a == b
-
-    return sum(is_similar(a, b) for a, b in zip(arr1, arr2))</code></pre>
+<pre><code class="python">def compare_pair(pair, data, similarity, threshold):
+    i, j = pair
+    sim = compare_similarity_np(data[i], data[j], threshold=threshold)
+    return (i, j, 1 if sim &gt;= similarity else 0)</code></pre>
 </details>
-<div class="desc"><p>Calculate the similarity between two arrays considering numeric values near to 1 in ratio.</p></div>
+<div class="desc"></div>
+</dd>
+<dt id="likelihood.graph.nn.compare_similarity_np"><code class="name flex">
+<span>def <span class="ident">compare_similarity_np</span></span>(<span>arr1: numpy.ndarray, arr2: numpy.ndarray, threshold: float = 0.05) ‑> int</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def compare_similarity_np(arr1: np.ndarray, arr2: np.ndarray, threshold: float = 0.05) -&gt; int:
+    &#34;&#34;&#34;Vectorized similarity comparison between two numeric/categorical arrays.&#34;&#34;&#34;
+    arr1 = np.asarray(arr1)
+    arr2 = np.asarray(arr2)
+
+    is_numeric = np.vectorize(
+        lambda a, b: isinstance(a, (int, float)) and isinstance(b, (int, float))
+    )(arr1, arr2)
+
+    similarity = np.zeros_like(arr1, dtype=bool)
+
+    if np.any(is_numeric):
+        a_num = arr1[is_numeric].astype(float)
+        b_num = arr2[is_numeric].astype(float)
+
+        both_zero = (a_num == 0) &amp; (b_num == 0)
+        nonzero = ~both_zero &amp; (a_num != 0) &amp; (b_num != 0)
+        ratio = np.zeros_like(a_num)
+        ratio[nonzero] = np.maximum(a_num[nonzero], b_num[nonzero]) / np.minimum(
+            a_num[nonzero], b_num[nonzero]
+        )
+        numeric_similar = both_zero | ((1 - threshold &lt;= ratio) &amp; (ratio &lt;= 1 + threshold))
+
+        similarity[is_numeric] = numeric_similar
+
+    similarity[~is_numeric] = arr1[~is_numeric] == arr2[~is_numeric]
+
+    return np.count_nonzero(similarity)</code></pre>
+</details>
+<div class="desc"><p>Vectorized similarity comparison between two numeric/categorical arrays.</p></div>
 </dd>
 </dl>
 </section>
@@ -313,12 +344,17 @@ class VanillaGNN(tf.keras.Model):
         val_losses = []
         val_f1_scores = []
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            data.x, data.y, test_size=test_size, shuffle=False
-        )
-        adjacency_train = tf.sparse.slice(data.adjacency, [0, 0], [len(X_train), len(X_train)])
+        num_nodes = len(data.x)
+        split_index = int((1 - test_size) * num_nodes)
+
+        X_train, X_test = data.x[:split_index], data.x[split_index:]
+        y_train, y_test = data.y[:split_index], data.y[split_index:]
+
+        adjacency_train = tf.sparse.slice(data.adjacency, [0, 0], [split_index, split_index])
         adjacency_test = tf.sparse.slice(
-            data.adjacency, [len(X_train), 0], [len(X_test), len(X_test)]
+            data.adjacency,
+            [split_index, split_index],
+            [num_nodes - split_index, num_nodes - split_index],
         )
 
         batch_starts = np.arange(0, len(X_train), batch_size)
@@ -339,10 +375,6 @@ class VanillaGNN(tf.keras.Model):
 
             if epoch % 5 == 0:
                 clear_output(wait=True)
-                warnings.warn(
-                    &#34;It is normal for validation metrics to underperform during training. Use the test method to validate after training.&#34;,
-                    UserWarning,
-                )
                 val_loss, val_f1 = self.evaluate(X_test, adjacency_test, y_test)
                 val_losses.append(val_loss)
                 val_f1_scores.append(val_f1)
@@ -632,12 +664,17 @@ the display labels for the scalar outputs.</p></div>
     val_losses = []
     val_f1_scores = []
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        data.x, data.y, test_size=test_size, shuffle=False
-    )
-    adjacency_train = tf.sparse.slice(data.adjacency, [0, 0], [len(X_train), len(X_train)])
+    num_nodes = len(data.x)
+    split_index = int((1 - test_size) * num_nodes)
+
+    X_train, X_test = data.x[:split_index], data.x[split_index:]
+    y_train, y_test = data.y[:split_index], data.y[split_index:]
+
+    adjacency_train = tf.sparse.slice(data.adjacency, [0, 0], [split_index, split_index])
     adjacency_test = tf.sparse.slice(
-        data.adjacency, [len(X_train), 0], [len(X_test), len(X_test)]
+        data.adjacency,
+        [split_index, split_index],
+        [num_nodes - split_index, num_nodes - split_index],
     )
 
     batch_starts = np.arange(0, len(X_train), batch_size)
@@ -658,10 +695,6 @@ the display labels for the scalar outputs.</p></div>
 
         if epoch % 5 == 0:
             clear_output(wait=True)
-            warnings.warn(
-                &#34;It is normal for validation metrics to underperform during training. Use the test method to validate after training.&#34;,
-                UserWarning,
-            )
             val_loss, val_f1 = self.evaluate(X_test, adjacency_test, y_test)
             val_losses.append(val_loss)
             val_f1_scores.append(val_f1)
@@ -1283,7 +1316,8 @@ containing the information needed to re-instantiate it.</p></div>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
 <li><code><a title="likelihood.graph.nn.cal_adjacency_matrix" href="#likelihood.graph.nn.cal_adjacency_matrix">cal_adjacency_matrix</a></code></li>
-<li><code><a title="likelihood.graph.nn.compare_similarity" href="#likelihood.graph.nn.compare_similarity">compare_similarity</a></code></li>
+<li><code><a title="likelihood.graph.nn.compare_pair" href="#likelihood.graph.nn.compare_pair">compare_pair</a></code></li>
+<li><code><a title="likelihood.graph.nn.compare_similarity_np" href="#likelihood.graph.nn.compare_similarity_np">compare_similarity_np</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
