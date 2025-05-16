@@ -21,27 +21,39 @@ tf.get_logger().setLevel("ERROR")
 from likelihood.tools import LoRALayer
 
 
-def compare_similarity(arr1: List[Any], arr2: List[Any], threshold: float = 0.05) -> int:
-    """Calculate the similarity between two arrays considering numeric values near to 1 in ratio."""
+def compare_similarity_np(arr1: np.ndarray, arr2: np.ndarray, threshold: float = 0.05) -> int:
+    """Vectorized similarity comparison between two numeric/categorical arrays."""
+    arr1 = np.asarray(arr1)
+    arr2 = np.asarray(arr2)
 
-    def is_similar(a: Any, b: Any) -> bool:
-        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
-            if a == 0 and b == 0:
-                return True
-            if a == 0 or b == 0:
-                return False
-            # For numeric values, check if their ratio is within the threshold range
-            ratio = max(a, b) / min(a, b)
-            return 1 - threshold <= ratio <= 1 + threshold
-        else:
-            return a == b
+    is_numeric = np.vectorize(
+        lambda a, b: isinstance(a, (int, float)) and isinstance(b, (int, float))
+    )(arr1, arr2)
 
-    return sum(is_similar(a, b) for a, b in zip(arr1, arr2))
+    similarity = np.zeros_like(arr1, dtype=bool)
+
+    if np.any(is_numeric):
+        a_num = arr1[is_numeric].astype(float)
+        b_num = arr2[is_numeric].astype(float)
+
+        both_zero = (a_num == 0) & (b_num == 0)
+        nonzero = ~both_zero & (a_num != 0) & (b_num != 0)
+        ratio = np.zeros_like(a_num)
+        ratio[nonzero] = np.maximum(a_num[nonzero], b_num[nonzero]) / np.minimum(
+            a_num[nonzero], b_num[nonzero]
+        )
+        numeric_similar = both_zero | ((1 - threshold <= ratio) & (ratio <= 1 + threshold))
+
+        similarity[is_numeric] = numeric_similar
+
+    similarity[~is_numeric] = arr1[~is_numeric] == arr2[~is_numeric]
+
+    return np.count_nonzero(similarity)
 
 
 def compare_pair(pair, data, similarity, threshold):
     i, j = pair
-    sim = compare_similarity(data[i], data[j], threshold=threshold)
+    sim = compare_similarity_np(data[i], data[j], threshold=threshold)
     return (i, j, 1 if sim >= similarity else 0)
 
 
@@ -93,11 +105,14 @@ def cal_adjacency_matrix(
 
     adj_dict = {i: data[i].tolist() for i in range(n)}
 
-    pairs = [(i, j) for i in range(n) for j in range(i, n)]
+    def pair_generator():
+        for i in range(n):
+            for j in range(i, n):
+                yield (i, j)
 
     with Pool(cpu_count()) as pool:
         results = pool.starmap(
-            compare_pair, [(pair, data, similarity, threshold) for pair in pairs]
+            compare_pair, ((pair, data, similarity, threshold) for pair in pair_generator())
         )
 
     adjacency_matrix = np.zeros((n, n), dtype=np.uint8)
@@ -116,9 +131,7 @@ def cal_adjacency_matrix(
             indices=indices, values=values, dense_shape=(num_nodes, num_nodes)
         )
 
-        return adj_dict, adjacency_matrix
-    else:
-        return adj_dict, adjacency_matrix
+    return adj_dict, adjacency_matrix
 
 
 class Data:

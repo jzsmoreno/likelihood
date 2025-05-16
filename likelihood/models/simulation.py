@@ -51,7 +51,6 @@ class SimulationEngine(FeatureSelection):
     """
 
     def __init__(self, use_scaler: bool = False, **kwargs):
-
         self.df = pd.DataFrame()
         self.n_importances = None
         self.use_scaler = use_scaler
@@ -91,7 +90,6 @@ class SimulationEngine(FeatureSelection):
 
         # Categorical column
         if quick_encoder != None:
-
             one_hot = OneHotEncoder()
             y = one_hot.decode(y)
             encoding_dic = quick_encoder.decoding_list[0]
@@ -180,7 +178,6 @@ class SimulationEngine(FeatureSelection):
         ]
 
     def _clean_data(self, df: DataFrame) -> DataFrame:
-
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
         df.replace(" ", np.nan, inplace=True)
         df = check_nan_inf(df)
