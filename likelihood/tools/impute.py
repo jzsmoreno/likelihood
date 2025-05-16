@@ -71,7 +71,6 @@ class SimpleImputer:
         self.cols_transf = X_impute.columns
         for column in X_impute.columns:
             if X_impute[column].isnull().sum() > 0:
-
                 if not X_impute[column].dtype == "object":
                     min_value = self.params[column]["min"]
                     max_value = self.params[column]["max"]

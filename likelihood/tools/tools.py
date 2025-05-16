@@ -1153,7 +1153,6 @@ class FeatureSelection:
         return feature_string + "} "
 
     def _load_data(self, dataset: DataFrame):
-
         if len(self.not_features) > 0:
             self.X = dataset.drop(columns=self.not_features)
 
