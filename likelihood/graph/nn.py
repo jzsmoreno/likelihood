@@ -14,7 +14,6 @@ import tensorflow as tf
 from IPython.display import clear_output
 from pandas.core.frame import DataFrame
 from sklearn.metrics import f1_score
-from sklearn.model_selection import train_test_split
 
 tf.get_logger().setLevel("ERROR")
 
@@ -286,12 +285,17 @@ class VanillaGNN(tf.keras.Model):
         val_losses = []
         val_f1_scores = []
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            data.x, data.y, test_size=test_size, shuffle=False
-        )
-        adjacency_train = tf.sparse.slice(data.adjacency, [0, 0], [len(X_train), len(X_train)])
+        num_nodes = len(data.x)
+        split_index = int((1 - test_size) * num_nodes)
+
+        X_train, X_test = data.x[:split_index], data.x[split_index:]
+        y_train, y_test = data.y[:split_index], data.y[split_index:]
+
+        adjacency_train = tf.sparse.slice(data.adjacency, [0, 0], [split_index, split_index])
         adjacency_test = tf.sparse.slice(
-            data.adjacency, [len(X_train), 0], [len(X_test), len(X_test)]
+            data.adjacency,
+            [split_index, split_index],
+            [num_nodes - split_index, num_nodes - split_index],
         )
 
         batch_starts = np.arange(0, len(X_train), batch_size)
