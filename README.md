@@ -1,4 +1,4 @@
-![likelihood](https://raw.githubusercontent.com/RodolfoFerro/likelihood/main/likelihood.png)
+![likelihood](https://raw.githubusercontent.com/jzsmoreno/likelihood/main/likelihood.png)
 
 ![GitHub last commit](https://img.shields.io/github/last-commit/jzsmoreno/likelihood?style=for-the-badge)
 ![GitHub repo size](https://img.shields.io/github/repo-size/jzsmoreno/likelihood?style=for-the-badge)
