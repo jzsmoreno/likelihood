@@ -1,3 +1,5 @@
+import base64
+import io
 import logging
 import os
 import random
@@ -8,8 +10,12 @@ from shutil import rmtree
 import matplotlib
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import pandas as pd
+from IPython.display import HTML, display
+from matplotlib import cm
+from matplotlib.colors import Normalize
 from pandas.plotting import radviz
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -951,6 +957,219 @@ class GetInsights:
         random.shuffle(sorted_names)
         return sorted_names
 
+    def render_html_report(
+        self,
+        frac: float = 0.2,
+        top_k: int = 5,
+        threshold_factor: float = 1.0,
+        max_rows: int = 5,
+        **kwargs,
+    ) -> None:
+        """
+        Generate and display an embedded HTML report in a Jupyter Notebook cell.
+
+        Parameters
+        ----------
+        frac : float, optional
+            Fraction of input data to use in predictor analyzer.
+        top_k : int, optional
+            Top K weights to highlight in encoder-decoder graph.
+        threshold_factor : float, optional
+            Factor to filter edge weights in encoder-decoder graph.
+        max_rows : int, optional
+            Maximum number of rows to display in the statistics DataFrame.
+        **kwargs : dict, optional
+            Additional keyword arguments for customization.
+        """
+
+        # Section: Predictor Analysis
+        display(HTML("<h2 style='margin-top:20px;'>📊 Predictor Analysis</h2>"))
+        display(
+            HTML(
+                "<p>This section visualizes how the model predicts the data. "
+                "You will see original inputs, reconstructed outputs, and analyses such as t-SNE "
+                "that reduce dimensionality to visualize latent space clustering.</p>"
+            )
+        )
+        stats_df = self.predictor_analyzer(frac=frac, **kwargs)
+
+        # Section: Encoder-Decoder Graph
+        display(HTML("<h2 style='margin-top:30px;'>🔁 Encoder-Decoder Graph</h2>"))
+        display(
+            HTML(
+                "<p>This visualization displays the connections between layers in the encoder and decoder. "
+                "Edges with the strongest weights are highlighted to emphasize influential features "
+                "in the model's transformation.</p>"
+            )
+        )
+        self.viz_encoder_decoder_graphs(threshold_factor=threshold_factor, top_k=top_k)
+
+        # Section: Statistical Summary
+        display(HTML("<h2 style='margin-top:30px;'>📈 Statistical Summary</h2>"))
+        display(
+            HTML(
+                "<p>This table summarizes feature statistics grouped by predicted classes, "
+                "including means, standard deviations, and modes, providing insight into "
+                "feature distributions across different classes.</p>"
+            )
+        )
+
+        # Limit number of rows displayed
+        if max_rows is not None and max_rows > 0:
+            stats_to_display = stats_df.head(max_rows)
+        else:
+            stats_to_display = stats_df
+
+        display(
+            stats_to_display.style.set_table_attributes(
+                "style='display:inline;border-collapse:collapse;'"
+            )
+            .set_caption("Feature Summary per Class")
+            .set_properties(
+                **{
+                    "border": "1px solid #ddd",
+                    "padding": "8px",
+                    "text-align": "center",
+                }
+            )
+        )
+
+        # Footer
+        display(
+            HTML(
+                "<p style='color: gray; margin-top:30px;'>Report generated with "
+                "<code>GetInsights</code> class. For detailed customization, extend "
+                "<code>render_html_report</code>.</p>"
+            )
+        )
+
+    def viz_encoder_decoder_graphs(self, threshold_factor=1.0, top_k=5):
+        """
+        Visualize encoder and decoder layers as directed graphs and show feature importances.
+        Highlights the top_k strongest weight connections.
+        """
+        use_labels = hasattr(self, "y_labels") and self.y_labels is not None
+        if use_labels:
+            assert (
+                len(self.y_labels) == self.encoder_weights.shape[0]
+            ), "Mismatch between y_labels and encoder input size"
+
+        def get_top_k_edges(weights, labels_src, labels_dst, k):
+            flat_weights = np.abs(weights.flatten())
+            indices = np.argpartition(flat_weights, -k)[-k:]
+            top_k_flat_indices = indices[np.argsort(-flat_weights[indices])]
+
+            top_k_edges = []
+            for flat_index in top_k_flat_indices:
+                i, j = np.unravel_index(flat_index, weights.shape)
+                src_label = (
+                    self.y_labels[i]
+                    if (labels_src == "Input" and use_labels)
+                    else f"{labels_src}_{i}"
+                )
+                dst_label = f"{labels_dst}_{j}"
+                weight = weights[i, j]
+                top_k_edges.append((src_label, dst_label, weight))
+            return top_k_edges
+
+        def create_graph(weights, labels_src, labels_dst):
+            if labels_src == "Input" and use_labels:
+                input_nodes = list(self.y_labels)
+            else:
+                input_nodes = [f"{labels_src}_{i}" for i in range(weights.shape[0])]
+            output_nodes = [f"{labels_dst}_{j}" for j in range(weights.shape[1])]
+
+            G = nx.DiGraph()
+            G.add_nodes_from(input_nodes + output_nodes)
+
+            abs_weights = np.abs(weights)
+            threshold = threshold_factor * np.mean(abs_weights)
+            top_k_edges = get_top_k_edges(weights, labels_src, labels_dst, top_k)
+            top_k_set = set((u, v) for u, v, _ in top_k_edges)
+
+            for i, src in enumerate(input_nodes):
+                for j, dst in enumerate(output_nodes):
+                    w = weights[i, j]
+                    if abs(w) > threshold:
+                        G.add_edge(src, dst, weight=w, highlight=(src, dst) in top_k_set)
+
+            return G, input_nodes, output_nodes
+
+        def layout_graph(nodes_left, nodes_right, x_offset):
+            pos = {}
+            max_len = max(len(nodes_left), len(nodes_right))
+            for i, node in enumerate(nodes_left):
+                pos[node] = (x_offset, -i)
+            for j, node in enumerate(nodes_right):
+                pos[node] = (x_offset + 1, -j)
+            return pos
+
+        def draw_graph(G, pos, node_colors, title, subplot_index):
+            ax = plt.subplot(1, 2, subplot_index)
+            weights = [abs(G[u][v]["weight"]) for u, v in G.edges()]
+            norm = Normalize(vmin=min(weights), vmax=max(weights))
+            cmap = cm.get_cmap("coolwarm")
+
+            edge_colors = [cmap(norm(abs(G[u][v]["weight"]))) for u, v in G.edges()]
+            edge_widths = [1.0 + 2.0 * norm(abs(G[u][v]["weight"])) for u, v in G.edges()]
+
+            nx.draw(
+                G,
+                pos,
+                with_labels=True,
+                node_color=node_colors,
+                node_size=1000,
+                font_size=9,
+                edge_color=edge_colors,
+                width=edge_widths,
+                arrows=True,
+                alpha=0.95,
+            )
+            ax.set_title(title, fontsize=13)
+
+        # Build graphs
+        G_enc, enc_inputs, enc_latents = create_graph(self.encoder_weights, "Input", "Latent")
+        G_dec, dec_latents, dec_outputs = create_graph(self.decoder_weights, "Latent", "Output")
+
+        pos_enc = layout_graph(enc_inputs, enc_latents, x_offset=0)
+        pos_dec = layout_graph(dec_latents, dec_outputs, x_offset=3)
+
+        plt.figure(figsize=(16, 6))
+        draw_graph(
+            G_enc,
+            pos_enc,
+            node_colors=["skyblue" if n in enc_inputs else "lightgreen" for n in G_enc.nodes()],
+            title="Encoder: Input → Latent",
+            subplot_index=1,
+        )
+        draw_graph(
+            G_dec,
+            pos_dec,
+            node_colors=["lightgreen" if n in dec_latents else "salmon" for n in G_dec.nodes()],
+            title="Decoder: Latent → Output",
+            subplot_index=2,
+        )
+
+        plt.suptitle(
+            f"Encoder-Decoder Graphs (Threshold: {threshold_factor:.2f}×Mean|w|, Top {top_k})",
+            fontsize=15,
+        )
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        plt.show()
+
+        # Feature importance plot
+        importances = np.mean(np.abs(self.encoder_weights), axis=1)
+        sorted_idx = np.argsort(-importances)
+        xticks = [self.y_labels[i] if use_labels else f"Input_{i}" for i in sorted_idx]
+
+        plt.figure(figsize=(10, 4))
+        plt.bar(range(len(importances)), importances[sorted_idx], color="skyblue")
+        plt.xticks(range(len(importances)), xticks, rotation=45, ha="right")
+        plt.title("Feature Importances (Encoder Input Nodes)", fontsize=13)
+        plt.ylabel("Mean |Weight|")
+        plt.tight_layout()
+        plt.show()
+
     def predictor_analyzer(
         self,
         frac: float = None,
@@ -982,10 +1201,10 @@ class GetInsights:
         self._viz_weights(cmap=cmap, aspect=aspect, highlight=highlight, **kwargs)
         inputs = self.inputs.copy()
         inputs = self._prepare_inputs(inputs, frac)
-        y_labels = kwargs.get("y_labels", None)
+        self.y_labels = kwargs.get("y_labels", None)
         encoded, reconstructed = self._encode_decode(inputs)
         self._visualize_data(inputs, reconstructed, cmap, aspect)
-        self._prepare_data_for_analysis(inputs, reconstructed, encoded, y_labels)
+        self._prepare_data_for_analysis(inputs, reconstructed, encoded, self.y_labels)
 
         try:
             self._get_tsne_repr(inputs, frac)
