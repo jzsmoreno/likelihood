@@ -156,13 +156,13 @@ class GetInsights:
             )
         )
 
-    def viz_classifier_graphs(self, threshold_factor=1.0, top_k=5):
+    def viz_classifier_graphs(self, threshold_factor=1.0, top_k=5, save_path=None):
         """
         Visualize all Dense layers in self.model.classifier as a single directed graph,
         connecting each Dense layer to the next.
         """
 
-        def get_top_k_edges(weights, labels_src, labels_dst, k):
+        def get_top_k_edges(weights, src_prefix, dst_prefix, k):
             flat_weights = np.abs(weights.flatten())
             indices = np.argpartition(flat_weights, -k)[-k:]
             top_k_flat_indices = indices[np.argsort(-flat_weights[indices])]
@@ -170,21 +170,20 @@ class GetInsights:
 
             for flat_index in top_k_flat_indices:
                 i, j = np.unravel_index(flat_index, weights.shape)
-                top_k_edges.append((f"{labels_src}_{i}", f"{labels_dst}_{j}", weights[i, j]))
+                top_k_edges.append((f"{src_prefix}_{i}", f"{dst_prefix}_{j}", weights[i, j]))
             return top_k_edges
 
-        def add_layer_to_graph(G, weights, layer_idx, threshold_factor, top_k):
-            src_label = f"L{layer_idx}"
-            dst_label = f"L{layer_idx + 1}"
-
-            input_nodes = [f"{src_label}_{i}" for i in range(weights.shape[0])]
-            output_nodes = [f"{dst_label}_{j}" for j in range(weights.shape[1])]
+        def add_dense_layer_edges(G, weights, layer_idx, threshold_factor, top_k):
+            src_prefix = f"L{layer_idx}"
+            dst_prefix = f"L{layer_idx + 1}"
+            input_nodes = [f"{src_prefix}_{i}" for i in range(weights.shape[0])]
+            output_nodes = [f"{dst_prefix}_{j}" for j in range(weights.shape[1])]
 
             G.add_nodes_from(input_nodes + output_nodes)
 
             abs_weights = np.abs(weights)
             threshold = threshold_factor * np.mean(abs_weights)
-            top_k_edges = get_top_k_edges(weights, src_label, dst_label, top_k)
+            top_k_edges = get_top_k_edges(weights, src_prefix, dst_prefix, top_k)
             top_k_set = set((u, v) for u, v, _ in top_k_edges)
 
             for i, src in enumerate(input_nodes):
@@ -193,26 +192,58 @@ class GetInsights:
                     if abs(w) > threshold:
                         G.add_edge(src, dst, weight=w, highlight=(src, dst) in top_k_set)
 
-            return input_nodes, output_nodes
-
-        def build_layout(G):
+        def compute_layout(G):
             pos = {}
-            layers = {}
+            layer_nodes = {}
 
             for node in G.nodes():
-                prefix, idx = node.split("_")
-                layer_idx = int(prefix[1:])
-                if layer_idx not in layers:
-                    layers[layer_idx] = []
-                layers[layer_idx].append(node)
+                layer_idx = int(node.split("_")[0][1:])
+                layer_nodes.setdefault(layer_idx, []).append(node)
 
-            for layer_idx, nodes in layers.items():
-                n = len(nodes)
-                for i, node in enumerate(nodes):
-                    y = -(i - (n - 1) / 2)
+            for layer_idx, nodes in sorted(layer_nodes.items()):
+                y_positions = np.linspace(1, -1, len(nodes))
+                for y, node in zip(y_positions, nodes):
                     pos[node] = (layer_idx * 2, y)
 
             return pos
+
+        def draw_graph(G, pos, title, save_path=None):
+            weights = [abs(G[u][v]["weight"]) for u, v in G.edges()]
+            if not weights:
+                print("No edges to draw.")
+                return
+
+            norm = Normalize(vmin=min(weights), vmax=max(weights))
+            cmap = cm.get_cmap("coolwarm")
+
+            edge_colors = [cmap(norm(G[u][v]["weight"])) for u, v in G.edges()]
+            edge_widths = [1.0 + 2.0 * norm(abs(G[u][v]["weight"])) for u, v in G.edges()]
+
+            fig, ax = plt.subplots(figsize=(12, 8))
+
+            nx.draw(
+                G,
+                pos,
+                ax=ax,
+                with_labels=True,
+                node_color="lightgray",
+                node_size=1000,
+                font_size=8,
+                edge_color=edge_colors,
+                width=edge_widths,
+                arrows=True,
+            )
+
+            ax.set_title(title, fontsize=14)
+
+            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+            sm.set_array([])
+            plt.colorbar(sm, ax=ax, orientation="vertical", label="Edge Weight")
+
+            plt.tight_layout()
+            if save_path:
+                plt.savefig(save_path)
+            plt.show()
 
         dense_layers = [
             layer
@@ -221,42 +252,20 @@ class GetInsights:
         ]
 
         if len(dense_layers) < 1:
-            print("Not enough Dense layers to visualize transitions.")
+            print("No Dense layers found in classifier.")
             return
 
         G = nx.DiGraph()
-        for idx in range(len(dense_layers)):
-            w = dense_layers[idx].get_weights()[0]
-            add_layer_to_graph(G, w, idx, threshold_factor, top_k)
+        for idx, layer in enumerate(dense_layers):
+            weights = layer.get_weights()[0]
+            add_dense_layer_edges(G, weights, idx, threshold_factor, top_k)
 
-        pos = build_layout(G)
-        weights = [abs(G[u][v]["weight"]) for u, v in G.edges()]
-        norm = Normalize(vmin=min(weights), vmax=max(weights)) if weights else None
-        cmap = cm.get_cmap("coolwarm")
+        pos = compute_layout(G)
+        draw_graph(G, pos, "Classifier Dense Layers Graph", save_path)
 
-        plt.figure(figsize=(12, 8))
-        edge_colors = [cmap(norm(abs(G[u][v]["weight"]))) for u, v in G.edges()]
-        edge_widths = [1.0 + 2.0 * norm(abs(G[u][v]["weight"])) for u, v in G.edges()]
-
-        nx.draw(
-            G,
-            pos,
-            with_labels=True,
-            node_color="lightgrey",
-            node_size=900,
-            font_size=8,
-            edge_color=edge_colors,
-            width=edge_widths,
-            arrows=True,
-        )
-
-        plt.title("Connected Classifier Dense Layers Graph", fontsize=14)
-        plt.tight_layout()
-        plt.show()
-
-    def viz_encoder_decoder_graphs(self, threshold_factor=1.0, top_k=5):
+    def viz_encoder_decoder_graphs(self, threshold_factor=1.0, top_k=5, save_path=None):
         """
-        Visualize Dense layers in self.model.encoder and self.model.decoder as connected directed graphs.
+        Visualize Dense layers in self.model.encoder and self.model.decoder as directed graphs.
         """
 
         def get_top_k_edges(weights, labels_src, labels_dst_prefix, k):
@@ -271,7 +280,7 @@ class GetInsights:
                 top_k_edges.append((src_label, dst_label, weights[i, j]))
             return top_k_edges
 
-        def add_layer_to_graph_custom(
+        def add_layer_to_graph(
             G, weights, labels_src, labels_dst_prefix, x_offset, top_k_set, threshold
         ):
             output_nodes = [f"{labels_dst_prefix}_{j}" for j in range(weights.shape[1])]
@@ -285,7 +294,7 @@ class GetInsights:
                     w = weights[i, j]
                     if abs(w) > threshold:
                         G.add_edge(src, dst, weight=w, highlight=(src, dst) in top_k_set)
-            return labels_src, output_nodes
+            return output_nodes
 
         def layout_graph(G):
             pos = {}
@@ -293,66 +302,61 @@ class GetInsights:
             for node, data in G.nodes(data=True):
                 x = data["x"]
                 layers.setdefault(x, []).append(node)
-            for x in layers.keys():
-                n = len(layers[x])
-                offset = (n - 1) / 2
-                for i, node in enumerate(layers[x]):
-                    pos[node] = (x, offset - i)
+
+            for x in sorted(layers):
+                nodes = layers[x]
+                y_positions = np.linspace(1, -1, len(nodes))
+                for y, node in zip(y_positions, nodes):
+                    pos[node] = (x, y)
             return pos
 
-        def draw_connected_graph(G, title, subplot_index, total):
-            ax = plt.subplot(1, total, subplot_index)
+        def draw_graph(G, title, ax):
             weights = [abs(G[u][v]["weight"]) for u, v in G.edges()]
             if not weights:
                 return
+
             norm = Normalize(vmin=min(weights), vmax=max(weights))
             cmap = cm.get_cmap("coolwarm")
 
-            edge_colors = [cmap(norm(abs(G[u][v]["weight"]))) for u, v in G.edges()]
+            edge_colors = [cmap(norm(G[u][v]["weight"])) for u, v in G.edges()]
             edge_widths = [1.0 + 2.0 * norm(abs(G[u][v]["weight"])) for u, v in G.edges()]
 
             pos = layout_graph(G)
             nx.draw(
                 G,
                 pos,
+                ax=ax,
                 with_labels=True,
-                node_color="lightgrey",
-                node_size=900,
+                node_color="lightgray",
+                node_size=1000,
                 font_size=8,
                 edge_color=edge_colors,
                 width=edge_widths,
                 arrows=True,
             )
-            ax.set_title(title, fontsize=12)
 
-        def build_graph(layers, label_prefix, input_node_labels=None):
+            ax.set_title(title, fontsize=12)
+            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+            sm.set_array([])
+            plt.colorbar(sm, ax=ax, orientation="vertical", label="Edge Weight")
+
+        def build_graph(layers, label_prefix, input_labels=None):
             G = nx.DiGraph()
             x_offset = 0
-            prev_labels = None
+            prev_labels = input_labels or [
+                f"{label_prefix}0_{i}" for i in range(layers[0].get_weights()[0].shape[0])
+            ]
 
             for idx, layer in enumerate(layers):
-                w = layer.get_weights()[0]
+                weights = layer.get_weights()[0]
                 label = f"{label_prefix}{idx+1}"
+                threshold = threshold_factor * np.mean(np.abs(weights))
+                top_k_edges = get_top_k_edges(weights, prev_labels, label, top_k)
+                top_k_set = set((src, dst) for src, dst, _ in top_k_edges)
 
-                abs_weights = np.abs(w)
-                threshold = threshold_factor * np.mean(abs_weights)
-
-                if idx == 0:
-                    if input_node_labels is not None:
-                        labels_src = input_node_labels
-                    else:
-                        labels_src = [f"{label_prefix}0_{i}" for i in range(w.shape[0])]
-                else:
-                    labels_src = prev_labels
-
-                top_k_edges = get_top_k_edges(w, labels_src, label, top_k)
-                top_k_set = set((u, v) for u, v, _ in top_k_edges)
-
-                _, output_nodes = add_layer_to_graph_custom(
-                    G, w, labels_src, label, x_offset, top_k_set, threshold
+                prev_labels = add_layer_to_graph(
+                    G, weights, prev_labels, label, x_offset, top_k_set, threshold
                 )
-
-                prev_labels = output_nodes
                 x_offset += 2
 
             return G
@@ -369,37 +373,43 @@ class GetInsights:
             return
 
         n_graphs = int(bool(encoder_layers)) + int(bool(decoder_layers))
-        plt.figure(figsize=(6 * n_graphs, 6))
+        fig, axes = plt.subplots(1, n_graphs, figsize=(7 * n_graphs, 6), squeeze=False)
 
+        col = 0
         if encoder_layers:
-            input_labels = None
-            if self.y_labels is not None:
-                first_layer_input_size = encoder_layers[0].get_weights()[0].shape[0]
-                if len(self.y_labels) == first_layer_input_size:
-                    input_labels = self.y_labels
-                else:
-                    print(
-                        "Warning: length of self.y_labels does not match first encoder layer input size."
-                    )
-            encoder_graph = build_graph(encoder_layers, "E", input_node_labels=input_labels)
-            draw_connected_graph(encoder_graph, "Encoder", 1, n_graphs)
+            input_labels = (
+                self.y_labels
+                if self.y_labels
+                and len(self.y_labels) == encoder_layers[0].get_weights()[0].shape[0]
+                else None
+            )
+            encoder_graph = build_graph(encoder_layers, "E", input_labels)
+            draw_graph(encoder_graph, "Encoder", axes[0][col])
+            col += 1
 
         if decoder_layers:
             decoder_graph = build_graph(decoder_layers, "D")
-            draw_connected_graph(decoder_graph, "Decoder", 2 if encoder_layers else 1, n_graphs)
+            draw_graph(decoder_graph, "Decoder", axes[0][col])
 
-        plt.suptitle("Connected Encoder & Decoder Dense Layer Graphs", fontsize=15)
+        fig.suptitle("Encoder & Decoder Dense Layer Graphs", fontsize=15)
         plt.tight_layout(rect=[0, 0, 1, 0.95])
+
+        if save_path:
+            plt.savefig(save_path)
         plt.show()
 
         if encoder_layers:
-            first_encoder_layer = encoder_layers[0]
-            weights = first_encoder_layer.get_weights()[0]
+            weights = encoder_layers[0].get_weights()[0]
             importances = np.abs(weights).mean(axis=1)
             sorted_idx = np.argsort(-importances)
-
-            use_labels = self.y_labels is not None and len(self.y_labels) == weights.shape[0]
-            xticks = [self.y_labels[i] if use_labels else f"Input_{i}" for i in sorted_idx]
+            xticks = [
+                (
+                    self.y_labels[i]
+                    if self.y_labels and len(self.y_labels) == weights.shape[0]
+                    else f"Input_{i}"
+                )
+                for i in sorted_idx
+            ]
 
             plt.figure(figsize=(10, 4))
             plt.bar(range(len(importances)), importances[sorted_idx], color="skyblue")
