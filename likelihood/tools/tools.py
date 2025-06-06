@@ -653,7 +653,7 @@ def cal_average(y: np.ndarray, alpha: float = 1):
 class DataScaler:
     """numpy array `scaler` and `rescaler`"""
 
-    __slots__ = ["dataset_", "_n", "data_scaled", "values", "transpose", "inv_fitting"]
+    __slots__ = ["dataset_", "_n", "data_scaled", "values", "inv_fitting"]
 
     def __init__(self, dataset: np.ndarray, n: int = 1) -> None:
         """Initializes the parameters required for scaling the data"""
@@ -695,11 +695,6 @@ class DataScaler:
             msg = "Trying to access an item at an invalid index."
             print(f"{error_type}: {msg}")
             return None
-        if self.dataset_.shape[0] > self.dataset_.shape[1]:
-            self.dataset_ = self.dataset_.T
-            self.transpose = True
-        else:
-            self.transpose = False
         for i in range(self.dataset_.shape[0]):
             if self._n != None:
                 fit = np.polyfit(xaxis, self.dataset_[i, :], self._n)
@@ -737,14 +732,13 @@ class DataScaler:
         dataset_ : `np.array`
             An array containing the rescaled data.
         """
-        if self.transpose:
-            dataset_ = dataset_.T
         for i in range(dataset_.shape[0]):
             dataset_[i, :] += 1
             dataset_[i, :] /= 2
             dataset_[i, :] = dataset_[i, :] * self.values[1][i]
             dataset_[i, :] += self.values[0][i]
-            dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
+            if self._n != None:
+                dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
 
         return dataset_
 
