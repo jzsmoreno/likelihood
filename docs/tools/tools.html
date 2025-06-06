@@ -2054,7 +2054,7 @@ value of evaluated function.</p></div>
 <pre><code class="python">class DataScaler:
     &#34;&#34;&#34;numpy array `scaler` and `rescaler`&#34;&#34;&#34;
 
-    __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;transpose&#34;, &#34;inv_fitting&#34;]
+    __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
     def __init__(self, dataset: np.ndarray, n: int = 1) -&gt; None:
         &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
@@ -2096,11 +2096,6 @@ value of evaluated function.</p></div>
             msg = &#34;Trying to access an item at an invalid index.&#34;
             print(f&#34;{error_type}: {msg}&#34;)
             return None
-        if self.dataset_.shape[0] &gt; self.dataset_.shape[1]:
-            self.dataset_ = self.dataset_.T
-            self.transpose = True
-        else:
-            self.transpose = False
         for i in range(self.dataset_.shape[0]):
             if self._n != None:
                 fit = np.polyfit(xaxis, self.dataset_[i, :], self._n)
@@ -2138,14 +2133,13 @@ value of evaluated function.</p></div>
         dataset_ : `np.array`
             An array containing the rescaled data.
         &#34;&#34;&#34;
-        if self.transpose:
-            dataset_ = dataset_.T
         for i in range(dataset_.shape[0]):
             dataset_[i, :] += 1
             dataset_[i, :] /= 2
             dataset_[i, :] = dataset_[i, :] * self.values[1][i]
             dataset_[i, :] += self.values[0][i]
-            dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
+            if self._n != None:
+                dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
 
         return dataset_</code></pre>
 </details>
@@ -2162,7 +2156,7 @@ value of evaluated function.</p></div>
 <pre><code class="python">class DataScaler:
     &#34;&#34;&#34;numpy array `scaler` and `rescaler`&#34;&#34;&#34;
 
-    __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;transpose&#34;, &#34;inv_fitting&#34;]
+    __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
     def __init__(self, dataset: np.ndarray, n: int = 1) -&gt; None:
         &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
@@ -2204,11 +2198,6 @@ value of evaluated function.</p></div>
             msg = &#34;Trying to access an item at an invalid index.&#34;
             print(f&#34;{error_type}: {msg}&#34;)
             return None
-        if self.dataset_.shape[0] &gt; self.dataset_.shape[1]:
-            self.dataset_ = self.dataset_.T
-            self.transpose = True
-        else:
-            self.transpose = False
         for i in range(self.dataset_.shape[0]):
             if self._n != None:
                 fit = np.polyfit(xaxis, self.dataset_[i, :], self._n)
@@ -2246,14 +2235,13 @@ value of evaluated function.</p></div>
         dataset_ : `np.array`
             An array containing the rescaled data.
         &#34;&#34;&#34;
-        if self.transpose:
-            dataset_ = dataset_.T
         for i in range(dataset_.shape[0]):
             dataset_[i, :] += 1
             dataset_[i, :] /= 2
             dataset_[i, :] = dataset_[i, :] * self.values[1][i]
             dataset_[i, :] += self.values[0][i]
-            dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
+            if self._n != None:
+                dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
 
         return dataset_</code></pre>
 </details>
@@ -2268,7 +2256,7 @@ value of evaluated function.</p></div>
 <pre><code class="python">class DataScaler:
     &#34;&#34;&#34;numpy array `scaler` and `rescaler`&#34;&#34;&#34;
 
-    __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;transpose&#34;, &#34;inv_fitting&#34;]
+    __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
     def __init__(self, dataset: np.ndarray, n: int = 1) -&gt; None:
         &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
@@ -2310,11 +2298,6 @@ value of evaluated function.</p></div>
             msg = &#34;Trying to access an item at an invalid index.&#34;
             print(f&#34;{error_type}: {msg}&#34;)
             return None
-        if self.dataset_.shape[0] &gt; self.dataset_.shape[1]:
-            self.dataset_ = self.dataset_.T
-            self.transpose = True
-        else:
-            self.transpose = False
         for i in range(self.dataset_.shape[0]):
             if self._n != None:
                 fit = np.polyfit(xaxis, self.dataset_[i, :], self._n)
@@ -2352,14 +2335,13 @@ value of evaluated function.</p></div>
         dataset_ : `np.array`
             An array containing the rescaled data.
         &#34;&#34;&#34;
-        if self.transpose:
-            dataset_ = dataset_.T
         for i in range(dataset_.shape[0]):
             dataset_[i, :] += 1
             dataset_[i, :] /= 2
             dataset_[i, :] = dataset_[i, :] * self.values[1][i]
             dataset_[i, :] += self.values[0][i]
-            dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
+            if self._n != None:
+                dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
 
         return dataset_</code></pre>
 </details>
@@ -2374,7 +2356,7 @@ value of evaluated function.</p></div>
 <pre><code class="python">class DataScaler:
     &#34;&#34;&#34;numpy array `scaler` and `rescaler`&#34;&#34;&#34;
 
-    __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;transpose&#34;, &#34;inv_fitting&#34;]
+    __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
     def __init__(self, dataset: np.ndarray, n: int = 1) -&gt; None:
         &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
@@ -2416,11 +2398,6 @@ value of evaluated function.</p></div>
             msg = &#34;Trying to access an item at an invalid index.&#34;
             print(f&#34;{error_type}: {msg}&#34;)
             return None
-        if self.dataset_.shape[0] &gt; self.dataset_.shape[1]:
-            self.dataset_ = self.dataset_.T
-            self.transpose = True
-        else:
-            self.transpose = False
         for i in range(self.dataset_.shape[0]):
             if self._n != None:
                 fit = np.polyfit(xaxis, self.dataset_[i, :], self._n)
@@ -2458,120 +2435,13 @@ value of evaluated function.</p></div>
         dataset_ : `np.array`
             An array containing the rescaled data.
         &#34;&#34;&#34;
-        if self.transpose:
-            dataset_ = dataset_.T
         for i in range(dataset_.shape[0]):
             dataset_[i, :] += 1
             dataset_[i, :] /= 2
             dataset_[i, :] = dataset_[i, :] * self.values[1][i]
             dataset_[i, :] += self.values[0][i]
-            dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
-
-        return dataset_</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="likelihood.tools.tools.DataScaler.transpose"><code class="name">var <span class="ident">transpose</span></code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">class DataScaler:
-    &#34;&#34;&#34;numpy array `scaler` and `rescaler`&#34;&#34;&#34;
-
-    __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;transpose&#34;, &#34;inv_fitting&#34;]
-
-    def __init__(self, dataset: np.ndarray, n: int = 1) -&gt; None:
-        &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
-        self.dataset_ = dataset.copy()
-        self._n = n
-
-    def rescale(self, dataset_: np.ndarray | None = None) -&gt; np.ndarray:
-        &#34;&#34;&#34;Perform a standard rescaling of the data
-
-        Returns
-        -------
-        data_scaled : `np.array`
-            An array containing the scaled data.
-        &#34;&#34;&#34;
-        if isinstance(dataset_, np.ndarray):
-            data_scaled = np.copy(dataset_)
-            mu = self.values[0]
-            sigma = self.values[1]
-            f = self.values[2]
-            data_scaled = data_scaled.reshape((self.dataset_.shape[0], -1))
-            for i in range(self.dataset_.shape[0]):
-                if self._n != None:
-                    poly = f[i](self.inv_fitting[i](data_scaled[i]))
-                    data_scaled[i] += -poly
-                data_scaled[i] = 2 * ((data_scaled[i] - mu[i]) / sigma[i]) - 1
-            return data_scaled
-        else:
-            self.data_scaled = np.copy(self.dataset_.copy())
-
-        mu = []
-        sigma = []
-        fitting = []
-        self.inv_fitting = []
-
-        try:
-            xaxis = range(self.dataset_.shape[1])
-        except:
-            error_type = &#34;IndexError&#34;
-            msg = &#34;Trying to access an item at an invalid index.&#34;
-            print(f&#34;{error_type}: {msg}&#34;)
-            return None
-        if self.dataset_.shape[0] &gt; self.dataset_.shape[1]:
-            self.dataset_ = self.dataset_.T
-            self.transpose = True
-        else:
-            self.transpose = False
-        for i in range(self.dataset_.shape[0]):
             if self._n != None:
-                fit = np.polyfit(xaxis, self.dataset_[i, :], self._n)
-                inv_fit = np.polyfit(self.dataset_[i, :], xaxis, self._n)
-                f = np.poly1d(fit)
-                poly = f(xaxis)
-                fitting.append(f)
-                self.inv_fitting.append(inv_fit)
-                self.data_scaled[i, :] += -poly
-            else:
-                fitting.append(0.0)
-                self.inv_fitting.append(0.0)
-            mu.append(np.min(self.data_scaled[i, :]))
-            if np.max(self.data_scaled[i, :]) != 0:
-                sigma.append(np.max(self.data_scaled[i, :]) - mu[i])
-            else:
-                sigma.append(1)
-
-            self.data_scaled[i, :] = 2 * ((self.data_scaled[i, :] - mu[i]) / sigma[i]) - 1
-
-        self.values = [mu, sigma, fitting]
-
-        return self.data_scaled
-
-    def scale(self, dataset_: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;Performs the inverse operation to the rescale function
-
-        Parameters
-        ----------
-        dataset_ : `np.array`
-            An array containing the scaled values.
-
-        Returns
-        -------
-        dataset_ : `np.array`
-            An array containing the rescaled data.
-        &#34;&#34;&#34;
-        if self.transpose:
-            dataset_ = dataset_.T
-        for i in range(dataset_.shape[0]):
-            dataset_[i, :] += 1
-            dataset_[i, :] /= 2
-            dataset_[i, :] = dataset_[i, :] * self.values[1][i]
-            dataset_[i, :] += self.values[0][i]
-            dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
+                dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
 
         return dataset_</code></pre>
 </details>
@@ -2586,7 +2456,7 @@ value of evaluated function.</p></div>
 <pre><code class="python">class DataScaler:
     &#34;&#34;&#34;numpy array `scaler` and `rescaler`&#34;&#34;&#34;
 
-    __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;transpose&#34;, &#34;inv_fitting&#34;]
+    __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
     def __init__(self, dataset: np.ndarray, n: int = 1) -&gt; None:
         &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
@@ -2628,11 +2498,6 @@ value of evaluated function.</p></div>
             msg = &#34;Trying to access an item at an invalid index.&#34;
             print(f&#34;{error_type}: {msg}&#34;)
             return None
-        if self.dataset_.shape[0] &gt; self.dataset_.shape[1]:
-            self.dataset_ = self.dataset_.T
-            self.transpose = True
-        else:
-            self.transpose = False
         for i in range(self.dataset_.shape[0]):
             if self._n != None:
                 fit = np.polyfit(xaxis, self.dataset_[i, :], self._n)
@@ -2670,14 +2535,13 @@ value of evaluated function.</p></div>
         dataset_ : `np.array`
             An array containing the rescaled data.
         &#34;&#34;&#34;
-        if self.transpose:
-            dataset_ = dataset_.T
         for i in range(dataset_.shape[0]):
             dataset_[i, :] += 1
             dataset_[i, :] /= 2
             dataset_[i, :] = dataset_[i, :] * self.values[1][i]
             dataset_[i, :] += self.values[0][i]
-            dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
+            if self._n != None:
+                dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
 
         return dataset_</code></pre>
 </details>
@@ -2729,11 +2593,6 @@ value of evaluated function.</p></div>
         msg = &#34;Trying to access an item at an invalid index.&#34;
         print(f&#34;{error_type}: {msg}&#34;)
         return None
-    if self.dataset_.shape[0] &gt; self.dataset_.shape[1]:
-        self.dataset_ = self.dataset_.T
-        self.transpose = True
-    else:
-        self.transpose = False
     for i in range(self.dataset_.shape[0]):
         if self._n != None:
             fit = np.polyfit(xaxis, self.dataset_[i, :], self._n)
@@ -2786,14 +2645,13 @@ value of evaluated function.</p></div>
     dataset_ : `np.array`
         An array containing the rescaled data.
     &#34;&#34;&#34;
-    if self.transpose:
-        dataset_ = dataset_.T
     for i in range(dataset_.shape[0]):
         dataset_[i, :] += 1
         dataset_[i, :] /= 2
         dataset_[i, :] = dataset_[i, :] * self.values[1][i]
         dataset_[i, :] += self.values[0][i]
-        dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
+        if self._n != None:
+            dataset_[i, :] += self.values[2][i](range(dataset_.shape[1]))
 
     return dataset_</code></pre>
 </details>
@@ -5096,7 +4954,6 @@ It receives an array of integers and returns a binary array using the one-hot en
 <li><code><a title="likelihood.tools.tools.DataScaler.inv_fitting" href="#likelihood.tools.tools.DataScaler.inv_fitting">inv_fitting</a></code></li>
 <li><code><a title="likelihood.tools.tools.DataScaler.rescale" href="#likelihood.tools.tools.DataScaler.rescale">rescale</a></code></li>
 <li><code><a title="likelihood.tools.tools.DataScaler.scale" href="#likelihood.tools.tools.DataScaler.scale">scale</a></code></li>
-<li><code><a title="likelihood.tools.tools.DataScaler.transpose" href="#likelihood.tools.tools.DataScaler.transpose">transpose</a></code></li>
 <li><code><a title="likelihood.tools.tools.DataScaler.values" href="#likelihood.tools.tools.DataScaler.values">values</a></code></li>
 </ul>
 </li>
