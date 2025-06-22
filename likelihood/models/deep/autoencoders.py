@@ -599,6 +599,9 @@ def call_existing_code(
         The number of classes in the dataset.
     num_layers : `int`
         The number of hidden layers in the classifier. Default is 1.
+
+    Keyword Arguments:
+    ----------
     vae_mode : `bool`
         Whether to use variational autoencoder mode. Default is False.
     vae_units : `int`
