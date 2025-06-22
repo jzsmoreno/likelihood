@@ -41,7 +41,7 @@ class GANRegressor(tf.keras.Model):
         self.build(dummy_input.shape)
 
     def build(self, input_shape):
-        self.gan = tf.keras.models.Sequential([self.generator, self.discriminator])
+        self.gan = tf.keras.models.Sequential([self.generator, self.discriminator], name="gan")
 
         self.generator.compile(
             optimizer=self.optimizer,
@@ -57,7 +57,7 @@ class GANRegressor(tf.keras.Model):
         super(GANRegressor, self).build(input_shape)
 
     def _build_generator(self):
-        generator = tf.keras.Sequential()
+        generator = tf.keras.Sequential(name="generator")
         generator.add(
             tf.keras.layers.Dense(
                 self.num_neurons,
@@ -78,7 +78,7 @@ class GANRegressor(tf.keras.Model):
         return generator
 
     def _build_discriminator(self):
-        discriminator = tf.keras.Sequential()
+        discriminator = tf.keras.Sequential(name="discriminator")
         for _ in range(self.depth):
             discriminator.add(
                 tf.keras.layers.Dense(

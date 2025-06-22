@@ -277,7 +277,8 @@ class AutoClassifier(tf.keras.Model):
                         activation=self.activation,
                         kernel_regularizer=l2(self.l2_reg),
                     ),
-                ]
+                ],
+                name="encoder",
             )
             if not self.encoder
             else self.encoder
@@ -296,7 +297,8 @@ class AutoClassifier(tf.keras.Model):
                         activation=self.activation,
                         kernel_regularizer=l2(self.l2_reg),
                     ),
-                ]
+                ],
+                name="decoder",
             )
             if not self.decoder
             else self.decoder
@@ -326,7 +328,7 @@ class AutoClassifier(tf.keras.Model):
             log_var = tf.keras.layers.Lambda(lambda x: x + 1e-7)(log_var)
 
             self.encoder = (
-                tf.keras.Model(inputs, [mean, log_var], name="encoder")
+                tf.keras.Model(inputs, [mean, log_var], name="vae_encoder")
                 if not self.encoder
                 else self.encoder
             )
@@ -345,7 +347,8 @@ class AutoClassifier(tf.keras.Model):
                         ),
                         tf.keras.layers.BatchNormalization(),
                         tf.keras.layers.Activation(self.activation),
-                    ]
+                    ],
+                    name="vae_decoder",
                 )
                 if not self.decoder
                 else self.decoder
@@ -366,13 +369,7 @@ class AutoClassifier(tf.keras.Model):
                 )
                 if self.dropout:
                     self.classifier.add(tf.keras.layers.Dropout(self.dropout))
-            self.classifier.add(
-                tf.keras.layers.Dense(
-                    units=self.num_classes,
-                    activation=self.classifier_activation,
-                    kernel_regularizer=l2(self.l2_reg),
-                )
-            )
+
         elif self.lora_mode:
             for _ in range(self.num_layers - 1):
                 self.classifier.add(
@@ -381,21 +378,14 @@ class AutoClassifier(tf.keras.Model):
                 self.classifier.add(tf.keras.layers.Activation(self.activation))
                 if self.dropout:
                     self.classifier.add(tf.keras.layers.Dropout(self.dropout))
-            self.classifier.add(
-                tf.keras.layers.Dense(
-                    units=self.num_classes,
-                    activation=self.classifier_activation,
-                    kernel_regularizer=l2(self.l2_reg),
-                )
+
+        self.classifier.add(
+            tf.keras.layers.Dense(
+                units=self.num_classes,
+                activation=self.classifier_activation,
+                kernel_regularizer=l2(self.l2_reg),
             )
-        else:
-            self.classifier.add(
-                tf.keras.layers.Dense(
-                    units=self.num_classes,
-                    activation=self.classifier_activation,
-                    kernel_regularizer=l2(self.l2_reg),
-                )
-            )
+        )
 
     def train_encoder_decoder(
         self, data, epochs, batch_size, validation_split=0.2, patience=10, **kwargs
@@ -609,6 +599,10 @@ def call_existing_code(
         The number of classes in the dataset.
     num_layers : `int`
         The number of hidden layers in the classifier. Default is 1.
+    vae_mode : `bool`
+        Whether to use variational autoencoder mode. Default is False.
+    vae_units : `int`
+        The number of units in the variational autoencoder. Default is 2.
 
     Returns
     -------
@@ -617,6 +611,8 @@ def call_existing_code(
     """
     dropout = kwargs.get("dropout", None)
     l2_reg = kwargs.get("l2_reg", 0.0)
+    vae_mode = kwargs.get("vae_mode", False)
+    vae_units = kwargs.get("vae_units", 2)
     model = AutoClassifier(
         input_shape_parm=input_shape_parm,
         num_classes=num_classes,
@@ -625,6 +621,8 @@ def call_existing_code(
         num_layers=num_layers,
         dropout=dropout,
         l2_reg=l2_reg,
+        vae_mode=vae_mode,
+        vae_units=vae_units,
     )
     model.compile(
         optimizer=optimizer,
@@ -731,6 +729,23 @@ def build_model(
             else hyperparameters["l2_reg"]
         )
     )
+    vae_mode = (
+        hp.Choice("vae_mode", [True, False])
+        if "vae_mode" not in hyperparameters_keys
+        else hyperparameters["vae_mode"]
+    )
+    if not vae_mode:
+        hyperparameters["vae_units"] = 2
+
+    vae_units = (
+        hp.Int("vae_units", min_value=2, max_value=10, step=1)
+        if "vae_units" not in hyperparameters_keys
+        else (
+            hp.Choice("vae_units", hyperparameters["vae_units"])
+            if isinstance(hyperparameters["vae_units"], list)
+            else hyperparameters["vae_units"]
+        )
+    )
 
     model = call_existing_code(
         units=units,
@@ -742,6 +757,8 @@ def build_model(
         num_layers=num_layers,
         dropout=dropout,
         l2_reg=l2_reg,
+        vae_mode=vae_mode,
+        vae_units=vae_units,
     )
     return model
 

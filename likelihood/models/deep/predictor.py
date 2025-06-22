@@ -109,15 +109,16 @@ class GetInsights:
                 "in the model's transformation.</p>"
             )
         )
-        self.viz_encoder_decoder_graphs(threshold_factor=threshold_factor, top_k=top_k)
+        if not self.model.encoder.name.startswith("vae"):
+            self.viz_encoder_decoder_graphs(threshold_factor=threshold_factor, top_k=top_k)
 
-        display(HTML("<h2 style='margin-top:30px;'>🧠 Classifier Layer Graphs</h2>"))
-        display(
-            HTML(
-                "<p>This visualization shows how features propagate through each dense layer in the classifier. "
-                "Only the strongest weighted connections are shown to highlight influential paths through the network.</p>"
+            display(HTML("<h2 style='margin-top:30px;'>🧠 Classifier Layer Graphs</h2>"))
+            display(
+                HTML(
+                    "<p>This visualization shows how features propagate through each dense layer in the classifier. "
+                    "Only the strongest weighted connections are shown to highlight influential paths through the network.</p>"
+                )
             )
-        )
         self.viz_classifier_graphs(threshold_factor=threshold_factor, top_k=top_k)
 
         display(HTML("<h2 style='margin-top:30px;'>📈 Statistical Summary</h2>"))
