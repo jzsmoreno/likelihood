@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>likelihood.tools.cat_embed API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>likelihood.tools.cat_embed</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="likelihood.tools.cat_embed.CategoricalEmbedder"><code class="flex name class">
+<span>class <span class="ident">CategoricalEmbedder</span></span>
+<span>(</span><span>embedding_dim=32)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class CategoricalEmbedder:
+    def __init__(self, embedding_dim=32):
+        self.embedding_dim = embedding_dim
+        self.label_encoders = {}
+        self.embeddings = {}
+
+    def fit(self, df: DataFrame, categorical_cols: List):
+        &#34;&#34;&#34;
+        Fit the embeddings on the given data.
+
+        Parameters
+        ----------
+        df : `DataFrame`
+            Pandas DataFrame containing the tabular data.
+        categorical_cols : `List`
+            List of column names representing categorical features.
+
+        Returns
+        -------
+        `None`
+        &#34;&#34;&#34;
+        df_processed = df.copy()
+        for col in categorical_cols:
+            if col not in df_processed.columns:
+                raise ValueError(f&#34;Column {col} not found in DataFrame&#34;)
+
+        for col in categorical_cols:
+            mode_val = df_processed[col].mode()
+            if not mode_val.empty:
+                df_processed[col] = df_processed[col].fillna(mode_val[0])
+
+        for col in categorical_cols:
+            le = LabelEncoder()
+            df_processed[col] = le.fit_transform(df_processed[col])
+            self.label_encoders[col] = le
+
+            vocab_size = len(le.classes_)
+            embedding_matrix = np.random.rand(vocab_size, self.embedding_dim)
+            self.embeddings[col] = tf.Variable(embedding_matrix, dtype=tf.float32)
+
+    def transform(self, df: DataFrame, categorical_cols: List[str]):
+        &#34;&#34;&#34;
+        Transform the data using the fitted embeddings.
+
+        Parameters
+        ----------
+        df : `DataFrame`
+            Pandas DataFrame containing the tabular data.
+        categorical_cols : `List[str]`
+            List of column names representing categorical features.
+
+        Returns
+        -------
+        Transformed Pandas DataFrame with original columns except `categorical_cols` replaced by their embedding representations.
+        &#34;&#34;&#34;
+
+        df_processed = df.copy()
+
+        for col in categorical_cols:
+            if col not in self.label_encoders:
+                raise ValueError(
+                    f&#34;Column {col} has not been fitted. Please call fit() on this column first.&#34;
+                )
+            mode_val = df_processed[col].mode()
+            if not mode_val.empty:
+                df_processed[col] = df_processed[col].fillna(mode_val[0])
+            le = self.label_encoders[col]
+            df_processed[col] = le.transform(df_processed[col])
+
+        for col in categorical_cols:
+            indices_tensor = tf.constant(df_processed[col], dtype=tf.int32)
+            embedding_layer = tf.nn.embedding_lookup(
+                params=self.embeddings[col], ids=indices_tensor
+            )
+            if len(embedding_layer.shape) == 1:
+                embedding_layer = tf.expand_dims(embedding_layer, axis=0)
+
+            for i in range(self.embedding_dim):
+                df_processed[f&#34;{col}_embed_{i}&#34;] = embedding_layer[:, i]
+            df_processed.drop(columns=[col], inplace=True)
+
+        return df_processed
+
+    def inverse_transform(self, df: pd.DataFrame, categorical_cols: List[str]):
+        &#34;&#34;&#34;
+        Inverse transform the data using the fitted embeddings.
+
+        Parameters
+        ----------
+        df : `DataFrame`
+            Pandas DataFrame containing the tabular data with embedded representations.
+        categorical_cols : `List[str]`
+            List of column names representing categorical features.
+
+        Returns
+        -------
+        Transformed Pandas DataFrame with original columns replaced by their categorical labels.
+        &#34;&#34;&#34;
+
+        df_processed = df.copy()
+
+        for col in categorical_cols:
+            if col not in self.label_encoders:
+                raise ValueError(
+                    f&#34;Column {col} has not been fitted. Please call fit() on this column first.&#34;
+                )
+
+            embedding_matrix = self.embeddings[col].numpy()
+            label_encoder = self.label_encoders[col]
+
+            embedded_columns = [f&#34;{col}_embed_{i}&#34; for i in range(self.embedding_dim)]
+            embeddings = df_processed[embedded_columns].values
+
+            distances = np.linalg.norm(embedding_matrix - embeddings[:, np.newaxis], axis=2)
+            original_indices = np.argmin(distances, axis=1)
+            original_labels = label_encoder.inverse_transform(original_indices)
+
+            df_processed[col] = original_labels
+            df_processed.drop(columns=embedded_columns, inplace=True)
+
+        return df_processed
+
+    def save_embeddings(self, path: str):
+        &#34;&#34;&#34;
+        Save the embeddings to a directory.
+
+        Parameters
+        ----------
+        path : `str`
+            Path to the directory where embeddings will be saved.
+        &#34;&#34;&#34;
+
+        os.makedirs(path, exist_ok=True)
+        for col, embedding in self.embeddings.items():
+            np.save(os.path.join(path, f&#34;{col}_embedding.npy&#34;), embedding.numpy())
+
+    def load_embeddings(self, path: str):
+        &#34;&#34;&#34;
+        Load the embeddings from a directory.
+
+        Parameters
+        ----------
+        path : `str`
+            Path to the directory where embeddings are saved.
+        &#34;&#34;&#34;
+
+        for col in self.label_encoders.keys():
+            embedding_path = os.path.join(path, f&#34;{col}_embedding.npy&#34;)
+            if not os.path.exists(embedding_path):
+                raise FileNotFoundError(f&#34;Embedding file {embedding_path} not found.&#34;)
+            embedding_matrix = np.load(embedding_path)
+            self.embeddings[col] = tf.Variable(embedding_matrix, dtype=tf.float32)</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="likelihood.tools.cat_embed.CategoricalEmbedder.fit"><code class="name flex">
+<span>def <span class="ident">fit</span></span>(<span>self, df: pandas.core.frame.DataFrame, categorical_cols: List)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def fit(self, df: DataFrame, categorical_cols: List):
+    &#34;&#34;&#34;
+    Fit the embeddings on the given data.
+
+    Parameters
+    ----------
+    df : `DataFrame`
+        Pandas DataFrame containing the tabular data.
+    categorical_cols : `List`
+        List of column names representing categorical features.
+
+    Returns
+    -------
+    `None`
+    &#34;&#34;&#34;
+    df_processed = df.copy()
+    for col in categorical_cols:
+        if col not in df_processed.columns:
+            raise ValueError(f&#34;Column {col} not found in DataFrame&#34;)
+
+    for col in categorical_cols:
+        mode_val = df_processed[col].mode()
+        if not mode_val.empty:
+            df_processed[col] = df_processed[col].fillna(mode_val[0])
+
+    for col in categorical_cols:
+        le = LabelEncoder()
+        df_processed[col] = le.fit_transform(df_processed[col])
+        self.label_encoders[col] = le
+
+        vocab_size = len(le.classes_)
+        embedding_matrix = np.random.rand(vocab_size, self.embedding_dim)
+        self.embeddings[col] = tf.Variable(embedding_matrix, dtype=tf.float32)</code></pre>
+</details>
+<div class="desc"><p>Fit the embeddings on the given data.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dd>Pandas DataFrame containing the tabular data.</dd>
+<dt><strong><code>categorical_cols</code></strong> :&ensp;<code>List</code></dt>
+<dd>List of column names representing categorical features.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>None</code></p></div>
+</dd>
+<dt id="likelihood.tools.cat_embed.CategoricalEmbedder.inverse_transform"><code class="name flex">
+<span>def <span class="ident">inverse_transform</span></span>(<span>self, df: pandas.core.frame.DataFrame, categorical_cols: List[str])</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def inverse_transform(self, df: pd.DataFrame, categorical_cols: List[str]):
+    &#34;&#34;&#34;
+    Inverse transform the data using the fitted embeddings.
+
+    Parameters
+    ----------
+    df : `DataFrame`
+        Pandas DataFrame containing the tabular data with embedded representations.
+    categorical_cols : `List[str]`
+        List of column names representing categorical features.
+
+    Returns
+    -------
+    Transformed Pandas DataFrame with original columns replaced by their categorical labels.
+    &#34;&#34;&#34;
+
+    df_processed = df.copy()
+
+    for col in categorical_cols:
+        if col not in self.label_encoders:
+            raise ValueError(
+                f&#34;Column {col} has not been fitted. Please call fit() on this column first.&#34;
+            )
+
+        embedding_matrix = self.embeddings[col].numpy()
+        label_encoder = self.label_encoders[col]
+
+        embedded_columns = [f&#34;{col}_embed_{i}&#34; for i in range(self.embedding_dim)]
+        embeddings = df_processed[embedded_columns].values
+
+        distances = np.linalg.norm(embedding_matrix - embeddings[:, np.newaxis], axis=2)
+        original_indices = np.argmin(distances, axis=1)
+        original_labels = label_encoder.inverse_transform(original_indices)
+
+        df_processed[col] = original_labels
+        df_processed.drop(columns=embedded_columns, inplace=True)
+
+    return df_processed</code></pre>
+</details>
+<div class="desc"><p>Inverse transform the data using the fitted embeddings.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dd>Pandas DataFrame containing the tabular data with embedded representations.</dd>
+<dt><strong><code>categorical_cols</code></strong> :&ensp;<code>List[str]</code></dt>
+<dd>List of column names representing categorical features.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>Transformed Pandas DataFrame with original columns replaced by their categorical labels.</p></div>
+</dd>
+<dt id="likelihood.tools.cat_embed.CategoricalEmbedder.load_embeddings"><code class="name flex">
+<span>def <span class="ident">load_embeddings</span></span>(<span>self, path: str)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def load_embeddings(self, path: str):
+    &#34;&#34;&#34;
+    Load the embeddings from a directory.
+
+    Parameters
+    ----------
+    path : `str`
+        Path to the directory where embeddings are saved.
+    &#34;&#34;&#34;
+
+    for col in self.label_encoders.keys():
+        embedding_path = os.path.join(path, f&#34;{col}_embedding.npy&#34;)
+        if not os.path.exists(embedding_path):
+            raise FileNotFoundError(f&#34;Embedding file {embedding_path} not found.&#34;)
+        embedding_matrix = np.load(embedding_path)
+        self.embeddings[col] = tf.Variable(embedding_matrix, dtype=tf.float32)</code></pre>
+</details>
+<div class="desc"><p>Load the embeddings from a directory.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>path</code></strong> :&ensp;<code>str</code></dt>
+<dd>Path to the directory where embeddings are saved.</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.tools.cat_embed.CategoricalEmbedder.save_embeddings"><code class="name flex">
+<span>def <span class="ident">save_embeddings</span></span>(<span>self, path: str)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def save_embeddings(self, path: str):
+    &#34;&#34;&#34;
+    Save the embeddings to a directory.
+
+    Parameters
+    ----------
+    path : `str`
+        Path to the directory where embeddings will be saved.
+    &#34;&#34;&#34;
+
+    os.makedirs(path, exist_ok=True)
+    for col, embedding in self.embeddings.items():
+        np.save(os.path.join(path, f&#34;{col}_embedding.npy&#34;), embedding.numpy())</code></pre>
+</details>
+<div class="desc"><p>Save the embeddings to a directory.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>path</code></strong> :&ensp;<code>str</code></dt>
+<dd>Path to the directory where embeddings will be saved.</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.tools.cat_embed.CategoricalEmbedder.transform"><code class="name flex">
+<span>def <span class="ident">transform</span></span>(<span>self, df: pandas.core.frame.DataFrame, categorical_cols: List[str])</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def transform(self, df: DataFrame, categorical_cols: List[str]):
+    &#34;&#34;&#34;
+    Transform the data using the fitted embeddings.
+
+    Parameters
+    ----------
+    df : `DataFrame`
+        Pandas DataFrame containing the tabular data.
+    categorical_cols : `List[str]`
+        List of column names representing categorical features.
+
+    Returns
+    -------
+    Transformed Pandas DataFrame with original columns except `categorical_cols` replaced by their embedding representations.
+    &#34;&#34;&#34;
+
+    df_processed = df.copy()
+
+    for col in categorical_cols:
+        if col not in self.label_encoders:
+            raise ValueError(
+                f&#34;Column {col} has not been fitted. Please call fit() on this column first.&#34;
+            )
+        mode_val = df_processed[col].mode()
+        if not mode_val.empty:
+            df_processed[col] = df_processed[col].fillna(mode_val[0])
+        le = self.label_encoders[col]
+        df_processed[col] = le.transform(df_processed[col])
+
+    for col in categorical_cols:
+        indices_tensor = tf.constant(df_processed[col], dtype=tf.int32)
+        embedding_layer = tf.nn.embedding_lookup(
+            params=self.embeddings[col], ids=indices_tensor
+        )
+        if len(embedding_layer.shape) == 1:
+            embedding_layer = tf.expand_dims(embedding_layer, axis=0)
+
+        for i in range(self.embedding_dim):
+            df_processed[f&#34;{col}_embed_{i}&#34;] = embedding_layer[:, i]
+        df_processed.drop(columns=[col], inplace=True)
+
+    return df_processed</code></pre>
+</details>
+<div class="desc"><p>Transform the data using the fitted embeddings.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dd>Pandas DataFrame containing the tabular data.</dd>
+<dt><strong><code>categorical_cols</code></strong> :&ensp;<code>List[str]</code></dt>
+<dd>List of column names representing categorical features.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>Transformed Pandas DataFrame with original columns except <code>categorical_cols</code> replaced by their embedding representations.</p></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="likelihood.tools" href="index.html">likelihood.tools</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="likelihood.tools.cat_embed.CategoricalEmbedder" href="#likelihood.tools.cat_embed.CategoricalEmbedder">CategoricalEmbedder</a></code></h4>
+<ul class="">
+<li><code><a title="likelihood.tools.cat_embed.CategoricalEmbedder.fit" href="#likelihood.tools.cat_embed.CategoricalEmbedder.fit">fit</a></code></li>
+<li><code><a title="likelihood.tools.cat_embed.CategoricalEmbedder.inverse_transform" href="#likelihood.tools.cat_embed.CategoricalEmbedder.inverse_transform">inverse_transform</a></code></li>
+<li><code><a title="likelihood.tools.cat_embed.CategoricalEmbedder.load_embeddings" href="#likelihood.tools.cat_embed.CategoricalEmbedder.load_embeddings">load_embeddings</a></code></li>
+<li><code><a title="likelihood.tools.cat_embed.CategoricalEmbedder.save_embeddings" href="#likelihood.tools.cat_embed.CategoricalEmbedder.save_embeddings">save_embeddings</a></code></li>
+<li><code><a title="likelihood.tools.cat_embed.CategoricalEmbedder.transform" href="#likelihood.tools.cat_embed.CategoricalEmbedder.transform">transform</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>

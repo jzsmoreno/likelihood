@@ -149,6 +149,24 @@ el.replaceWith(d);
             else hyperparameters[&#34;l2_reg&#34;]
         )
     )
+    vae_mode = (
+        hp.Choice(&#34;vae_mode&#34;, [True, False])
+        if &#34;vae_mode&#34; not in hyperparameters_keys
+        else hyperparameters[&#34;vae_mode&#34;]
+    )
+
+    try:
+        vae_units = (
+            hp.Int(&#34;vae_units&#34;, min_value=2, max_value=10, step=1)
+            if (&#34;vae_units&#34; not in hyperparameters_keys) and vae_mode
+            else (
+                hp.Choice(&#34;vae_units&#34;, hyperparameters[&#34;vae_units&#34;])
+                if isinstance(hyperparameters[&#34;vae_units&#34;], list)
+                else hyperparameters[&#34;vae_units&#34;]
+            )
+        )
+    except KeyError:
+        vae_units = None
 
     model = call_existing_code(
         units=units,
@@ -160,6 +178,8 @@ el.replaceWith(d);
         num_layers=num_layers,
         dropout=dropout,
         l2_reg=l2_reg,
+        vae_mode=vae_mode,
+        vae_units=vae_units,
     )
     return model</code></pre>
 </details>
@@ -283,6 +303,13 @@ The loss value.</p></div>
     num_layers : `int`
         The number of hidden layers in the classifier. Default is 1.
 
+    Keyword Arguments:
+    ----------
+    vae_mode : `bool`
+        Whether to use variational autoencoder mode. Default is False.
+    vae_units : `int`
+        The number of units in the variational autoencoder. Default is 2.
+
     Returns
     -------
     `AutoClassifier`
@@ -290,6 +317,8 @@ The loss value.</p></div>
     &#34;&#34;&#34;
     dropout = kwargs.get(&#34;dropout&#34;, None)
     l2_reg = kwargs.get(&#34;l2_reg&#34;, 0.0)
+    vae_mode = kwargs.get(&#34;vae_mode&#34;, False)
+    vae_units = kwargs.get(&#34;vae_units&#34;, 2)
     model = AutoClassifier(
         input_shape_parm=input_shape_parm,
         num_classes=num_classes,
@@ -298,6 +327,8 @@ The loss value.</p></div>
         num_layers=num_layers,
         dropout=dropout,
         l2_reg=l2_reg,
+        vae_mode=vae_mode,
+        vae_units=vae_units,
     )
     model.compile(
         optimizer=optimizer,
@@ -324,6 +355,11 @@ The loss value.</p></div>
 <dt><strong><code>num_layers</code></strong> :&ensp;<code>int</code></dt>
 <dd>The number of hidden layers in the classifier. Default is 1.</dd>
 </dl>
+<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<p>vae_mode : <code>bool</code>
+Whether to use variational autoencoder mode. Default is False.
+vae_units : <code>int</code>
+The number of units in the variational autoencoder. Default is 2.</p>
 <h2 id="returns">Returns</h2>
 <p><code><a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></code>
 The AutoClassifier instance.</p></div>
@@ -598,9 +634,11 @@ def setup_model(
             tuner.results_summary()
     else:
         best_model = tf.keras.models.load_model(filepath)
-
     best_hps = tuner.get_best_hyperparameters(1)[0].values
-    return best_model, pd.DataFrame(best_hps, index=[&#34;Value&#34;])</code></pre>
+    vae_mode = best_hps.get(&#34;vae_mode&#34;, hyperparameters.get(&#34;vae_mode&#34;, False))
+    best_hps[&#34;vae_units&#34;] = None if not vae_mode else best_hps[&#34;vae_units&#34;]
+
+    return best_model, pd.DataFrame(best_hps, index=[&#34;Value&#34;]).dropna(axis=1)</code></pre>
 </details>
 <div class="desc"><p>Setup model for training and tuning.</p>
 <h2 id="parameters">Parameters</h2>
@@ -841,7 +879,8 @@ class AutoClassifier(tf.keras.Model):
                         activation=self.activation,
                         kernel_regularizer=l2(self.l2_reg),
                     ),
-                ]
+                ],
+                name=&#34;encoder&#34;,
             )
             if not self.encoder
             else self.encoder
@@ -860,7 +899,8 @@ class AutoClassifier(tf.keras.Model):
                         activation=self.activation,
                         kernel_regularizer=l2(self.l2_reg),
                     ),
-                ]
+                ],
+                name=&#34;decoder&#34;,
             )
             if not self.decoder
             else self.decoder
@@ -890,7 +930,7 @@ class AutoClassifier(tf.keras.Model):
             log_var = tf.keras.layers.Lambda(lambda x: x + 1e-7)(log_var)
 
             self.encoder = (
-                tf.keras.Model(inputs, [mean, log_var], name=&#34;encoder&#34;)
+                tf.keras.Model(inputs, [mean, log_var], name=&#34;vae_encoder&#34;)
                 if not self.encoder
                 else self.encoder
             )
@@ -909,7 +949,8 @@ class AutoClassifier(tf.keras.Model):
                         ),
                         tf.keras.layers.BatchNormalization(),
                         tf.keras.layers.Activation(self.activation),
-                    ]
+                    ],
+                    name=&#34;vae_decoder&#34;,
                 )
                 if not self.decoder
                 else self.decoder
@@ -930,13 +971,7 @@ class AutoClassifier(tf.keras.Model):
                 )
                 if self.dropout:
                     self.classifier.add(tf.keras.layers.Dropout(self.dropout))
-            self.classifier.add(
-                tf.keras.layers.Dense(
-                    units=self.num_classes,
-                    activation=self.classifier_activation,
-                    kernel_regularizer=l2(self.l2_reg),
-                )
-            )
+
         elif self.lora_mode:
             for _ in range(self.num_layers - 1):
                 self.classifier.add(
@@ -945,21 +980,14 @@ class AutoClassifier(tf.keras.Model):
                 self.classifier.add(tf.keras.layers.Activation(self.activation))
                 if self.dropout:
                     self.classifier.add(tf.keras.layers.Dropout(self.dropout))
-            self.classifier.add(
-                tf.keras.layers.Dense(
-                    units=self.num_classes,
-                    activation=self.classifier_activation,
-                    kernel_regularizer=l2(self.l2_reg),
-                )
+
+        self.classifier.add(
+            tf.keras.layers.Dense(
+                units=self.num_classes,
+                activation=self.classifier_activation,
+                kernel_regularizer=l2(self.l2_reg),
             )
-        else:
-            self.classifier.add(
-                tf.keras.layers.Dense(
-                    units=self.num_classes,
-                    activation=self.classifier_activation,
-                    kernel_regularizer=l2(self.l2_reg),
-                )
-            )
+        )
 
     def train_encoder_decoder(
         self, data, epochs, batch_size, validation_split=0.2, patience=10, **kwargs
@@ -1243,7 +1271,7 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
         log_var = tf.keras.layers.Lambda(lambda x: x + 1e-7)(log_var)
 
         self.encoder = (
-            tf.keras.Model(inputs, [mean, log_var], name=&#34;encoder&#34;)
+            tf.keras.Model(inputs, [mean, log_var], name=&#34;vae_encoder&#34;)
             if not self.encoder
             else self.encoder
         )
@@ -1262,7 +1290,8 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
                     ),
                     tf.keras.layers.BatchNormalization(),
                     tf.keras.layers.Activation(self.activation),
-                ]
+                ],
+                name=&#34;vae_decoder&#34;,
             )
             if not self.decoder
             else self.decoder
@@ -1283,13 +1312,7 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
             )
             if self.dropout:
                 self.classifier.add(tf.keras.layers.Dropout(self.dropout))
-        self.classifier.add(
-            tf.keras.layers.Dense(
-                units=self.num_classes,
-                activation=self.classifier_activation,
-                kernel_regularizer=l2(self.l2_reg),
-            )
-        )
+
     elif self.lora_mode:
         for _ in range(self.num_layers - 1):
             self.classifier.add(
@@ -1298,21 +1321,14 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
             self.classifier.add(tf.keras.layers.Activation(self.activation))
             if self.dropout:
                 self.classifier.add(tf.keras.layers.Dropout(self.dropout))
-        self.classifier.add(
-            tf.keras.layers.Dense(
-                units=self.num_classes,
-                activation=self.classifier_activation,
-                kernel_regularizer=l2(self.l2_reg),
-            )
+
+    self.classifier.add(
+        tf.keras.layers.Dense(
+            units=self.num_classes,
+            activation=self.classifier_activation,
+            kernel_regularizer=l2(self.l2_reg),
         )
-    else:
-        self.classifier.add(
-            tf.keras.layers.Dense(
-                units=self.num_classes,
-                activation=self.classifier_activation,
-                kernel_regularizer=l2(self.l2_reg),
-            )
-        )</code></pre>
+    )</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -1338,7 +1354,8 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
                     activation=self.activation,
                     kernel_regularizer=l2(self.l2_reg),
                 ),
-            ]
+            ],
+            name=&#34;encoder&#34;,
         )
         if not self.encoder
         else self.encoder
@@ -1357,7 +1374,8 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
                     activation=self.activation,
                     kernel_regularizer=l2(self.l2_reg),
                 ),
-            ]
+            ],
+            name=&#34;decoder&#34;,
         )
         if not self.decoder
         else self.decoder

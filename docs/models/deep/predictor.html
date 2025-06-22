@@ -144,15 +144,16 @@ el.replaceWith(d);
                 &#34;in the model&#39;s transformation.&lt;/p&gt;&#34;
             )
         )
-        self.viz_encoder_decoder_graphs(threshold_factor=threshold_factor, top_k=top_k)
+        if not self.model.encoder.name.startswith(&#34;vae&#34;):
+            self.viz_encoder_decoder_graphs(threshold_factor=threshold_factor, top_k=top_k)
 
-        display(HTML(&#34;&lt;h2 style=&#39;margin-top:30px;&#39;&gt;🧠 Classifier Layer Graphs&lt;/h2&gt;&#34;))
-        display(
-            HTML(
-                &#34;&lt;p&gt;This visualization shows how features propagate through each dense layer in the classifier. &#34;
-                &#34;Only the strongest weighted connections are shown to highlight influential paths through the network.&lt;/p&gt;&#34;
+            display(HTML(&#34;&lt;h2 style=&#39;margin-top:30px;&#39;&gt;🧠 Classifier Layer Graphs&lt;/h2&gt;&#34;))
+            display(
+                HTML(
+                    &#34;&lt;p&gt;This visualization shows how features propagate through each dense layer in the classifier. &#34;
+                    &#34;Only the strongest weighted connections are shown to highlight influential paths through the network.&lt;/p&gt;&#34;
+                )
             )
-        )
         self.viz_classifier_graphs(threshold_factor=threshold_factor, top_k=top_k)
 
         display(HTML(&#34;&lt;h2 style=&#39;margin-top:30px;&#39;&gt;📈 Statistical Summary&lt;/h2&gt;&#34;))
@@ -919,15 +920,16 @@ of the weights, t-SNE representation, and feature statistics.</p>
             &#34;in the model&#39;s transformation.&lt;/p&gt;&#34;
         )
     )
-    self.viz_encoder_decoder_graphs(threshold_factor=threshold_factor, top_k=top_k)
+    if not self.model.encoder.name.startswith(&#34;vae&#34;):
+        self.viz_encoder_decoder_graphs(threshold_factor=threshold_factor, top_k=top_k)
 
-    display(HTML(&#34;&lt;h2 style=&#39;margin-top:30px;&#39;&gt;🧠 Classifier Layer Graphs&lt;/h2&gt;&#34;))
-    display(
-        HTML(
-            &#34;&lt;p&gt;This visualization shows how features propagate through each dense layer in the classifier. &#34;
-            &#34;Only the strongest weighted connections are shown to highlight influential paths through the network.&lt;/p&gt;&#34;
+        display(HTML(&#34;&lt;h2 style=&#39;margin-top:30px;&#39;&gt;🧠 Classifier Layer Graphs&lt;/h2&gt;&#34;))
+        display(
+            HTML(
+                &#34;&lt;p&gt;This visualization shows how features propagate through each dense layer in the classifier. &#34;
+                &#34;Only the strongest weighted connections are shown to highlight influential paths through the network.&lt;/p&gt;&#34;
+            )
         )
-    )
     self.viz_classifier_graphs(threshold_factor=threshold_factor, top_k=top_k)
 
     display(HTML(&#34;&lt;h2 style=&#39;margin-top:30px;&#39;&gt;📈 Statistical Summary&lt;/h2&gt;&#34;))
