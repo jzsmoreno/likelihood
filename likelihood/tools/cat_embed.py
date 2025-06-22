@@ -35,19 +35,19 @@ class CategoricalEmbedder:
         -------
         `None`
         """
-
+        df_processed = df.copy()
         for col in categorical_cols:
-            if col not in df.columns:
+            if col not in df_processed.columns:
                 raise ValueError(f"Column {col} not found in DataFrame")
 
         for col in categorical_cols:
-            mode_val = df[col].mode()
+            mode_val = df_processed[col].mode()
             if not mode_val.empty:
-                df[col] = df[col].fillna(mode_val[0])
+                df_processed[col] = df_processed[col].fillna(mode_val[0])
 
         for col in categorical_cols:
             le = LabelEncoder()
-            df[col] = le.fit_transform(df[col])
+            df_processed[col] = le.fit_transform(df_processed[col])
             self.label_encoders[col] = le
 
             vocab_size = len(le.classes_)
@@ -77,10 +77,11 @@ class CategoricalEmbedder:
                 raise ValueError(
                     f"Column {col} has not been fitted. Please call fit() on this column first."
                 )
-
+            mode_val = df_processed[col].mode()
+            if not mode_val.empty:
+                df_processed[col] = df_processed[col].fillna(mode_val[0])
             le = self.label_encoders[col]
-            mode_val = le.transform(le.classes_)[0]
-            df_processed[col] = df_processed[col].fillna(mode_val)
+            df_processed[col] = le.transform(df_processed[col])
 
         for col in categorical_cols:
             indices_tensor = tf.constant(df_processed[col], dtype=tf.int32)
@@ -93,6 +94,45 @@ class CategoricalEmbedder:
             for i in range(self.embedding_dim):
                 df_processed[f"{col}_embed_{i}"] = embedding_layer[:, i]
             df_processed.drop(columns=[col], inplace=True)
+
+        return df_processed
+
+    def inverse_transform(self, df: pd.DataFrame, categorical_cols: List[str]):
+        """
+        Inverse transform the data using the fitted embeddings.
+
+        Parameters
+        ----------
+        df : `DataFrame`
+            Pandas DataFrame containing the tabular data with embedded representations.
+        categorical_cols : `List[str]`
+            List of column names representing categorical features.
+
+        Returns
+        -------
+        Transformed Pandas DataFrame with original columns replaced by their categorical labels.
+        """
+
+        df_processed = df.copy()
+
+        for col in categorical_cols:
+            if col not in self.label_encoders:
+                raise ValueError(
+                    f"Column {col} has not been fitted. Please call fit() on this column first."
+                )
+
+            embedding_matrix = self.embeddings[col].numpy()
+            label_encoder = self.label_encoders[col]
+
+            embedded_columns = [f"{col}_embed_{i}" for i in range(self.embedding_dim)]
+            embeddings = df_processed[embedded_columns].values
+
+            distances = np.linalg.norm(embedding_matrix - embeddings[:, np.newaxis], axis=2)
+            original_indices = np.argmin(distances, axis=1)
+            original_labels = label_encoder.inverse_transform(original_indices)
+
+            df_processed[col] = original_labels
+            df_processed.drop(columns=embedded_columns, inplace=True)
 
         return df_processed
 
@@ -162,3 +202,12 @@ if __name__ == "__main__":
     processed_df_loaded = new_embedder.transform(df, categorical_cols=["color", "size"])
     print("\nProcessed DataFrame with Loaded Embeddings:")
     print(processed_df_loaded.head())
+
+    # Inverse transform the data
+    df_loaded = new_embedder.inverse_transform(
+        processed_df_loaded, categorical_cols=["color", "size"]
+    )
+    print("\nOriginal DataFrame:")
+    print(df.head())
+    print("\nProcessed DataFrame with Inverse Transform:")
+    print(df_loaded.head())
