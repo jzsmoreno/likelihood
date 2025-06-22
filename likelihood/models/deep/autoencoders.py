@@ -734,18 +734,19 @@ def build_model(
         if "vae_mode" not in hyperparameters_keys
         else hyperparameters["vae_mode"]
     )
-    if not vae_mode:
-        hyperparameters["vae_units"] = 2
 
-    vae_units = (
-        hp.Int("vae_units", min_value=2, max_value=10, step=1)
-        if "vae_units" not in hyperparameters_keys
-        else (
-            hp.Choice("vae_units", hyperparameters["vae_units"])
-            if isinstance(hyperparameters["vae_units"], list)
-            else hyperparameters["vae_units"]
+    try:
+        vae_units = (
+            hp.Int("vae_units", min_value=2, max_value=10, step=1)
+            if ("vae_units" not in hyperparameters_keys) and vae_mode
+            else (
+                hp.Choice("vae_units", hyperparameters["vae_units"])
+                if isinstance(hyperparameters["vae_units"], list)
+                else hyperparameters["vae_units"]
+            )
         )
-    )
+    except KeyError:
+        vae_units = None
 
     model = call_existing_code(
         units=units,
@@ -893,6 +894,8 @@ def setup_model(
             tuner.results_summary()
     else:
         best_model = tf.keras.models.load_model(filepath)
-
     best_hps = tuner.get_best_hyperparameters(1)[0].values
-    return best_model, pd.DataFrame(best_hps, index=["Value"])
+    vae_mode = best_hps.get("vae_mode", hyperparameters.get("vae_mode", False))
+    best_hps["vae_units"] = None if not vae_mode else best_hps["vae_units"]
+
+    return best_model, pd.DataFrame(best_hps, index=["Value"]).dropna(axis=1)
