@@ -3,12 +3,12 @@ from .autoencoders import (
     EarlyStopping,
     LoRALayer,
     OneHotEncoder,
-    build_model,
     cal_loss_step,
     keras_tuner,
     l2,
     np,
     partial,
+    pd,
     sampling,
     suppress_warnings,
     tf,
@@ -543,6 +543,203 @@ class AutoClassifier:
         }
 
 
+def call_existing_code(
+    units: int,
+    activation: str,
+    threshold: float,
+    optimizer: str,
+    input_shape_parm: None | int = None,
+    num_classes: None | int = None,
+    num_layers: int = 1,
+    **kwargs,
+) -> AutoClassifier:
+    """
+    Calls an existing AutoClassifier instance.
+
+    Parameters
+    ----------
+    units : `int`
+        The number of neurons in each hidden layer.
+    activation : `str`
+        The type of activation function to use for the neural network layers.
+    threshold : `float`
+        The threshold for the classifier.
+    optimizer : `str`
+        The type of optimizer to use for the neural network layers.
+    input_shape_parm : `None` | `int`
+        The shape of the input data.
+    num_classes : `int`
+        The number of classes in the dataset.
+    num_layers : `int`
+        The number of hidden layers in the classifier. Default is 1.
+
+    Keyword Arguments:
+    ----------
+    vae_mode : `bool`
+        Whether to use variational autoencoder mode. Default is False.
+    vae_units : `int`
+        The number of units in the variational autoencoder. Default is 2.
+
+    Returns
+    -------
+    `AutoClassifier`
+        The AutoClassifier instance.
+    """
+    dropout = kwargs.get("dropout", None)
+    l2_reg = kwargs.get("l2_reg", 0.0)
+    vae_mode = kwargs.get("vae_mode", False)
+    vae_units = kwargs.get("vae_units", 2)
+    model = AutoClassifier(
+        input_shape_parm=input_shape_parm,
+        num_classes=num_classes,
+        units=units,
+        activation=activation,
+        num_layers=num_layers,
+        dropout=dropout,
+        l2_reg=l2_reg,
+        vae_mode=vae_mode,
+        vae_units=vae_units,
+    )
+    model.compile(
+        optimizer=optimizer,
+        loss=tf.keras.losses.CategoricalCrossentropy(),
+        metrics=[tf.keras.metrics.F1Score(threshold=threshold)],
+    )
+    return model._main_model
+
+
+def build_model(
+    hp, input_shape_parm: None | int, num_classes: None | int, **kwargs
+) -> AutoClassifier:
+    """Builds a neural network model using Keras Tuner's search algorithm.
+
+    Parameters
+    ----------
+    hp : `keras_tuner.HyperParameters`
+        The hyperparameters to tune.
+    input_shape_parm : `None` | `int`
+        The shape of the input data.
+    num_classes : `int`
+        The number of classes in the dataset.
+
+    Keyword Arguments:
+    ----------
+    Additional keyword arguments to pass to the model.
+
+    hyperparameters : `dict`
+        The hyperparameters to set.
+
+    Returns
+    -------
+    `keras.Model`
+        The neural network model.
+    """
+    hyperparameters = kwargs.get("hyperparameters", None)
+    hyperparameters_keys = hyperparameters.keys() if hyperparameters is not None else []
+
+    units = (
+        hp.Int(
+            "units",
+            min_value=int(input_shape_parm * 0.2),
+            max_value=int(input_shape_parm * 1.5),
+            step=2,
+        )
+        if "units" not in hyperparameters_keys
+        else (
+            hp.Choice("units", hyperparameters["units"])
+            if isinstance(hyperparameters["units"], list)
+            else hyperparameters["units"]
+        )
+    )
+    activation = (
+        hp.Choice("activation", ["sigmoid", "relu", "tanh", "selu", "softplus", "softsign"])
+        if "activation" not in hyperparameters_keys
+        else (
+            hp.Choice("activation", hyperparameters["activation"])
+            if isinstance(hyperparameters["activation"], list)
+            else hyperparameters["activation"]
+        )
+    )
+    optimizer = (
+        hp.Choice("optimizer", ["sgd", "adam", "adadelta", "rmsprop", "adamax", "adagrad"])
+        if "optimizer" not in hyperparameters_keys
+        else (
+            hp.Choice("optimizer", hyperparameters["optimizer"])
+            if isinstance(hyperparameters["optimizer"], list)
+            else hyperparameters["optimizer"]
+        )
+    )
+    threshold = (
+        hp.Float("threshold", min_value=0.1, max_value=0.9, sampling="log")
+        if "threshold" not in hyperparameters_keys
+        else (
+            hp.Choice("threshold", hyperparameters["threshold"])
+            if isinstance(hyperparameters["threshold"], list)
+            else hyperparameters["threshold"]
+        )
+    )
+    num_layers = (
+        hp.Int("num_layers", min_value=1, max_value=10, step=1)
+        if "num_layers" not in hyperparameters_keys
+        else (
+            hp.Choice("num_layers", hyperparameters["num_layers"])
+            if isinstance(hyperparameters["num_layers"], list)
+            else hyperparameters["num_layers"]
+        )
+    )
+    dropout = (
+        hp.Float("dropout", min_value=0.1, max_value=0.9, sampling="log")
+        if "dropout" not in hyperparameters_keys
+        else (
+            hp.Choice("dropout", hyperparameters["dropout"])
+            if isinstance(hyperparameters["dropout"], list)
+            else hyperparameters["dropout"]
+        )
+    )
+    l2_reg = (
+        hp.Float("l2_reg", min_value=1e-6, max_value=0.1, sampling="log")
+        if "l2_reg" not in hyperparameters_keys
+        else (
+            hp.Choice("l2_reg", hyperparameters["l2_reg"])
+            if isinstance(hyperparameters["l2_reg"], list)
+            else hyperparameters["l2_reg"]
+        )
+    )
+    vae_mode = (
+        hp.Choice("vae_mode", [True, False])
+        if "vae_mode" not in hyperparameters_keys
+        else hyperparameters["vae_mode"]
+    )
+
+    try:
+        vae_units = (
+            hp.Int("vae_units", min_value=2, max_value=10, step=1)
+            if ("vae_units" not in hyperparameters_keys) and vae_mode
+            else (
+                hp.Choice("vae_units", hyperparameters["vae_units"])
+                if isinstance(hyperparameters["vae_units"], list)
+                else hyperparameters["vae_units"]
+            )
+        )
+    except KeyError:
+        vae_units = None
+
+    model = call_existing_code(
+        units=units,
+        activation=activation,
+        threshold=threshold,
+        optimizer=optimizer,
+        input_shape_parm=input_shape_parm,
+        num_classes=num_classes,
+        num_layers=num_layers,
+        dropout=dropout,
+        l2_reg=l2_reg,
+        vae_mode=vae_mode,
+        vae_units=vae_units,
+    )
+    return model
+
+
 @suppress_warnings
 def setup_model(
     data: DataFrame,
@@ -667,12 +864,14 @@ def setup_model(
         best_model = models[0]
         best_model(input_sample)
 
-        best_model.save(filepath)
+        best_model.save(filepath if filepath.endswith(".keras") else filepath + ".keras")
 
         if verbose:
             tuner.results_summary()
     else:
-        best_model = AutoClassifier.load(filepath)
+        best_model = tf.keras.models.load_model(
+            filepath if filepath.endswith(".keras") else filepath + ".keras"
+        )
     best_hps = tuner.get_best_hyperparameters(1)[0].values
     vae_mode = best_hps.get("vae_mode", hyperparameters.get("vae_mode", False))
     best_hps["vae_units"] = None if not vae_mode else best_hps["vae_units"]
