@@ -1,3 +1,21 @@
+from .autoencoders import (
+    DataFrame,
+    EarlyStopping,
+    LoRALayer,
+    OneHotEncoder,
+    build_model,
+    cal_loss_step,
+    keras_tuner,
+    l2,
+    np,
+    partial,
+    sampling,
+    suppress_warnings,
+    tf,
+    train_step,
+)
+
+
 class AutoClassifier:
     """
     An auto-classifier model that automatically determines the best classification strategy based on the input data.
@@ -449,8 +467,8 @@ class AutoClassifier:
         AutoClassifier
             The loaded model instance.
         """
-        import os
         import json
+        import os
 
         # Load configuration
         with open(os.path.join(filepath, "config.json"), "r") as f:
@@ -523,3 +541,140 @@ class AutoClassifier:
             "lora_mode": self.lora_mode,
             "lora_rank": self.lora_rank,
         }
+
+
+@suppress_warnings
+def setup_model(
+    data: DataFrame,
+    target: str,
+    epochs: int,
+    train_size: float = 0.7,
+    seed=None,
+    train_mode: bool = True,
+    filepath: str = "./my_dir/best_model",
+    method: str = "Hyperband",
+    **kwargs,
+) -> AutoClassifier:
+    """Setup model for training and tuning.
+
+    Parameters
+    ----------
+    data : `DataFrame`
+        The dataset to train the model on.
+    target : `str`
+        The name of the target column.
+    epochs : `int`
+        The number of epochs to train the model for.
+    train_size : `float`
+        The proportion of the dataset to use for training.
+    seed : `Any` | `int`
+        The random seed to use for reproducibility.
+    train_mode : `bool`
+        Whether to train the model or not.
+    filepath : `str`
+        The path to save the best model to.
+    method : `str`
+        The method to use for hyperparameter tuning. Options are "Hyperband" and "RandomSearch".
+
+    Keyword Arguments:
+    ----------
+    Additional keyword arguments to pass to the model.
+
+    max_trials : `int`
+        The maximum number of trials to perform.
+    directory : `str`
+        The directory to save the model to.
+    project_name : `str`
+        The name of the project.
+    objective : `str`
+        The objective to optimize.
+    verbose : `bool`
+        Whether to print verbose output.
+    hyperparameters : `dict`
+        The hyperparameters to set.
+
+    Returns
+    -------
+    model : `AutoClassifier`
+        The trained model.
+    """
+    max_trials = kwargs.get("max_trials", 10)
+    directory = kwargs.get("directory", "./my_dir")
+    project_name = kwargs.get("project_name", "get_best")
+    objective = kwargs.get("objective", "val_loss")
+    verbose = kwargs.get("verbose", True)
+    hyperparameters = kwargs.get("hyperparameters", None)
+
+    X = data.drop(columns=target)
+    input_sample = X.sample(1)
+    y = data[target]
+    assert (
+        X.select_dtypes(include=["object"]).empty == True
+    ), "Categorical variables within the DataFrame must be encoded, this is done by using the DataFrameEncoder from likelihood."
+    validation_split = 1.0 - train_size
+
+    if train_mode:
+        try:
+            if (not os.path.exists(directory)) and directory != "./":
+                os.makedirs(directory)
+            elif directory != "./":
+                print(f"Directory {directory} already exists, it will be deleted.")
+                rmtree(directory)
+                os.makedirs(directory)
+        except:
+            print("Warning: unable to create directory")
+
+        y_encoder = OneHotEncoder()
+        y = y_encoder.encode(y.to_list())
+        X = X.to_numpy()
+        input_sample.to_numpy()
+        X = np.asarray(X).astype(np.float32)
+        input_sample = np.asarray(input_sample).astype(np.float32)
+        y = np.asarray(y).astype(np.float32)
+
+        input_shape_parm = X.shape[1]
+        num_classes = y.shape[1]
+        global build_model
+        build_model = partial(
+            build_model,
+            input_shape_parm=input_shape_parm,
+            num_classes=num_classes,
+            hyperparameters=hyperparameters,
+        )
+
+        if method == "Hyperband":
+            tuner = keras_tuner.Hyperband(
+                hypermodel=build_model,
+                objective=objective,
+                max_epochs=epochs,
+                factor=3,
+                directory=directory,
+                project_name=project_name,
+                seed=seed,
+            )
+        elif method == "RandomSearch":
+            tuner = keras_tuner.RandomSearch(
+                hypermodel=build_model,
+                objective=objective,
+                max_trials=max_trials,
+                directory=directory,
+                project_name=project_name,
+                seed=seed,
+            )
+
+        tuner.search(X, y, epochs=epochs, validation_split=validation_split, verbose=verbose)
+        models = tuner.get_best_models(num_models=2)
+        best_model = models[0]
+        best_model(input_sample)
+
+        best_model.save(filepath)
+
+        if verbose:
+            tuner.results_summary()
+    else:
+        best_model = AutoClassifier.load(filepath)
+    best_hps = tuner.get_best_hyperparameters(1)[0].values
+    vae_mode = best_hps.get("vae_mode", hyperparameters.get("vae_mode", False))
+    best_hps["vae_units"] = None if not vae_mode else best_hps["vae_units"]
+
+    return best_model, pd.DataFrame(best_hps, index=["Value"]).dropna(axis=1)

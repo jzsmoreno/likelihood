@@ -4,11 +4,15 @@ from typing import Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
+from packaging import version
 from pandas.core.frame import DataFrame
 
 from likelihood.tools import DataScaler, FeatureSelection, OneHotEncoder, cdf, check_nan_inf
 
-warnings.simplefilter("ignore", np.RankWarning)
+if version.parse(np.__version__) < version.parse("2.0.0"):
+    filter = np.RankWarning
+else:
+    filter = np.exceptions.RankWarning
 
 
 # --------------------------------------------------------------------------------------------------------------------------------------
