@@ -484,12 +484,12 @@ class AutoClassifier(tf.keras.Model):
         Sets the encoder and decoder layers from another AutoClassifier instance,
         ensuring compatibility in dimensions. Only works if vae_mode is False.
 
-        Parameters:
+        Parameters
         -----------
         source_model : AutoClassifier
             The source model to copy the encoder and decoder layers from.
 
-        Raises:
+        Raises
         -------
         ValueError
             If the input shape or units of the source model do not match.

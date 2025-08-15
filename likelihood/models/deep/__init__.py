@@ -9,3 +9,4 @@ else:
     from .predictor import GetInsights
 
 from .gan import *
+from .rl import *
