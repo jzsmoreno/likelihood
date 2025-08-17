@@ -26,6 +26,7 @@ def sampling_wrapper(args):
     mean, log_var = args
     return sampling(mean, log_var)
 
+
 @tf.keras.utils.register_keras_serializable(package="Custom", name="sampling_output_shape")
 def sampling_output_shape(input_shapes):
     return input_shapes[0]
