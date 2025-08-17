@@ -16,6 +16,21 @@ from .autoencoders import (
 )
 
 
+@tf.keras.utils.register_keras_serializable(package="Custom", name="stabilize_log_var")
+def stabilize_log_var(x):
+    return x + 1e-7
+
+
+@tf.keras.utils.register_keras_serializable(package="Custom", name="sampling_wrapper")
+def sampling_wrapper(args):
+    mean, log_var = args
+    return sampling(mean, log_var)
+
+@tf.keras.utils.register_keras_serializable(package="Custom", name="sampling_output_shape")
+def sampling_output_shape(input_shapes):
+    return input_shapes[0]
+
+
 class AutoClassifier:
     """
     An auto-classifier model that automatically determines the best classification strategy based on the input data.
@@ -101,7 +116,7 @@ class AutoClassifier:
 
             mean = tf.keras.layers.Dense(self.vae_units, name="mean")(x)
             log_var = tf.keras.layers.Dense(self.vae_units, name="log_var")(x)
-            log_var = tf.keras.layers.Lambda(lambda x: x + 1e-7, name="log_var_stabilized")(log_var)
+            log_var = tf.keras.layers.Lambda(stabilize_log_var, name="log_var_stabilized")(log_var)
 
             self._encoder = tf.keras.Model(inputs, [mean, log_var], name="vae_encoder")
         else:
@@ -203,7 +218,7 @@ class AutoClassifier:
             mean, log_var = self._encoder(inputs)
             # Sampling layer
             encoded = tf.keras.layers.Lambda(
-                lambda args: sampling(args[0], args[1]), name="sampling_layer"
+                sampling_wrapper, output_shape=sampling_output_shape, name="sampling_layer"
             )([mean, log_var])
         else:
             encoded = self._encoder(inputs)
