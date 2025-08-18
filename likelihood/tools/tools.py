@@ -8,10 +8,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yaml
+from packaging import version
 from pandas.core.frame import DataFrame
 
-# Suppress RankWarning
-warnings.simplefilter("ignore", np.RankWarning)
+if version.parse(np.__version__) < version.parse("2.0.0"):
+    filter = np.RankWarning
+else:
+    filter = np.exceptions.RankWarning
+
+warnings.simplefilter("ignore", filter)
 
 # -------------------------------------------------------------------------
 

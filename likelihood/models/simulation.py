@@ -4,11 +4,15 @@ from typing import Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
+from packaging import version
 from pandas.core.frame import DataFrame
 
 from likelihood.tools import DataScaler, FeatureSelection, OneHotEncoder, cdf, check_nan_inf
 
-warnings.simplefilter("ignore", np.RankWarning)
+if version.parse(np.__version__) < version.parse("2.0.0"):
+    filter = np.RankWarning
+else:
+    filter = np.exceptions.RankWarning
 
 
 # --------------------------------------------------------------------------------------------------------------------------------------
@@ -128,14 +132,15 @@ class SimulationEngine(FeatureSelection):
             )
             poly = kwargs.get("poly", 9)
             plot = kwargs.get("plot", False)
+            bandwidth = kwargs.get("bandwidth", 1.5)
             if not x[1]:
                 media = self.df[key].mean()
                 standard_deviation = self.df[key].std()
-                lower_limit = media - 1.5 * standard_deviation
-                upper_limit = media + 1.5 * standard_deviation
+                lower_limit = media - bandwidth * standard_deviation
+                upper_limit = media + bandwidth * standard_deviation
                 if plot:
                     print(f"Cumulative Distribution Function ({key})")
-                f, cdf_, ox = cdf(x[0].flatten(), poly=poly, plot=plot)
+                f, _, ox = cdf(x[0].flatten(), poly=poly, plot=plot)
             else:
                 f, ox = None, None
                 least_frequent_category, most_frequent_category = categories_by_quartile(

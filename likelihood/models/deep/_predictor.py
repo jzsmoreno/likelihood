@@ -17,7 +17,7 @@ from pandas.plotting import radviz
 from sklearn.manifold import TSNE
 from tensorflow.keras.layers import InputLayer
 
-from likelihood.models.deep.autoencoders import AutoClassifier, sampling
+from likelihood.models.deep._autoencoders import AutoClassifier, sampling
 
 
 class GetInsights:
@@ -48,11 +48,15 @@ class GetInsights:
         self.model = model
 
         self.encoder_layer = (
-            self.model.encoder.layers[1]
-            if isinstance(self.model.encoder.layers[0], InputLayer)
-            else self.model.encoder.layers[0]
+            self.model._encoder.layers[1]
+            if isinstance(self.model._encoder.layers[0], InputLayer)
+            else self.model._encoder.layers[0]
         )
-        self.decoder_layer = self.model.decoder.layers[0]
+        self.decoder_layer = (
+            self.model._decoder.layers[1]
+            if isinstance(self.model._decoder.layers[0], InputLayer)
+            else self.model._decoder.layers[0]
+        )
 
         self.encoder_weights = self.encoder_layer.get_weights()[0]
         self.decoder_weights = self.decoder_layer.get_weights()[0]
@@ -109,7 +113,7 @@ class GetInsights:
                 "in the model's transformation.</p>"
             )
         )
-        if not self.model.encoder.name.startswith("vae"):
+        if not self.model._encoder.name.startswith("vae"):
             self.viz_encoder_decoder_graphs(threshold_factor=threshold_factor, top_k=top_k)
 
             display(HTML("<h2 style='margin-top:30px;'>🧠 Classifier Layer Graphs</h2>"))
@@ -248,7 +252,7 @@ class GetInsights:
 
         dense_layers = [
             layer
-            for layer in self.model.classifier.layers
+            for layer in self.model._classifier.layers
             if isinstance(layer, tf.keras.layers.Dense)
         ]
 
@@ -363,10 +367,10 @@ class GetInsights:
             return G
 
         encoder_layers = [
-            l for l in self.model.encoder.layers if isinstance(l, tf.keras.layers.Dense)
+            l for l in self.model._encoder.layers if isinstance(l, tf.keras.layers.Dense)
         ]
         decoder_layers = [
-            l for l in self.model.decoder.layers if isinstance(l, tf.keras.layers.Dense)
+            l for l in self.model._decoder.layers if isinstance(l, tf.keras.layers.Dense)
         ]
 
         if not encoder_layers and not decoder_layers:
@@ -506,11 +510,11 @@ class GetInsights:
         `tuple` : The encoded and reconstructed data.
         """
         try:
-            mean, log_var = self.model.encoder(inputs)
+            mean, log_var = self.model._encoder(inputs)
             encoded = sampling(mean, log_var)
         except:
-            encoded = self.model.encoder(inputs)
-        reconstructed = self.model.decoder(encoded)
+            encoded = self.model._encoder(inputs)
+        reconstructed = self.model._decoder(encoded)
         return encoded, reconstructed
 
     def _visualize_data(
@@ -571,7 +575,7 @@ class GetInsights:
         `None`
         """
         self.classification = (
-            self.model.classifier(tf.concat([reconstructed, encoded], axis=1))
+            self.model._classifier(tf.concat([reconstructed, encoded], axis=1))
             .numpy()
             .argmax(axis=1)
         )

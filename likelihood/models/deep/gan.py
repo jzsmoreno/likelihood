@@ -102,7 +102,7 @@ class GANRegressor(tf.keras.Model):
         Train the GAN model.
 
         Parameters
-        --------
+        ----------
         X : array-like
             Input data.
         y : array-like
@@ -117,7 +117,7 @@ class GANRegressor(tf.keras.Model):
             Verbosity level. Default is 1.
 
         Returns
-        --------
+        -------
         history : pd.DataFrame
             Training history.
         """
@@ -234,7 +234,7 @@ class GANRegressor(tf.keras.Model):
         Train the generator model.
 
         Parameters
-        --------
+        ----------
         X_train : array-like
             Training data.
         y_train : array-like
@@ -249,7 +249,7 @@ class GANRegressor(tf.keras.Model):
             Number of epochs to wait before early stopping. Default is 3.
 
         Returns
-        --------
+        -------
         history : pd.DataFrame
             Training history.
         """

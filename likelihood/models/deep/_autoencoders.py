@@ -1,213 +1,38 @@
-import logging
-import os
-from functools import partial
-from shutil import rmtree
-
-import numpy as np
-import pandas as pd
-
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-logging.getLogger("tensorflow").setLevel(logging.ERROR)
-
-import keras_tuner
-import tensorflow as tf
-from pandas.core.frame import DataFrame
-from tensorflow.keras.layers import InputLayer
-from tensorflow.keras.regularizers import l2
-
-from likelihood.tools import LoRALayer, OneHotEncoder, suppress_warnings
-
-tf.get_logger().setLevel("ERROR")
+from .autoencoders import (
+    DataFrame,
+    EarlyStopping,
+    LoRALayer,
+    OneHotEncoder,
+    cal_loss_step,
+    keras_tuner,
+    l2,
+    np,
+    partial,
+    pd,
+    sampling,
+    suppress_warnings,
+    tf,
+    train_step,
+)
 
 
-class EarlyStopping:
-    def __init__(self, patience=10, min_delta=0.001):
-        self.patience = patience
-        self.min_delta = min_delta
-        self.best_loss = np.inf
-        self.counter = 0
-        self.stop_training = False
-
-    def __call__(self, current_loss):
-        if self.best_loss - current_loss > self.min_delta:
-            self.best_loss = current_loss
-            self.counter = 0
-        else:
-            self.counter += 1
-
-        if self.counter >= self.patience:
-            self.stop_training = True
+@tf.keras.utils.register_keras_serializable(package="Custom", name="stabilize_log_var")
+def stabilize_log_var(x):
+    return x + 1e-7
 
 
-def mse_loss(y_true, y_pred):
-    """
-    Mean squared error loss function.
-
-    Parameters
-    ----------
-    y_true : `tf.Tensor`
-        The true values.
-    y_pred : `tf.Tensor`
-        The predicted values.
-
-    Returns
-    -------
-    `tf.Tensor`
-    """
-    return tf.reduce_mean(tf.square(y_true - y_pred))
+@tf.keras.utils.register_keras_serializable(package="Custom", name="sampling_wrapper")
+def sampling_wrapper(args):
+    mean, log_var = args
+    return sampling(mean, log_var)
 
 
-def kl_loss(mean, log_var):
-    """
-    Kullback-Leibler divergence loss function.
-
-    Parameters
-    ----------
-    mean : `tf.Tensor`
-        The mean of the distribution.
-    log_var : `tf.Tensor`
-        The log variance of the distribution.
-
-    Returns
-    -------
-    `tf.Tensor`
-    """
-    return -0.5 * tf.reduce_mean(1 + log_var - tf.square(mean) - tf.exp(log_var))
+@tf.keras.utils.register_keras_serializable(package="Custom", name="sampling_output_shape")
+def sampling_output_shape(input_shapes):
+    return input_shapes[0]
 
 
-def vae_loss(y_true, y_pred, mean, log_var):
-    """
-    Variational autoencoder loss function.
-
-    Parameters
-    ----------
-    y_true : `tf.Tensor`
-        The true values.
-    y_pred : `tf.Tensor`
-        The predicted values.
-    mean : `tf.Tensor`
-        The mean of the distribution.
-    log_var : `tf.Tensor`
-        The log variance of the distribution.
-
-    Returns
-    -------
-    `tf.Tensor`
-    """
-    return mse_loss(y_true, y_pred) + kl_loss(mean, log_var)
-
-
-def sampling(mean, log_var, epsilon_value=1e-8):
-    """
-    Samples from the distribution.
-
-    Parameters
-    ----------
-    mean : `tf.Tensor`
-        The mean of the distribution.
-    log_var : `tf.Tensor`
-        The log variance of the distribution.
-    epsilon_value : float
-        A small value to avoid numerical instability.
-
-    Returns
-    -------
-    `tf.Tensor`
-    """
-    epsilon = tf.random.normal(shape=tf.shape(mean), mean=0.0, stddev=1.0)
-    stddev = tf.exp(0.5 * log_var) + epsilon_value
-    epsilon = tf.random.normal(shape=tf.shape(mean), mean=0.0, stddev=1.0)
-    return mean + stddev * epsilon
-
-
-def check_for_nans(tensors, name="Tensor"):
-    for t in tensors:
-        if tf.reduce_any(tf.math.is_nan(t)) or tf.reduce_any(tf.math.is_inf(t)):
-            print(f"Warning: {name} contains NaNs or Infs")
-            return True
-    return False
-
-
-def cal_loss_step(batch, encoder, decoder, vae_mode=False, training=True):
-    """
-    Calculates the loss value on a batch of data.
-
-    Parameters
-    ----------
-    batch : `tf.Tensor`
-        The batch of data.
-    encoder : `tf.keras.Model`
-        The encoder model.
-    decoder : `tf.keras.Model`
-        The decoder model.
-    optimizer : `tf.keras.optimizers.Optimizer`
-        The optimizer to use.
-    vae_mode : `bool`
-        Whether to use variational autoencoder mode. Default is False.
-    training : `bool`
-        Whether the model is in training mode. Default is True.
-
-    Returns
-    -------
-    `tf.Tensor`
-        The loss value.
-    """
-    if vae_mode:
-        mean, log_var = encoder(batch, training=training)
-        log_var = tf.clip_by_value(log_var, clip_value_min=1e-8, clip_value_max=tf.float32.max)
-        decoded = decoder(sampling(mean, log_var), training=training)
-        loss = vae_loss(batch, decoded, mean, log_var)
-    else:
-        encoded = encoder(batch, training=training)
-        decoded = decoder(encoded, training=training)
-        loss = mse_loss(batch, decoded)
-
-    return loss
-
-
-@tf.function
-def train_step(batch, encoder, decoder, optimizer, vae_mode=False):
-    """
-    Trains the model on a batch of data.
-
-    Parameters
-    ----------
-    mean : `tf.Tensor`
-        The mean of the distribution.
-    log_var : `tf.Tensor`
-        The log variance of the distribution.
-    batch : `tf.Tensor`
-        The batch of data.
-    encoder : `tf.keras.Model`
-        The encoder model.
-    decoder : `tf.keras.Model`
-        The decoder model.
-    optimizer : `tf.keras.optimizers.Optimizer`
-        The optimizer to use.
-    vae_mode : `bool`
-        Whether to use variational autoencoder mode. Default is False.
-
-    Returns
-    -------
-    `tf.Tensor`
-        The loss value.
-    """
-    optimizer.build(encoder.trainable_variables + decoder.trainable_variables)
-
-    with tf.GradientTape() as encoder_tape, tf.GradientTape() as decoder_tape:
-        loss = cal_loss_step(batch, encoder, decoder, vae_mode=vae_mode)
-
-    gradients_of_encoder = encoder_tape.gradient(loss, encoder.trainable_variables)
-    gradients_of_decoder = decoder_tape.gradient(loss, decoder.trainable_variables)
-
-    optimizer.apply_gradients(zip(gradients_of_encoder, encoder.trainable_variables))
-    optimizer.apply_gradients(zip(gradients_of_decoder, decoder.trainable_variables))
-
-    return loss
-
-
-@tf.keras.utils.register_keras_serializable(package="Custom", name="AutoClassifier")
-class AutoClassifier(tf.keras.Model):
+class AutoClassifier:
     """
     An auto-classifier model that automatically determines the best classification strategy based on the input data.
 
@@ -245,15 +70,12 @@ class AutoClassifier(tf.keras.Model):
     """
 
     def __init__(self, input_shape_parm, num_classes, units, activation, **kwargs):
-        super(AutoClassifier, self).__init__()
         self.input_shape_parm = input_shape_parm
         self.num_classes = num_classes
         self.units = units
         self.activation = activation
 
-        self.encoder = None
-        self.decoder = None
-        self.classifier = None
+        # Store all configuration parameters
         self.classifier_activation = kwargs.get("classifier_activation", "softmax")
         self.num_layers = kwargs.get("num_layers", 1)
         self.dropout = kwargs.get("dropout", None)
@@ -263,129 +85,200 @@ class AutoClassifier(tf.keras.Model):
         self.lora_mode = kwargs.get("lora_mode", False)
         self.lora_rank = kwargs.get("lora_rank", 4)
 
-    def build_encoder_decoder(self, input_shape):
-        self.encoder = (
-            tf.keras.Sequential(
-                [
-                    tf.keras.layers.Dense(
-                        units=self.units,
-                        activation=self.activation,
-                        kernel_regularizer=l2(self.l2_reg),
-                    ),
-                    tf.keras.layers.Dense(
-                        units=int(self.units / 2),
-                        activation=self.activation,
-                        kernel_regularizer=l2(self.l2_reg),
-                    ),
-                ],
-                name="encoder",
-            )
-            if not self.encoder
-            else self.encoder
-        )
+        # Initialize models as None - will be built when needed
+        self._encoder = None
+        self._decoder = None
+        self._classifier = None
+        self._main_model = None
 
-        self.decoder = (
-            tf.keras.Sequential(
-                [
-                    tf.keras.layers.Dense(
-                        units=self.units,
-                        activation=self.activation,
-                        kernel_regularizer=l2(self.l2_reg),
-                    ),
-                    tf.keras.layers.Dense(
-                        units=self.input_shape_parm,
-                        activation=self.activation,
-                        kernel_regularizer=l2(self.l2_reg),
-                    ),
-                ],
-                name="decoder",
-            )
-            if not self.decoder
-            else self.decoder
-        )
+        # Build all models
+        self._build_models()
 
-    def build(self, input_shape):
+    def _build_encoder(self):
+        """Build the encoder model."""
         if self.vae_mode:
-            inputs = tf.keras.Input(shape=self.input_shape_parm, name="encoder_input")
+            inputs = tf.keras.Input(shape=(self.input_shape_parm,), name="encoder_input")
             x = tf.keras.layers.Dense(
                 units=self.units,
                 kernel_regularizer=l2(self.l2_reg),
                 kernel_initializer="he_normal",
+                name="vae_encoder_dense_1",
             )(inputs)
-            x = tf.keras.layers.BatchNormalization()(x)
-            x = tf.keras.layers.Activation(self.activation)(x)
+            x = tf.keras.layers.BatchNormalization(name="vae_encoder_bn_1")(x)
+            x = tf.keras.layers.Activation(self.activation, name="vae_encoder_act_1")(x)
             x = tf.keras.layers.Dense(
                 units=int(self.units / 2),
                 kernel_regularizer=l2(self.l2_reg),
                 kernel_initializer="he_normal",
                 name="encoder_hidden",
             )(x)
-            x = tf.keras.layers.BatchNormalization()(x)
-            x = tf.keras.layers.Activation(self.activation)(x)
+            x = tf.keras.layers.BatchNormalization(name="vae_encoder_bn_2")(x)
+            x = tf.keras.layers.Activation(self.activation, name="vae_encoder_act_2")(x)
 
-            mean = tf.keras.layers.Dense(2, name="mean")(x)
-            log_var = tf.keras.layers.Dense(2, name="log_var")(x)
-            log_var = tf.keras.layers.Lambda(lambda x: x + 1e-7)(log_var)
+            mean = tf.keras.layers.Dense(self.vae_units, name="mean")(x)
+            log_var = tf.keras.layers.Dense(self.vae_units, name="log_var")(x)
+            log_var = tf.keras.layers.Lambda(stabilize_log_var, name="log_var_stabilized")(log_var)
 
-            self.encoder = (
-                tf.keras.Model(inputs, [mean, log_var], name="vae_encoder")
-                if not self.encoder
-                else self.encoder
-            )
-            self.decoder = (
-                tf.keras.Sequential(
-                    [
-                        tf.keras.layers.Dense(
-                            units=self.units,
-                            kernel_regularizer=l2(self.l2_reg),
-                        ),
-                        tf.keras.layers.BatchNormalization(),
-                        tf.keras.layers.Activation(self.activation),
-                        tf.keras.layers.Dense(
-                            units=self.input_shape_parm,
-                            kernel_regularizer=l2(self.l2_reg),
-                        ),
-                        tf.keras.layers.BatchNormalization(),
-                        tf.keras.layers.Activation(self.activation),
-                    ],
-                    name="vae_decoder",
-                )
-                if not self.decoder
-                else self.decoder
-            )
-
+            self._encoder = tf.keras.Model(inputs, [mean, log_var], name="vae_encoder")
         else:
-            self.build_encoder_decoder(input_shape)
-
-        self.classifier = tf.keras.Sequential()
-        if self.num_layers > 1 and not self.lora_mode:
-            for _ in range(self.num_layers - 1):
-                self.classifier.add(
-                    tf.keras.layers.Dense(
-                        units=self.units,
-                        activation=self.activation,
-                        kernel_regularizer=l2(self.l2_reg),
-                    )
-                )
-                if self.dropout:
-                    self.classifier.add(tf.keras.layers.Dropout(self.dropout))
-
-        elif self.lora_mode:
-            for _ in range(self.num_layers - 1):
-                self.classifier.add(
-                    LoRALayer(units=self.units, rank=self.lora_rank, name=f"LoRA_{_}")
-                )
-                self.classifier.add(tf.keras.layers.Activation(self.activation))
-                if self.dropout:
-                    self.classifier.add(tf.keras.layers.Dropout(self.dropout))
-
-        self.classifier.add(
-            tf.keras.layers.Dense(
-                units=self.num_classes,
-                activation=self.classifier_activation,
+            inputs = tf.keras.Input(shape=(self.input_shape_parm,), name="encoder_input")
+            x = tf.keras.layers.Dense(
+                units=self.units,
+                activation=self.activation,
                 kernel_regularizer=l2(self.l2_reg),
-            )
+                name="encoder_dense_1",
+            )(inputs)
+            outputs = tf.keras.layers.Dense(
+                units=int(self.units / 2),
+                activation=self.activation,
+                kernel_regularizer=l2(self.l2_reg),
+                name="encoder_dense_2",
+            )(x)
+
+            self._encoder = tf.keras.Model(inputs, outputs, name="encoder")
+
+    def _build_decoder(self):
+        """Build the decoder model."""
+        if self.vae_mode:
+            inputs = tf.keras.Input(shape=(self.vae_units,), name="decoder_input")
+            x = tf.keras.layers.Dense(
+                units=self.units, kernel_regularizer=l2(self.l2_reg), name="vae_decoder_dense_1"
+            )(inputs)
+            x = tf.keras.layers.BatchNormalization(name="vae_decoder_bn_1")(x)
+            x = tf.keras.layers.Activation(self.activation, name="vae_decoder_act_1")(x)
+            x = tf.keras.layers.Dense(
+                units=self.input_shape_parm,
+                kernel_regularizer=l2(self.l2_reg),
+                name="vae_decoder_dense_2",
+            )(x)
+            x = tf.keras.layers.BatchNormalization(name="vae_decoder_bn_2")(x)
+            outputs = tf.keras.layers.Activation(self.activation, name="vae_decoder_act_2")(x)
+        else:
+            inputs = tf.keras.Input(shape=(int(self.units / 2),), name="decoder_input")
+            x = tf.keras.layers.Dense(
+                units=self.units,
+                activation=self.activation,
+                kernel_regularizer=l2(self.l2_reg),
+                name="decoder_dense_1",
+            )(inputs)
+            outputs = tf.keras.layers.Dense(
+                units=self.input_shape_parm,
+                activation=self.activation,
+                kernel_regularizer=l2(self.l2_reg),
+                name="decoder_dense_2",
+            )(x)
+
+        self._decoder = tf.keras.Model(inputs, outputs, name="decoder")
+
+    def _build_classifier(self):
+        """Build the classifier model."""
+        # Input shape is decoded + encoded features
+        if self.vae_mode:
+            input_dim = self.input_shape_parm + self.vae_units
+        else:
+            input_dim = self.input_shape_parm + int(self.units / 2)
+
+        inputs = tf.keras.Input(shape=(input_dim,), name="classifier_input")
+        x = inputs
+
+        # Build hidden layers
+        if self.num_layers > 1 and not self.lora_mode:
+            for i in range(self.num_layers - 1):
+                x = tf.keras.layers.Dense(
+                    units=self.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                    name=f"classifier_dense_{i+1}",
+                )(x)
+                if self.dropout:
+                    x = tf.keras.layers.Dropout(self.dropout, name=f"classifier_dropout_{i+1}")(x)
+
+        elif self.lora_mode and self.num_layers > 1:
+            for i in range(self.num_layers - 1):
+                x = LoRALayer(units=self.units, rank=self.lora_rank, name=f"LoRA_{i}")(x)
+                x = tf.keras.layers.Activation(self.activation, name=f"lora_activation_{i+1}")(x)
+                if self.dropout:
+                    x = tf.keras.layers.Dropout(self.dropout, name=f"lora_dropout_{i+1}")(x)
+
+        # Output layer
+        outputs = tf.keras.layers.Dense(
+            units=self.num_classes,
+            activation=self.classifier_activation,
+            kernel_regularizer=l2(self.l2_reg),
+            name="classifier_output",
+        )(x)
+
+        self._classifier = tf.keras.Model(inputs, outputs, name="classifier")
+
+    def _build_main_model(self):
+        """Build the main model that combines encoder, decoder, and classifier."""
+        inputs = tf.keras.Input(shape=(self.input_shape_parm,), name="main_input")
+
+        # Encoder forward pass
+        if self.vae_mode:
+            mean, log_var = self._encoder(inputs)
+            # Sampling layer
+            encoded = tf.keras.layers.Lambda(
+                sampling_wrapper, output_shape=sampling_output_shape, name="sampling_layer"
+            )([mean, log_var])
+        else:
+            encoded = self._encoder(inputs)
+
+        # Decoder forward pass
+        decoded = self._decoder(encoded)
+
+        # Combine decoded and encoded features
+        combined = tf.keras.layers.Concatenate(name="combine_features")([decoded, encoded])
+
+        # Classifier forward pass
+        outputs = self._classifier(combined)
+
+        self._main_model = tf.keras.Model(
+            inputs=inputs, outputs=outputs, name="auto_classifier_main"
         )
+
+    def _build_models(self):
+        """Build all component models."""
+        self._build_encoder()
+        self._build_decoder()
+        self._build_classifier()
+        self._build_main_model()
+
+    @property
+    def encoder(self):
+        """Get the encoder model."""
+        return self._encoder
+
+    @encoder.setter
+    def encoder(self, value):
+        """Set the encoder model and rebuild main model."""
+        self._encoder = value
+        if self._decoder and self._classifier:
+            self._build_main_model()
+
+    @property
+    def decoder(self):
+        """Get the decoder model."""
+        return self._decoder
+
+    @decoder.setter
+    def decoder(self, value):
+        """Set the decoder model and rebuild main model."""
+        self._decoder = value
+        if self._encoder and self._classifier:
+            self._build_main_model()
+
+    @property
+    def classifier(self):
+        """Get the classifier model."""
+        return self._classifier
+
+    @classifier.setter
+    def classifier(self, value):
+        """Set the classifier model and rebuild main model."""
+        self._classifier = value
+        if self._encoder and self._decoder:
+            self._build_main_model()
 
     def train_encoder_decoder(
         self, data, epochs, batch_size, validation_split=0.2, patience=10, **kwargs
@@ -395,33 +288,21 @@ class AutoClassifier(tf.keras.Model):
 
         Parameters
         ----------
-        data : `tf.data.Dataset`, `np.ndarray`
+        data : tf.data.Dataset, np.ndarray
             The input data.
-        epochs : `int`
+        epochs : int
             The number of epochs to train for.
-        batch_size : `int`
+        batch_size : int
             The batch size to use.
-        validation_split : `float`
+        validation_split : float
             The proportion of the dataset to use for validation. Default is 0.2.
-        patience : `int`
+        patience : int
             The number of epochs to wait before early stopping. Default is 10.
-
-        Keyword Arguments:
-        ----------
-        Additional keyword arguments to pass to the model.
         """
         verbose = kwargs.get("verbose", True)
         optimizer = kwargs.get("optimizer", tf.keras.optimizers.Adam())
-        dummy_input = tf.convert_to_tensor(tf.random.normal([1, self.input_shape_parm]))
-        self.build(dummy_input.shape)
-        if not self.vae_mode:
-            dummy_output = self.encoder(dummy_input)
-            self.decoder(dummy_output)
-        else:
-            mean, log_var = self.encoder(dummy_input)
-            dummy_output = sampling(mean, log_var)
-            self.decoder(dummy_output)
 
+        # Prepare data
         if isinstance(data, np.ndarray):
             data = tf.data.Dataset.from_tensor_slices(data).batch(batch_size)
             data = data.map(lambda x: tf.cast(x, tf.float32))
@@ -429,68 +310,75 @@ class AutoClassifier(tf.keras.Model):
         early_stopping = EarlyStopping(patience=patience)
         train_batches = data.take(int((1 - validation_split) * len(data)))
         val_batches = data.skip(int((1 - validation_split) * len(data)))
-        for epoch in range(epochs):
-            for train_batch, val_batch in zip(train_batches, val_batches):
-                loss_train = train_step(
-                    train_batch, self.encoder, self.decoder, optimizer, self.vae_mode
-                )
-                loss_val = cal_loss_step(
-                    val_batch, self.encoder, self.decoder, self.vae_mode, False
-                )
 
-            early_stopping(loss_train)
+        for epoch in range(epochs):
+            train_loss = 0
+            val_loss = 0
+
+            # Training step
+            for train_batch in train_batches:
+                loss_train = train_step(
+                    train_batch, self._encoder, self._decoder, optimizer, self.vae_mode
+                )
+                train_loss = loss_train  # Keep last batch loss
+
+            # Validation step
+            for val_batch in val_batches:
+                loss_val = cal_loss_step(
+                    val_batch, self._encoder, self._decoder, self.vae_mode, False
+                )
+                val_loss = loss_val  # Keep last batch loss
+
+            early_stopping(train_loss)
 
             if early_stopping.stop_training:
-                print(f"Early stopping triggered at epoch {epoch}.")
+                if verbose:
+                    print(f"Early stopping triggered at epoch {epoch}.")
                 break
 
             if epoch % 10 == 0 and verbose:
                 print(
-                    f"Epoch {epoch}: Train Loss: {loss_train:.6f} Validation Loss: {loss_val:.6f}"
+                    f"Epoch {epoch}: Train Loss: {train_loss:.6f} Validation Loss: {val_loss:.6f}"
                 )
+
         self.freeze_encoder_decoder()
 
-    def call(self, x):
-        if self.vae_mode:
-            mean, log_var = self.encoder(x)
-            encoded = sampling(mean, log_var)
-        else:
-            encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        combined = tf.concat([decoded, encoded], axis=1)
-        classification = self.classifier(combined)
-        return classification
-
     def freeze_encoder_decoder(self):
-        """
-        Freezes the encoder and decoder layers to prevent them from being updated during training.
-        """
-        for layer in self.encoder.layers:
-            layer.trainable = False
-        for layer in self.decoder.layers:
-            layer.trainable = False
+        """Freezes the encoder and decoder layers to prevent them from being updated during training."""
+        if self._encoder:
+            for layer in self._encoder.layers:
+                layer.trainable = False
+        if self._decoder:
+            for layer in self._decoder.layers:
+                layer.trainable = False
+
+        # Rebuild main model to reflect trainability changes
+        self._build_main_model()
 
     def unfreeze_encoder_decoder(self):
-        """
-        Unfreezes the encoder and decoder layers allowing them to be updated during training.
-        """
-        for layer in self.encoder.layers:
-            layer.trainable = True
-        for layer in self.decoder.layers:
-            layer.trainable = True
+        """Unfreezes the encoder and decoder layers allowing them to be updated during training."""
+        if self._encoder:
+            for layer in self._encoder.layers:
+                layer.trainable = True
+        if self._decoder:
+            for layer in self._decoder.layers:
+                layer.trainable = True
+
+        # Rebuild main model to reflect trainability changes
+        self._build_main_model()
 
     def set_encoder_decoder(self, source_model):
         """
         Sets the encoder and decoder layers from another AutoClassifier instance,
-        ensuring compatibility in dimensions. Only works if vae_mode is False.
+        ensuring compatibility in dimensions.
 
         Parameters
-        -----------
+        ----------
         source_model : AutoClassifier
             The source model to copy the encoder and decoder layers from.
 
         Raises
-        -------
+        ------
         ValueError
             If the input shape or units of the source model do not match.
         """
@@ -505,36 +393,63 @@ class AutoClassifier(tf.keras.Model):
             raise ValueError(
                 f"Incompatible number of units. Expected {self.units}, got {source_model.units}."
             )
-        self.encoder, self.decoder = tf.keras.Sequential(), tf.keras.Sequential()
-        for i, layer in enumerate(source_model.encoder.layers):
-            if isinstance(layer, tf.keras.layers.Dense):
-                dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
-                dense_layer = tf.keras.layers.Dense(
-                    units=layer.units,
-                    activation=self.activation,
-                    kernel_regularizer=l2(self.l2_reg),
-                )
-                dense_layer.build(dummy_input.shape)
-                self.encoder.add(dense_layer)
-                self.encoder.layers[i].set_weights(layer.get_weights())
-            elif not isinstance(layer, InputLayer):
-                raise ValueError(f"Layer type {type(layer)} not supported for copying.")
 
-        for i, layer in enumerate(source_model.decoder.layers):
-            if isinstance(layer, tf.keras.layers.Dense):
-                dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
-                dense_layer = tf.keras.layers.Dense(
-                    units=layer.units,
-                    activation=self.activation,
-                    kernel_regularizer=l2(self.l2_reg),
-                )
-                dense_layer.build(dummy_input.shape)
-                self.decoder.add(dense_layer)
-                self.decoder.layers[i].set_weights(layer.get_weights())
-            elif not isinstance(layer, InputLayer):
-                raise ValueError(f"Layer type {type(layer)} not supported for copying.")
+        # Clone and copy weights
+        if source_model._encoder:
+            self._encoder = tf.keras.models.clone_model(source_model._encoder)
+            self._encoder.set_weights(source_model._encoder.get_weights())
 
-    def get_config(self):
+        if source_model._decoder:
+            self._decoder = tf.keras.models.clone_model(source_model._decoder)
+            self._decoder.set_weights(source_model._decoder.get_weights())
+
+        # Rebuild main model with new encoder/decoder
+        self._build_main_model()
+
+    # Main model interface methods
+    def __call__(self, x, training=None):
+        """Forward pass through the model."""
+        return self._main_model(x, training=training)
+
+    def compile(self, *args, **kwargs):
+        """Compile the main model."""
+        return self._main_model.compile(*args, **kwargs)
+
+    def fit(self, *args, **kwargs):
+        """Fit the main model."""
+        return self._main_model.fit(*args, **kwargs)
+
+    def evaluate(self, *args, **kwargs):
+        """Evaluate the main model."""
+        return self._main_model.evaluate(*args, **kwargs)
+
+    def predict(self, *args, **kwargs):
+        """Predict using the main model."""
+        return self._main_model.predict(*args, **kwargs)
+
+    def save(self, filepath, **kwargs):
+        """
+        Save the complete model including all components.
+
+        Parameters
+        ----------
+        filepath : str
+            Path where to save the model.
+        """
+        import os
+
+        # Create directory if it doesn't exist
+        os.makedirs(filepath, exist_ok=True)
+
+        # Save all component models
+        self._encoder.save(os.path.join(filepath, "encoder.keras"))
+        self._decoder.save(os.path.join(filepath, "decoder.keras"))
+        self._classifier.save(os.path.join(filepath, "classifier.keras"))
+        self._main_model.save(os.path.join(filepath, "main_model.keras"))
+
+        # Save configuration
+        import json
+
         config = {
             "input_shape_parm": self.input_shape_parm,
             "num_classes": self.num_classes,
@@ -549,25 +464,99 @@ class AutoClassifier(tf.keras.Model):
             "lora_mode": self.lora_mode,
             "lora_rank": self.lora_rank,
         }
-        base_config = super(AutoClassifier, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
+
+        with open(os.path.join(filepath, "config.json"), "w") as f:
+            json.dump(config, f, indent=2)
 
     @classmethod
-    def from_config(cls, config):
-        return cls(
-            input_shape_parm=config["input_shape_parm"],
-            num_classes=config["num_classes"],
-            units=config["units"],
-            activation=config["activation"],
-            classifier_activation=config["classifier_activation"],
-            num_layers=config["num_layers"],
-            dropout=config["dropout"],
-            l2_reg=config["l2_reg"],
-            vae_mode=config["vae_mode"],
-            vae_units=config["vae_units"],
-            lora_mode=config["lora_mode"],
-            lora_rank=config["lora_rank"],
+    def load(cls, filepath):
+        """
+        Load a complete model from saved components.
+
+        Parameters
+        ----------
+        filepath : str
+            Path where the model was saved.
+
+        Returns
+        -------
+        AutoClassifier
+            The loaded model instance.
+        """
+        import json
+        import os
+
+        # Load configuration
+        with open(os.path.join(filepath, "config.json"), "r") as f:
+            config = json.load(f)
+
+        # Create new instance
+        instance = cls(**config)
+
+        # Load component models
+        instance._encoder = tf.keras.models.load_model(os.path.join(filepath, "encoder.keras"))
+        instance._decoder = tf.keras.models.load_model(os.path.join(filepath, "decoder.keras"))
+        instance._classifier = tf.keras.models.load_model(
+            os.path.join(filepath, "classifier.keras")
         )
+        instance._main_model = tf.keras.models.load_model(
+            os.path.join(filepath, "main_model.keras")
+        )
+
+        return instance
+
+    # Additional properties and methods for compatibility
+    @property
+    def weights(self):
+        """Get all model weights."""
+        return self._main_model.weights
+
+    def get_weights(self):
+        """Get all model weights."""
+        return self._main_model.get_weights()
+
+    def set_weights(self, weights):
+        """Set all model weights."""
+        return self._main_model.set_weights(weights)
+
+    @property
+    def trainable_variables(self):
+        """Get trainable variables."""
+        return self._main_model.trainable_variables
+
+    @property
+    def non_trainable_variables(self):
+        """Get non-trainable variables."""
+        return self._main_model.non_trainable_variables
+
+    def summary(self, *args, **kwargs):
+        """Print model summary."""
+        print("=== AutoClassifier Summary ===")
+        print("\n--- Encoder ---")
+        self._encoder.summary(*args, **kwargs)
+        print("\n--- Decoder ---")
+        self._decoder.summary(*args, **kwargs)
+        print("\n--- Classifier ---")
+        self._classifier.summary(*args, **kwargs)
+        print("\n--- Main Model ---")
+        self._main_model.summary(*args, **kwargs)
+
+    def get_config(self):
+        """Get model configuration."""
+        return {
+            "input_shape_parm": self.input_shape_parm,
+            "num_classes": self.num_classes,
+            "units": self.units,
+            "activation": self.activation,
+            "classifier_activation": self.classifier_activation,
+            "num_layers": self.num_layers,
+            "dropout": self.dropout,
+            "l2_reg": self.l2_reg,
+            "vae_mode": self.vae_mode,
+            "vae_units": self.vae_units,
+            "lora_mode": self.lora_mode,
+            "lora_rank": self.lora_rank,
+        }
 
 
 def call_existing_code(
@@ -632,7 +621,7 @@ def call_existing_code(
         loss=tf.keras.losses.CategoricalCrossentropy(),
         metrics=[tf.keras.metrics.F1Score(threshold=threshold)],
     )
-    return model
+    return model._main_model
 
 
 def build_model(
@@ -891,12 +880,14 @@ def setup_model(
         best_model = models[0]
         best_model(input_sample)
 
-        best_model.save(filepath, save_format="tf")
+        best_model.save(filepath if filepath.endswith(".keras") else filepath + ".keras")
 
         if verbose:
             tuner.results_summary()
     else:
-        best_model = tf.keras.models.load_model(filepath)
+        best_model = tf.keras.models.load_model(
+            filepath if filepath.endswith(".keras") else filepath + ".keras"
+        )
     best_hps = tuner.get_best_hyperparameters(1)[0].values
     vae_mode = best_hps.get("vae_mode", hyperparameters.get("vae_mode", False))
     best_hps["vae_units"] = None if not vae_mode else best_hps["vae_units"]
