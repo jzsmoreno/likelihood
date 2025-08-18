@@ -1086,12 +1086,12 @@ class AutoClassifier(tf.keras.Model):
         Sets the encoder and decoder layers from another AutoClassifier instance,
         ensuring compatibility in dimensions. Only works if vae_mode is False.
 
-        Parameters:
+        Parameters
         -----------
         source_model : AutoClassifier
             The source model to copy the encoder and decoder layers from.
 
-        Raises:
+        Raises
         -------
         ValueError
             If the input shape or units of the source model do not match.
@@ -1466,12 +1466,12 @@ containing the information needed to re-instantiate it.</p></div>
     Sets the encoder and decoder layers from another AutoClassifier instance,
     ensuring compatibility in dimensions. Only works if vae_mode is False.
 
-    Parameters:
+    Parameters
     -----------
     source_model : AutoClassifier
         The source model to copy the encoder and decoder layers from.
 
-    Raises:
+    Raises
     -------
     ValueError
         If the input shape or units of the source model do not match.
@@ -1518,12 +1518,16 @@ containing the information needed to re-instantiate it.</p></div>
 </details>
 <div class="desc"><p>Sets the encoder and decoder layers from another AutoClassifier instance,
 ensuring compatibility in dimensions. Only works if vae_mode is False.</p>
-<h2 id="parameters">Parameters:</h2>
-<p>source_model : AutoClassifier
-The source model to copy the encoder and decoder layers from.</p>
-<h2 id="raises">Raises:</h2>
-<p>ValueError
-If the input shape or units of the source model do not match.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>source_model</code></strong> :&ensp;<code><a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></code></dt>
+<dd>The source model to copy the encoder and decoder layers from.</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>ValueError</code></dt>
+<dd>If the input shape or units of the source model do not match.</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier.train_encoder_decoder"><code class="name flex">
 <span>def <span class="ident">train_encoder_decoder</span></span>(<span>self, data, epochs, batch_size, validation_split=0.2, patience=10, **kwargs)</span>

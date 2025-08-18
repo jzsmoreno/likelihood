@@ -709,6 +709,7 @@ el.replaceWith(d);
             / (data_normalized.iloc[:, :-1].max() - data_normalized.iloc[:, :-1].min())
             - 1
         )
+        data_normalized.dropna(axis=1, inplace=True)
         radviz(data_normalized, color_column, color=self.colors)
         plt.title(title)
         plt.show()

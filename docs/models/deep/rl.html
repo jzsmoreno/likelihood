@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>likelihood.models.deep.rl API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>likelihood.models.deep.rl</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="likelihood.models.deep.rl.print_progress_bar"><code class="name flex">
+<span>def <span class="ident">print_progress_bar</span></span>(<span>iteration, total, length=30)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def print_progress_bar(iteration, total, length=30):
+    percent = f&#34;{100 * (iteration / float(total)):.1f}&#34;
+    filled_length = int(length * iteration // total)
+    bar = &#34;█&#34; * filled_length + &#34;-&#34; * (length - filled_length)
+    print(f&#34;\rProgress: |{bar}| {percent}% Complete&#34;, end=&#34;\r&#34;)
+    if iteration == total:
+        print()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="likelihood.models.deep.rl.AutoQL"><code class="flex name class">
+<span>class <span class="ident">AutoQL</span></span>
+<span>(</span><span>env, model, maxlen=2000)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AutoQL:
+    &#34;&#34;&#34;
+    AutoQL: A reinforcement learning agent using Q-learning with Epsilon-greedy policy.
+
+    This class implements a Q-learning agent with:
+    - Epsilon-greedy policy for exploration
+    - Replay buffer for experience replay
+    - Automatic model version handling for TensorFlow
+    &#34;&#34;&#34;
+
+    def __init__(
+        self,
+        env,
+        model,
+        maxlen=2000,
+    ):
+        &#34;&#34;&#34;Initialize AutoQL agent
+
+        Parameters
+        ----------
+        env : Any
+            The environment to interact with
+        model : tf.keras.Model
+            The Q-network model
+        &#34;&#34;&#34;
+
+        self.env = env
+        self.model = model
+        self.maxlen = maxlen
+        self.replay_buffer = deque(maxlen=self.maxlen)
+
+    def epsilon_greedy_policy(self, state, action, epsilon=0):
+        &#34;&#34;&#34;
+        Epsilon-greedy policy for action selection
+
+        Parameters
+        ----------
+            state : `np.ndarray`
+                Current state.
+            action : int
+                Expected action to process.
+            epsilon : float
+                Exploration probability. By default it is set to `0`
+
+        Returns
+        -------
+            tuple: (state, action, reward, next_action, done)
+        &#34;&#34;&#34;
+        current_state, value, reward, next_action, done = self.env.step(state, action)
+
+        if np.random.rand() &gt; epsilon:
+            state = np.asarray(state).astype(np.float32)
+            return current_state, value, reward, next_action, done
+        step_ = random.sample(self.env.get_transitions(), 1)
+        _state, greedy_action, _reward, _next_action, _done = zip(*step_)
+
+        return _state[0], greedy_action[0], _reward[0], _next_action[0], _done[0]
+
+    def play_one_step(self, state, action, epsilon):
+        &#34;&#34;&#34;
+        Perform one step in the environment and add experience to buffer
+
+        Parameters
+        ----------
+            state : `np.ndarray`
+                Current state
+            action : int
+                Expected action to process.
+
+            epsilon : float
+                Exploration probability.
+
+        Returns
+        -------
+            tuple: (state, action, reward, next_action, done)
+        &#34;&#34;&#34;
+        current_state, greedy_action, reward, next_action, done = self.epsilon_greedy_policy(
+            state, action, epsilon
+        )
+
+        done = 1 if done else 0
+
+        # Add experience to replay buffer
+        self.replay_buffer.append(
+            (
+                current_state,  # Previous state
+                greedy_action,  # Current action
+                reward,  # Reward
+                next_action,  # Next action
+                done,  # Done flag
+            )
+        )
+
+        return current_state, greedy_action, reward, next_action, done
+
+    @tf.function
+    def _training_step(self):
+        &#34;&#34;&#34;
+        Perform one training step using experience replay
+
+        Returns
+        -------
+            float: Training loss
+        &#34;&#34;&#34;
+
+        batch_ = random.sample(self.replay_buffer, self.batch_size)
+        states, actions, rewards, next_actions, dones = zip(*batch_)
+        states = np.array(states).reshape(self.batch_size, -1)
+        actions = np.array(actions).reshape(
+            self.batch_size,
+        )
+        rewards = np.array(rewards).reshape(
+            self.batch_size,
+        )
+        max_next_Q_values = np.array(next_actions).reshape(self.batch_size, -1)
+        dones = np.array(dones).reshape(
+            self.batch_size,
+        )
+        target_Q_values = rewards + (1 - dones) * self.gamma * max_next_Q_values
+
+        actions = tf.convert_to_tensor(actions, dtype=tf.int32)
+        states = tf.convert_to_tensor(states, dtype=tf.float32)
+        target_Q_values = tf.convert_to_tensor(target_Q_values, dtype=tf.float32)
+
+        with tf.GradientTape() as tape:
+            all_Q_values = self.model(states)
+            indices = tf.stack([tf.range(tf.shape(actions)[0]), actions], axis=1)
+            Q_values = tf.gather_nd(all_Q_values, indices)
+            loss = tf.reduce_mean(self.loss_fn(target_Q_values, Q_values))
+        grads = tape.gradient(loss, self.model.trainable_variables)
+        self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+        return loss
+
+    def train(
+        self,
+        x_data,
+        y_data,
+        optimizer=&#34;adam&#34;,
+        loss_fn=&#34;mse&#34;,
+        num_episodes=50,
+        num_steps=100,
+        gamma=0.7,
+        batch_size=32,
+        patience=10,
+        alpha=0.01,
+    ):
+        &#34;&#34;&#34;Train the agent for a fixed number of episodes
+
+        Parameters
+        ----------
+        optimizer : str
+            The optimizer for training (e.g., `sgd`). By default it is set to `adam`.
+        loss_fn : str
+            The loss function. By default it is set to `mse`.
+        num_episodes : int
+            Total number of episodes to train. By default it is set to `50`.
+        num_steps : int
+            Steps per episode. By default it is set to `100`. If `num_steps` is less than `self.env.maxlen`, then the second will be chosen.
+        gamma : float
+            Discount factor. By default it is set to `0.7`.
+        batch_size : int
+            Size of training batches. By default it is set to `32`.
+        patience : int
+            How many episodes to wait for improvement.
+        alpha : float
+            Trade-off factor between loss and reward.
+        &#34;&#34;&#34;
+        rewards = []
+        self.best_weights = None
+        self.best_loss = float(&#34;inf&#34;)
+
+        optimizers = {
+            &#34;sgd&#34;: tf.keras.optimizers.SGD(),
+            &#34;adam&#34;: tf.keras.optimizers.Adam(),
+            &#34;adamw&#34;: tf.keras.optimizers.AdamW(),
+            &#34;adadelta&#34;: tf.keras.optimizers.Adadelta(),
+            &#34;rmsprop&#34;: tf.keras.optimizers.RMSprop(),
+        }
+        self.optimizer = optimizers[optimizer]
+        losses = {
+            &#34;mse&#34;: tf.keras.losses.MeanSquaredError(),
+            &#34;mae&#34;: tf.keras.losses.MeanAbsoluteError(),
+            &#34;mape&#34;: tf.keras.losses.MeanAbsolutePercentageError(),
+        }
+        self.loss_fn = losses[loss_fn]
+        self.num_episodes = num_episodes
+        self.num_steps = num_steps if num_steps &gt;= self.env.maxlen else self.env.maxlen
+        self.gamma = gamma
+        self.batch_size = batch_size
+        loss = float(&#34;inf&#34;)
+        no_improve_count = 0
+        best_combined_metric = float(&#34;inf&#34;)
+
+        for episode in range(self.num_episodes):
+            print_progress_bar(episode + 1, self.num_episodes)
+            self.env.reset()
+            sum_rewards = 0
+            epsilon = max(1 - episode / (self.num_episodes * 0.8), 0.01)
+
+            for step in range(self.num_steps):
+                state, action, reward, next_action, done = self.play_one_step(
+                    x_data[step], y_data[step], epsilon
+                )
+                sum_rewards += reward if isinstance(reward, int) else reward[0]
+
+                # Train if buffer has enough samples
+                if len(self.replay_buffer) &gt; self.batch_size:
+                    loss = self._training_step()
+
+                if done:
+                    break
+
+            combined_metric = loss - alpha * sum_rewards
+
+            if combined_metric &lt; best_combined_metric:
+                best_combined_metric = combined_metric
+                self.best_weights = self.model.get_weights()
+                self.best_loss = loss
+                no_improve_count = 0  # Reset counter on improvement
+            else:
+                no_improve_count += 1
+
+            rewards.append(sum_rewards)
+
+            # Logging
+            if episode % (self.num_episodes // 10) == 0:
+                print(
+                    f&#34;Episode: {episode}, Steps: {step+1}, Epsilon: {epsilon:.3f}, Loss: {loss:.2e}, Reward: {sum_rewards}, No Improve Count: {no_improve_count}&#34;
+                )
+
+            # Early stopping condition
+            if no_improve_count &gt;= patience:
+                print(
+                    f&#34;Early stopping at episode {episode} due to no improvement in {patience} episodes.&#34;
+                )
+                break
+
+        # Save best model
+        self.model.set_weights(self.best_weights)
+
+    def __str__(self):
+        return (
+            f&#34;AutoQL (Env: {self.env.name}, Episodes: {self.num_episodes}, Steps: {self.num_steps})&#34;
+        )</code></pre>
+</details>
+<div class="desc"><p>AutoQL: A reinforcement learning agent using Q-learning with Epsilon-greedy policy.</p>
+<p>This class implements a Q-learning agent with:
+- Epsilon-greedy policy for exploration
+- Replay buffer for experience replay
+- Automatic model version handling for TensorFlow</p>
+<p>Initialize AutoQL agent</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>env</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The environment to interact with</dd>
+<dt><strong><code>model</code></strong> :&ensp;<code>tf.keras.Model</code></dt>
+<dd>The Q-network model</dd>
+</dl></div>
+<h3>Methods</h3>
+<dl>
+<dt id="likelihood.models.deep.rl.AutoQL.epsilon_greedy_policy"><code class="name flex">
+<span>def <span class="ident">epsilon_greedy_policy</span></span>(<span>self, state, action, epsilon=0)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def epsilon_greedy_policy(self, state, action, epsilon=0):
+    &#34;&#34;&#34;
+    Epsilon-greedy policy for action selection
+
+    Parameters
+    ----------
+        state : `np.ndarray`
+            Current state.
+        action : int
+            Expected action to process.
+        epsilon : float
+            Exploration probability. By default it is set to `0`
+
+    Returns
+    -------
+        tuple: (state, action, reward, next_action, done)
+    &#34;&#34;&#34;
+    current_state, value, reward, next_action, done = self.env.step(state, action)
+
+    if np.random.rand() &gt; epsilon:
+        state = np.asarray(state).astype(np.float32)
+        return current_state, value, reward, next_action, done
+    step_ = random.sample(self.env.get_transitions(), 1)
+    _state, greedy_action, _reward, _next_action, _done = zip(*step_)
+
+    return _state[0], greedy_action[0], _reward[0], _next_action[0], _done[0]</code></pre>
+</details>
+<div class="desc"><p>Epsilon-greedy policy for action selection</p>
+<h2 id="parameters">Parameters</h2>
+<pre><code>state : &lt;code&gt;np.ndarray&lt;/code&gt;
+    Current state.
+action : int
+    Expected action to process.
+epsilon : float
+    Exploration probability. By default it is set to &lt;code&gt;0&lt;/code&gt;
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>tuple: (state, action, reward, next_action, done)
+</code></pre></div>
+</dd>
+<dt id="likelihood.models.deep.rl.AutoQL.play_one_step"><code class="name flex">
+<span>def <span class="ident">play_one_step</span></span>(<span>self, state, action, epsilon)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def play_one_step(self, state, action, epsilon):
+    &#34;&#34;&#34;
+    Perform one step in the environment and add experience to buffer
+
+    Parameters
+    ----------
+        state : `np.ndarray`
+            Current state
+        action : int
+            Expected action to process.
+
+        epsilon : float
+            Exploration probability.
+
+    Returns
+    -------
+        tuple: (state, action, reward, next_action, done)
+    &#34;&#34;&#34;
+    current_state, greedy_action, reward, next_action, done = self.epsilon_greedy_policy(
+        state, action, epsilon
+    )
+
+    done = 1 if done else 0
+
+    # Add experience to replay buffer
+    self.replay_buffer.append(
+        (
+            current_state,  # Previous state
+            greedy_action,  # Current action
+            reward,  # Reward
+            next_action,  # Next action
+            done,  # Done flag
+        )
+    )
+
+    return current_state, greedy_action, reward, next_action, done</code></pre>
+</details>
+<div class="desc"><p>Perform one step in the environment and add experience to buffer</p>
+<h2 id="parameters">Parameters</h2>
+<pre><code>state : &lt;code&gt;np.ndarray&lt;/code&gt;
+    Current state
+action : int
+    Expected action to process.
+
+epsilon : float
+    Exploration probability.
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>tuple: (state, action, reward, next_action, done)
+</code></pre></div>
+</dd>
+<dt id="likelihood.models.deep.rl.AutoQL.train"><code class="name flex">
+<span>def <span class="ident">train</span></span>(<span>self,<br>x_data,<br>y_data,<br>optimizer='adam',<br>loss_fn='mse',<br>num_episodes=50,<br>num_steps=100,<br>gamma=0.7,<br>batch_size=32,<br>patience=10,<br>alpha=0.01)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def train(
+    self,
+    x_data,
+    y_data,
+    optimizer=&#34;adam&#34;,
+    loss_fn=&#34;mse&#34;,
+    num_episodes=50,
+    num_steps=100,
+    gamma=0.7,
+    batch_size=32,
+    patience=10,
+    alpha=0.01,
+):
+    &#34;&#34;&#34;Train the agent for a fixed number of episodes
+
+    Parameters
+    ----------
+    optimizer : str
+        The optimizer for training (e.g., `sgd`). By default it is set to `adam`.
+    loss_fn : str
+        The loss function. By default it is set to `mse`.
+    num_episodes : int
+        Total number of episodes to train. By default it is set to `50`.
+    num_steps : int
+        Steps per episode. By default it is set to `100`. If `num_steps` is less than `self.env.maxlen`, then the second will be chosen.
+    gamma : float
+        Discount factor. By default it is set to `0.7`.
+    batch_size : int
+        Size of training batches. By default it is set to `32`.
+    patience : int
+        How many episodes to wait for improvement.
+    alpha : float
+        Trade-off factor between loss and reward.
+    &#34;&#34;&#34;
+    rewards = []
+    self.best_weights = None
+    self.best_loss = float(&#34;inf&#34;)
+
+    optimizers = {
+        &#34;sgd&#34;: tf.keras.optimizers.SGD(),
+        &#34;adam&#34;: tf.keras.optimizers.Adam(),
+        &#34;adamw&#34;: tf.keras.optimizers.AdamW(),
+        &#34;adadelta&#34;: tf.keras.optimizers.Adadelta(),
+        &#34;rmsprop&#34;: tf.keras.optimizers.RMSprop(),
+    }
+    self.optimizer = optimizers[optimizer]
+    losses = {
+        &#34;mse&#34;: tf.keras.losses.MeanSquaredError(),
+        &#34;mae&#34;: tf.keras.losses.MeanAbsoluteError(),
+        &#34;mape&#34;: tf.keras.losses.MeanAbsolutePercentageError(),
+    }
+    self.loss_fn = losses[loss_fn]
+    self.num_episodes = num_episodes
+    self.num_steps = num_steps if num_steps &gt;= self.env.maxlen else self.env.maxlen
+    self.gamma = gamma
+    self.batch_size = batch_size
+    loss = float(&#34;inf&#34;)
+    no_improve_count = 0
+    best_combined_metric = float(&#34;inf&#34;)
+
+    for episode in range(self.num_episodes):
+        print_progress_bar(episode + 1, self.num_episodes)
+        self.env.reset()
+        sum_rewards = 0
+        epsilon = max(1 - episode / (self.num_episodes * 0.8), 0.01)
+
+        for step in range(self.num_steps):
+            state, action, reward, next_action, done = self.play_one_step(
+                x_data[step], y_data[step], epsilon
+            )
+            sum_rewards += reward if isinstance(reward, int) else reward[0]
+
+            # Train if buffer has enough samples
+            if len(self.replay_buffer) &gt; self.batch_size:
+                loss = self._training_step()
+
+            if done:
+                break
+
+        combined_metric = loss - alpha * sum_rewards
+
+        if combined_metric &lt; best_combined_metric:
+            best_combined_metric = combined_metric
+            self.best_weights = self.model.get_weights()
+            self.best_loss = loss
+            no_improve_count = 0  # Reset counter on improvement
+        else:
+            no_improve_count += 1
+
+        rewards.append(sum_rewards)
+
+        # Logging
+        if episode % (self.num_episodes // 10) == 0:
+            print(
+                f&#34;Episode: {episode}, Steps: {step+1}, Epsilon: {epsilon:.3f}, Loss: {loss:.2e}, Reward: {sum_rewards}, No Improve Count: {no_improve_count}&#34;
+            )
+
+        # Early stopping condition
+        if no_improve_count &gt;= patience:
+            print(
+                f&#34;Early stopping at episode {episode} due to no improvement in {patience} episodes.&#34;
+            )
+            break
+
+    # Save best model
+    self.model.set_weights(self.best_weights)</code></pre>
+</details>
+<div class="desc"><p>Train the agent for a fixed number of episodes</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>optimizer</code></strong> :&ensp;<code>str</code></dt>
+<dd>The optimizer for training (e.g., <code>sgd</code>). By default it is set to <code>adam</code>.</dd>
+<dt><strong><code>loss_fn</code></strong> :&ensp;<code>str</code></dt>
+<dd>The loss function. By default it is set to <code>mse</code>.</dd>
+<dt><strong><code>num_episodes</code></strong> :&ensp;<code>int</code></dt>
+<dd>Total number of episodes to train. By default it is set to <code>50</code>.</dd>
+<dt><strong><code>num_steps</code></strong> :&ensp;<code>int</code></dt>
+<dd>Steps per episode. By default it is set to <code>100</code>. If <code>num_steps</code> is less than <code>self.env.maxlen</code>, then the second will be chosen.</dd>
+<dt><strong><code>gamma</code></strong> :&ensp;<code>float</code></dt>
+<dd>Discount factor. By default it is set to <code>0.7</code>.</dd>
+<dt><strong><code>batch_size</code></strong> :&ensp;<code>int</code></dt>
+<dd>Size of training batches. By default it is set to <code>32</code>.</dd>
+<dt><strong><code>patience</code></strong> :&ensp;<code>int</code></dt>
+<dd>How many episodes to wait for improvement.</dd>
+<dt><strong><code>alpha</code></strong> :&ensp;<code>float</code></dt>
+<dd>Trade-off factor between loss and reward.</dd>
+</dl></div>
+</dd>
+</dl>
+</dd>
+<dt id="likelihood.models.deep.rl.Env"><code class="flex name class">
+<span>class <span class="ident">Env</span></span>
+<span>(</span><span>model, maxlen=100, name='likenasium')</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Env:
+    def __init__(self, model, maxlen=100, name=&#34;likenasium&#34;):
+        &#34;&#34;&#34;
+        Initialize the environment with a model.
+
+        Parameters
+        ----------
+            model : Any
+                Model with `.predict()` method (e.g., Keras model).
+            maxlen : int
+                Maximum length of deque. By default it is set to `100`.
+            name : str
+                The name of the environment. By default it is set to `likenasium`.
+        &#34;&#34;&#34;
+        self.model = model
+        self.maxlen = maxlen
+        self.transitions = deque(
+            maxlen=self.maxlen
+        )  # Stores (state, action, reward, next_action, done)
+        self.current_state = None
+        self.current_step = 0
+        self.done = False
+
+    def step(self, state, action, verbose=0):
+        &#34;&#34;&#34;
+        Perform an environment step with the given action.
+
+        Parameters
+        ----------
+            state : `np.ndarray`
+                Current state to process (input to the model).
+            action : int
+                Expected action to process.
+
+        Returns
+        -------
+            tuple: (current_state, action_pred, reward, next_action, done)
+        &#34;&#34;&#34;
+        if self.done:
+            return None, None, 0, None, True
+
+        # Process action through model
+        model_output = self.model.predict(state.reshape((1, -1)), verbose=verbose)
+        action_pred = np.argmax(model_output, axis=1)[0]
+        model_output[:, action_pred] = 0.0
+        next_action = np.max(model_output, axis=1)[0]  # Second most probable action
+
+        # Calculate reward (1 if correct prediction, 0 otherwise)
+        reward = 1 if action_pred == action else 0
+
+        # Update current state
+        self.current_state = state
+        self.current_step += 1
+
+        # Add transition to history
+        if self.current_step &lt;= self.maxlen:
+            self.transitions.append(
+                (
+                    self.current_state,  # Previous state
+                    action_pred,  # Current action
+                    reward,  # Reward
+                    next_action,  # Next action
+                    self.done,  # Done flag
+                )
+            )
+        return self.current_state, action_pred, reward, next_action, self.done
+
+    def reset(self):
+        &#34;&#34;&#34;Reset the environment to initial state.&#34;&#34;&#34;
+        self.current_state = None
+        self.current_step = 0
+        self.done = False
+        self.transitions = deque(maxlen=self.maxlen)
+        return self.current_state
+
+    def get_transitions(self):
+        &#34;&#34;&#34;Get all stored transitions.&#34;&#34;&#34;
+        return self.transitions</code></pre>
+</details>
+<div class="desc"><p>Initialize the environment with a model.</p>
+<h2 id="parameters">Parameters</h2>
+<pre><code>model : Any
+    Model with &lt;code&gt;.predict()&lt;/code&gt; method (e.g., Keras model).
+maxlen : int
+    Maximum length of deque. By default it is set to &lt;code&gt;100&lt;/code&gt;.
+name : str
+    The name of the environment. By default it is set to &lt;code&gt;likenasium&lt;/code&gt;.
+</code></pre></div>
+<h3>Methods</h3>
+<dl>
+<dt id="likelihood.models.deep.rl.Env.get_transitions"><code class="name flex">
+<span>def <span class="ident">get_transitions</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_transitions(self):
+    &#34;&#34;&#34;Get all stored transitions.&#34;&#34;&#34;
+    return self.transitions</code></pre>
+</details>
+<div class="desc"><p>Get all stored transitions.</p></div>
+</dd>
+<dt id="likelihood.models.deep.rl.Env.reset"><code class="name flex">
+<span>def <span class="ident">reset</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def reset(self):
+    &#34;&#34;&#34;Reset the environment to initial state.&#34;&#34;&#34;
+    self.current_state = None
+    self.current_step = 0
+    self.done = False
+    self.transitions = deque(maxlen=self.maxlen)
+    return self.current_state</code></pre>
+</details>
+<div class="desc"><p>Reset the environment to initial state.</p></div>
+</dd>
+<dt id="likelihood.models.deep.rl.Env.step"><code class="name flex">
+<span>def <span class="ident">step</span></span>(<span>self, state, action, verbose=0)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def step(self, state, action, verbose=0):
+    &#34;&#34;&#34;
+    Perform an environment step with the given action.
+
+    Parameters
+    ----------
+        state : `np.ndarray`
+            Current state to process (input to the model).
+        action : int
+            Expected action to process.
+
+    Returns
+    -------
+        tuple: (current_state, action_pred, reward, next_action, done)
+    &#34;&#34;&#34;
+    if self.done:
+        return None, None, 0, None, True
+
+    # Process action through model
+    model_output = self.model.predict(state.reshape((1, -1)), verbose=verbose)
+    action_pred = np.argmax(model_output, axis=1)[0]
+    model_output[:, action_pred] = 0.0
+    next_action = np.max(model_output, axis=1)[0]  # Second most probable action
+
+    # Calculate reward (1 if correct prediction, 0 otherwise)
+    reward = 1 if action_pred == action else 0
+
+    # Update current state
+    self.current_state = state
+    self.current_step += 1
+
+    # Add transition to history
+    if self.current_step &lt;= self.maxlen:
+        self.transitions.append(
+            (
+                self.current_state,  # Previous state
+                action_pred,  # Current action
+                reward,  # Reward
+                next_action,  # Next action
+                self.done,  # Done flag
+            )
+        )
+    return self.current_state, action_pred, reward, next_action, self.done</code></pre>
+</details>
+<div class="desc"><p>Perform an environment step with the given action.</p>
+<h2 id="parameters">Parameters</h2>
+<pre><code>state : &lt;code&gt;np.ndarray&lt;/code&gt;
+    Current state to process (input to the model).
+action : int
+    Expected action to process.
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>tuple: (current_state, action_pred, reward, next_action, done)
+</code></pre></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="likelihood.models.deep" href="index.html">likelihood.models.deep</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="likelihood.models.deep.rl.print_progress_bar" href="#likelihood.models.deep.rl.print_progress_bar">print_progress_bar</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="likelihood.models.deep.rl.AutoQL" href="#likelihood.models.deep.rl.AutoQL">AutoQL</a></code></h4>
+<ul class="">
+<li><code><a title="likelihood.models.deep.rl.AutoQL.epsilon_greedy_policy" href="#likelihood.models.deep.rl.AutoQL.epsilon_greedy_policy">epsilon_greedy_policy</a></code></li>
+<li><code><a title="likelihood.models.deep.rl.AutoQL.play_one_step" href="#likelihood.models.deep.rl.AutoQL.play_one_step">play_one_step</a></code></li>
+<li><code><a title="likelihood.models.deep.rl.AutoQL.train" href="#likelihood.models.deep.rl.AutoQL.train">train</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="likelihood.models.deep.rl.Env" href="#likelihood.models.deep.rl.Env">Env</a></code></h4>
+<ul class="">
+<li><code><a title="likelihood.models.deep.rl.Env.get_transitions" href="#likelihood.models.deep.rl.Env.get_transitions">get_transitions</a></code></li>
+<li><code><a title="likelihood.models.deep.rl.Env.reset" href="#likelihood.models.deep.rl.Env.reset">reset</a></code></li>
+<li><code><a title="likelihood.models.deep.rl.Env.step" href="#likelihood.models.deep.rl.Env.step">step</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>
