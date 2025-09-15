@@ -27,12 +27,12 @@ class Env:
 
         Parameters
         ----------
-            model : Any
-                Model with `.predict()` method (e.g., Keras model).
-            maxlen : int
-                Maximum length of deque. By default it is set to `100`.
-            name : str
-                The name of the environment. By default it is set to `likenasium`.
+        model : Any
+            Model with `.predict()` method (e.g., Keras model).
+        maxlen : int
+            Maximum length of deque. By default it is set to `100`.
+        name : str
+            The name of the environment. By default it is set to `likenasium`.
         """
         self.model = model
         self.maxlen = maxlen
@@ -49,14 +49,14 @@ class Env:
 
         Parameters
         ----------
-            state : `np.ndarray`
-                Current state to process (input to the model).
-            action : int
-                Expected action to process.
+        state : `np.ndarray`
+            Current state to process (input to the model).
+        action : `int`
+            Expected action to process.
 
         Returns
         -------
-            tuple: (current_state, action_pred, reward, next_action, done)
+            `tuple` : (current_state, action_pred, reward, next_action, done)
         """
         if self.done:
             return None, None, 0, None, True
@@ -120,9 +120,9 @@ class AutoQL:
 
         Parameters
         ----------
-        env : Any
+        env : `Any`
             The environment to interact with
-        model : tf.keras.Model
+        model : `tf.keras.Model`
             The Q-network model
         """
 
@@ -137,16 +137,16 @@ class AutoQL:
 
         Parameters
         ----------
-            state : `np.ndarray`
-                Current state.
-            action : int
-                Expected action to process.
-            epsilon : float
-                Exploration probability. By default it is set to `0`
+        state : `np.ndarray`
+            Current state.
+        action : `int`
+            Expected action to process.
+        epsilon : `float`
+            Exploration probability. By default it is set to `0`
 
         Returns
         -------
-            tuple: (state, action, reward, next_action, done)
+            `tuple` : (state, action, reward, next_action, done)
         """
         current_state, value, reward, next_action, done = self.env.step(state, action)
 
@@ -164,17 +164,17 @@ class AutoQL:
 
         Parameters
         ----------
-            state : `np.ndarray`
-                Current state
-            action : int
-                Expected action to process.
+        state : `np.ndarray`
+            Current state
+        action : `int`
+            Expected action to process.
 
-            epsilon : float
-                Exploration probability.
+        epsilon : `float`
+            Exploration probability.
 
         Returns
         -------
-            tuple: (state, action, reward, next_action, done)
+            `tuple` : (state, action, reward, next_action, done)
         """
         current_state, greedy_action, reward, next_action, done = self.epsilon_greedy_policy(
             state, action, epsilon
@@ -202,7 +202,7 @@ class AutoQL:
 
         Returns
         -------
-            float: Training loss
+            `float` : Training loss
         """
 
         batch_ = random.sample(self.replay_buffer, self.batch_size)
@@ -250,21 +250,21 @@ class AutoQL:
 
         Parameters
         ----------
-        optimizer : str
+        optimizer : `str`
             The optimizer for training (e.g., `sgd`). By default it is set to `adam`.
-        loss_fn : str
+        loss_fn : `str`
             The loss function. By default it is set to `mse`.
-        num_episodes : int
+        num_episodes : `int`
             Total number of episodes to train. By default it is set to `50`.
-        num_steps : int
+        num_steps : `int`
             Steps per episode. By default it is set to `100`. If `num_steps` is less than `self.env.maxlen`, then the second will be chosen.
-        gamma : float
+        gamma : `float`
             Discount factor. By default it is set to `0.7`.
-        batch_size : int
+        batch_size : `int`
             Size of training batches. By default it is set to `32`.
-        patience : int
+        patience : `int`
             How many episodes to wait for improvement.
-        alpha : float
+        alpha : `float`
             Trade-off factor between loss and reward.
         """
         rewards = []

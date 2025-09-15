@@ -154,7 +154,7 @@ def xicor(X: np.ndarray, Y: np.ndarray, ties: bool = True, random_seed: int = No
         The first variable to be correlated. Must have at least one dimension.
     Y : `np.ndarray`
         The second variable to be correlated. Must have at least one dimension.
-    ties : bool
+    ties : `bool`
         Whether to handle ties using randomization.
     random_seed : int, optional
         Seed for the random number generator for reproducibility.
@@ -356,9 +356,9 @@ def find_multiples(target: int) -> tuple[int, int] | None:
     Returns
     -------
     tuple[int, int] | None
-        If i and i+1 both divide target, returns (i, i+1).
-        Otherwise, returns (i, target // i).
-        Returns None if no factors are found.
+        If `i` and `i+1` both divide target, returns (i, i+1).
+        Otherwise, returns `(i, target // i)`.
+        Returns `None` if no factors are found.
     """
     for i in range(2, target + 1):
         if target % i == 0:
