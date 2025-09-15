@@ -861,7 +861,7 @@ class DataFrameEncoder:
         """Encodes the `object` type columns of the dataframe
 
         Keyword Arguments:
-        ----------
+        ------------------
         - save_mode (`bool`): An optional integer parameter. By default it is set to `True`
         - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
         - norm_method (`str`): An optional string parameter to perform normalization. By default it is set to `None`
