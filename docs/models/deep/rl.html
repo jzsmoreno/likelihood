@@ -96,9 +96,9 @@ el.replaceWith(d);
 
         Parameters
         ----------
-        env : Any
+        env : `Any`
             The environment to interact with
-        model : tf.keras.Model
+        model : `tf.keras.Model`
             The Q-network model
         &#34;&#34;&#34;
 
@@ -113,16 +113,16 @@ el.replaceWith(d);
 
         Parameters
         ----------
-            state : `np.ndarray`
-                Current state.
-            action : int
-                Expected action to process.
-            epsilon : float
-                Exploration probability. By default it is set to `0`
+        state : `np.ndarray`
+            Current state.
+        action : `int`
+            Expected action to process.
+        epsilon : `float`
+            Exploration probability. By default it is set to `0`
 
         Returns
         -------
-            tuple: (state, action, reward, next_action, done)
+            `tuple` : (state, action, reward, next_action, done)
         &#34;&#34;&#34;
         current_state, value, reward, next_action, done = self.env.step(state, action)
 
@@ -140,17 +140,17 @@ el.replaceWith(d);
 
         Parameters
         ----------
-            state : `np.ndarray`
-                Current state
-            action : int
-                Expected action to process.
+        state : `np.ndarray`
+            Current state
+        action : `int`
+            Expected action to process.
 
-            epsilon : float
-                Exploration probability.
+        epsilon : `float`
+            Exploration probability.
 
         Returns
         -------
-            tuple: (state, action, reward, next_action, done)
+            `tuple` : (state, action, reward, next_action, done)
         &#34;&#34;&#34;
         current_state, greedy_action, reward, next_action, done = self.epsilon_greedy_policy(
             state, action, epsilon
@@ -178,7 +178,7 @@ el.replaceWith(d);
 
         Returns
         -------
-            float: Training loss
+            `float` : Training loss
         &#34;&#34;&#34;
 
         batch_ = random.sample(self.replay_buffer, self.batch_size)
@@ -226,21 +226,21 @@ el.replaceWith(d);
 
         Parameters
         ----------
-        optimizer : str
+        optimizer : `str`
             The optimizer for training (e.g., `sgd`). By default it is set to `adam`.
-        loss_fn : str
+        loss_fn : `str`
             The loss function. By default it is set to `mse`.
-        num_episodes : int
+        num_episodes : `int`
             Total number of episodes to train. By default it is set to `50`.
-        num_steps : int
+        num_steps : `int`
             Steps per episode. By default it is set to `100`. If `num_steps` is less than `self.env.maxlen`, then the second will be chosen.
-        gamma : float
+        gamma : `float`
             Discount factor. By default it is set to `0.7`.
-        batch_size : int
+        batch_size : `int`
             Size of training batches. By default it is set to `32`.
-        patience : int
+        patience : `int`
             How many episodes to wait for improvement.
-        alpha : float
+        alpha : `float`
             Trade-off factor between loss and reward.
         &#34;&#34;&#34;
         rewards = []
@@ -350,16 +350,16 @@ el.replaceWith(d);
 
     Parameters
     ----------
-        state : `np.ndarray`
-            Current state.
-        action : int
-            Expected action to process.
-        epsilon : float
-            Exploration probability. By default it is set to `0`
+    state : `np.ndarray`
+        Current state.
+    action : `int`
+        Expected action to process.
+    epsilon : `float`
+        Exploration probability. By default it is set to `0`
 
     Returns
     -------
-        tuple: (state, action, reward, next_action, done)
+        `tuple` : (state, action, reward, next_action, done)
     &#34;&#34;&#34;
     current_state, value, reward, next_action, done = self.env.step(state, action)
 
@@ -373,15 +373,16 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Epsilon-greedy policy for action selection</p>
 <h2 id="parameters">Parameters</h2>
-<pre><code>state : &lt;code&gt;np.ndarray&lt;/code&gt;
-    Current state.
-action : int
-    Expected action to process.
-epsilon : float
-    Exploration probability. By default it is set to &lt;code&gt;0&lt;/code&gt;
-</code></pre>
+<dl>
+<dt><strong><code>state</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Current state.</dd>
+<dt><strong><code>action</code></strong> :&ensp;<code>int</code></dt>
+<dd>Expected action to process.</dd>
+<dt><strong><code>epsilon</code></strong> :&ensp;<code>float</code></dt>
+<dd>Exploration probability. By default it is set to <code>0</code></dd>
+</dl>
 <h2 id="returns">Returns</h2>
-<pre><code>tuple: (state, action, reward, next_action, done)
+<pre><code>&lt;code&gt;tuple&lt;/code&gt; : (state, action, reward, next_action, done)
 </code></pre></div>
 </dd>
 <dt id="likelihood.models.deep.rl.AutoQL.play_one_step"><code class="name flex">
@@ -398,17 +399,17 @@ epsilon : float
 
     Parameters
     ----------
-        state : `np.ndarray`
-            Current state
-        action : int
-            Expected action to process.
+    state : `np.ndarray`
+        Current state
+    action : `int`
+        Expected action to process.
 
-        epsilon : float
-            Exploration probability.
+    epsilon : `float`
+        Exploration probability.
 
     Returns
     -------
-        tuple: (state, action, reward, next_action, done)
+        `tuple` : (state, action, reward, next_action, done)
     &#34;&#34;&#34;
     current_state, greedy_action, reward, next_action, done = self.epsilon_greedy_policy(
         state, action, epsilon
@@ -431,16 +432,16 @@ epsilon : float
 </details>
 <div class="desc"><p>Perform one step in the environment and add experience to buffer</p>
 <h2 id="parameters">Parameters</h2>
-<pre><code>state : &lt;code&gt;np.ndarray&lt;/code&gt;
-    Current state
-action : int
-    Expected action to process.
-
-epsilon : float
-    Exploration probability.
-</code></pre>
+<dl>
+<dt><strong><code>state</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Current state</dd>
+<dt><strong><code>action</code></strong> :&ensp;<code>int</code></dt>
+<dd>Expected action to process.</dd>
+<dt><strong><code>epsilon</code></strong> :&ensp;<code>float</code></dt>
+<dd>Exploration probability.</dd>
+</dl>
 <h2 id="returns">Returns</h2>
-<pre><code>tuple: (state, action, reward, next_action, done)
+<pre><code>&lt;code&gt;tuple&lt;/code&gt; : (state, action, reward, next_action, done)
 </code></pre></div>
 </dd>
 <dt id="likelihood.models.deep.rl.AutoQL.train"><code class="name flex">
@@ -468,21 +469,21 @@ epsilon : float
 
     Parameters
     ----------
-    optimizer : str
+    optimizer : `str`
         The optimizer for training (e.g., `sgd`). By default it is set to `adam`.
-    loss_fn : str
+    loss_fn : `str`
         The loss function. By default it is set to `mse`.
-    num_episodes : int
+    num_episodes : `int`
         Total number of episodes to train. By default it is set to `50`.
-    num_steps : int
+    num_steps : `int`
         Steps per episode. By default it is set to `100`. If `num_steps` is less than `self.env.maxlen`, then the second will be chosen.
-    gamma : float
+    gamma : `float`
         Discount factor. By default it is set to `0.7`.
-    batch_size : int
+    batch_size : `int`
         Size of training batches. By default it is set to `32`.
-    patience : int
+    patience : `int`
         How many episodes to wait for improvement.
-    alpha : float
+    alpha : `float`
         Trade-off factor between loss and reward.
     &#34;&#34;&#34;
     rewards = []
@@ -597,12 +598,12 @@ epsilon : float
 
         Parameters
         ----------
-            model : Any
-                Model with `.predict()` method (e.g., Keras model).
-            maxlen : int
-                Maximum length of deque. By default it is set to `100`.
-            name : str
-                The name of the environment. By default it is set to `likenasium`.
+        model : Any
+            Model with `.predict()` method (e.g., Keras model).
+        maxlen : int
+            Maximum length of deque. By default it is set to `100`.
+        name : str
+            The name of the environment. By default it is set to `likenasium`.
         &#34;&#34;&#34;
         self.model = model
         self.maxlen = maxlen
@@ -619,14 +620,14 @@ epsilon : float
 
         Parameters
         ----------
-            state : `np.ndarray`
-                Current state to process (input to the model).
-            action : int
-                Expected action to process.
+        state : `np.ndarray`
+            Current state to process (input to the model).
+        action : `int`
+            Expected action to process.
 
         Returns
         -------
-            tuple: (current_state, action_pred, reward, next_action, done)
+            `tuple` : (current_state, action_pred, reward, next_action, done)
         &#34;&#34;&#34;
         if self.done:
             return None, None, 0, None, True
@@ -671,13 +672,14 @@ epsilon : float
 </details>
 <div class="desc"><p>Initialize the environment with a model.</p>
 <h2 id="parameters">Parameters</h2>
-<pre><code>model : Any
-    Model with &lt;code&gt;.predict()&lt;/code&gt; method (e.g., Keras model).
-maxlen : int
-    Maximum length of deque. By default it is set to &lt;code&gt;100&lt;/code&gt;.
-name : str
-    The name of the environment. By default it is set to &lt;code&gt;likenasium&lt;/code&gt;.
-</code></pre></div>
+<dl>
+<dt><strong><code>model</code></strong> :&ensp;<code>Any</code></dt>
+<dd>Model with <code>.predict()</code> method (e.g., Keras model).</dd>
+<dt><strong><code>maxlen</code></strong> :&ensp;<code>int</code></dt>
+<dd>Maximum length of deque. By default it is set to <code>100</code>.</dd>
+<dt><strong><code>name</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the environment. By default it is set to <code>likenasium</code>.</dd>
+</dl></div>
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.deep.rl.Env.get_transitions"><code class="name flex">
@@ -726,14 +728,14 @@ name : str
 
     Parameters
     ----------
-        state : `np.ndarray`
-            Current state to process (input to the model).
-        action : int
-            Expected action to process.
+    state : `np.ndarray`
+        Current state to process (input to the model).
+    action : `int`
+        Expected action to process.
 
     Returns
     -------
-        tuple: (current_state, action_pred, reward, next_action, done)
+        `tuple` : (current_state, action_pred, reward, next_action, done)
     &#34;&#34;&#34;
     if self.done:
         return None, None, 0, None, True
@@ -766,13 +768,14 @@ name : str
 </details>
 <div class="desc"><p>Perform an environment step with the given action.</p>
 <h2 id="parameters">Parameters</h2>
-<pre><code>state : &lt;code&gt;np.ndarray&lt;/code&gt;
-    Current state to process (input to the model).
-action : int
-    Expected action to process.
-</code></pre>
+<dl>
+<dt><strong><code>state</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Current state to process (input to the model).</dd>
+<dt><strong><code>action</code></strong> :&ensp;<code>int</code></dt>
+<dd>Expected action to process.</dd>
+</dl>
 <h2 id="returns">Returns</h2>
-<pre><code>tuple: (current_state, action_pred, reward, next_action, done)
+<pre><code>&lt;code&gt;tuple&lt;/code&gt; : (current_state, action_pred, reward, next_action, done)
 </code></pre></div>
 </dd>
 </dl>

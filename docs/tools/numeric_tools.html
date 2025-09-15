@@ -105,9 +105,9 @@ Prints the matrix to console.</p></div>
     Returns
     -------
     tuple[int, int] | None
-        If i and i+1 both divide target, returns (i, i+1).
-        Otherwise, returns (i, target // i).
-        Returns None if no factors are found.
+        If `i` and `i+1` both divide target, returns (i, i+1).
+        Otherwise, returns `(i, target // i)`.
+        Returns `None` if no factors are found.
     &#34;&#34;&#34;
     for i in range(2, target + 1):
         if target % i == 0:
@@ -126,9 +126,9 @@ Prints the matrix to console.</p></div>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><code>tuple[int, int] | None</code></dt>
-<dd>If i and i+1 both divide target, returns (i, i+1).
-Otherwise, returns (i, target // i).
-Returns None if no factors are found.</dd>
+<dd>If <code>i</code> and <code>i+1</code> both divide target, returns (i, i+1).
+Otherwise, returns <code>(i, target // i)</code>.
+Returns <code>None</code> if no factors are found.</dd>
 </dl></div>
 </dd>
 <dt id="likelihood.tools.numeric_tools.gauss_elimination"><code class="name flex">
@@ -467,7 +467,7 @@ containing their corresponding correlation coefficients.</p></div>
         The first variable to be correlated. Must have at least one dimension.
     Y : `np.ndarray`
         The second variable to be correlated. Must have at least one dimension.
-    ties : bool
+    ties : `bool`
         Whether to handle ties using randomization.
     random_seed : int, optional
         Seed for the random number generator for reproducibility.
