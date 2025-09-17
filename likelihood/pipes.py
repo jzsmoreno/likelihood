@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+from likelihood.tools.impute import SimpleImputer
 from likelihood.tools.models_tools import TransformRange, remove_collinearity
 from likelihood.tools.tools import DataFrameEncoder, DataScaler, LinearRegression, OneHotEncoder
 
@@ -22,7 +23,7 @@ class Pipeline:
         self.target_col = self.config["target_column"]
         self.steps = self.config["preprocessing_steps"]
         self.compute_importance = self.config.get("compute_feature_importance", False)
-        self.fitted_components: Dict[str, object] = {}  # Stores (step_name, fitted_object)
+        self.fitted_components: Dict[str, object] = {}
         self.columns_bin_sizes: Dict[str, int] | None = None
 
     def _load_config(self, config_path: str) -> Dict:
@@ -30,7 +31,6 @@ class Pipeline:
         with open(config_path, "r") as f:
             config = json.load(f)
 
-        # Validate required fields
         assert "target_column" in config, "Config must specify 'target_column'"
         assert "preprocessing_steps" in config, "Config must specify 'preprocessing_steps'"
         return config
@@ -53,16 +53,13 @@ class Pipeline:
         importances : Optional[np.ndarray]
             Feature importance scores (if compute_feature_importance=True).
         """
-        # Extract target and features
         y = df[self.target_col].values
         X = df.drop(columns=[self.target_col]).copy()
 
-        # Apply preprocessing steps
         for step in self.steps:
             step_name = step["name"]
             params = step.get("params", {})
             X = self._apply_step(step_name, X, fit=True, **params)
-        # Compute feature importance (if enabled)
         importances = None
         if self.compute_importance:
             numeric_X = X.select_dtypes(include=["float"])
@@ -90,7 +87,6 @@ class Pipeline:
             Cleaned feature matrix.
         """
         X = df.copy()
-        # Replay fitted steps on new data
         for step_name, _ in self.fitted_components.items():
             X = self._apply_step(step_name, X, fit=False)
 
@@ -104,6 +100,7 @@ class Pipeline:
             "remove_collinearity": self._handle_remove_collinearity,
             "TransformRange": self._handle_transformrange,
             "OneHotEncoder": self._handle_onehotencoder,
+            "SimpleImputer": self._handle_simpleimputer,
         }
 
         if step_name not in handlers:
@@ -120,11 +117,11 @@ class Pipeline:
         numeric_columns = numeric_X.columns.tolist()
         n = None if n == 0 else n
         if fit:
-            scaler = DataScaler(numeric_X.values.T, n=n)  # Assume X is numerical for scaling
+            scaler = DataScaler(numeric_X.values.T, n=n)
             self.fitted_components["DataScaler"] = scaler
             numeric_X = pd.DataFrame(scaler.rescale().T, columns=numeric_X.columns)
         else:
-            scaler = self.fitted_components["DataScaler"]  # Get latest fitted scaler
+            scaler = self.fitted_components["DataScaler"]
             numeric_X = pd.DataFrame(
                 scaler.rescale(numeric_X.values.T).T, columns=numeric_X.columns
             )
@@ -144,7 +141,7 @@ class Pipeline:
         else:
             encoder = self.fitted_components["DataFrameEncoder"]
             encoder._df = X
-            return encoder.encode()  # Adjust if decode isn't needed—depends on your use case
+            return encoder.encode()
 
     def _handle_remove_collinearity(
         self, X: pd.DataFrame, fit: bool, threshold: float = 0.9
@@ -155,7 +152,6 @@ class Pipeline:
         categorical_columns = set(X.columns) - set(numeric_columns)
         if fit:
             cleaned_X = remove_collinearity(numeric_X, threshold=threshold)
-            # Store dropped columns to replicate in transform()
             dropped_cols = set(X.columns) - set(cleaned_X.columns) - categorical_columns
             self.fitted_components["remove_collinearity"] = dropped_cols
             return X.drop(columns=dropped_cols)
@@ -195,7 +191,7 @@ class Pipeline:
                     X[col].values
                     if isinstance(unique_values[0], int)
                     else X[col].map(category_to_indices[col])
-                )  # Adjust for multi-column support
+                )
                 tmp_df = pd.concat([tmp_df, pd.DataFrame(encoded_X, columns=unique_values)], axis=1)
             self.fitted_components["OneHotEncoder"] = (encoder, columns, category_to_indices)
         else:
@@ -210,9 +206,27 @@ class Pipeline:
                         else X[col].map(category_to_indices[col])
                     ),
                     fit=False,
-                )  # Adjust for multi-column support
+                )
                 tmp_df = pd.concat([tmp_df, pd.DataFrame(encoded_X, columns=unique_values)], axis=1)
         return tmp_df
+
+    def _handle_simpleimputer(
+        self,
+        X: pd.DataFrame,
+        fit: bool,
+        use_scaler: bool = False,
+        boundary: bool = True,
+    ) -> pd.DataFrame:
+        "Handle SimpleImputer (fit on numerical and categorical columns)."
+        if fit:
+            use_scaler = True if use_scaler == 1 else False
+            imputer = SimpleImputer(use_scaler=use_scaler)
+            tmp_df = imputer.fit_transform(X, boundary=boundary)
+            self.fitted_components["SimpleImputer"] = imputer
+            return tmp_df
+        else:
+            imputer = self.fitted_components["SimpleImputer"]
+            return imputer.transform(X, boundary=boundary)
 
     def save(self, filepath: str) -> None:
         """
@@ -234,6 +248,8 @@ class Pipeline:
             "columns_bin_sizes": self.columns_bin_sizes,
         }
 
+        filepath = filepath + ".pkl" if not filepath.endswith(".pkl") else filepath
+
         with open(filepath, "wb") as f:
             pickle.dump(save_dict, f)
 
@@ -254,13 +270,13 @@ class Pipeline:
         """
         import pickle
 
+        filepath = filepath + ".pkl" if not filepath.endswith(".pkl") else filepath
+
         with open(filepath, "rb") as f:
             save_dict = pickle.load(f)
 
-        # Initialize with config path placeholder; actual config loaded from saved data
         pipeline = cls.__new__(cls)
 
-        # Restore all saved attributes
         pipeline.config = save_dict["config"]
         pipeline.fitted_components = save_dict["fitted_components"]
         pipeline.target_col = save_dict["target_col"]

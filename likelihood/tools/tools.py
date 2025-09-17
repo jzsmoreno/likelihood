@@ -1032,6 +1032,7 @@ class OneHotEncoder:
     def encode(self, x: np.ndarray | list, fit: bool = True):
         if not isinstance(x, np.ndarray):
             x = np.array(x)
+        x = x.astype(int)
         if fit:
             self.num_categories = x.max() + 1
 
@@ -1189,7 +1190,9 @@ def check_nan_inf(df: DataFrame, verbose: bool = False) -> DataFrame:
     if nan_values:
         (
             print(
-                "UserWarning: Some rows may have been deleted due to the existence of NaN values."
+                "UserWarning: Some rows may have been deleted due to the existence of NaN values.",
+                f"NaN values removed: ",
+                "{:,}".format(nan_count),
             )
             if verbose
             else None
@@ -1199,16 +1202,15 @@ def check_nan_inf(df: DataFrame, verbose: bool = False) -> DataFrame:
     if inf_values:
         (
             print(
-                "UserWarning: Some rows may have been deleted due to the existence of Inf values."
+                "UserWarning: Some rows may have been deleted due to the existence of Inf values.",
+                f"Infinite values removed: ",
+                "{:,}".format(inf_count),
             )
             if verbose
             else None
         )
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
         df.dropna(inplace=True)
-
-    print(f"NaN values removed: ", "{:,}".format(nan_count))
-    print(f"Infinite values removed: ", "{:,}".format(inf_count))
 
     return df
 

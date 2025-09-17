@@ -105,7 +105,16 @@ class TransformRange:
         if bins[-1] <= max_val:
             bins = np.append(bins, max_val + 1)
 
+        lower_bin_edge = -np.inf
+        upper_bin_edge = np.inf
+
         labels = [f"{int(bins[i])}-{int(bins[i+1] - 1)}" for i in range(len(bins) - 1)]
+        end = int(bins[-1] - 1)
+        bins = bins.tolist()
+        bins.insert(0, lower_bin_edge)
+        bins.append(upper_bin_edge)
+        labels.insert(0, f"< {start}")
+        labels.append(f"> {end}")
         return bins, labels
 
     def _transform_column_to_ranges(
@@ -158,7 +167,6 @@ class TransformRange:
             bin_size = self.info[column]["range"]
 
         bins, labels = self._create_bins_and_labels(min_val, max_val, bin_size)
-
         return pd.cut(numeric_series, bins=bins, labels=labels, right=False, include_lowest=True)
 
     def transform_dataframe(
@@ -173,6 +181,8 @@ class TransformRange:
             A dictionary where the keys are column names and the values are the bin sizes.
         drop_original : `bool`, optional
             If True, drops original columns from the result, by default False
+        fit : `bool`, default=True
+            Whether to compute bin edges based on the data (True) or use predefined binning (False).
 
         Returns
         -------
