@@ -25,6 +25,12 @@
       "params": {
         "threshold": 1.0  
       }
+    },
+    {
+      "name": "OneHotEncoder",
+      "params": {
+        "columns": ["Income_range"]  
+      }
     }
   ]
 }

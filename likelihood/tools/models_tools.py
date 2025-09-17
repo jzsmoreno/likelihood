@@ -63,6 +63,7 @@ class TransformRange:
         if not isinstance(df, pd.DataFrame):
             raise TypeError("df must be a pandas DataFrame")
         self.df = df.copy()  # Create a copy to avoid modifying the original
+        self.info = {}
 
     def _create_bins_and_labels(
         self, min_val: Union[int, float], max_val: Union[int, float], bin_size: int
@@ -107,7 +108,9 @@ class TransformRange:
         labels = [f"{int(bins[i])}-{int(bins[i+1] - 1)}" for i in range(len(bins) - 1)]
         return bins, labels
 
-    def _transform_column_to_ranges(self, column: str, bin_size: int) -> pd.Series:
+    def _transform_column_to_ranges(
+        self, column: str, bin_size: int, fit: bool = True
+    ) -> pd.Series:
         """
         Transforms a column in the DataFrame into range bins.
 
@@ -130,30 +133,36 @@ class TransformRange:
         ValueError
             If bin_size is not positive or if column contains non-numeric data.
         """
-        if column not in self.df.columns:
-            raise KeyError(f"Column '{column}' not found in DataFrame")
-
-        if bin_size <= 0:
-            raise ValueError("bin_size must be positive")
-
         numeric_series = pd.to_numeric(self.df[column], errors="coerce")
-        if numeric_series.isna().all():
-            raise ValueError(f"Column '{column}' contains no valid numeric data")
+        if fit:
+            if column not in self.df.columns:
+                raise KeyError(f"Column '{column}' not found in DataFrame")
 
-        min_val = numeric_series.min()
-        max_val = numeric_series.max()
+            if bin_size <= 0:
+                raise ValueError("bin_size must be positive")
 
-        if min_val == max_val:
-            return pd.Series(
-                [f"{int(min_val)}-{int(max_val)}"] * len(self.df), name=f"{column}_range"
-            )
+            if numeric_series.isna().all():
+                raise ValueError(f"Column '{column}' contains no valid numeric data")
+
+            min_val = numeric_series.min()
+            max_val = numeric_series.max()
+
+            if min_val == max_val:
+                return pd.Series(
+                    [f"{int(min_val)}-{int(max_val)}"] * len(self.df), name=f"{column}_range"
+                )
+            self.info[column] = {"min_value": min_val, "max_value": max_val, "range": bin_size}
+        else:
+            min_val = self.info[column]["min_value"]
+            max_val = self.info[column]["max_value"]
+            bin_size = self.info[column]["range"]
 
         bins, labels = self._create_bins_and_labels(min_val, max_val, bin_size)
 
         return pd.cut(numeric_series, bins=bins, labels=labels, right=False, include_lowest=True)
 
     def transform_dataframe(
-        self, columns_bin_sizes: Dict[str, int], drop_original: bool = False
+        self, columns_bin_sizes: Dict[str, int], drop_original: bool = False, fit: bool = True
     ) -> pd.DataFrame:
         """
         Creates a new DataFrame with range columns.
@@ -183,7 +192,9 @@ class TransformRange:
 
         range_columns = {}
         for column, bin_size in columns_bin_sizes.items():
-            range_columns[f"{column}_range"] = self._transform_column_to_ranges(column, bin_size)
+            range_columns[f"{column}_range"] = self._transform_column_to_ranges(
+                column, bin_size, fit
+            )
 
         result_df = pd.DataFrame(range_columns)
 

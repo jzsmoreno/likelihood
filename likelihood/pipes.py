@@ -66,11 +66,14 @@ class Pipeline:
         importances = None
         if self.compute_importance:
             numeric_X = X.select_dtypes(include=["float"])
+            numeric_columns = numeric_X.columns.tolist()
             model = LinearRegression()
             model.fit(numeric_X.T.values, y)
             importances = model.get_importances()
-
-        return X, y, importances
+        df_scores = pd.DataFrame([importances], columns=numeric_columns)
+        df_scores_abs = df_scores.abs()
+        df_scores_norm = df_scores_abs / df_scores_abs.to_numpy().sum()
+        return X, y, df_scores_norm
 
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -173,16 +176,40 @@ class Pipeline:
         else:
             transformer = self.fitted_components["TransformRange"]
             transformer.df = X
-            return transformer.transform_dataframe(columns_bin_sizes=self.columns_bin_sizes)
+            return transformer.transform_dataframe(
+                columns_bin_sizes=self.columns_bin_sizes, fit=False
+            )
 
-    def _handle_onehotencoder(self, X: pd.DataFrame, fit: bool, columns: List[str]) -> pd.DataFrame:
+    def _handle_onehotencoder(
+        self, X: pd.DataFrame, fit: bool, columns: List[str] | None = None
+    ) -> pd.DataFrame:
         """Handle OneHotEncoder (fits on categorical columns)."""
-
         if fit:
+            tmp_df = X.drop(columns=columns)
             encoder = OneHotEncoder()
-            encoded_X = encoder.encode(X[columns].values)  # Adjust for multi-column support
-            self.fitted_components["OneHotEncoder"] = encoder
-            return pd.DataFrame(encoded_X)
+            category_to_indices = {}
+            for col in columns:
+                unique_values = X[col].unique()
+                category_to_indices[col] = {value: i for i, value in enumerate(unique_values)}
+                encoded_X = encoder.encode(
+                    X[col].values
+                    if isinstance(unique_values[0], int)
+                    else X[col].map(category_to_indices[col])
+                )  # Adjust for multi-column support
+                tmp_df = pd.concat([tmp_df, pd.DataFrame(encoded_X, columns=unique_values)], axis=1)
+            self.fitted_components["OneHotEncoder"] = (encoder, columns, category_to_indices)
         else:
-            encoder = self.fitted_components["OneHotEncoder"]
-            return pd.DataFrame(encoder.encode(X[columns].values))
+            encoder, columns, category_to_indices = self.fitted_components["OneHotEncoder"]
+            tmp_df = X.drop(columns=columns)
+            for col in columns:
+                unique_values = list(category_to_indices[col].keys())
+                encoded_X = encoder.encode(
+                    (
+                        X[col].values
+                        if isinstance(unique_values[0], int)
+                        else X[col].map(category_to_indices[col])
+                    ),
+                    fit=False,
+                )  # Adjust for multi-column support
+                tmp_df = pd.concat([tmp_df, pd.DataFrame(encoded_X, columns=unique_values)], axis=1)
+        return tmp_df

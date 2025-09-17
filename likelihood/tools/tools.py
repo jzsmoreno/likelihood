@@ -1024,20 +1024,20 @@ class OneHotEncoder:
     It receives an array of integers and returns a binary array using the one-hot encoding method.
     """
 
-    __slots__ = ["x"]
+    __slots__ = ["num_categories"]
 
     def __init__(self) -> None:
         pass
 
-    def encode(self, x: np.ndarray | list):
-        self.x = x
+    def encode(self, x: np.ndarray | list, fit: bool = True):
+        if not isinstance(x, np.ndarray):
+            x = np.array(x)
+        if fit:
+            self.num_categories = x.max() + 1
 
-        if not isinstance(self.x, np.ndarray):
-            self.x = np.array(self.x)
+        y = np.zeros((x.size, self.num_categories))
 
-        y = np.zeros((self.x.size, self.x.max() + 1))
-
-        y[np.arange(self.x.size), self.x] = 1
+        y[np.arange(x.size), x] = 1
 
         return y
 
