@@ -660,7 +660,7 @@ class DataScaler:
 
     __slots__ = ["dataset_", "_n", "data_scaled", "values", "inv_fitting"]
 
-    def __init__(self, dataset: np.ndarray, n: int = 1) -> None:
+    def __init__(self, dataset: np.ndarray, n: int | None = 1) -> None:
         """Initializes the parameters required for scaling the data"""
         self.dataset_ = dataset.copy()
         self._n = n

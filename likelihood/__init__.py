@@ -16,4 +16,5 @@ To get started with Likelihood, simply import the desired modules and start expl
 
 from likelihood.main import *
 from likelihood.models import *
+from likelihood.pipes import Pipeline
 from likelihood.tools import *

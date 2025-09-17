@@ -1,0 +1,30 @@
+{
+  "target_column": "Target",
+  "compute_feature_importance": true,  
+  "preprocessing_steps": [
+    {
+      "name": "TransformRange",
+      "params": {
+        "columns_bin_sizes": {"Age": 10, "Income": 30000}  
+      }
+    },
+    {
+      "name": "DataScaler",
+      "params": {
+        "n": 0  
+      }
+    },
+    {
+      "name": "DataFrameEncoder",
+      "params": {
+        "norm_method": "median"  
+      }
+    },
+    {
+      "name": "remove_collinearity",
+      "params": {
+        "threshold": 1.0  
+      }
+    }
+  ]
+}
