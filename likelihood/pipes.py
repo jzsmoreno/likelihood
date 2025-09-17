@@ -213,3 +213,59 @@ class Pipeline:
                 )  # Adjust for multi-column support
                 tmp_df = pd.concat([tmp_df, pd.DataFrame(encoded_X, columns=unique_values)], axis=1)
         return tmp_df
+
+    def save(self, filepath: str) -> None:
+        """
+        Save the fitted pipeline state to a file using pickle.
+
+        Parameters
+        ----------
+        filepath : str
+            Path where the serialized pipeline will be saved.
+        """
+        import pickle
+
+        save_dict = {
+            "config": self.config,
+            "fitted_components": self.fitted_components,
+            "target_col": self.target_col,
+            "steps": self.steps,
+            "compute_importance": self.compute_importance,
+            "columns_bin_sizes": self.columns_bin_sizes,
+        }
+
+        with open(filepath, "wb") as f:
+            pickle.dump(save_dict, f)
+
+    @classmethod
+    def load(cls, filepath: str) -> "Pipeline":
+        """
+        Load a fitted pipeline from a file.
+
+        Parameters
+        ----------
+        filepath : str
+            Path to the serialized pipeline file.
+
+        Returns
+        -------
+        pipeline : Pipeline
+            Reconstructed pipeline instance with fitted components.
+        """
+        import pickle
+
+        with open(filepath, "rb") as f:
+            save_dict = pickle.load(f)
+
+        # Initialize with config path placeholder; actual config loaded from saved data
+        pipeline = cls.__new__(cls)
+
+        # Restore all saved attributes
+        pipeline.config = save_dict["config"]
+        pipeline.fitted_components = save_dict["fitted_components"]
+        pipeline.target_col = save_dict["target_col"]
+        pipeline.steps = save_dict["steps"]
+        pipeline.compute_importance = save_dict["compute_importance"]
+        pipeline.columns_bin_sizes = save_dict["columns_bin_sizes"]
+
+        return pipeline

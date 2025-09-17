@@ -139,6 +139,7 @@ dmypy.json
 
 # Ignore <files>.pkl for testing
 *.pkl
+pipe
 
 # Ignore <files>.csv for testing
 *.csv
