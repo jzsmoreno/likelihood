@@ -56,10 +56,44 @@ class Pipeline:
         y = df[self.target_col].values
         X = df.drop(columns=[self.target_col]).copy()
 
+        initial_info = {
+            "shape": X.shape,
+            "columns": list(X.columns),
+            "dtypes": X.dtypes.to_dict(),
+            "missing_values": X.isnull().sum().to_dict(),
+        }
+
+        steps_info = []
         for step in self.steps:
             step_name = step["name"]
             params = step.get("params", {})
+            step_info = {
+                "step_name": step_name,
+                "parameters": params,
+                "description": self._get_step_description(step_name),
+            }
+
             X = self._apply_step(step_name, X, fit=True, **params)
+
+            step_info["output_shape"] = X.shape
+            step_info["output_columns"] = list(X.columns)
+            step_info["output_dtypes"] = X.dtypes.to_dict()
+
+            steps_info.append(step_info)
+
+        final_info = {
+            "shape": X.shape,
+            "columns": list(X.columns),
+            "dtypes": X.dtypes.to_dict(),
+            "missing_values": X.isnull().sum().to_dict(),
+        }
+
+        self.documentation = {
+            "initial_dataset": initial_info,
+            "processing_steps": steps_info,
+            "final_dataset": final_info,
+        }
+
         importances = None
         if self.compute_importance:
             numeric_X = X.select_dtypes(include=["float"])
@@ -67,9 +101,13 @@ class Pipeline:
             model = LinearRegression()
             model.fit(numeric_X.T.values, y)
             importances = model.get_importances()
-        df_scores = pd.DataFrame([importances], columns=numeric_columns)
-        df_scores_abs = df_scores.abs()
-        df_scores_norm = df_scores_abs / df_scores_abs.to_numpy().sum()
+            df_scores = pd.DataFrame([importances], columns=numeric_columns)
+            df_scores_abs = df_scores.abs()
+        df_scores_norm = (
+            df_scores_abs / df_scores_abs.to_numpy().sum()
+            if isinstance(importances, np.ndarray)
+            else pd.DataFrame()
+        )
         return X, y, df_scores_norm
 
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -109,6 +147,19 @@ class Pipeline:
             )
 
         return handlers[step_name](X, fit=fit, **params)
+
+    def _get_step_description(self, step_name: str) -> str:
+        """Return a description of what each preprocessing step does."""
+        descriptions = {
+            "DataScaler": "Scales numerical features using normalization",
+            "DataFrameEncoder": "Encodes categorical variables and normalizes to numerical features",
+            "remove_collinearity": "Removes highly correlated features to reduce multicollinearity",
+            "TransformRange": "Bins continuous features into discrete ranges",
+            "OneHotEncoder": "Converts categorical variables into binary variables",
+            "SimpleImputer": "Handles missing values by imputing with multiple linear regression strategies",
+        }
+
+        return descriptions.get(step_name, f"Unknown preprocessing step: {step_name}")
 
     # ------------------------------ Step Handlers ------------------------------
     def _handle_datascaler(self, X: pd.DataFrame, fit: bool, n: int = 1) -> pd.DataFrame:
@@ -246,6 +297,7 @@ class Pipeline:
             "steps": self.steps,
             "compute_importance": self.compute_importance,
             "columns_bin_sizes": self.columns_bin_sizes,
+            "documentation": self.documentation,
         }
 
         filepath = filepath + ".pkl" if not filepath.endswith(".pkl") else filepath
@@ -283,5 +335,6 @@ class Pipeline:
         pipeline.steps = save_dict["steps"]
         pipeline.compute_importance = save_dict["compute_importance"]
         pipeline.columns_bin_sizes = save_dict["columns_bin_sizes"]
+        pipeline.documentation = save_dict["documentation"]
 
         return pipeline

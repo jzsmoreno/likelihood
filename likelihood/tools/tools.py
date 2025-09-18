@@ -2,7 +2,7 @@ import math
 import os
 import pickle
 import warnings
-from typing import Callable, Dict, List, Tuple, Union
+from typing import Callable, Dict, Generator, List, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,7 +25,7 @@ Data Science from Scratch, Second Edition, by Joel Grus (O'Reilly).Copyright 201
 """
 
 
-def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -> List:
+def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -> Generator:
     """Generates 'batch_size'-sized minibatches from the dataset
 
     Parameters
