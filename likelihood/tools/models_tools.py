@@ -47,22 +47,21 @@ class TransformRange:
     Transforms numerical columns into categorical range bins with descriptive labels.
     """
 
-    def __init__(self, df: pd.DataFrame) -> None:
+    def __init__(self, columns_bin_sizes: Dict[str, int]) -> None:
         """Initializes the class with the original DataFrame.
 
         Parameters
         ----------
-        df : `pd.DataFrame`
-            The original DataFrame to transform.
+        columns_bin_sizes : `dict`
+            A dictionary where the keys are column names and the values are the bin sizes.
 
         Raises
         ------
         TypeError
             If df is not a pandas DataFrame.
         """
-        if not isinstance(df, pd.DataFrame):
-            raise TypeError("df must be a pandas DataFrame")
-        self.df = df.copy()  # Create a copy to avoid modifying the original
+        self.info = {}
+        self.columns_bin_sizes = columns_bin_sizes
 
     def _create_bins_and_labels(
         self, min_val: Union[int, float], max_val: Union[int, float], bin_size: int
@@ -104,15 +103,28 @@ class TransformRange:
         if bins[-1] <= max_val:
             bins = np.append(bins, max_val + 1)
 
+        lower_bin_edge = -np.inf
+        upper_bin_edge = np.inf
+
         labels = [f"{int(bins[i])}-{int(bins[i+1] - 1)}" for i in range(len(bins) - 1)]
+        end = int(bins[-1] - 1)
+        bins = bins.tolist()
+        bins.insert(0, lower_bin_edge)
+        bins.append(upper_bin_edge)
+        labels.insert(0, f"< {start}")
+        labels.append(f"> {end}")
         return bins, labels
 
-    def _transform_column_to_ranges(self, column: str, bin_size: int) -> pd.Series:
+    def _transform_column_to_ranges(
+        self, df: pd.DataFrame, column: str, bin_size: int, fit: bool = True
+    ) -> pd.Series:
         """
         Transforms a column in the DataFrame into range bins.
 
         Parameters
         ----------
+        df : `pd.DataFrame`
+            The original DataFrame to transform.
         column : `str`
             The name of the column to transform.
         bin_size : `int`
@@ -130,40 +142,51 @@ class TransformRange:
         ValueError
             If bin_size is not positive or if column contains non-numeric data.
         """
-        if column not in self.df.columns:
-            raise KeyError(f"Column '{column}' not found in DataFrame")
+        if not isinstance(df, pd.DataFrame):
+            raise TypeError("df must be a pandas DataFrame")
+        df_ = df.copy()  # Create a copy to avoid modifying the original
+        numeric_series = pd.to_numeric(df_[column], errors="coerce")
+        if fit:
+            self.df = df_.copy()
+            if column not in df_.columns:
+                raise KeyError(f"Column '{column}' not found in DataFrame")
 
-        if bin_size <= 0:
-            raise ValueError("bin_size must be positive")
+            if bin_size <= 0:
+                raise ValueError("bin_size must be positive")
 
-        numeric_series = pd.to_numeric(self.df[column], errors="coerce")
-        if numeric_series.isna().all():
-            raise ValueError(f"Column '{column}' contains no valid numeric data")
+            if numeric_series.isna().all():
+                raise ValueError(f"Column '{column}' contains no valid numeric data")
 
-        min_val = numeric_series.min()
-        max_val = numeric_series.max()
+            min_val = numeric_series.min()
+            max_val = numeric_series.max()
 
-        if min_val == max_val:
-            return pd.Series(
-                [f"{int(min_val)}-{int(max_val)}"] * len(self.df), name=f"{column}_range"
-            )
+            if min_val == max_val:
+                return pd.Series(
+                    [f"{int(min_val)}-{int(max_val)}"] * len(df_), name=f"{column}_range"
+                )
+            self.info[column] = {"min_value": min_val, "max_value": max_val, "range": bin_size}
+        else:
+            min_val = self.info[column]["min_value"]
+            max_val = self.info[column]["max_value"]
+            bin_size = self.info[column]["range"]
 
         bins, labels = self._create_bins_and_labels(min_val, max_val, bin_size)
-
         return pd.cut(numeric_series, bins=bins, labels=labels, right=False, include_lowest=True)
 
-    def transform_dataframe(
-        self, columns_bin_sizes: Dict[str, int], drop_original: bool = False
+    def transform(
+        self, df: pd.DataFrame, drop_original: bool = False, fit: bool = True
     ) -> pd.DataFrame:
         """
         Creates a new DataFrame with range columns.
 
         Parameters
         ----------
-        columns_bin_sizes : `dict`
-            A dictionary where the keys are column names and the values are the bin sizes.
+        df : `pd.DataFrame`
+            The original DataFrame to transform.
         drop_original : `bool`, optional
             If True, drops original columns from the result, by default False
+        fit : `bool`, default=True
+            Whether to compute bin edges based on the data (True) or use predefined binning (False).
 
         Returns
         -------
@@ -175,22 +198,24 @@ class TransformRange:
         TypeError
             If columns_bin_sizes is not a dictionary.
         """
-        if not isinstance(columns_bin_sizes, dict):
+        if not isinstance(self.columns_bin_sizes, dict):
             raise TypeError("columns_bin_sizes must be a dictionary")
 
-        if not columns_bin_sizes:
+        if not self.columns_bin_sizes:
             return pd.DataFrame()
 
         range_columns = {}
-        for column, bin_size in columns_bin_sizes.items():
-            range_columns[f"{column}_range"] = self._transform_column_to_ranges(column, bin_size)
+        for column, bin_size in self.columns_bin_sizes.items():
+            range_columns[f"{column}_range"] = self._transform_column_to_ranges(
+                df, column, bin_size, fit
+            )
 
         result_df = pd.DataFrame(range_columns)
 
         if not drop_original:
-            original_cols = [col for col in self.df.columns if col not in columns_bin_sizes]
+            original_cols = [col for col in df.columns if col not in self.columns_bin_sizes]
             if original_cols:
-                result_df = pd.concat([self.df[original_cols], result_df], axis=1)
+                result_df = pd.concat([df[original_cols], result_df], axis=1)
 
         return result_df
 

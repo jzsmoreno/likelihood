@@ -56,7 +56,7 @@ class Env:
 
         Returns
         -------
-            `tuple` : (current_state, action_pred, reward, next_action, done)
+        tuple : (current_state, action_pred, reward, next_action, done)
         """
         if self.done:
             return None, None, 0, None, True
@@ -146,7 +146,7 @@ class AutoQL:
 
         Returns
         -------
-            `tuple` : (state, action, reward, next_action, done)
+        tuple : (state, action, reward, next_action, done)
         """
         current_state, value, reward, next_action, done = self.env.step(state, action)
 
@@ -174,7 +174,7 @@ class AutoQL:
 
         Returns
         -------
-            `tuple` : (state, action, reward, next_action, done)
+        tuple : (state, action, reward, next_action, done)
         """
         current_state, greedy_action, reward, next_action, done = self.epsilon_greedy_policy(
             state, action, epsilon
@@ -202,7 +202,7 @@ class AutoQL:
 
         Returns
         -------
-            `float` : Training loss
+        float : Training loss
         """
 
         batch_ = random.sample(self.replay_buffer, self.batch_size)

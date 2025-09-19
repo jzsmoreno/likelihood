@@ -2,7 +2,7 @@ import math
 import os
 import pickle
 import warnings
-from typing import Callable, Dict, List, Tuple, Union
+from typing import Callable, Dict, Generator, List, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,7 +25,7 @@ Data Science from Scratch, Second Edition, by Joel Grus (O'Reilly).Copyright 201
 """
 
 
-def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -> List:
+def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -> Generator:
     """Generates 'batch_size'-sized minibatches from the dataset
 
     Parameters
@@ -660,7 +660,7 @@ class DataScaler:
 
     __slots__ = ["dataset_", "_n", "data_scaled", "values", "inv_fitting"]
 
-    def __init__(self, dataset: np.ndarray, n: int = 1) -> None:
+    def __init__(self, dataset: np.ndarray, n: int | None = 1) -> None:
         """Initializes the parameters required for scaling the data"""
         self.dataset_ = dataset.copy()
         self._n = n
@@ -1024,20 +1024,21 @@ class OneHotEncoder:
     It receives an array of integers and returns a binary array using the one-hot encoding method.
     """
 
-    __slots__ = ["x"]
+    __slots__ = ["num_categories"]
 
     def __init__(self) -> None:
         pass
 
-    def encode(self, x: np.ndarray | list):
-        self.x = x
+    def encode(self, x: np.ndarray | list, fit: bool = True):
+        if not isinstance(x, np.ndarray):
+            x = np.array(x)
+        x = x.astype(int)
+        if fit:
+            self.num_categories = x.max() + 1
 
-        if not isinstance(self.x, np.ndarray):
-            self.x = np.array(self.x)
+        y = np.zeros((x.size, self.num_categories))
 
-        y = np.zeros((self.x.size, self.x.max() + 1))
-
-        y[np.arange(self.x.size), self.x] = 1
+        y[np.arange(x.size), x] = 1
 
         return y
 
@@ -1189,7 +1190,9 @@ def check_nan_inf(df: DataFrame, verbose: bool = False) -> DataFrame:
     if nan_values:
         (
             print(
-                "UserWarning: Some rows may have been deleted due to the existence of NaN values."
+                "UserWarning: Some rows may have been deleted due to the existence of NaN values.",
+                f"NaN values removed: ",
+                "{:,}".format(nan_count),
             )
             if verbose
             else None
@@ -1199,16 +1202,15 @@ def check_nan_inf(df: DataFrame, verbose: bool = False) -> DataFrame:
     if inf_values:
         (
             print(
-                "UserWarning: Some rows may have been deleted due to the existence of Inf values."
+                "UserWarning: Some rows may have been deleted due to the existence of Inf values.",
+                f"Infinite values removed: ",
+                "{:,}".format(inf_count),
             )
             if verbose
             else None
         )
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
         df.dropna(inplace=True)
-
-    print(f"NaN values removed: ", "{:,}".format(nan_count))
-    print(f"Infinite values removed: ", "{:,}".format(inf_count))
 
     return df
 
