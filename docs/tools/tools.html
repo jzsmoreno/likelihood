@@ -313,7 +313,9 @@ el.replaceWith(d);
     if nan_values:
         (
             print(
-                &#34;UserWarning: Some rows may have been deleted due to the existence of NaN values.&#34;
+                &#34;UserWarning: Some rows may have been deleted due to the existence of NaN values.&#34;,
+                f&#34;NaN values removed: &#34;,
+                &#34;{:,}&#34;.format(nan_count),
             )
             if verbose
             else None
@@ -323,16 +325,15 @@ el.replaceWith(d);
     if inf_values:
         (
             print(
-                &#34;UserWarning: Some rows may have been deleted due to the existence of Inf values.&#34;
+                &#34;UserWarning: Some rows may have been deleted due to the existence of Inf values.&#34;,
+                f&#34;Infinite values removed: &#34;,
+                &#34;{:,}&#34;.format(inf_count),
             )
             if verbose
             else None
         )
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
         df.dropna(inplace=True)
-
-    print(f&#34;NaN values removed: &#34;, &#34;{:,}&#34;.format(nan_count))
-    print(f&#34;Infinite values removed: &#34;, &#34;{:,}&#34;.format(inf_count))
 
     return df</code></pre>
 </details>
@@ -714,14 +715,14 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 </dl></div>
 </dd>
 <dt id="likelihood.tools.tools.minibatches"><code class="name flex">
-<span>def <span class="ident">minibatches</span></span>(<span>dataset: List, batch_size: int, shuffle: bool = True) ‑> List</span>
+<span>def <span class="ident">minibatches</span></span>(<span>dataset: List, batch_size: int, shuffle: bool = True) ‑> Generator</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -&gt; List:
+<pre><code class="python">def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -&gt; Generator:
     &#34;&#34;&#34;Generates &#39;batch_size&#39;-sized minibatches from the dataset
 
     Parameters
@@ -2044,7 +2045,7 @@ value of evaluated function.</p></div>
 </dd>
 <dt id="likelihood.tools.tools.DataScaler"><code class="flex name class">
 <span>class <span class="ident">DataScaler</span></span>
-<span>(</span><span>dataset: numpy.ndarray, n: int = 1)</span>
+<span>(</span><span>dataset: numpy.ndarray, n: None | int = 1)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -2056,7 +2057,7 @@ value of evaluated function.</p></div>
 
     __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
-    def __init__(self, dataset: np.ndarray, n: int = 1) -&gt; None:
+    def __init__(self, dataset: np.ndarray, n: int | None = 1) -&gt; None:
         &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
         self.dataset_ = dataset.copy()
         self._n = n
@@ -2158,7 +2159,7 @@ value of evaluated function.</p></div>
 
     __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
-    def __init__(self, dataset: np.ndarray, n: int = 1) -&gt; None:
+    def __init__(self, dataset: np.ndarray, n: int | None = 1) -&gt; None:
         &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
         self.dataset_ = dataset.copy()
         self._n = n
@@ -2258,7 +2259,7 @@ value of evaluated function.</p></div>
 
     __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
-    def __init__(self, dataset: np.ndarray, n: int = 1) -&gt; None:
+    def __init__(self, dataset: np.ndarray, n: int | None = 1) -&gt; None:
         &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
         self.dataset_ = dataset.copy()
         self._n = n
@@ -2358,7 +2359,7 @@ value of evaluated function.</p></div>
 
     __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
-    def __init__(self, dataset: np.ndarray, n: int = 1) -&gt; None:
+    def __init__(self, dataset: np.ndarray, n: int | None = 1) -&gt; None:
         &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
         self.dataset_ = dataset.copy()
         self._n = n
@@ -2458,7 +2459,7 @@ value of evaluated function.</p></div>
 
     __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
-    def __init__(self, dataset: np.ndarray, n: int = 1) -&gt; None:
+    def __init__(self, dataset: np.ndarray, n: int | None = 1) -&gt; None:
         &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
         self.dataset_ = dataset.copy()
         self._n = n
@@ -4642,20 +4643,21 @@ A string representation of the directed graph.</p></div>
     It receives an array of integers and returns a binary array using the one-hot encoding method.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;x&#34;]
+    __slots__ = [&#34;num_categories&#34;]
 
     def __init__(self) -&gt; None:
         pass
 
-    def encode(self, x: np.ndarray | list):
-        self.x = x
+    def encode(self, x: np.ndarray | list, fit: bool = True):
+        if not isinstance(x, np.ndarray):
+            x = np.array(x)
+        x = x.astype(int)
+        if fit:
+            self.num_categories = x.max() + 1
 
-        if not isinstance(self.x, np.ndarray):
-            self.x = np.array(self.x)
+        y = np.zeros((x.size, self.num_categories))
 
-        y = np.zeros((self.x.size, self.x.max() + 1))
-
-        y[np.arange(self.x.size), self.x] = 1
+        y[np.arange(x.size), x] = 1
 
         return y
 
@@ -4671,7 +4673,7 @@ A string representation of the directed graph.</p></div>
 It receives an array of integers and returns a binary array using the one-hot encoding method.</p></div>
 <h3>Instance variables</h3>
 <dl>
-<dt id="likelihood.tools.tools.OneHotEncoder.x"><code class="name">var <span class="ident">x</span></code></dt>
+<dt id="likelihood.tools.tools.OneHotEncoder.num_categories"><code class="name">var <span class="ident">num_categories</span></code></dt>
 <dd>
 <details class="source">
 <summary>
@@ -4683,20 +4685,21 @@ It receives an array of integers and returns a binary array using the one-hot en
     It receives an array of integers and returns a binary array using the one-hot encoding method.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;x&#34;]
+    __slots__ = [&#34;num_categories&#34;]
 
     def __init__(self) -&gt; None:
         pass
 
-    def encode(self, x: np.ndarray | list):
-        self.x = x
+    def encode(self, x: np.ndarray | list, fit: bool = True):
+        if not isinstance(x, np.ndarray):
+            x = np.array(x)
+        x = x.astype(int)
+        if fit:
+            self.num_categories = x.max() + 1
 
-        if not isinstance(self.x, np.ndarray):
-            self.x = np.array(self.x)
+        y = np.zeros((x.size, self.num_categories))
 
-        y = np.zeros((self.x.size, self.x.max() + 1))
-
-        y[np.arange(self.x.size), self.x] = 1
+        y[np.arange(x.size), x] = 1
 
         return y
 
@@ -4732,22 +4735,23 @@ It receives an array of integers and returns a binary array using the one-hot en
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.tools.tools.OneHotEncoder.encode"><code class="name flex">
-<span>def <span class="ident">encode</span></span>(<span>self, x: numpy.ndarray | list)</span>
+<span>def <span class="ident">encode</span></span>(<span>self, x: numpy.ndarray | list, fit: bool = True)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def encode(self, x: np.ndarray | list):
-    self.x = x
+<pre><code class="python">def encode(self, x: np.ndarray | list, fit: bool = True):
+    if not isinstance(x, np.ndarray):
+        x = np.array(x)
+    x = x.astype(int)
+    if fit:
+        self.num_categories = x.max() + 1
 
-    if not isinstance(self.x, np.ndarray):
-        self.x = np.array(self.x)
+    y = np.zeros((x.size, self.num_categories))
 
-    y = np.zeros((self.x.size, self.x.max() + 1))
-
-    y[np.arange(self.x.size), self.x] = 1
+    y[np.arange(x.size), x] = 1
 
     return y</code></pre>
 </details>
@@ -4997,7 +5001,7 @@ It receives an array of integers and returns a binary array using the one-hot en
 <ul class="">
 <li><code><a title="likelihood.tools.tools.OneHotEncoder.decode" href="#likelihood.tools.tools.OneHotEncoder.decode">decode</a></code></li>
 <li><code><a title="likelihood.tools.tools.OneHotEncoder.encode" href="#likelihood.tools.tools.OneHotEncoder.encode">encode</a></code></li>
-<li><code><a title="likelihood.tools.tools.OneHotEncoder.x" href="#likelihood.tools.tools.OneHotEncoder.x">x</a></code></li>
+<li><code><a title="likelihood.tools.tools.OneHotEncoder.num_categories" href="#likelihood.tools.tools.OneHotEncoder.num_categories">num_categories</a></code></li>
 </ul>
 </li>
 <li>

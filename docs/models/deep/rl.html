@@ -122,7 +122,7 @@ el.replaceWith(d);
 
         Returns
         -------
-            `tuple` : (state, action, reward, next_action, done)
+        tuple : (state, action, reward, next_action, done)
         &#34;&#34;&#34;
         current_state, value, reward, next_action, done = self.env.step(state, action)
 
@@ -150,7 +150,7 @@ el.replaceWith(d);
 
         Returns
         -------
-            `tuple` : (state, action, reward, next_action, done)
+        tuple : (state, action, reward, next_action, done)
         &#34;&#34;&#34;
         current_state, greedy_action, reward, next_action, done = self.epsilon_greedy_policy(
             state, action, epsilon
@@ -178,7 +178,7 @@ el.replaceWith(d);
 
         Returns
         -------
-            `float` : Training loss
+        float : Training loss
         &#34;&#34;&#34;
 
         batch_ = random.sample(self.replay_buffer, self.batch_size)
@@ -359,7 +359,7 @@ el.replaceWith(d);
 
     Returns
     -------
-        `tuple` : (state, action, reward, next_action, done)
+    tuple : (state, action, reward, next_action, done)
     &#34;&#34;&#34;
     current_state, value, reward, next_action, done = self.env.step(state, action)
 
@@ -382,8 +382,10 @@ el.replaceWith(d);
 <dd>Exploration probability. By default it is set to <code>0</code></dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<pre><code>&lt;code&gt;tuple&lt;/code&gt; : (state, action, reward, next_action, done)
-</code></pre></div>
+<dl>
+<dt><strong><code>tuple</code></strong> :&ensp;<code>(state, action, reward, next_action, done)</code></dt>
+<dd>&nbsp;</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.deep.rl.AutoQL.play_one_step"><code class="name flex">
 <span>def <span class="ident">play_one_step</span></span>(<span>self, state, action, epsilon)</span>
@@ -409,7 +411,7 @@ el.replaceWith(d);
 
     Returns
     -------
-        `tuple` : (state, action, reward, next_action, done)
+    tuple : (state, action, reward, next_action, done)
     &#34;&#34;&#34;
     current_state, greedy_action, reward, next_action, done = self.epsilon_greedy_policy(
         state, action, epsilon
@@ -441,8 +443,10 @@ el.replaceWith(d);
 <dd>Exploration probability.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<pre><code>&lt;code&gt;tuple&lt;/code&gt; : (state, action, reward, next_action, done)
-</code></pre></div>
+<dl>
+<dt><strong><code>tuple</code></strong> :&ensp;<code>(state, action, reward, next_action, done)</code></dt>
+<dd>&nbsp;</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.deep.rl.AutoQL.train"><code class="name flex">
 <span>def <span class="ident">train</span></span>(<span>self,<br>x_data,<br>y_data,<br>optimizer='adam',<br>loss_fn='mse',<br>num_episodes=50,<br>num_steps=100,<br>gamma=0.7,<br>batch_size=32,<br>patience=10,<br>alpha=0.01)</span>
@@ -627,7 +631,7 @@ el.replaceWith(d);
 
         Returns
         -------
-            `tuple` : (current_state, action_pred, reward, next_action, done)
+        tuple : (current_state, action_pred, reward, next_action, done)
         &#34;&#34;&#34;
         if self.done:
             return None, None, 0, None, True
@@ -735,7 +739,7 @@ el.replaceWith(d);
 
     Returns
     -------
-        `tuple` : (current_state, action_pred, reward, next_action, done)
+    tuple : (current_state, action_pred, reward, next_action, done)
     &#34;&#34;&#34;
     if self.done:
         return None, None, 0, None, True
@@ -775,8 +779,10 @@ el.replaceWith(d);
 <dd>Expected action to process.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<pre><code>&lt;code&gt;tuple&lt;/code&gt; : (current_state, action_pred, reward, next_action, done)
-</code></pre></div>
+<dl>
+<dt><strong><code>tuple</code></strong> :&ensp;<code>(current_state, action_pred, reward, next_action, done)</code></dt>
+<dd>&nbsp;</dd>
+</dl></div>
 </dd>
 </dl>
 </dd>

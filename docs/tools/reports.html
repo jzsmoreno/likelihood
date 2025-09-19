@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>likelihood.tools.reports API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>likelihood.tools.reports</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="likelihood.tools.reports.generate_html_pipeline"><code class="name flex">
+<span>def <span class="ident">generate_html_pipeline</span></span>(<span>data_dict, save_to_file=False, file_name='data_processing_report.html')</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def generate_html_pipeline(data_dict, save_to_file=False, file_name=&#34;data_processing_report.html&#34;):
+    css_js = &#34;&#34;&#34;
+    &lt;style&gt;
+        :root {
+            --primary: #0d9488;
+            --primary-dark: #0f766e;
+            --success: #10b981;
+            --accent: #3b82f6;
+            --card-bg: #ffffff;
+            --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.03);
+            --border-radius-md: 6px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: &#39;Inter&#39;, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            margin: 0;
+            padding: 1rem;
+            font-size: 14px;
+        }
+
+        h2 {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            text-align: center;
+            padding: 1rem;
+            border-radius: var(--border-radius-md);
+            font-weight: 600;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        section {
+            background: var(--card-bg);
+            border-radius: var(--border-radius-md);
+            padding: 1rem;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 1.2rem;
+        }
+
+        h3 {
+            color: var(--primary-dark);
+            font-weight: 600;
+            font-size: 1.2rem;
+            border-left: 4px solid var(--success);
+            padding-left: 0.8rem;
+            margin: 1rem 0 0.8rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin: 0.5rem 0 1rem;
+        }
+
+        th, td {
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: top;
+        }
+
+        thead {
+            background-color: #f0fdf4;
+        }
+
+        tbody tr:nth-child(odd) {
+            background-color: #f9fafb;
+        }
+
+        tbody tr:hover {
+            background-color: #e0f2fe;
+        }
+
+        .nested-table {
+            font-size: 12px;
+            margin-top: 0.5rem;
+        }
+
+        details {
+            margin-bottom: 0.8rem;
+            padding: 0.5rem 0.8rem;
+            background: #f9f9f9;
+            border-radius: var(--border-radius-md);
+        }
+
+        summary {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--primary-dark);
+            cursor: pointer;
+        }
+
+        summary::before {
+            content: &#34;▶&#34;;
+            margin-right: 6px;
+            color: var(--success);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                font-size: 13px;
+            }
+
+            h2 {
+                font-size: 1.3rem;
+                padding: 0.8rem;
+            }
+
+            h3 {
+                font-size: 1.1rem;
+            }
+
+            table, .nested-table {
+                font-size: 12px;
+            }
+        }
+    &lt;/style&gt;
+    &#34;&#34;&#34;
+
+    def render_value(val):
+        if isinstance(val, dict):
+            return dict_to_table(val, nested=True)
+        elif isinstance(val, list):
+            if all(isinstance(item, (str, int, float)) for item in val):
+                return &#34;, &#34;.join(escape(str(x)) for x in val)
+            else:
+                return &#34;&lt;ul&gt;&#34; + &#34;&#34;.join(f&#34;&lt;li&gt;{render_value(v)}&lt;/li&gt;&#34; for v in val) + &#34;&lt;/ul&gt;&#34;
+        else:
+            return escape(str(val))
+
+    def dict_to_table(d, title=None, nested=False):
+        html = &#34;&#34;
+        if title and not nested:
+            html += f&#34;&lt;h4&gt;{escape(title)}&lt;/h4&gt;&#34;
+        table_class = &#34;nested-table&#34; if nested else &#34;table&#34;
+        html += f&#34;&lt;table class=&#39;{table_class}&#39;&gt;&#34;
+        html += &#34;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Key&lt;/th&gt;&lt;th&gt;Value&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&#34;
+        for key, val in d.items():
+            key_html = escape(str(key))
+            val_html = render_value(val)
+            html += f&#34;&lt;tr&gt;&lt;td&gt;{key_html}&lt;/td&gt;&lt;td&gt;{val_html}&lt;/td&gt;&lt;/tr&gt;&#34;
+        html += &#34;&lt;/tbody&gt;&lt;/table&gt;&#34;
+        return html
+
+    html_content = css_js
+    html_content += &#34;&lt;h2&gt;📈 Data Processing Report&lt;/h2&gt;&#34;
+
+    html_content += &#34;&lt;section&gt;&#34;
+    html_content += &#34;&lt;h3&gt;📁 Initial Dataset&lt;/h3&gt;&#34;
+    html_content += dict_to_table(data_dict[&#34;initial_dataset&#34;])
+    html_content += &#34;&lt;/section&gt;&#34;
+
+    html_content += &#34;&lt;section&gt;&#34;
+    html_content += &#34;&lt;h3&gt;🔧 Processing Steps&lt;/h3&gt;&#34;
+    for i, step in enumerate(data_dict[&#34;processing_steps&#34;]):
+        html_content += &#34;&lt;details open&gt;&#34;
+        html_content += f&#34;&lt;summary&gt;Step {i + 1}: {escape(step[&#39;step_name&#39;])}&lt;/summary&gt;&#34;
+        html_content += f&#34;&lt;p&gt;&lt;strong&gt;Description:&lt;/strong&gt; {escape(step[&#39;description&#39;])}&lt;/p&gt;&#34;
+        html_content += dict_to_table(step[&#34;parameters&#34;], title=&#34;Parameters&#34;, nested=True)
+        html_content += dict_to_table(
+            {
+                &#34;Output Shape&#34;: step[&#34;output_shape&#34;],
+                &#34;Input Columns&#34;: step[&#34;input_columns&#34;],
+                &#34;Output Columns&#34;: step[&#34;output_columns&#34;],
+                &#34;Output Dtypes&#34;: step[&#34;output_dtypes&#34;],
+            },
+            title=&#34;Output Info&#34;,
+            nested=True,
+        )
+        html_content += &#34;&lt;/details&gt;&#34;
+    html_content += &#34;&lt;/section&gt;&#34;
+
+    html_content += &#34;&lt;section&gt;&#34;
+    html_content += &#34;&lt;h3&gt;✅ Final Dataset&lt;/h3&gt;&#34;
+    html_content += dict_to_table(data_dict[&#34;final_dataset&#34;])
+    html_content += &#34;&lt;/section&gt;&#34;
+
+    if save_to_file:
+        with open(file_name, &#34;w&#34;, encoding=&#34;utf-8&#34;) as f:
+            f.write(html_content)
+        print(f&#34;✅ Report saved to &#39;{file_name}&#39;&#34;)
+    else:
+        display(HTML(html_content))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</section>
+<section>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="likelihood.tools" href="index.html">likelihood.tools</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="likelihood.tools.reports.generate_html_pipeline" href="#likelihood.tools.reports.generate_html_pipeline">generate_html_pipeline</a></code></li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>
