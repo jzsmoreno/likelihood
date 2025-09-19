@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+from likelihood.tools import generate_html_pipeline
 from likelihood.tools.impute import SimpleImputer
 from likelihood.tools.models_tools import TransformRange, remove_collinearity
 from likelihood.tools.tools import DataFrameEncoder, DataScaler, LinearRegression, OneHotEncoder
@@ -72,6 +73,7 @@ class Pipeline:
                 "parameters": params,
                 "description": self._get_step_description(step_name),
             }
+            step_info["input_columns"] = list(X.columns)
 
             X = self._apply_step(step_name, X, fit=True, **params)
 
@@ -129,6 +131,22 @@ class Pipeline:
             X = self._apply_step(step_name, X, fit=False)
 
         return X
+
+    def get_doc(
+        self, save_to_file: bool = True, file_name: str = "data_processing_report.html"
+    ) -> None:
+        """
+        Generate an HTML report from `self.documentation` for pipeline documentation.
+
+        Parameters
+        ----------
+        save_to_file : bool, optional
+            Whether to save generated HTML content to a file. Default is True.
+        file_name : str, optional
+            Filename for output when `save_to_file` is True. Default is "data_processing_report.html".
+        """
+
+        generate_html_pipeline(self.documentation, save_to_file=save_to_file, file_name=file_name)
 
     def _apply_step(self, step_name: str, X: pd.DataFrame, fit: bool, **params) -> pd.DataFrame:
         """Dispatch to the correct handler for a preprocessing step."""
