@@ -215,17 +215,14 @@ class Pipeline:
     ) -> pd.DataFrame:
         """Handle TransformRange (bin numerical features into ranges)."""
         if fit:
-            transformer = TransformRange(X)
-            cleaned_X = transformer.transform_dataframe(columns_bin_sizes=columns_bin_sizes)
+            transformer = TransformRange(columns_bin_sizes)
+            cleaned_X = transformer.transform(X)
             self.fitted_components["TransformRange"] = transformer
             self.columns_bin_sizes = columns_bin_sizes
             return cleaned_X
         else:
             transformer = self.fitted_components["TransformRange"]
-            transformer.df = X
-            return transformer.transform_dataframe(
-                columns_bin_sizes=self.columns_bin_sizes, fit=False
-            )
+            return transformer.transform(X, fit=False)
 
     def _handle_onehotencoder(
         self, X: pd.DataFrame, fit: bool, columns: List[str] | None = None
