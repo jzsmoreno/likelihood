@@ -59,7 +59,7 @@ class Pipeline:
         initial_info = {
             "shape": X.shape,
             "columns": list(X.columns),
-            "dtypes": X.dtypes.to_dict(),
+            "dtypes": X.dtypes.apply(lambda x: x.name).to_dict(),
             "missing_values": X.isnull().sum().to_dict(),
         }
 
@@ -77,14 +77,14 @@ class Pipeline:
 
             step_info["output_shape"] = X.shape
             step_info["output_columns"] = list(X.columns)
-            step_info["output_dtypes"] = X.dtypes.to_dict()
+            step_info["output_dtypes"] = X.dtypes.apply(lambda x: x.name).to_dict()
 
             steps_info.append(step_info)
 
         final_info = {
             "shape": X.shape,
             "columns": list(X.columns),
-            "dtypes": X.dtypes.to_dict(),
+            "dtypes": X.dtypes.apply(lambda x: x.name).to_dict(),
             "missing_values": X.isnull().sum().to_dict(),
         }
 
