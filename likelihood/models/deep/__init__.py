@@ -8,5 +8,6 @@ else:
     from .autoencoders import *
     from .predictor import GetInsights
 
+from .bandit import *
 from .gan import *
 from .rl import *

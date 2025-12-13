@@ -188,7 +188,7 @@ def cal_missing_values(df: DataFrame) -> None:
     """
 
     col = df.columns
-    print("Total size : ", "{:,}".format(len(df)))
+    print("Total size :", "{:,}".format(len(df)))
     for i in col:
         print(
             str(i) + " : " f"{(df.isnull().sum()[i]/(df.isnull().sum()[i]+df[i].count()))*100:.2f}%"
@@ -812,8 +812,8 @@ class DataFrameEncoder:
     def load_config(self, path_to_dictionaries: str = "./", **kwargs) -> None:
         """Loads dictionaries from a given directory
 
-        Keyword Arguments:
-        ----------
+        Keyword Arguments
+        -----------------
         - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
         """
         dictionary_name = (
@@ -860,8 +860,8 @@ class DataFrameEncoder:
     def encode(self, path_to_save: str = "./", **kwargs) -> DataFrame:
         """Encodes the `object` type columns of the dataframe
 
-        Keyword Arguments:
-        ------------------
+        Keyword Arguments
+        -----------------
         - save_mode (`bool`): An optional integer parameter. By default it is set to `True`
         - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
         - norm_method (`str`): An optional string parameter to perform normalization. By default it is set to `None`

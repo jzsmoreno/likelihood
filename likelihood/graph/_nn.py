@@ -80,8 +80,8 @@ def cal_adjacency_matrix(
     adjacency_matrix : `ndarray`
         The adjacency matrix.
 
-    Keyword Arguments:
-    ----------
+    Keyword Arguments
+    -----------------
     similarity: `int`
         The minimum number of features that must be the same in both arrays to be considered similar.
     threshold : `float`

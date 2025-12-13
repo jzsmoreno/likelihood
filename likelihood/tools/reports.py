@@ -1,4 +1,5 @@
 from html import escape
+
 from IPython.display import HTML, display
 
 

@@ -381,13 +381,13 @@ if __name__ == "__main__":
     A = np.array([[1, 1, 1], [1, -1, 2], [1, -1, -3]])
     Ag = A.copy()
     b = np.array([6, 5, -10])
-    print("b : ", b)
+    print("b :", b)
     # Solve Ax=b, x = [1, 2, 3]
     x = solve(A, b)
     x_hat_sor = sor_elimination(A, b, 3, 200, 0.05)
     # assert np.allclose(x, x_hat_sor), f"Expected:\n{x}\ngot\n{x_hat_sor}"
 
-    print("Using Gaussian elimination : ")
+    print("Using Gaussian elimination :")
     Ag = np.insert(Ag, len(Ag), b, axis=1)
     print(Ag)
     x_hat_gaus = gauss_elimination(Ag)
@@ -395,7 +395,7 @@ if __name__ == "__main__":
     print("New correlation coefficient test")
     X = np.random.rand(100, 1)
     Y = X * X
-    print("coefficient for Y = X * X : ", xicor(X, Y, False))
+    print("coefficient for Y = X * X :", xicor(X, Y, False))
     df["index"] = ["A", "B", "C", "D"]
     print("New correlation coefficient test for pandas DataFrame")
     values_df = xi_corr(df)

@@ -49,8 +49,8 @@ class AutoClassifier:
     activation : `str`
         The type of activation function to use for the neural network layers.
 
-    Keyword Arguments:
-    ----------
+    Keyword Arguments
+    -----------------
     Additional keyword arguments to pass to the model.
 
     classifier_activation : `str`
@@ -591,8 +591,8 @@ def call_existing_code(
     num_layers : `int`
         The number of hidden layers in the classifier. Default is 1.
 
-    Keyword Arguments:
-    ----------
+    Keyword Arguments
+    -----------------
     vae_mode : `bool`
         Whether to use variational autoencoder mode. Default is False.
     vae_units : `int`
@@ -640,8 +640,8 @@ def build_model(
     num_classes : `int`
         The number of classes in the dataset.
 
-    Keyword Arguments:
-    ----------
+    Keyword Arguments
+    -----------------
     Additional keyword arguments to pass to the model.
 
     hyperparameters : `dict`
@@ -791,8 +791,8 @@ def setup_model(
     method : `str`
         The method to use for hyperparameter tuning. Options are "Hyperband" and "RandomSearch".
 
-    Keyword Arguments:
-    ----------
+    Keyword Arguments
+    -----------------
     Additional keyword arguments to pass to the model.
 
     max_trials : `int`
