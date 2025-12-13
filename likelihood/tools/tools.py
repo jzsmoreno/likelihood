@@ -412,7 +412,7 @@ def fft_denoise(
         denoised_dataset[i, :] = denoised_signal
 
         peak_index = L[np.argmax(np.abs(fhat[L]))]
-        periods[i] = 1 / (2 * freq[peak_index])
+        periods[i] = 1 / freq[peak_index]
 
         if mode:
             print(f"The {i+1}-th row of the dataset has been denoised.")
@@ -649,10 +649,16 @@ def cal_average(y: np.ndarray, alpha: float = 1):
         The average of the data.
     """
 
-    n = int(alpha * len(y))
-    w = np.ones(n) / n
-    average = np.convolve(y, w, mode="same") / np.convolve(np.ones_like(y), w, mode="same")
-    return average
+    window_size = int(alpha * len(y))
+    if len(y) < 2:
+        return y
+
+    n = min(window_size, len(y))
+    if n <= 1:
+        return y
+
+    padded = np.pad(y, n // 2, mode="edge")
+    return np.convolve(padded, np.ones(n) / n, mode="valid")[: len(y)]
 
 
 class DataScaler:
