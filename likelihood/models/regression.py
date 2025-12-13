@@ -422,7 +422,9 @@ class Arima(AbstractArima):
                 norm_datapoints = np.linalg.norm(datapoints)
                 norm_y_sum = np.linalg.norm(y_sum)
                 if norm_y_sum != 0 and norm_datapoints != 0:
-                    y_sum = cal_average(np.abs(y_sum * (norm_datapoints / norm_y_sum)) * np.sign(datapoints), 0.05)
+                    y_sum = cal_average(
+                        np.abs(y_sum * (norm_datapoints / norm_y_sum)) * np.sign(datapoints), 0.05
+                    )
             else:
                 y_sum = datapoints.copy()
 
