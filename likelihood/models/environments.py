@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Dict
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 
@@ -41,7 +41,7 @@ class OptionCriticEnv:
 
     def __init__(
         self,
-        episodes: Dict[int, Dict],
+        episodes: Dict[int, Dict[str, List]],
     ):
         """
         Initializes the OptionCriticEnv with a dataset of episodes.
@@ -65,18 +65,42 @@ class OptionCriticEnv:
         """
         self.episodes = episodes
 
-        if not episodes or not episodes[0].get("state") or not episodes[0].get("selected_option"):
-            raise ValueError("The episode data is missing required fields.")
+        required_keys = ["state", "action", "selected_option", "reward", "next_state", "done"]
+        for episode_id, data in episodes.items():
+            if not all(k in data for k in required_keys):
+                raise ValueError(
+                    f"Episode {episode_id} missing keys: {set(required_keys) - set(data.keys())}"
+                )
+
         self.observation_space = np.array(episodes[0]["state"][0])
         self.done = False
+        self.idx_episode = 0
+        self.current_state = None
         self.num_options = len(set(episodes[0]["selected_option"]))
         self.actions_by_option = defaultdict(set)
 
-        for episode_id, episode_data in episodes.items():
-            selected_options = episode_data["selected_option"]
-            actions = episode_data["action"]
+        # Build fast lookup for transitions
+        self.state_action_option_to_transition: Dict[Tuple, Dict[str, Any]] = {}
 
-            for i, selected in enumerate(selected_options):
+        for episode_id, data in episodes.items():
+            states = data["state"]
+            actions = data["action"]
+            options = data["selected_option"]
+            next_states = data["next_state"]
+            rewards = data["reward"]
+            dones = data["done"]
+
+            for i in range(len(states)):
+                state_key = tuple(states[i])
+                key = (state_key, options[i], actions[i])
+
+                self.state_action_option_to_transition[key] = {
+                    "next_state": next_states[i],
+                    "reward": rewards[i],
+                    "done": dones[i],
+                }
+
+            for i, selected in enumerate(options):
                 self.actions_by_option[selected].add(actions[i])
 
         self.unique_actions_count = [
@@ -97,8 +121,9 @@ class OptionCriticEnv:
         info : `Dict`
             Empty dictionary (no additional information)
         """
-        self.idx_episode = np.random.randint(len(self.episodes))
-        self.current_state = self.episodes[self.idx_episode]["state"][0]
+        episode_id = np.random.choice(list(self.episodes.keys()))
+        self.idx_episode = episode_id
+        self.current_state = self.episodes[episode_id]["state"][0]
         return self.current_state, {}
 
     def step(self, action: int, option: int) -> tuple[np.ndarray, float, bool, bool, dict]:
@@ -125,20 +150,13 @@ class OptionCriticEnv:
         info : `Dict`
             Empty dictionary (no additional information)
         """
-        for key, value in self.episodes.items():
-            for idx, state in enumerate(value["state"]):
-                if (
-                    np.array_equal(state, self.current_state)
-                    and value["action"][idx] == action
-                    and value["selected_option"][idx] == option
-                ):
-                    reward = value["reward"][idx]
-                    next_state = value["next_state"][idx]
-                    self.done = value["done"][idx]
-                    self.current_state = next_state
-                    return next_state.copy(), reward, self.done, True, {}
-
-        return self.current_state, 0.0, self.done, False, {}
+        key = (tuple(self.current_state), option, action)
+        if key in self.state_action_option_to_transition:
+            trans = self.state_action_option_to_transition[key]
+            self.current_state = trans["next_state"]
+            return trans["next_state"].copy(), trans["reward"], trans["done"], True, {}
+        else:
+            return self.current_state, 0.0, False, False, {}
 
 
 if __name__ == "__main__":
