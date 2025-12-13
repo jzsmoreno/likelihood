@@ -2,11 +2,11 @@ import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 
 from likelihood.main import *
 from likelihood.models.utils import FeaturesArima
 from likelihood.tools import *
-import seaborn as sns
 
 # -------------------------------------------------------------------------
 
@@ -119,13 +119,13 @@ class AbstractArima(FeaturesArima):
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 1, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
         """Train the model using sampling method.
 
         Parameters
         ----------
         nwalkers : `int`, optional
-            Number of walkers for sampling, by default 1
+            Number of walkers for sampling, by default 10
         mov : `int`, optional
             Maximum number of iterations, by default 200
         weights : `bool`, optional
@@ -235,14 +235,14 @@ class AbstractArima(FeaturesArima):
             alpha=0.2,
             color=sns.color_palette("deep")[1],
         )
-        plt.title("Predicted vs Real Values with Confidence Interval", fontsize=14)
+        plt.title("Predicted vs Real Values with Confidence Interval", fontsize=12)
         plt.xlabel("Time Steps", fontsize=12)
         plt.ylabel("y", fontsize=12)
         plt.grid(True, linestyle="--", alpha=0.7)
         plt.xticks(fontsize=10)
         plt.yticks(fontsize=10)
         print(f"Confidence Interval: ±{Z * y_std:.4f}")
-        plt.legend(loc="upper left", fontsize=10)
+        plt.legend(loc="upper left", fontsize=9)
         if mode:
             plt.savefig(f"pred_{n}.png", dpi=300)
         plt.tight_layout()
@@ -414,11 +414,15 @@ class Arima(AbstractArima):
         noise = self.noise
         self.theta_trained = theta
 
-        assert type(self.d) == int, "d must be 0, 1 or 2"
+        assert type(self.d) == int, "d must be 0 or 1"
 
         if self.d != 0 or self.q != 0:
             if self.d != 0:
                 y_sum = super().integrated(datapoints)
+                norm_datapoints = np.linalg.norm(datapoints)
+                norm_y_sum = np.linalg.norm(y_sum)
+                if norm_y_sum != 0 and norm_datapoints != 0:
+                    y_sum = cal_average(np.abs(y_sum * (norm_datapoints / norm_y_sum)) * np.sign(datapoints), 0.05)
             else:
                 y_sum = datapoints.copy()
 
@@ -432,6 +436,10 @@ class Arima(AbstractArima):
                 if y_sum_average_magnitude > y_vec_magnitude:
                     scaling_factor = y_vec_magnitude / y_sum_average_magnitude
                     y_sum_average = y_sum_average * scaling_factor
+                theta_mean = np.mean(theta[-self.q :])
+                if abs(theta_mean) > 1:
+                    additional_scaling_factor = 1.0 - abs(theta_mean)
+                    y_sum_average = y_sum_average * additional_scaling_factor
                 y_average_vec = super().forward(y_sum_average, theta[-self.q :], mode, 0)
                 if mode:
                     y_vec = y_regr_vec.copy()
