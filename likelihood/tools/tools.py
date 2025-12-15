@@ -1083,7 +1083,9 @@ class FeatureSelection:
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
 
-    def get_digraph(self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False) -> str:
+    def get_digraph(
+        self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
+    ) -> str:
         """
         Get directed graph showing importance of features.
 
