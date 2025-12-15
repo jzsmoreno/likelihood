@@ -133,18 +133,13 @@ class AbstractArima(FeaturesArima):
         """
         datapoints = self.datapoints
         xvec = self.xvec
-
         self.nwalkers = nwalkers
         self.mov = mov
 
         assert self.nwalkers <= self.mov, "n_walkers must be less or equal than mov"
-
         model = self.model
-
         n = self.p + self.q
-
         theta = np.random.rand(n)
-
         x_vec = xvec(datapoints)
 
         if weights:

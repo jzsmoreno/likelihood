@@ -37,6 +37,12 @@
       "params": {
         "columns": ["Income_range"]  
       }
+    },
+    {
+      "name": "OneHotEncoder",
+      "params": {
+        "columns": ["Age_range"]  
+      }
     }
   ]
 }

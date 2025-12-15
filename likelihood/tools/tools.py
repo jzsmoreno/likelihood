@@ -196,7 +196,12 @@ def cal_missing_values(df: DataFrame) -> None:
 
 
 def cdf(
-    x: np.ndarray, poly: int = 9, inv: bool = False, plot: bool = False, savename: str = None
+    x: np.ndarray,
+    poly: int = 9,
+    inv: bool = False,
+    plot: bool = False,
+    savename: str | None = None,
+    key: str | None = None,
 ) -> tuple:
     """Calculates the cumulative distribution function of the data.
 
@@ -210,8 +215,10 @@ def cdf(
         If True, calculate the inverse CDF (quantile function).
     plot : `bool`
         If True, plot the results.
-    savename : `str`, optional
+    savename : `str` or `None`, optional
         Filename to save the plot.
+    key : `str` or `None`, optional
+        Additional information to display with the chart title.
 
     Returns
     -------
@@ -240,7 +247,11 @@ def cdf(
     else:
         fit = np.polyfit(sorted_x, probabilities, poly)
         f = np.poly1d(fit)
-        plot_label = "Cumulative Distribution Function"
+        plot_label = (
+            "Cumulative Distribution Function"
+            if key is None
+            else f"Cumulative Distribution Function ({key})"
+        )
         x_values = sorted_x
         y_values = cdf_values
 
@@ -1033,27 +1044,28 @@ class OneHotEncoder:
     __slots__ = ["num_categories"]
 
     def __init__(self) -> None:
-        pass
+        self.num_categories = None
 
     def encode(self, x: np.ndarray | list, fit: bool = True):
         if not isinstance(x, np.ndarray):
             x = np.array(x)
+        x = x[~np.isnan(x)]
         x = x.astype(int)
+
         if fit:
             self.num_categories = x.max() + 1
-
+        else:
+            if np.any(x >= self.num_categories):
+                new_max_category = x.max() + 1
+                self.num_categories = max(self.num_categories, new_max_category)
         y = np.zeros((x.size, self.num_categories))
-
         y[np.arange(x.size), x] = 1
-
         return y
 
     def decode(self, x: np.ndarray | list) -> np.ndarray:
         if not isinstance(x, np.ndarray):
             x = np.array(x)
-
         y = np.argmax(x, axis=1)
-
         return y
 
 
