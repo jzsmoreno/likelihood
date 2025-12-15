@@ -4,7 +4,6 @@ import os
 import networkx as nx
 import pandas as pd
 from IPython.display import clear_output
-from pandas.core.frame import DataFrame
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
@@ -18,7 +17,6 @@ import numpy as np
 import seaborn as sns
 import tensorflow as tf
 import torch
-from pandas.core.frame import DataFrame
 from torch.utils.data import DataLoader, TensorDataset
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -254,7 +252,7 @@ class TransformRange:
         }
 
 
-def remove_collinearity(df: DataFrame, threshold: float = 0.9):
+def remove_collinearity(df: pd.DataFrame, threshold: float = 0.9):
     """
     Removes highly collinear features from the DataFrame based on a correlation threshold.
 
@@ -264,14 +262,15 @@ def remove_collinearity(df: DataFrame, threshold: float = 0.9):
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : `pd.DataFrame`
         The input DataFrame containing numerical data.
     threshold : `float`
         The correlation threshold above which features will be removed. Default is `0.9`.
 
     Returns
     -------
-        DataFrame : A DataFrame with highly collinear features removed.
+    df_reduced : `pd.DataFrame`
+        A DataFrame with highly collinear features removed.
     """
     corr_matrix = df.corr().abs()
     upper_triangle = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
@@ -409,7 +408,7 @@ def apply_lora(model, rank=4):
     return new_model
 
 
-def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -> DataFrame:
+def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -> pd.DataFrame:
     """
     Calculate various graph metrics based on the given adjacency matrix and return them in a single DataFrame.
 
@@ -422,7 +421,8 @@ def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -
 
     Returns
     -------
-    DataFrame : A DataFrame containing the following graph metrics as columns.
+    metrics_df : pd.DataFrame
+        A DataFrame containing the following graph metrics as columns.
         - `Degree`: The degree of each node, representing the number of edges connected to each node.
         - `DegreeCentrality`: Degree centrality values for each node, indicating the number of direct connections each node has.
         - `ClusteringCoefficient`: Clustering coefficient values for each node, representing the degree to which nodes cluster together.

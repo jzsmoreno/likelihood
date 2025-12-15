@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 import yaml
 from packaging import version
-from pandas.core.frame import DataFrame
 
 if version.parse(np.__version__) < version.parse("2.0.0"):
     filter = np.RankWarning
@@ -125,7 +124,7 @@ def estimate_gradient(f: Callable, v: np.ndarray, h: float = 1e-4) -> List[np.nd
 
 
 def generate_feature_yaml(
-    df: DataFrame, ignore_features: List[str] = None, yaml_string: bool = False
+    df: pd.DataFrame, ignore_features: List[str] = None, yaml_string: bool = False
 ) -> Dict | str:
     """
     Generate a YAML string containing information about ordinal, numeric, and categorical features
@@ -174,12 +173,12 @@ def generate_feature_yaml(
     return feature_info
 
 
-def cal_missing_values(df: DataFrame) -> None:
-    """Calculate the percentage of missing (`NaN`/`NaT`) values per column in a dataframe.
+def cal_missing_values(df: pd.DataFrame) -> None:
+    """Calculate the percentage of missing (`NaN`/`NaT`) values per column in a DataFrame.
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : `pd.DataFrame`
         The input dataframe.
 
     Returns
@@ -817,7 +816,7 @@ class DataFrameEncoder:
         "median_list",
     ]
 
-    def __init__(self, data: DataFrame) -> None:
+    def __init__(self, data: pd.DataFrame) -> None:
         """Sets the columns of the `DataFrame`"""
         self._df = data.copy()
         self._names = data.columns
@@ -874,7 +873,7 @@ class DataFrameEncoder:
         if save_mode:
             self._save_encoder(path_to_save, dictionary_name)
 
-    def encode(self, path_to_save: str = "./", **kwargs) -> DataFrame:
+    def encode(self, path_to_save: str = "./", **kwargs) -> pd.DataFrame:
         """Encodes the `object` type columns of the dataframe
 
         Keyword Arguments
@@ -904,7 +903,7 @@ class DataFrameEncoder:
                         self._df[colname] = self._df[colname] / self.median_list[num]
             return self._df
 
-    def decode(self) -> DataFrame:
+    def decode(self) -> pd.DataFrame:
         """Decodes the `int` type columns of the `DataFrame`"""
         j = 0
         df_decoded = self._df.copy()
@@ -1084,13 +1083,13 @@ class FeatureSelection:
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
 
-    def get_digraph(self, dataset: DataFrame, n_importances: int, use_scaler: bool = False) -> str:
+    def get_digraph(self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False) -> str:
         """
         Get directed graph showing importance of features.
 
         Parameters
         ----------
-        dataset : `DataFrame`
+        dataset : `pd.DataFrame`
             Dataset to be used for generating the graph.
         n_importances : `int`
             Number of top importances to show in the graph.
@@ -1170,7 +1169,7 @@ class FeatureSelection:
 
         return feature_string + "} "
 
-    def _load_data(self, dataset: DataFrame):
+    def _load_data(self, dataset: pd.DataFrame):
         if len(self.not_features) > 0:
             self.X = dataset.drop(columns=self.not_features)
 
@@ -1184,18 +1183,18 @@ class FeatureSelection:
         self.X = self.X.drop(columns=["index"])
 
 
-def check_nan_inf(df: DataFrame, verbose: bool = False) -> DataFrame:
+def check_nan_inf(df: pd.DataFrame, verbose: bool = False) -> pd.DataFrame:
     """
     Checks for NaN and Inf values in the DataFrame. If any are found, they will be removed.
 
     Parameters
     ----------
-    df : DataFrame
+    df : pd.DataFrame
         The input DataFrame to be checked.
 
     Returns
     ----------
-    DataFrame
+    pd.DataFrame
         A new DataFrame with NaN and Inf values removed.
     """
 

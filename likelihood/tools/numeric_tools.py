@@ -1,10 +1,6 @@
-from typing import Dict
-
 import numpy as np
 import pandas as pd
-from numpy import arange, array, ndarray, random
 from numpy.linalg import solve
-from pandas.core.frame import DataFrame
 
 
 # -------------------------------------------------------------------------
@@ -100,12 +96,12 @@ def xi_corr(df: pd.DataFrame) -> pd.DataFrame:
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : `pd.DataFrame`
         Input data containing the variables to be correlated.
 
     Returns
     -------
-    `DataFrame`
+    correlations : `pd.DataFrame`
         A square dataframe with variable names as both index and columns,
         containing their corresponding correlation coefficients.
     """
@@ -205,7 +201,7 @@ def xicor(X: np.ndarray, Y: np.ndarray, ties: bool = True, random_seed: int = No
 # -------------------------------------------------------------------------
 
 
-def ecprint(A: ndarray) -> None:
+def ecprint(A: np.ndarray) -> None:
     """Function that prints the augmented matrix.
 
     Parameters
@@ -231,14 +227,14 @@ def ecprint(A: ndarray) -> None:
 
 
 def sor_elimination(
-    A: ndarray,
-    b: ndarray,
+    A: np.ndarray,
+    b: np.ndarray,
     n: int,
     max_iterations: int,
     w: float,
     error: float = 1e-3,
     verbose: bool = True,
-) -> ndarray:
+) -> np.ndarray:
     """Computes the Successive Over-Relaxation algorithm.
 
     Parameters
@@ -283,7 +279,7 @@ def sor_elimination(
     raise RuntimeError("Convergence not achieved within the maximum number of iterations.")
 
 
-def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
+def gauss_elimination(A: np.ndarray | list, pr: int = 2) -> np.ndarray:
     """Computes the Gauss elimination algorithm.
 
     Parameters
@@ -291,7 +287,6 @@ def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
     A : `np.array` or `list`
         An array containing the parameters of the $n$ equations
         with the equalities.
-
     pr : `int`
         significant numbers of decimals.
 
