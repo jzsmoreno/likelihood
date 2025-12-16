@@ -33,6 +33,7 @@ jobs:
         pip install tensorflow
         pip install keras-tuner
         pip install scikit-learn
+        pip install torch
 
     - name: Set up Git
       env:
