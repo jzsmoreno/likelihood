@@ -1286,10 +1286,10 @@ if __name__ == "__main__":
 
     # Graph the data for visualization
     plt.plot(x[0, :], y, "o", label="Original Data")
-    plt.plot(x[0, :], y_hat, "x", label="$\hat{y}$")
+    plt.plot(x[0, :], y_hat, "x", label="$\\hat{y}$")
     plt.legend()
     plt.xlabel("$x$")
-    plt.ylabel("$y, $\hat{y}$")
+    plt.ylabel("$y, \\hat{y}$")
     plt.show()
 
     a = generate_series(1, 40, incline=False)

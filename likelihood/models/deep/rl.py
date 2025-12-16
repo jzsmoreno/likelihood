@@ -3,12 +3,6 @@ from collections import deque
 
 import numpy as np
 import tensorflow as tf
-from packaging import version
-
-if version.parse(tf.__version__) > version.parse("2.15.0"):
-    from ._autoencoders import AutoClassifier
-else:
-    from .autoencoders import AutoClassifier
 
 
 def print_progress_bar(iteration, total, length=30):

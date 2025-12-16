@@ -11,7 +11,6 @@ logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 import keras_tuner
 import tensorflow as tf
-from pandas.core.frame import DataFrame
 from tensorflow.keras.layers import InputLayer
 from tensorflow.keras.regularizers import l2
 
@@ -769,7 +768,7 @@ def build_model(
 
 @suppress_warnings
 def setup_model(
-    data: DataFrame,
+    data: pd.DataFrame,
     target: str,
     epochs: int,
     train_size: float = 0.7,
@@ -783,7 +782,7 @@ def setup_model(
 
     Parameters
     ----------
-    data : `DataFrame`
+    data : `pd.DataFrame`
         The dataset to train the model on.
     target : `str`
         The name of the target column.

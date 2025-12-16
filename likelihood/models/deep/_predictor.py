@@ -12,7 +12,6 @@ import tensorflow as tf
 from IPython.display import HTML, display
 from matplotlib import cm
 from matplotlib.colors import Normalize
-from pandas.core.frame import DataFrame
 from pandas.plotting import radviz
 from sklearn.manifold import TSNE
 from tensorflow.keras.layers import InputLayer
@@ -450,7 +449,7 @@ class GetInsights:
 
         Returns
         -------
-        `DataFrame` : The statistical summary of the input data.
+        `pd.DataFrame` : The statistical summary of the input data.
         """
         self._viz_weights(cmap=cmap, aspect=aspect, highlight=highlight, **kwargs)
         inputs = self.inputs.copy()
@@ -725,18 +724,18 @@ class GetInsights:
             )
         plt.show()
 
-    def _statistics(self, data_input: DataFrame) -> DataFrame:
+    def _statistics(self, data_input: pd.DataFrame) -> pd.DataFrame:
         """
         Compute statistical summaries of the input data.
 
         Parameters
         ----------
-        data_input : `DataFrame`
+        data_input : `pd.DataFrame`
             The data to compute statistics for.
 
         Returns
         -------
-        `DataFrame` : The statistical summary of the input data.
+        `pd.DataFrame` : The statistical summary of the input data.
         """
         data = data_input.copy(deep=True)
 
