@@ -1,6 +1,7 @@
 from typing import List
 
 import networkx as nx
+import pandas as pd
 from IPython.display import HTML, display
 from pyvis.network import Network
 

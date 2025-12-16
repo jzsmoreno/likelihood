@@ -1,5 +1,4 @@
 from .autoencoders import (
-    DataFrame,
     EarlyStopping,
     LoRALayer,
     OneHotEncoder,
@@ -760,7 +759,7 @@ def build_model(
 
 @suppress_warnings
 def setup_model(
-    data: DataFrame,
+    data: pd.DataFrame,
     target: str,
     epochs: int,
     train_size: float = 0.7,
@@ -774,7 +773,7 @@ def setup_model(
 
     Parameters
     ----------
-    data : `DataFrame`
+    data : `pd.DataFrame`
         The dataset to train the model on.
     target : `str`
         The name of the target column.
