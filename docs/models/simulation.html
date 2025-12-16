@@ -114,11 +114,9 @@ el.replaceWith(d);
         super().__init__(**kwargs)
 
     def predict(self, df: DataFrame, column: str) -&gt; np.ndarray | list:
-        # Let us assign the dictionary entries corresponding to the column
         w, quick_encoder, names_cols, dfe, numeric_dict = self.w_dict[column]
 
         df = df[names_cols].copy()
-        # Change the scale of the DataFrame
         dataset = self.df.copy()
         dataset.drop(columns=column, inplace=True)
         numeric_df = dataset.select_dtypes(include=&#34;number&#34;)
@@ -132,7 +130,6 @@ el.replaceWith(d);
             for col in numeric_df.columns:
                 df[col] = numeric_df[col].values
 
-        # Encoding the DataFrame
         for num, colname in enumerate(dfe._encode_columns):
             if df[colname].dtype == &#34;object&#34;:
                 encode_dict = dfe.encoding_list[num]
@@ -140,19 +137,15 @@ el.replaceWith(d);
                     dfe._code_transformation_to, dictionary_list=encode_dict
                 )
 
-        # Prediction
         y = df.to_numpy() @ w
 
-        # Categorical column
         if quick_encoder != None:
             one_hot = OneHotEncoder()
             y = one_hot.decode(y)
             encoding_dic = quick_encoder.decoding_list[0]
             y = [encoding_dic[item] for item in y]
-        # Numeric column
         else:
             if self.use_scaler:
-                # scale output
                 y += 1
                 y /= 2
                 y = y * (self.df[column].max() - self.df[column].min())
@@ -172,7 +165,6 @@ el.replaceWith(d);
     def fit(self, df: DataFrame, n_importances: int, **kwargs) -&gt; None:
         self.df = df
         self.n_importances = n_importances
-        # We run the feature selection algorithm
         self.get_digraph(self.df, self.n_importances, self.use_scaler)
         proba_dict_keys = list(self.w_dict.keys())
         self.proba_dict = dict(zip(proba_dict_keys, [i for i in range(len(proba_dict_keys))]))
@@ -189,9 +181,7 @@ el.replaceWith(d);
                 standard_deviation = self.df[key].std()
                 lower_limit = media - bandwidth * standard_deviation
                 upper_limit = media + bandwidth * standard_deviation
-                if plot:
-                    print(f&#34;Cumulative Distribution Function ({key})&#34;)
-                f, _, ox = cdf(x[0].flatten(), poly=poly, plot=plot)
+                f, _, ox = cdf(x[0].flatten(), poly=poly, plot=plot, key=key)
             else:
                 f, ox = None, None
                 least_frequent_category, most_frequent_category = categories_by_quartile(
@@ -246,8 +236,10 @@ el.replaceWith(d);
         &#34;&#34;&#34;
         Save the state of the SimulationEngine to a file.
 
-        Parameters:
-            filename (str): The name of the file where the object will be saved.
+        Parameters
+        ----------
+        filename : str
+            The name of the file where the object will be saved.
         &#34;&#34;&#34;
         filename = filename if filename.endswith(&#34;.pkl&#34;) else filename + &#34;.pkl&#34;
         with open(filename, &#34;wb&#34;) as f:
@@ -258,11 +250,15 @@ el.replaceWith(d);
         &#34;&#34;&#34;
         Load the state of a SimulationEngine from a file.
 
-        Parameters:
-            filename (str): The name of the file containing the saved object.
+        Parameters
+        ----------
+        filename : str
+            The name of the file containing the saved object.
 
-        Returns:
-            SimulationEngine: A new instance of SimulationEngine with the loaded state.
+        Returns
+        -------
+        SimulationEngine : Any
+            A new instance of SimulationEngine with the loaded state.
         &#34;&#34;&#34;
         filename = filename + &#34;.pkl&#34; if not filename.endswith(&#34;.pkl&#34;) else filename
         with open(filename, &#34;rb&#34;) as f:
@@ -303,11 +299,15 @@ def load(filename: str = &#34;./simulation_model&#34;):
     &#34;&#34;&#34;
     Load the state of a SimulationEngine from a file.
 
-    Parameters:
-        filename (str): The name of the file containing the saved object.
+    Parameters
+    ----------
+    filename : str
+        The name of the file containing the saved object.
 
-    Returns:
-        SimulationEngine: A new instance of SimulationEngine with the loaded state.
+    Returns
+    -------
+    SimulationEngine : Any
+        A new instance of SimulationEngine with the loaded state.
     &#34;&#34;&#34;
     filename = filename + &#34;.pkl&#34; if not filename.endswith(&#34;.pkl&#34;) else filename
     with open(filename, &#34;rb&#34;) as f:
@@ -315,10 +315,13 @@ def load(filename: str = &#34;./simulation_model&#34;):
 </details>
 <div class="desc"><p>Load the state of a SimulationEngine from a file.</p>
 <h2 id="parameters">Parameters</h2>
-<p>filename (str): The name of the file containing the saved object.</p>
+<dl>
+<dt><strong><code>filename</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the file containing the saved object.</dd>
+</dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><code><a title="likelihood.models.simulation.SimulationEngine" href="#likelihood.models.simulation.SimulationEngine">SimulationEngine</a></code></dt>
+<dt><strong><code>SimulationEngine</code></strong> :&ensp;<code>Any</code></dt>
 <dd>A new instance of SimulationEngine with the loaded state.</dd>
 </dl></div>
 </dd>
@@ -336,7 +339,6 @@ def load(filename: str = &#34;./simulation_model&#34;):
 <pre><code class="python">def fit(self, df: DataFrame, n_importances: int, **kwargs) -&gt; None:
     self.df = df
     self.n_importances = n_importances
-    # We run the feature selection algorithm
     self.get_digraph(self.df, self.n_importances, self.use_scaler)
     proba_dict_keys = list(self.w_dict.keys())
     self.proba_dict = dict(zip(proba_dict_keys, [i for i in range(len(proba_dict_keys))]))
@@ -353,9 +355,7 @@ def load(filename: str = &#34;./simulation_model&#34;):
             standard_deviation = self.df[key].std()
             lower_limit = media - bandwidth * standard_deviation
             upper_limit = media + bandwidth * standard_deviation
-            if plot:
-                print(f&#34;Cumulative Distribution Function ({key})&#34;)
-            f, _, ox = cdf(x[0].flatten(), poly=poly, plot=plot)
+            f, _, ox = cdf(x[0].flatten(), poly=poly, plot=plot, key=key)
         else:
             f, ox = None, None
             least_frequent_category, most_frequent_category = categories_by_quartile(
@@ -428,11 +428,9 @@ def load(filename: str = &#34;./simulation_model&#34;):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def predict(self, df: DataFrame, column: str) -&gt; np.ndarray | list:
-    # Let us assign the dictionary entries corresponding to the column
     w, quick_encoder, names_cols, dfe, numeric_dict = self.w_dict[column]
 
     df = df[names_cols].copy()
-    # Change the scale of the DataFrame
     dataset = self.df.copy()
     dataset.drop(columns=column, inplace=True)
     numeric_df = dataset.select_dtypes(include=&#34;number&#34;)
@@ -446,7 +444,6 @@ def load(filename: str = &#34;./simulation_model&#34;):
         for col in numeric_df.columns:
             df[col] = numeric_df[col].values
 
-    # Encoding the DataFrame
     for num, colname in enumerate(dfe._encode_columns):
         if df[colname].dtype == &#34;object&#34;:
             encode_dict = dfe.encoding_list[num]
@@ -454,19 +451,15 @@ def load(filename: str = &#34;./simulation_model&#34;):
                 dfe._code_transformation_to, dictionary_list=encode_dict
             )
 
-    # Prediction
     y = df.to_numpy() @ w
 
-    # Categorical column
     if quick_encoder != None:
         one_hot = OneHotEncoder()
         y = one_hot.decode(y)
         encoding_dic = quick_encoder.decoding_list[0]
         y = [encoding_dic[item] for item in y]
-    # Numeric column
     else:
         if self.use_scaler:
-            # scale output
             y += 1
             y /= 2
             y = y * (self.df[column].max() - self.df[column].min())
@@ -487,8 +480,10 @@ def load(filename: str = &#34;./simulation_model&#34;):
     &#34;&#34;&#34;
     Save the state of the SimulationEngine to a file.
 
-    Parameters:
-        filename (str): The name of the file where the object will be saved.
+    Parameters
+    ----------
+    filename : str
+        The name of the file where the object will be saved.
     &#34;&#34;&#34;
     filename = filename if filename.endswith(&#34;.pkl&#34;) else filename + &#34;.pkl&#34;
     with open(filename, &#34;wb&#34;) as f:
@@ -496,7 +491,10 @@ def load(filename: str = &#34;./simulation_model&#34;):
 </details>
 <div class="desc"><p>Save the state of the SimulationEngine to a file.</p>
 <h2 id="parameters">Parameters</h2>
-<p>filename (str): The name of the file where the object will be saved.</p></div>
+<dl>
+<dt><strong><code>filename</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the file where the object will be saved.</dd>
+</dl></div>
 </dd>
 </dl>
 <h3>Inherited members</h3>

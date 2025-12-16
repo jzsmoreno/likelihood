@@ -52,7 +52,7 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def ecprint(A: ndarray) -&gt; None:
+<pre><code class="python">def ecprint(A: np.ndarray) -&gt; None:
     &#34;&#34;&#34;Function that prints the augmented matrix.
 
     Parameters
@@ -95,7 +95,8 @@ Prints the matrix to console.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def find_multiples(target: int) -&gt; tuple[int, int] | None:
-    &#34;&#34;&#34;Find two factors of a given target number.
+    &#34;&#34;&#34;
+    Find two factors of a given target number that are as close to each other as possible.
 
     Parameters
     ----------
@@ -105,19 +106,16 @@ Prints the matrix to console.</p></div>
     Returns
     -------
     tuple[int, int] | None
-        If `i` and `i+1` both divide target, returns (i, i+1).
+        If `i` and `target // i` both divide target, returns (i, target // i).
         Otherwise, returns `(i, target // i)`.
         Returns `None` if no factors are found.
     &#34;&#34;&#34;
-    for i in range(2, target + 1):
+    for i in range(1, int(target**0.5) + 1):
         if target % i == 0:
-            if (i + 1) &lt;= target and target % (i + 1) == 0:
-                return i + 1, target // (i + 1)
-            else:
-                return i, target // i
+            return max(i, target // i), min(i, target // i)
     return None</code></pre>
 </details>
-<div class="desc"><p>Find two factors of a given target number.</p>
+<div class="desc"><p>Find two factors of a given target number that are as close to each other as possible.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>target</code></strong> :&ensp;<code>int</code></dt>
@@ -126,7 +124,7 @@ Prints the matrix to console.</p></div>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><code>tuple[int, int] | None</code></dt>
-<dd>If <code>i</code> and <code>i+1</code> both divide target, returns (i, i+1).
+<dd>If <code>i</code> and <code>target // i</code> both divide target, returns (i, target // i).
 Otherwise, returns <code>(i, target // i)</code>.
 Returns <code>None</code> if no factors are found.</dd>
 </dl></div>
@@ -139,7 +137,7 @@ Returns <code>None</code> if no factors are found.</dd>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def gauss_elimination(A: ndarray | list, pr: int = 2) -&gt; ndarray:
+<pre><code class="python">def gauss_elimination(A: np.ndarray | list, pr: int = 2) -&gt; np.ndarray:
     &#34;&#34;&#34;Computes the Gauss elimination algorithm.
 
     Parameters
@@ -147,7 +145,6 @@ Returns <code>None</code> if no factors are found.</dd>
     A : `np.array` or `list`
         An array containing the parameters of the $n$ equations
         with the equalities.
-
     pr : `int`
         significant numbers of decimals.
 
@@ -320,14 +317,14 @@ with the equalities.</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def sor_elimination(
-    A: ndarray,
-    b: ndarray,
+    A: np.ndarray,
+    b: np.ndarray,
     n: int,
     max_iterations: int,
     w: float,
     error: float = 1e-3,
     verbose: bool = True,
-) -&gt; ndarray:
+) -&gt; np.ndarray:
     &#34;&#34;&#34;Computes the Successive Over-Relaxation algorithm.
 
     Parameters
@@ -408,12 +405,12 @@ with the equalities.</dd>
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : `pd.DataFrame`
         Input data containing the variables to be correlated.
 
     Returns
     -------
-    `DataFrame`
+    correlations : `pd.DataFrame`
         A square dataframe with variable names as both index and columns,
         containing their corresponding correlation coefficients.
     &#34;&#34;&#34;
@@ -439,13 +436,15 @@ with the equalities.</dd>
 <div class="desc"><p>Calculate new coefficient of correlation for all pairs of columns in a <code>DataFrame</code>.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
 <dd>Input data containing the variables to be correlated.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p><code>DataFrame</code>
-A square dataframe with variable names as both index and columns,
-containing their corresponding correlation coefficients.</p></div>
+<dl>
+<dt><strong><code>correlations</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>A square dataframe with variable names as both index and columns,
+containing their corresponding correlation coefficients.</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.tools.numeric_tools.xicor"><code class="name flex">
 <span>def <span class="ident">xicor</span></span>(<span>X: numpy.ndarray, Y: numpy.ndarray, ties: bool = True, random_seed: int = None) ‑> float</span>

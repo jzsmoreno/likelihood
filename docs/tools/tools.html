@@ -68,10 +68,16 @@ el.replaceWith(d);
         The average of the data.
     &#34;&#34;&#34;
 
-    n = int(alpha * len(y))
-    w = np.ones(n) / n
-    average = np.convolve(y, w, mode=&#34;same&#34;) / np.convolve(np.ones_like(y), w, mode=&#34;same&#34;)
-    return average</code></pre>
+    window_size = int(alpha * len(y))
+    if len(y) &lt; 2:
+        return y
+
+    n = min(window_size, len(y))
+    if n &lt;= 1:
+        return y
+
+    padded = np.pad(y, n // 2, mode=&#34;edge&#34;)
+    return np.convolve(padded, np.ones(n) / n, mode=&#34;valid&#34;)[: len(y)]</code></pre>
 </details>
 <div class="desc"><p>Calculates the moving average of the data</p>
 <h2 id="parameters">Parameters</h2>
@@ -95,12 +101,12 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def cal_missing_values(df: DataFrame) -&gt; None:
-    &#34;&#34;&#34;Calculate the percentage of missing (`NaN`/`NaT`) values per column in a dataframe.
+<pre><code class="python">def cal_missing_values(df: pd.DataFrame) -&gt; None:
+    &#34;&#34;&#34;Calculate the percentage of missing (`NaN`/`NaT`) values per column in a DataFrame.
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : `pd.DataFrame`
         The input dataframe.
 
     Returns
@@ -109,16 +115,16 @@ el.replaceWith(d);
     &#34;&#34;&#34;
 
     col = df.columns
-    print(&#34;Total size : &#34;, &#34;{:,}&#34;.format(len(df)))
+    print(&#34;Total size :&#34;, &#34;{:,}&#34;.format(len(df)))
     for i in col:
         print(
             str(i) + &#34; : &#34; f&#34;{(df.isnull().sum()[i]/(df.isnull().sum()[i]+df[i].count()))*100:.2f}%&#34;
         )</code></pre>
 </details>
-<div class="desc"><p>Calculate the percentage of missing (<code>NaN</code>/<code>NaT</code>) values per column in a dataframe.</p>
+<div class="desc"><p>Calculate the percentage of missing (<code>NaN</code>/<code>NaT</code>) values per column in a DataFrame.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
 <dd>The input dataframe.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
@@ -187,7 +193,7 @@ el.replaceWith(d);
 </dl></div>
 </dd>
 <dt id="likelihood.tools.tools.cdf"><code class="name flex">
-<span>def <span class="ident">cdf</span></span>(<span>x: numpy.ndarray,<br>poly: int = 9,<br>inv: bool = False,<br>plot: bool = False,<br>savename: str = None) ‑> tuple</span>
+<span>def <span class="ident">cdf</span></span>(<span>x: numpy.ndarray,<br>poly: int = 9,<br>inv: bool = False,<br>plot: bool = False,<br>savename: str | None = None,<br>key: str | None = None) ‑> tuple</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -195,7 +201,12 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def cdf(
-    x: np.ndarray, poly: int = 9, inv: bool = False, plot: bool = False, savename: str = None
+    x: np.ndarray,
+    poly: int = 9,
+    inv: bool = False,
+    plot: bool = False,
+    savename: str | None = None,
+    key: str | None = None,
 ) -&gt; tuple:
     &#34;&#34;&#34;Calculates the cumulative distribution function of the data.
 
@@ -209,8 +220,10 @@ el.replaceWith(d);
         If True, calculate the inverse CDF (quantile function).
     plot : `bool`
         If True, plot the results.
-    savename : `str`, optional
+    savename : `str` or `None`, optional
         Filename to save the plot.
+    key : `str` or `None`, optional
+        Additional information to display with the chart title.
 
     Returns
     -------
@@ -239,7 +252,11 @@ el.replaceWith(d);
     else:
         fit = np.polyfit(sorted_x, probabilities, poly)
         f = np.poly1d(fit)
-        plot_label = &#34;Cumulative Distribution Function&#34;
+        plot_label = (
+            &#34;Cumulative Distribution Function&#34;
+            if key is None
+            else f&#34;Cumulative Distribution Function ({key})&#34;
+        )
         x_values = sorted_x
         y_values = cdf_values
 
@@ -268,8 +285,10 @@ el.replaceWith(d);
 <dd>If True, calculate the inverse CDF (quantile function).</dd>
 <dt><strong><code>plot</code></strong> :&ensp;<code>bool</code></dt>
 <dd>If True, plot the results.</dd>
-<dt><strong><code>savename</code></strong> :&ensp;<code>str</code>, optional</dt>
+<dt><strong><code>savename</code></strong> :&ensp;<code>str</code> or <code>None</code>, optional</dt>
 <dd>Filename to save the plot.</dd>
+<dt><strong><code>key</code></strong> :&ensp;<code>str</code> or <code>None</code>, optional</dt>
+<dd>Additional information to display with the chart title.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
@@ -289,18 +308,18 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def check_nan_inf(df: DataFrame, verbose: bool = False) -&gt; DataFrame:
+<pre><code class="python">def check_nan_inf(df: pd.DataFrame, verbose: bool = False) -&gt; pd.DataFrame:
     &#34;&#34;&#34;
     Checks for NaN and Inf values in the DataFrame. If any are found, they will be removed.
 
     Parameters
     ----------
-    df : DataFrame
+    df : pd.DataFrame
         The input DataFrame to be checked.
 
     Returns
     ----------
-    DataFrame
+    pd.DataFrame
         A new DataFrame with NaN and Inf values removed.
     &#34;&#34;&#34;
 
@@ -340,12 +359,12 @@ el.replaceWith(d);
 <div class="desc"><p>Checks for NaN and Inf values in the DataFrame. If any are found, they will be removed.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
 <dd>The input DataFrame to be checked.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><code>DataFrame</code></dt>
+<dt><code>pd.DataFrame</code></dt>
 <dd>A new DataFrame with NaN and Inf values removed.</dd>
 </dl></div>
 </dd>
@@ -488,7 +507,7 @@ Difference quotient of <code>f</code> evaluated at <code>x</code>.</p></div>
         denoised_dataset[i, :] = denoised_signal
 
         peak_index = L[np.argmax(np.abs(fhat[L]))]
-        periods[i] = 1 / (2 * freq[peak_index])
+        periods[i] = 1 / freq[peak_index]
 
         if mode:
             print(f&#34;The {i+1}-th row of the dataset has been denoised.&#34;)
@@ -523,7 +542,7 @@ Difference quotient of <code>f</code> evaluated at <code>x</code>.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def generate_feature_yaml(
-    df: DataFrame, ignore_features: List[str] = None, yaml_string: bool = False
+    df: pd.DataFrame, ignore_features: List[str] = None, yaml_string: bool = False
 ) -&gt; Dict | str:
     &#34;&#34;&#34;
     Generate a YAML string containing information about ordinal, numeric, and categorical features
@@ -1204,7 +1223,7 @@ value of evaluated function.</p></div>
         &#34;median_list&#34;,
     ]
 
-    def __init__(self, data: DataFrame) -&gt; None:
+    def __init__(self, data: pd.DataFrame) -&gt; None:
         &#34;&#34;&#34;Sets the columns of the `DataFrame`&#34;&#34;&#34;
         self._df = data.copy()
         self._names = data.columns
@@ -1216,8 +1235,8 @@ value of evaluated function.</p></div>
     def load_config(self, path_to_dictionaries: str = &#34;./&#34;, **kwargs) -&gt; None:
         &#34;&#34;&#34;Loads dictionaries from a given directory
 
-        Keyword Arguments:
-        ----------
+        Keyword Arguments
+        -----------------
         - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
         &#34;&#34;&#34;
         dictionary_name = (
@@ -1261,11 +1280,11 @@ value of evaluated function.</p></div>
         if save_mode:
             self._save_encoder(path_to_save, dictionary_name)
 
-    def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; DataFrame:
+    def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; pd.DataFrame:
         &#34;&#34;&#34;Encodes the `object` type columns of the dataframe
 
-        Keyword Arguments:
-        ------------------
+        Keyword Arguments
+        -----------------
         - save_mode (`bool`): An optional integer parameter. By default it is set to `True`
         - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
         - norm_method (`str`): An optional string parameter to perform normalization. By default it is set to `None`
@@ -1291,7 +1310,7 @@ value of evaluated function.</p></div>
                         self._df[colname] = self._df[colname] / self.median_list[num]
             return self._df
 
-    def decode(self) -&gt; DataFrame:
+    def decode(self) -&gt; pd.DataFrame:
         &#34;&#34;&#34;Decodes the `int` type columns of the `DataFrame`&#34;&#34;&#34;
         j = 0
         df_decoded = self._df.copy()
@@ -1375,7 +1394,7 @@ value of evaluated function.</p></div>
         &#34;median_list&#34;,
     ]
 
-    def __init__(self, data: DataFrame) -&gt; None:
+    def __init__(self, data: pd.DataFrame) -&gt; None:
         &#34;&#34;&#34;Sets the columns of the `DataFrame`&#34;&#34;&#34;
         self._df = data.copy()
         self._names = data.columns
@@ -1387,8 +1406,8 @@ value of evaluated function.</p></div>
     def load_config(self, path_to_dictionaries: str = &#34;./&#34;, **kwargs) -&gt; None:
         &#34;&#34;&#34;Loads dictionaries from a given directory
 
-        Keyword Arguments:
-        ----------
+        Keyword Arguments
+        -----------------
         - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
         &#34;&#34;&#34;
         dictionary_name = (
@@ -1432,11 +1451,11 @@ value of evaluated function.</p></div>
         if save_mode:
             self._save_encoder(path_to_save, dictionary_name)
 
-    def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; DataFrame:
+    def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; pd.DataFrame:
         &#34;&#34;&#34;Encodes the `object` type columns of the dataframe
 
-        Keyword Arguments:
-        ------------------
+        Keyword Arguments
+        -----------------
         - save_mode (`bool`): An optional integer parameter. By default it is set to `True`
         - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
         - norm_method (`str`): An optional string parameter to perform normalization. By default it is set to `None`
@@ -1462,7 +1481,7 @@ value of evaluated function.</p></div>
                         self._df[colname] = self._df[colname] / self.median_list[num]
             return self._df
 
-    def decode(self) -&gt; DataFrame:
+    def decode(self) -&gt; pd.DataFrame:
         &#34;&#34;&#34;Decodes the `int` type columns of the `DataFrame`&#34;&#34;&#34;
         j = 0
         df_decoded = self._df.copy()
@@ -1544,7 +1563,7 @@ value of evaluated function.</p></div>
         &#34;median_list&#34;,
     ]
 
-    def __init__(self, data: DataFrame) -&gt; None:
+    def __init__(self, data: pd.DataFrame) -&gt; None:
         &#34;&#34;&#34;Sets the columns of the `DataFrame`&#34;&#34;&#34;
         self._df = data.copy()
         self._names = data.columns
@@ -1556,8 +1575,8 @@ value of evaluated function.</p></div>
     def load_config(self, path_to_dictionaries: str = &#34;./&#34;, **kwargs) -&gt; None:
         &#34;&#34;&#34;Loads dictionaries from a given directory
 
-        Keyword Arguments:
-        ----------
+        Keyword Arguments
+        -----------------
         - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
         &#34;&#34;&#34;
         dictionary_name = (
@@ -1601,11 +1620,11 @@ value of evaluated function.</p></div>
         if save_mode:
             self._save_encoder(path_to_save, dictionary_name)
 
-    def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; DataFrame:
+    def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; pd.DataFrame:
         &#34;&#34;&#34;Encodes the `object` type columns of the dataframe
 
-        Keyword Arguments:
-        ------------------
+        Keyword Arguments
+        -----------------
         - save_mode (`bool`): An optional integer parameter. By default it is set to `True`
         - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
         - norm_method (`str`): An optional string parameter to perform normalization. By default it is set to `None`
@@ -1631,7 +1650,7 @@ value of evaluated function.</p></div>
                         self._df[colname] = self._df[colname] / self.median_list[num]
             return self._df
 
-    def decode(self) -&gt; DataFrame:
+    def decode(self) -&gt; pd.DataFrame:
         &#34;&#34;&#34;Decodes the `int` type columns of the `DataFrame`&#34;&#34;&#34;
         j = 0
         df_decoded = self._df.copy()
@@ -1713,7 +1732,7 @@ value of evaluated function.</p></div>
         &#34;median_list&#34;,
     ]
 
-    def __init__(self, data: DataFrame) -&gt; None:
+    def __init__(self, data: pd.DataFrame) -&gt; None:
         &#34;&#34;&#34;Sets the columns of the `DataFrame`&#34;&#34;&#34;
         self._df = data.copy()
         self._names = data.columns
@@ -1725,8 +1744,8 @@ value of evaluated function.</p></div>
     def load_config(self, path_to_dictionaries: str = &#34;./&#34;, **kwargs) -&gt; None:
         &#34;&#34;&#34;Loads dictionaries from a given directory
 
-        Keyword Arguments:
-        ----------
+        Keyword Arguments
+        -----------------
         - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
         &#34;&#34;&#34;
         dictionary_name = (
@@ -1770,11 +1789,11 @@ value of evaluated function.</p></div>
         if save_mode:
             self._save_encoder(path_to_save, dictionary_name)
 
-    def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; DataFrame:
+    def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; pd.DataFrame:
         &#34;&#34;&#34;Encodes the `object` type columns of the dataframe
 
-        Keyword Arguments:
-        ------------------
+        Keyword Arguments
+        -----------------
         - save_mode (`bool`): An optional integer parameter. By default it is set to `True`
         - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
         - norm_method (`str`): An optional string parameter to perform normalization. By default it is set to `None`
@@ -1800,7 +1819,7 @@ value of evaluated function.</p></div>
                         self._df[colname] = self._df[colname] / self.median_list[num]
             return self._df
 
-    def decode(self) -&gt; DataFrame:
+    def decode(self) -&gt; pd.DataFrame:
         &#34;&#34;&#34;Decodes the `int` type columns of the `DataFrame`&#34;&#34;&#34;
         j = 0
         df_decoded = self._df.copy()
@@ -1875,7 +1894,7 @@ value of evaluated function.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def decode(self) -&gt; DataFrame:
+<pre><code class="python">def decode(self) -&gt; pd.DataFrame:
     &#34;&#34;&#34;Decodes the `int` type columns of the `DataFrame`&#34;&#34;&#34;
     j = 0
     df_decoded = self._df.copy()
@@ -1911,11 +1930,11 @@ value of evaluated function.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; DataFrame:
+<pre><code class="python">def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; pd.DataFrame:
     &#34;&#34;&#34;Encodes the `object` type columns of the dataframe
 
-    Keyword Arguments:
-    ------------------
+    Keyword Arguments
+    -----------------
     - save_mode (`bool`): An optional integer parameter. By default it is set to `True`
     - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
     - norm_method (`str`): An optional string parameter to perform normalization. By default it is set to `None`
@@ -1942,7 +1961,7 @@ value of evaluated function.</p></div>
         return self._df</code></pre>
 </details>
 <div class="desc"><p>Encodes the <code>object</code> type columns of the dataframe</p>
-<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
 <ul>
 <li>save_mode (<code>bool</code>): An optional integer parameter. By default it is set to <code>True</code></li>
 <li>dictionary_name (<code>str</code>): An optional string parameter. By default it is set to <code>labelencoder_dictionary</code></li>
@@ -1980,8 +1999,8 @@ value of evaluated function.</p></div>
 <pre><code class="python">def load_config(self, path_to_dictionaries: str = &#34;./&#34;, **kwargs) -&gt; None:
     &#34;&#34;&#34;Loads dictionaries from a given directory
 
-    Keyword Arguments:
-    ----------
+    Keyword Arguments
+    -----------------
     - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
     &#34;&#34;&#34;
     dictionary_name = (
@@ -1996,7 +2015,7 @@ value of evaluated function.</p></div>
     print(&#34;Configuration successfully uploaded&#34;)</code></pre>
 </details>
 <div class="desc"><p>Loads dictionaries from a given directory</p>
-<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
 <ul>
 <li>dictionary_name (<code>str</code>): An optional string parameter. By default it is set to <code>labelencoder_dictionary</code></li>
 </ul></div>
@@ -2694,13 +2713,15 @@ value of evaluated function.</p></div>
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
 
-    def get_digraph(self, dataset: DataFrame, n_importances: int, use_scaler: bool = False) -&gt; str:
+    def get_digraph(
+        self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
+    ) -&gt; str:
         &#34;&#34;&#34;
         Get directed graph showing importance of features.
 
         Parameters
         ----------
-        dataset : `DataFrame`
+        dataset : `pd.DataFrame`
             Dataset to be used for generating the graph.
         n_importances : `int`
             Number of top importances to show in the graph.
@@ -2780,7 +2801,7 @@ value of evaluated function.</p></div>
 
         return feature_string + &#34;} &#34;
 
-    def _load_data(self, dataset: DataFrame):
+    def _load_data(self, dataset: pd.DataFrame):
         if len(self.not_features) &gt; 0:
             self.X = dataset.drop(columns=self.not_features)
 
@@ -2826,13 +2847,15 @@ value of evaluated function.</p></div>
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
 
-    def get_digraph(self, dataset: DataFrame, n_importances: int, use_scaler: bool = False) -&gt; str:
+    def get_digraph(
+        self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
+    ) -&gt; str:
         &#34;&#34;&#34;
         Get directed graph showing importance of features.
 
         Parameters
         ----------
-        dataset : `DataFrame`
+        dataset : `pd.DataFrame`
             Dataset to be used for generating the graph.
         n_importances : `int`
             Number of top importances to show in the graph.
@@ -2912,7 +2935,7 @@ value of evaluated function.</p></div>
 
         return feature_string + &#34;} &#34;
 
-    def _load_data(self, dataset: DataFrame):
+    def _load_data(self, dataset: pd.DataFrame):
         if len(self.not_features) &gt; 0:
             self.X = dataset.drop(columns=self.not_features)
 
@@ -2948,13 +2971,15 @@ value of evaluated function.</p></div>
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
 
-    def get_digraph(self, dataset: DataFrame, n_importances: int, use_scaler: bool = False) -&gt; str:
+    def get_digraph(
+        self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
+    ) -&gt; str:
         &#34;&#34;&#34;
         Get directed graph showing importance of features.
 
         Parameters
         ----------
-        dataset : `DataFrame`
+        dataset : `pd.DataFrame`
             Dataset to be used for generating the graph.
         n_importances : `int`
             Number of top importances to show in the graph.
@@ -3034,7 +3059,7 @@ value of evaluated function.</p></div>
 
         return feature_string + &#34;} &#34;
 
-    def _load_data(self, dataset: DataFrame):
+    def _load_data(self, dataset: pd.DataFrame):
         if len(self.not_features) &gt; 0:
             self.X = dataset.drop(columns=self.not_features)
 
@@ -3070,13 +3095,15 @@ value of evaluated function.</p></div>
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
 
-    def get_digraph(self, dataset: DataFrame, n_importances: int, use_scaler: bool = False) -&gt; str:
+    def get_digraph(
+        self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
+    ) -&gt; str:
         &#34;&#34;&#34;
         Get directed graph showing importance of features.
 
         Parameters
         ----------
-        dataset : `DataFrame`
+        dataset : `pd.DataFrame`
             Dataset to be used for generating the graph.
         n_importances : `int`
             Number of top importances to show in the graph.
@@ -3156,7 +3183,7 @@ value of evaluated function.</p></div>
 
         return feature_string + &#34;} &#34;
 
-    def _load_data(self, dataset: DataFrame):
+    def _load_data(self, dataset: pd.DataFrame):
         if len(self.not_features) &gt; 0:
             self.X = dataset.drop(columns=self.not_features)
 
@@ -3192,13 +3219,15 @@ value of evaluated function.</p></div>
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
 
-    def get_digraph(self, dataset: DataFrame, n_importances: int, use_scaler: bool = False) -&gt; str:
+    def get_digraph(
+        self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
+    ) -&gt; str:
         &#34;&#34;&#34;
         Get directed graph showing importance of features.
 
         Parameters
         ----------
-        dataset : `DataFrame`
+        dataset : `pd.DataFrame`
             Dataset to be used for generating the graph.
         n_importances : `int`
             Number of top importances to show in the graph.
@@ -3278,7 +3307,7 @@ value of evaluated function.</p></div>
 
         return feature_string + &#34;} &#34;
 
-    def _load_data(self, dataset: DataFrame):
+    def _load_data(self, dataset: pd.DataFrame):
         if len(self.not_features) &gt; 0:
             self.X = dataset.drop(columns=self.not_features)
 
@@ -3314,13 +3343,15 @@ value of evaluated function.</p></div>
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
 
-    def get_digraph(self, dataset: DataFrame, n_importances: int, use_scaler: bool = False) -&gt; str:
+    def get_digraph(
+        self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
+    ) -&gt; str:
         &#34;&#34;&#34;
         Get directed graph showing importance of features.
 
         Parameters
         ----------
-        dataset : `DataFrame`
+        dataset : `pd.DataFrame`
             Dataset to be used for generating the graph.
         n_importances : `int`
             Number of top importances to show in the graph.
@@ -3400,7 +3431,7 @@ value of evaluated function.</p></div>
 
         return feature_string + &#34;} &#34;
 
-    def _load_data(self, dataset: DataFrame):
+    def _load_data(self, dataset: pd.DataFrame):
         if len(self.not_features) &gt; 0:
             self.X = dataset.drop(columns=self.not_features)
 
@@ -3426,13 +3457,15 @@ value of evaluated function.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_digraph(self, dataset: DataFrame, n_importances: int, use_scaler: bool = False) -&gt; str:
+<pre><code class="python">def get_digraph(
+    self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
+) -&gt; str:
     &#34;&#34;&#34;
     Get directed graph showing importance of features.
 
     Parameters
     ----------
-    dataset : `DataFrame`
+    dataset : `pd.DataFrame`
         Dataset to be used for generating the graph.
     n_importances : `int`
         Number of top importances to show in the graph.
@@ -3515,7 +3548,7 @@ value of evaluated function.</p></div>
 <div class="desc"><p>Get directed graph showing importance of features.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>dataset</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dt><strong><code>dataset</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
 <dd>Dataset to be used for generating the graph.</dd>
 <dt><strong><code>n_importances</code></strong> :&ensp;<code>int</code></dt>
 <dd>Number of top importances to show in the graph.</dd>
@@ -4646,27 +4679,28 @@ A string representation of the directed graph.</p></div>
     __slots__ = [&#34;num_categories&#34;]
 
     def __init__(self) -&gt; None:
-        pass
+        self.num_categories = None
 
     def encode(self, x: np.ndarray | list, fit: bool = True):
         if not isinstance(x, np.ndarray):
             x = np.array(x)
+        x = x[~np.isnan(x)]
         x = x.astype(int)
+
         if fit:
             self.num_categories = x.max() + 1
-
+        else:
+            if np.any(x &gt;= self.num_categories):
+                new_max_category = x.max() + 1
+                self.num_categories = max(self.num_categories, new_max_category)
         y = np.zeros((x.size, self.num_categories))
-
         y[np.arange(x.size), x] = 1
-
         return y
 
     def decode(self, x: np.ndarray | list) -&gt; np.ndarray:
         if not isinstance(x, np.ndarray):
             x = np.array(x)
-
         y = np.argmax(x, axis=1)
-
         return y</code></pre>
 </details>
 <div class="desc"><p>Class used to encode categorical variables.
@@ -4688,27 +4722,28 @@ It receives an array of integers and returns a binary array using the one-hot en
     __slots__ = [&#34;num_categories&#34;]
 
     def __init__(self) -&gt; None:
-        pass
+        self.num_categories = None
 
     def encode(self, x: np.ndarray | list, fit: bool = True):
         if not isinstance(x, np.ndarray):
             x = np.array(x)
+        x = x[~np.isnan(x)]
         x = x.astype(int)
+
         if fit:
             self.num_categories = x.max() + 1
-
+        else:
+            if np.any(x &gt;= self.num_categories):
+                new_max_category = x.max() + 1
+                self.num_categories = max(self.num_categories, new_max_category)
         y = np.zeros((x.size, self.num_categories))
-
         y[np.arange(x.size), x] = 1
-
         return y
 
     def decode(self, x: np.ndarray | list) -&gt; np.ndarray:
         if not isinstance(x, np.ndarray):
             x = np.array(x)
-
         y = np.argmax(x, axis=1)
-
         return y</code></pre>
 </details>
 <div class="desc"></div>
@@ -4727,9 +4762,7 @@ It receives an array of integers and returns a binary array using the one-hot en
 <pre><code class="python">def decode(self, x: np.ndarray | list) -&gt; np.ndarray:
     if not isinstance(x, np.ndarray):
         x = np.array(x)
-
     y = np.argmax(x, axis=1)
-
     return y</code></pre>
 </details>
 <div class="desc"></div>
@@ -4745,14 +4778,17 @@ It receives an array of integers and returns a binary array using the one-hot en
 <pre><code class="python">def encode(self, x: np.ndarray | list, fit: bool = True):
     if not isinstance(x, np.ndarray):
         x = np.array(x)
+    x = x[~np.isnan(x)]
     x = x.astype(int)
+
     if fit:
         self.num_categories = x.max() + 1
-
+    else:
+        if np.any(x &gt;= self.num_categories):
+            new_max_category = x.max() + 1
+            self.num_categories = max(self.num_categories, new_max_category)
     y = np.zeros((x.size, self.num_categories))
-
     y[np.arange(x.size), x] = 1
-
     return y</code></pre>
 </details>
 <div class="desc"></div>

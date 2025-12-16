@@ -45,16 +45,23 @@ el.replaceWith(d);
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.tools.reports.generate_html_pipeline"><code class="name flex">
-<span>def <span class="ident">generate_html_pipeline</span></span>(<span>data_dict, save_to_file=False, file_name='data_processing_report.html')</span>
+<span>def <span class="ident">generate_html_pipeline</span></span>(<span>data_dict, save_to_file=False, file_name='data_processing_report_improved.html')</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def generate_html_pipeline(data_dict, save_to_file=False, file_name=&#34;data_processing_report.html&#34;):
+<pre><code class="python">def generate_html_pipeline(
+    data_dict, save_to_file=False, file_name=&#34;data_processing_report_improved.html&#34;
+):
+    &#34;&#34;&#34;
+    Generates an HTML report for a data processing pipeline with an improved
+    layout using a tabbed interface to reduce vertical scroll.
+    &#34;&#34;&#34;
     css_js = &#34;&#34;&#34;
     &lt;style&gt;
+        /* Existing Styles (omitted for brevity, keep the original content) */
         :root {
             --primary: #0d9488;
             --primary-dark: #0f766e;
@@ -62,7 +69,8 @@ el.replaceWith(d);
             --accent: #3b82f6;
             --card-bg: #ffffff;
             --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.03);
-            --border-radius-md: 6px;
+            --border-radius-md: 8px;
+            --font-family: &#39;Roboto&#39;, sans-serif;
         }
 
         * {
@@ -70,11 +78,11 @@ el.replaceWith(d);
         }
 
         body {
-            font-family: &#39;Inter&#39;, -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: var(--font-family);
             background: #f8fafc;
             color: #1e293b;
             margin: 0;
-            padding: 1rem;
+            padding: 1.5rem;
             font-size: 14px;
         }
 
@@ -82,39 +90,45 @@ el.replaceWith(d);
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
             text-align: center;
-            padding: 1rem;
+            padding: 1.2rem;
             border-radius: var(--border-radius-md);
-            font-weight: 600;
-            font-size: 1.5rem;
-            margin-bottom: 1.5rem;
+            font-weight: 700;
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
 
         section {
             background: var(--card-bg);
             border-radius: var(--border-radius-md);
-            padding: 1rem;
+            padding: 1.5rem;
             box-shadow: var(--shadow-sm);
-            margin-bottom: 1.2rem;
+            margin-bottom: 2rem;
         }
 
         h3 {
             color: var(--primary-dark);
             font-weight: 600;
-            font-size: 1.2rem;
-            border-left: 4px solid var(--success);
-            padding-left: 0.8rem;
-            margin: 1rem 0 0.8rem;
+            font-size: 1.4rem;
+            border-left: 5px solid var(--success);
+            padding-left: 1rem;
+            margin-bottom: 1rem;
+            transition: color 0.3s ease;
+        }
+
+        h3:hover {
+            color: var(--primary);
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 13px;
-            margin: 0.5rem 0 1rem;
+            font-size: 14px;
+            margin: 1rem 0;
         }
 
         th, td {
-            padding: 0.5rem 0.75rem;
+            padding: 0.8rem 1rem;
             text-align: left;
             border-bottom: 1px solid #e2e8f0;
             vertical-align: top;
@@ -134,29 +148,98 @@ el.replaceWith(d);
 
         .nested-table {
             font-size: 12px;
-            margin-top: 0.5rem;
+            margin-top: 0.8rem;
         }
 
         details {
-            margin-bottom: 0.8rem;
-            padding: 0.5rem 0.8rem;
+            margin-bottom: 1rem;
+            padding: 0.8rem;
             background: #f9f9f9;
             border-radius: var(--border-radius-md);
+            transition: background 0.3s ease;
+        }
+
+        details[open] {
+            background: #f0fdf4;
         }
 
         summary {
-            font-weight: 600;
-            font-size: 1rem;
+            font-weight: 700;
+            font-size: 1.1rem;
             color: var(--primary-dark);
             cursor: pointer;
+            list-style: none; /* Hide default marker */
+            transition: color 0.3s ease;
+        }
+
+        summary::-webkit-details-marker {
+            display: none; /* For Chrome/Safari */
         }
 
         summary::before {
             content: &#34;▶&#34;;
             margin-right: 6px;
             color: var(--success);
-            font-size: 0.9rem;
+            font-size: 1rem;
+            display: inline-block;
+            transition: transform 0.2s;
         }
+        
+        details[open] summary::before {
+            content: &#34;▼&#34;;
+        }
+
+        summary:hover {
+            color: var(--primary);
+        }
+        
+        .tabbed-interface {
+            display: flex;
+            flex-direction: column;
+            background: var(--card-bg);
+            border-radius: var(--border-radius-md);
+            box-shadow: var(--shadow-sm);
+            padding: 0;
+            margin-bottom: 2rem;
+        }
+
+        .tab-buttons {
+            display: flex;
+            border-bottom: 2px solid #e2e8f0;
+            flex-wrap: wrap; /* Allows wrapping on smaller screens */
+        }
+
+        .tab-button {
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            font-weight: 600;
+            color: #475569;
+            font-size: 1rem;
+            transition: color 0.3s, border-bottom 0.3s;
+            flex-grow: 1; /* Makes buttons take up equal space */
+            text-align: center;
+        }
+
+        .tab-button.active, .tab-button:hover {
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary);
+        }
+
+        .tab-content {
+            padding: 1.5rem;
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        /* --- END NEW TABBED LAYOUT STYLES --- */
 
         @media (max-width: 768px) {
             body {
@@ -164,19 +247,52 @@ el.replaceWith(d);
             }
 
             h2 {
-                font-size: 1.3rem;
-                padding: 0.8rem;
+                font-size: 1.6rem;
+                padding: 1rem;
             }
 
             h3 {
-                font-size: 1.1rem;
+                font-size: 1.3rem;
             }
 
             table, .nested-table {
                 font-size: 12px;
             }
+
+            section {
+                padding: 1rem;
+            }
+            
+            .tab-button {
+                padding: 0.8rem 1rem;
+                font-size: 0.9rem;
+            }
         }
     &lt;/style&gt;
+    &lt;script&gt;
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName(&#34;tab-pane&#34;);
+            for (i = 0; i &lt; tabcontent.length; i++) {
+                tabcontent[i].style.display = &#34;none&#34;;
+                tabcontent[i].classList.remove(&#34;active&#34;);
+            }
+            tablinks = document.getElementsByClassName(&#34;tab-button&#34;);
+            for (i = 0; i &lt; tablinks.length; i++) {
+                tablinks[i].classList.remove(&#34;active&#34;);
+            }
+            document.getElementById(tabName).style.display = &#34;block&#34;;
+            document.getElementById(tabName).classList.add(&#34;active&#34;);
+            evt.currentTarget.classList.add(&#34;active&#34;);
+            // Scroll to the top of the tabbed interface container
+            document.querySelector(&#39;.tabbed-interface&#39;).scrollIntoView({ behavior: &#39;smooth&#39;, block: &#39;start&#39; });
+        }
+
+        // Set &#39;Initial Dataset&#39; as the default active tab on load
+        window.onload = function() {
+            document.querySelector(&#39;.tab-button&#39;).click();
+        };
+    &lt;/script&gt;
     &#34;&#34;&#34;
 
     def render_value(val):
@@ -192,59 +308,119 @@ el.replaceWith(d);
 
     def dict_to_table(d, title=None, nested=False):
         html = &#34;&#34;
-        if title and not nested:
-            html += f&#34;&lt;h4&gt;{escape(title)}&lt;/h4&gt;&#34;
-        table_class = &#34;nested-table&#34; if nested else &#34;table&#34;
+        table_class = &#34;nested-table&#34; if nested else &#34;main-table&#34;
         html += f&#34;&lt;table class=&#39;{table_class}&#39;&gt;&#34;
         html += &#34;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Key&lt;/th&gt;&lt;th&gt;Value&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&#34;
+        if not isinstance(d, dict):
+            d = {&#34;Error&#34;: &#34;Data not available or incorrect format&#34;}
+
         for key, val in d.items():
+            if val is None or (isinstance(val, (str, list, dict)) and not val):
+                continue
             key_html = escape(str(key))
             val_html = render_value(val)
             html += f&#34;&lt;tr&gt;&lt;td&gt;{key_html}&lt;/td&gt;&lt;td&gt;{val_html}&lt;/td&gt;&lt;/tr&gt;&#34;
         html += &#34;&lt;/tbody&gt;&lt;/table&gt;&#34;
         return html
 
-    html_content = css_js
-    html_content += &#34;&lt;h2&gt;📈 Data Processing Report&lt;/h2&gt;&#34;
-
-    html_content += &#34;&lt;section&gt;&#34;
-    html_content += &#34;&lt;h3&gt;📁 Initial Dataset&lt;/h3&gt;&#34;
-    html_content += dict_to_table(data_dict[&#34;initial_dataset&#34;])
-    html_content += &#34;&lt;/section&gt;&#34;
-
-    html_content += &#34;&lt;section&gt;&#34;
-    html_content += &#34;&lt;h3&gt;🔧 Processing Steps&lt;/h3&gt;&#34;
-    for i, step in enumerate(data_dict[&#34;processing_steps&#34;]):
-        html_content += &#34;&lt;details open&gt;&#34;
-        html_content += f&#34;&lt;summary&gt;Step {i + 1}: {escape(step[&#39;step_name&#39;])}&lt;/summary&gt;&#34;
-        html_content += f&#34;&lt;p&gt;&lt;strong&gt;Description:&lt;/strong&gt; {escape(step[&#39;description&#39;])}&lt;/p&gt;&#34;
-        html_content += dict_to_table(step[&#34;parameters&#34;], title=&#34;Parameters&#34;, nested=True)
-        html_content += dict_to_table(
-            {
-                &#34;Output Shape&#34;: step[&#34;output_shape&#34;],
-                &#34;Input Columns&#34;: step[&#34;input_columns&#34;],
-                &#34;Output Columns&#34;: step[&#34;output_columns&#34;],
-                &#34;Output Dtypes&#34;: step[&#34;output_dtypes&#34;],
-            },
-            title=&#34;Output Info&#34;,
-            nested=True,
+    html_content = f&#34;&#34;&#34;
+    &lt;!DOCTYPE html&gt;
+    &lt;html lang=&#34;en&#34;&gt;
+    &lt;head&gt;
+        &lt;meta charset=&#34;UTF-8&#34;&gt;
+        &lt;meta name=&#34;viewport&#34; content=&#34;width=device-width, initial-scale=1.0&#34;&gt;
+        &lt;title&gt;Data Processing Report&lt;/title&gt;
+        {css_js}
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h2&gt;📈 Data Processing Report&lt;/h2&gt;
+    &#34;&#34;&#34;
+    html_content += &#34;&#34;&#34;
+        &lt;div class=&#34;tabbed-interface&#34;&gt;
+            &lt;div class=&#34;tab-buttons&#34;&gt;
+                &lt;button class=&#34;tab-button&#34; onclick=&#34;openTab(event, &#39;initial_dataset_tab&#39;)&#34;&gt;📁 Initial Dataset&lt;/button&gt;
+                &lt;button class=&#34;tab-button&#34; onclick=&#34;openTab(event, &#39;processing_steps_tab&#39;)&#34;&gt;🔧 Processing Steps&lt;/button&gt;
+                &lt;button class=&#34;tab-button&#34; onclick=&#34;openTab(event, &#39;final_dataset_tab&#39;)&#34;&gt;✅ Final Dataset&lt;/button&gt;
+            &lt;/div&gt;
+            &lt;div class=&#34;tab-content&#34;&gt;
+    &#34;&#34;&#34;
+    html_content += &#34;&#34;&#34;
+                &lt;div id=&#34;initial_dataset_tab&#34; class=&#34;tab-pane&#34;&gt;
+                    &lt;h3&gt;📁 Initial Dataset Overview&lt;/h3&gt;
+    &#34;&#34;&#34;
+    html_content += dict_to_table(data_dict.get(&#34;initial_dataset&#34;, {}))
+    html_content += &#34;&#34;&#34;
+                &lt;/div&gt;
+    &#34;&#34;&#34;
+    html_content += &#34;&#34;&#34;
+                &lt;div id=&#34;processing_steps_tab&#34; class=&#34;tab-pane&#34;&gt;
+                    &lt;h3&gt;🔧 Pipeline Steps Breakdown&lt;/h3&gt;
+    &#34;&#34;&#34;
+    for i, step in enumerate(data_dict.get(&#34;processing_steps&#34;, [])):
+        html_content += f&#34;&lt;details&gt;&#34;
+        html_content += (
+            f&#34;&lt;summary&gt;Step {i + 1}: {escape(step.get(&#39;step_name&#39;, &#39;Unnamed Step&#39;))}&lt;/summary&gt;&#34;
         )
+        html_content += f&#34;&lt;p&gt;&lt;strong&gt;Description:&lt;/strong&gt; {escape(step.get(&#39;description&#39;, &#39;No description provided&#39;))}&lt;/p&gt;&#34;
+
+        html_content += (
+            f&#34;&lt;div style=&#39;margin-left: 1rem; border-left: 3px solid #e0f2fe; padding-left: 1rem;&#39;&gt;&#34;
+        )
+
+        params_data = step.get(&#34;parameters&#34;, {})
+        if params_data:
+            html_content += &#34;&lt;h4&gt;⚙️ Parameters&lt;/h4&gt;&#34;
+            html_content += dict_to_table(params_data, nested=True)
+        else:
+            html_content += &#34;&lt;p&gt;&lt;em&gt;No parameters recorded.&lt;/em&gt;&lt;/p&gt;&#34;
+
+        output_info = {
+            &#34;Output Shape&#34;: step.get(&#34;output_shape&#34;, &#34;N/A&#34;),
+            &#34;Input Columns&#34;: step.get(&#34;input_columns&#34;, &#34;N/A&#34;),
+            &#34;Output Columns&#34;: step.get(&#34;output_columns&#34;, &#34;N/A&#34;),
+            &#34;Output Dtypes&#34;: step.get(&#34;output_dtypes&#34;, &#34;N/A&#34;),
+            &#34;Category Columns&#34;: step.get(&#34;unique_categories&#34;, &#34;N/A&#34;),
+        }
+        html_content += &#34;&lt;h4&gt;📊 Output Information&lt;/h4&gt;&#34;
+        html_content += dict_to_table(output_info, nested=True)
+
+        html_content += &#34;&lt;/div&gt;&#34;
         html_content += &#34;&lt;/details&gt;&#34;
-    html_content += &#34;&lt;/section&gt;&#34;
+    html_content += &#34;&#34;&#34;
+                &lt;/div&gt;
+    &#34;&#34;&#34;
 
-    html_content += &#34;&lt;section&gt;&#34;
-    html_content += &#34;&lt;h3&gt;✅ Final Dataset&lt;/h3&gt;&#34;
-    html_content += dict_to_table(data_dict[&#34;final_dataset&#34;])
-    html_content += &#34;&lt;/section&gt;&#34;
-
+    html_content += &#34;&#34;&#34;
+                &lt;div id=&#34;final_dataset_tab&#34; class=&#34;tab-pane&#34;&gt;
+                    &lt;h3&gt;✅ Final Dataset Overview&lt;/h3&gt;
+    &#34;&#34;&#34;
+    html_content += dict_to_table(data_dict.get(&#34;final_dataset&#34;, {}))
+    html_content += &#34;&#34;&#34;
+                &lt;/div&gt;
+            &lt;/div&gt; &lt;/div&gt; &#34;&#34;&#34;
+    current_time_str = datetime.datetime.now().strftime(&#34;%Y-%m-%d %H:%M:%S&#34;)
+    html_content += f&#34;&#34;&#34;
+        &lt;p style=&#34;text-align: center; color: #94a3b8; font-size: 0.8rem; margin-top: 3rem;&#34;&gt;
+            Report Generated by Pipeline at {current_time_str}
+        &lt;/p&gt;
+    &lt;/body&gt;
+    &lt;/html&gt;
+    &#34;&#34;&#34;
     if save_to_file:
-        with open(file_name, &#34;w&#34;, encoding=&#34;utf-8&#34;) as f:
-            f.write(html_content)
-        print(f&#34;✅ Report saved to &#39;{file_name}&#39;&#34;)
+        try:
+            with open(file_name, &#34;w&#34;, encoding=&#34;utf-8&#34;) as f:
+                f.write(html_content)
+            print(f&#34;✅ Report saved to &#39;{file_name}&#39;&#34;)
+        except NameError:
+            return f&#34;Report content saved to &#39;{file_name}&#39;&#34;
     else:
-        display(HTML(html_content))</code></pre>
+        try:
+            display(HTML(html_content))
+        except (ImportError, NameError):
+            return html_content</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Generates an HTML report for a data processing pipeline with an improved
+layout using a tabbed interface to reduce vertical scroll.</p></div>
 </dd>
 </dl>
 </section>

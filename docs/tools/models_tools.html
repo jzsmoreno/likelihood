@@ -67,6 +67,140 @@ el.replaceWith(d);
 </details>
 <div class="desc"></div>
 </dd>
+<dt id="likelihood.tools.models_tools.collect_experience"><code class="name flex">
+<span>def <span class="ident">collect_experience</span></span>(<span>env: Any,<br>model: torch.nn.modules.module.Module,<br>gamma: float = 0.99,<br>lambda_parameter: float = 0.95,<br>penalty_for_done_state: float = -1.0,<br>tolerance: int = inf,<br>verbose: bool = False) ‑> tuple[typing.List[tuple], typing.List[float], typing.List[float], typing.List[float]]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def collect_experience(
+    env: Any,
+    model: torch.nn.Module,
+    gamma: float = 0.99,
+    lambda_parameter: float = 0.95,
+    penalty_for_done_state: float = -1.0,
+    tolerance: int = float(&#34;inf&#34;),
+    verbose: bool = False,
+) -&gt; tuple[List[tuple], List[float], List[float], List[float]]:
+    &#34;&#34;&#34;Gathers experience samples from an environment using a reinforcement learning model.
+
+    Parameters
+    ----------
+    env : `Any`
+        The environment to collect experience from.
+    model : `torch.nn.Module`
+        The reinforcement learning model (e.g., a torch neural network).
+    gamma : float, optional
+        Discount factor for future rewards, default=0.99.
+    lambda_parameter : float, optional
+        TD error correction parameter, default=0.95.
+    penalty_for_done_state : float, optional
+        Penalty applied to the state when the environment reaches a terminal state, default=-1.0.
+
+    Returns
+    -------
+    trajectory : `list[tuple]`
+        The return trajectory (state, selected_option, action, reward, next_state, terminate, done).
+    returns : `list[float]`
+        The list of cumulative returns.
+    advantages : `list[float]`
+        The list of advantage terms for each step.
+    old_probs : `list[float]`
+        The list of old policy probabilities for each step.
+    &#34;&#34;&#34;
+    state = env.reset()
+    done = False
+    trajectory = []
+    old_probs = []
+    tolerance_count = 0
+
+    while not done and tolerance_count &lt; tolerance:
+        state = state[0] if isinstance(state, tuple) else state
+        state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+
+        option_probs, action_probs, termination_probs, selected_option, action = model(state_tensor)
+
+        action = torch.multinomial(action_probs, 1).item()
+        option = torch.multinomial(option_probs, 1).item()
+        old_probs.append(action_probs[0, action].item())
+
+        terminate = torch.bernoulli(termination_probs).item() &gt; 0.5
+        signature = env.step.__code__
+        if signature.co_argcount &gt; 2:
+            next_state, reward, done, truncated, info = env.step(action, option)
+        else:
+            next_state, reward, done, truncated, info = env.step(action)
+
+        if done:
+            reward = penalty_for_done_state
+        tolerance_count += 1
+        trajectory.append((state, selected_option, action, reward, next_state, terminate, done))
+        state = next_state
+        if verbose:
+            print_trajectory_info(
+                state, selected_option, action, reward, next_state, terminate, done
+            )
+
+    returns = []
+    advantages = []
+    G = 0
+    delta = 0
+
+    for t in reversed(range(len(trajectory))):
+        state, selected_option, action, reward, next_state, terminate, done = trajectory[t]
+
+        state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+        _, action_probs, _, _, _ = model(state_tensor)
+
+        if t == len(trajectory) - 1:
+            G = reward
+            advantages.insert(0, G - action_probs[0, action].item())
+        else:
+            next_state_tensor = torch.tensor(next_state, dtype=torch.float32).unsqueeze(0)
+            _, next_action_probs, _, _, _ = model(next_state_tensor)
+
+            delta = (
+                reward
+                + gamma * next_action_probs[0, action].item()
+                - action_probs[0, action].item()
+            )
+            G = reward + gamma * G
+            advantages.insert(
+                0, delta + gamma * lambda_parameter * advantages[0] if advantages else delta
+            )
+
+        returns.insert(0, G)
+
+    return trajectory, returns, advantages, old_probs</code></pre>
+</details>
+<div class="desc"><p>Gathers experience samples from an environment using a reinforcement learning model.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>env</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The environment to collect experience from.</dd>
+<dt><strong><code>model</code></strong> :&ensp;<code>torch.nn.Module</code></dt>
+<dd>The reinforcement learning model (e.g., a torch neural network).</dd>
+<dt><strong><code>gamma</code></strong> :&ensp;<code>float</code>, optional</dt>
+<dd>Discount factor for future rewards, default=0.99.</dd>
+<dt><strong><code>lambda_parameter</code></strong> :&ensp;<code>float</code>, optional</dt>
+<dd>TD error correction parameter, default=0.95.</dd>
+<dt><strong><code>penalty_for_done_state</code></strong> :&ensp;<code>float</code>, optional</dt>
+<dd>Penalty applied to the state when the environment reaches a terminal state, default=-1.0.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>trajectory</code></strong> :&ensp;<code>list[tuple]</code></dt>
+<dd>The return trajectory (state, selected_option, action, reward, next_state, terminate, done).</dd>
+<dt><strong><code>returns</code></strong> :&ensp;<code>list[float]</code></dt>
+<dd>The list of cumulative returns.</dd>
+<dt><strong><code>advantages</code></strong> :&ensp;<code>list[float]</code></dt>
+<dd>The list of advantage terms for each step.</dd>
+<dt><strong><code>old_probs</code></strong> :&ensp;<code>list[float]</code></dt>
+<dd>The list of old policy probabilities for each step.</dd>
+</dl></div>
+</dd>
 <dt id="likelihood.tools.models_tools.graph_metrics"><code class="name flex">
 <span>def <span class="ident">graph_metrics</span></span>(<span>adj_matrix: numpy.ndarray, eigenvector_threshold: float = 1e-06) ‑> pandas.core.frame.DataFrame</span>
 </code></dt>
@@ -75,7 +209,7 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -&gt; DataFrame:
+<pre><code class="python">def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -&gt; pd.DataFrame:
     &#34;&#34;&#34;
     Calculate various graph metrics based on the given adjacency matrix and return them in a single DataFrame.
 
@@ -88,13 +222,14 @@ el.replaceWith(d);
 
     Returns
     -------
-    DataFrame : A DataFrame containing the following graph metrics as columns.
-        - `Degree Centrality`: Degree centrality values for each node, indicating the number of direct connections each node has.
-        - `Clustering Coefficient`: Clustering coefficient values for each node, representing the degree to which nodes cluster together.
-        - `Eigenvector Centrality`: Eigenvector centrality values, indicating the influence of a node in the graph based on the eigenvectors of the adjacency matrix.
+    metrics_df : pd.DataFrame
+        A DataFrame containing the following graph metrics as columns.
         - `Degree`: The degree of each node, representing the number of edges connected to each node.
-        - `Betweenness Centrality`: Betweenness centrality values, representing the extent to which a node lies on the shortest paths between other nodes.
-        - `Closeness Centrality`: Closeness centrality values, indicating the inverse of the average shortest path distance from a node to all other nodes in the graph.
+        - `DegreeCentrality`: Degree centrality values for each node, indicating the number of direct connections each node has.
+        - `ClusteringCoefficient`: Clustering coefficient values for each node, representing the degree to which nodes cluster together.
+        - `EigenvectorCentrality`: Eigenvector centrality values, indicating the influence of a node in the graph based on the eigenvectors of the adjacency matrix.
+        - `BetweennessCentrality`: Betweenness centrality values, representing the extent to which a node lies on the shortest paths between other nodes.
+        - `ClosenessCentrality`: Closeness centrality values, indicating the inverse of the average shortest path distance from a node to all other nodes in the graph.
         - `Assortativity`: The assortativity coefficient of the graph, measuring the tendency of nodes to connect to similar nodes.
 
     Notes
@@ -121,11 +256,11 @@ el.replaceWith(d);
     metrics_df = pd.DataFrame(
         {
             &#34;Degree&#34;: degree,
-            &#34;Degree Centrality&#34;: degree_centrality,
-            &#34;Clustering Coefficient&#34;: clustering_coeff,
-            &#34;Eigenvector Centrality&#34;: eigenvector_centrality,
-            &#34;Betweenness Centrality&#34;: betweenness_centrality,
-            &#34;Closeness Centrality&#34;: closeness_centrality,
+            &#34;DegreeCentrality&#34;: degree_centrality,
+            &#34;ClusteringCoefficient&#34;: clustering_coeff,
+            &#34;EigenvectorCentrality&#34;: eigenvector_centrality,
+            &#34;BetweennessCentrality&#34;: betweenness_centrality,
+            &#34;ClosenessCentrality&#34;: closeness_centrality,
         }
     )
     metrics_df[&#34;Assortativity&#34;] = assortativity
@@ -141,16 +276,105 @@ el.replaceWith(d);
 <dd>A threshold for the eigenvector centrality calculation, used to determine the cutoff for small eigenvalues. Default is <code>1e-6</code>.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p>DataFrame : A DataFrame containing the following graph metrics as columns.
-- <code>Degree Centrality</code>: Degree centrality values for each node, indicating the number of direct connections each node has.
-- <code>Clustering Coefficient</code>: Clustering coefficient values for each node, representing the degree to which nodes cluster together.
-- <code>Eigenvector Centrality</code>: Eigenvector centrality values, indicating the influence of a node in the graph based on the eigenvectors of the adjacency matrix.
+<dl>
+<dt><strong><code>metrics_df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>A DataFrame containing the following graph metrics as columns.
 - <code>Degree</code>: The degree of each node, representing the number of edges connected to each node.
-- <code>Betweenness Centrality</code>: Betweenness centrality values, representing the extent to which a node lies on the shortest paths between other nodes.
-- <code>Closeness Centrality</code>: Closeness centrality values, indicating the inverse of the average shortest path distance from a node to all other nodes in the graph.
-- <code>Assortativity</code>: The assortativity coefficient of the graph, measuring the tendency of nodes to connect to similar nodes.</p>
+- <code>DegreeCentrality</code>: Degree centrality values for each node, indicating the number of direct connections each node has.
+- <code>ClusteringCoefficient</code>: Clustering coefficient values for each node, representing the degree to which nodes cluster together.
+- <code>EigenvectorCentrality</code>: Eigenvector centrality values, indicating the influence of a node in the graph based on the eigenvectors of the adjacency matrix.
+- <code>BetweennessCentrality</code>: Betweenness centrality values, representing the extent to which a node lies on the shortest paths between other nodes.
+- <code>ClosenessCentrality</code>: Closeness centrality values, indicating the inverse of the average shortest path distance from a node to all other nodes in the graph.
+- <code>Assortativity</code>: The assortativity coefficient of the graph, measuring the tendency of nodes to connect to similar nodes.</dd>
+</dl>
 <h2 id="notes">Notes</h2>
 <p>The returned DataFrame will have one row for each node and one column for each of the computed metrics.</p></div>
+</dd>
+<dt id="likelihood.tools.models_tools.ppo_loss"><code class="name flex">
+<span>def <span class="ident">ppo_loss</span></span>(<span>advantages: torch.Tensor,<br>old_action_probs: torch.Tensor,<br>action_probs: torch.Tensor,<br>epsilon: float = 0.2)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def ppo_loss(
+    advantages: torch.Tensor,
+    old_action_probs: torch.Tensor,
+    action_probs: torch.Tensor,
+    epsilon: float = 0.2,
+):
+    &#34;&#34;&#34;Computes the Proximal Policy Optimization (PPO) loss using the clipped objective.
+
+    Parameters
+    ----------
+    advantages : `torch.Tensor`
+        The advantages (delta) for each action taken, calculated as the difference between returns and value predictions.
+    old_action_probs : `torch.Tensor`
+        The action probabilities from the previous policy (before the current update).
+    action_probs : `torch.Tensor`
+        The action probabilities from the current policy (after the update).
+    epsilon : `float`, optional, default=0.2
+        The clipping parameter that limits how much the policy can change between updates.
+
+    Returns
+    -------
+    loss : `torch.Tensor`
+        The PPO loss, averaged across the batch of samples. The loss is computed using the clipped objective to penalize large policy updates.
+    &#34;&#34;&#34;
+
+    if advantages.dim() == 1:
+        advantages = advantages.unsqueeze(-1)
+
+    log_ratio = torch.log(action_probs + 1e-8) - torch.log(old_action_probs + 1e-8)
+    ratio = torch.exp(log_ratio)  # π(a|s) / π_old(a|s)
+
+    clipped_ratio = torch.clamp(ratio, 1 - epsilon, 1 + epsilon)
+
+    loss = -torch.min(ratio * advantages, clipped_ratio * advantages)
+
+    return loss.mean()</code></pre>
+</details>
+<div class="desc"><p>Computes the Proximal Policy Optimization (PPO) loss using the clipped objective.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>advantages</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>The advantages (delta) for each action taken, calculated as the difference between returns and value predictions.</dd>
+<dt><strong><code>old_action_probs</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>The action probabilities from the previous policy (before the current update).</dd>
+<dt><strong><code>action_probs</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>The action probabilities from the current policy (after the update).</dd>
+<dt><strong><code>epsilon</code></strong> :&ensp;<code>float</code>, optional, default=<code>0.2</code></dt>
+<dd>The clipping parameter that limits how much the policy can change between updates.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>loss</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>The PPO loss, averaged across the batch of samples. The loss is computed using the clipped objective to penalize large policy updates.</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.tools.models_tools.print_trajectory_info"><code class="name flex">
+<span>def <span class="ident">print_trajectory_info</span></span>(<span>state, selected_option, action, reward, next_state, terminate, done)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def print_trajectory_info(state, selected_option, action, reward, next_state, terminate, done):
+    print(&#34;=&#34; * 50)
+    print(&#34;TRAJECTORY INFO&#34;.center(50, &#34;=&#34;))
+    print(&#34;=&#34; * 50)
+    print(f&#34;State: {state}&#34;)
+    print(f&#34;Selected Option: {selected_option}&#34;)
+    print(f&#34;Action: {action}&#34;)
+    print(f&#34;Reward: {reward}&#34;)
+    print(f&#34;Next State: {next_state}&#34;)
+    print(f&#34;Terminate: {terminate}&#34;)
+    print(f&#34;Done: {done}&#34;)
+    print(&#34;=&#34; * 50)</code></pre>
+</details>
+<div class="desc"></div>
 </dd>
 <dt id="likelihood.tools.models_tools.remove_collinearity"><code class="name flex">
 <span>def <span class="ident">remove_collinearity</span></span>(<span>df: pandas.core.frame.DataFrame, threshold: float = 0.9)</span>
@@ -160,7 +384,7 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def remove_collinearity(df: DataFrame, threshold: float = 0.9):
+<pre><code class="python">def remove_collinearity(df: pd.DataFrame, threshold: float = 0.9):
     &#34;&#34;&#34;
     Removes highly collinear features from the DataFrame based on a correlation threshold.
 
@@ -170,14 +394,15 @@ el.replaceWith(d);
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : `pd.DataFrame`
         The input DataFrame containing numerical data.
     threshold : `float`
         The correlation threshold above which features will be removed. Default is `0.9`.
 
     Returns
     -------
-        DataFrame : A DataFrame with highly collinear features removed.
+    df_reduced : `pd.DataFrame`
+        A DataFrame with highly collinear features removed.
     &#34;&#34;&#34;
     corr_matrix = df.corr().abs()
     upper_triangle = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
@@ -194,14 +419,16 @@ that are highly correlated with any other column in the DataFrame. It uses an ab
 correlation value greater than the specified threshold to identify which columns to drop.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
 <dd>The input DataFrame containing numerical data.</dd>
 <dt><strong><code>threshold</code></strong> :&ensp;<code>float</code></dt>
 <dd>The correlation threshold above which features will be removed. Default is <code>0.9</code>.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<pre><code>DataFrame : A DataFrame with highly collinear features removed.
-</code></pre></div>
+<dl>
+<dt><strong><code>df_reduced</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>A DataFrame with highly collinear features removed.</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.tools.models_tools.suppress_warnings"><code class="name flex">
 <span>def <span class="ident">suppress_warnings</span></span>(<span>func)</span>
@@ -257,8 +484,8 @@ correlation value greater than the specified threshold to identify which columns
     frac : `float`
         Fraction of data to use (default is 1.0).
 
-    Keyword Arguments:
-    ------------------
+    Keyword Arguments
+    -----------------
     Additional keyword arguments passed to the `model.fit` function, such as validation split and callbacks.
 
     Returns
@@ -323,11 +550,335 @@ correlation value greater than the specified threshold to identify which columns
 <dt><strong><code>frac</code></strong> :&ensp;<code>float</code></dt>
 <dd>Fraction of data to use (default is 1.0).</dd>
 </dl>
-<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
 <p>Additional keyword arguments passed to the <code>model.fit</code> function, such as validation split and callbacks.</p>
 <h2 id="returns">Returns</h2>
 <p><code>tf.keras.Model</code>
 The trained model after fitting.</p></div>
+</dd>
+<dt id="likelihood.tools.models_tools.train_model_with_episodes"><code class="name flex">
+<span>def <span class="ident">train_model_with_episodes</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_episodes: int,<br>episode_patience: int = 5,<br>**kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def train_model_with_episodes(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    env: Any,
+    num_episodes: int,
+    episode_patience: int = 5,
+    **kwargs,
+):
+    &#34;&#34;&#34;Trains a model via reinforcement learning episodes.
+
+    Parameters
+    ----------
+    model : `torch.nn.Module`
+        The model to be trained.
+    optimizer : `torch.optim.Optimizer`
+        The optimizer for the model.
+    env : `Any`
+        The environment used for the episodes.
+    num_episodes : `int`
+        The number of episodes to train.
+
+    Keyword Arguments
+    -----------------
+    Additional keyword arguments passed to the `train_option_critic` function.
+
+    num_epochs : `int`
+        Number of training epochs.
+    batch_size : `int`
+        Batch size per training step.
+    gamma : `float`
+        Discount factor for future rewards.
+    device : `str`
+        Target device (e.g., &#34;cpu&#34; or &#34;cuda&#34;).
+    beta : `float`
+        Critic learning rate hyperparameter.
+    patience : `int`
+        Early stopping patience in epochs.
+
+    Returns
+    -------
+    model : `torch.nn.Module`
+        The trained model.
+    best_loss_so_far : `float`
+        The best loss value observed during training.
+    &#34;&#34;&#34;
+    previous_weights = model.state_dict()
+    best_loss_so_far = float(&#34;inf&#34;)
+    loss_window = []
+    average_loss = 0.0
+    no_improvement_count = 0
+
+    print(f&#34;{&#39;Episode&#39;:&lt;12} {&#39;Loss&#39;:&lt;8} {&#39;Best Loss&#39;:&lt;17} {&#39;Status&#39;:&lt;15} {&#39;Avg Loss&#39;:&lt;4}&#34;)
+    print(&#34;=&#34; * 70)
+
+    NEW_BEST_COLOR = &#34;\033[92m&#34;
+    REVERT_COLOR = &#34;\033[91m&#34;
+    RESET_COLOR = &#34;\033[0m&#34;
+    advantages_per_episode = []
+
+    for episode in range(num_episodes):
+        model, loss, advantages = train_option_critic(model, optimizer, env, **kwargs)
+        advantages_per_episode.extend(advantages)
+
+        loss_window.append(loss)
+        average_loss = sum(loss_window) / len(loss_window)
+
+        if loss &lt; best_loss_so_far:
+            best_loss_so_far = loss
+            previous_weights = model.state_dict()
+            no_improvement_count = 0
+            status = f&#34;{NEW_BEST_COLOR}Updated{RESET_COLOR}&#34;
+        else:
+            model.load_state_dict(previous_weights)
+            no_improvement_count += 1
+            status = f&#34;{REVERT_COLOR}No Improvement{RESET_COLOR}&#34;
+
+        # Printing the results for each episode
+        print(
+            f&#34;{episode + 1:&lt;8} {loss:&lt;12.4f} {best_loss_so_far:&lt;15.4f} {status:&lt;25} {average_loss:&lt;12.4f}&#34;
+        )
+        print(&#34;=&#34; * 70)
+
+        if no_improvement_count &gt;= episode_patience:
+            print(f&#34;\nNo improvement for {episode_patience} episodes. Stopping early.&#34;)
+            break
+
+    print(f&#34;\nTraining complete. Final best loss: {best_loss_so_far:.4f}&#34;)
+    sns.set_theme(style=&#34;whitegrid&#34;)
+    plt.figure(figsize=(5, 3))
+    plt.plot(
+        range(len(advantages_per_episode)),
+        advantages_per_episode,
+        marker=None,
+        markersize=6,
+        color=sns.color_palette(&#34;deep&#34;)[0],
+        linestyle=&#34;-&#34;,
+        linewidth=2,
+    )
+    plt.xscale(&#34;log&#34;)
+
+    plt.xlabel(&#34;Epoch&#34;, fontsize=12)
+    plt.ylabel(&#34;Average Advantages&#34;, fontsize=12)
+    plt.grid(True, which=&#34;both&#34;, axis=&#34;both&#34;, linestyle=&#34;--&#34;, linewidth=0.5, alpha=0.6)
+    plt.tight_layout()
+    plt.show()
+
+    return model, best_loss_so_far</code></pre>
+</details>
+<div class="desc"><p>Trains a model via reinforcement learning episodes.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>model</code></strong> :&ensp;<code>torch.nn.Module</code></dt>
+<dd>The model to be trained.</dd>
+<dt><strong><code>optimizer</code></strong> :&ensp;<code>torch.optim.Optimizer</code></dt>
+<dd>The optimizer for the model.</dd>
+<dt><strong><code>env</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The environment used for the episodes.</dd>
+<dt><strong><code>num_episodes</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of episodes to train.</dd>
+</dl>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
+<p>Additional keyword arguments passed to the <code><a title="likelihood.tools.models_tools.train_option_critic" href="#likelihood.tools.models_tools.train_option_critic">train_option_critic()</a></code> function.</p>
+<p>num_epochs : <code>int</code>
+Number of training epochs.
+batch_size : <code>int</code>
+Batch size per training step.
+gamma : <code>float</code>
+Discount factor for future rewards.
+device : <code>str</code>
+Target device (e.g., "cpu" or "cuda").
+beta : <code>float</code>
+Critic learning rate hyperparameter.
+patience : <code>int</code>
+Early stopping patience in epochs.</p>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>model</code></strong> :&ensp;<code>torch.nn.Module</code></dt>
+<dd>The trained model.</dd>
+<dt><strong><code>best_loss_so_far</code></strong> :&ensp;<code>float</code></dt>
+<dd>The best loss value observed during training.</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.tools.models_tools.train_option_critic"><code class="name flex">
+<span>def <span class="ident">train_option_critic</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_epochs: int = 1000,<br>batch_size: int = 32,<br>device: str = 'cpu',<br>beta: float = 0.01,<br>epsilon: float = 0.2,<br>patience: int = 15,<br>verbose: bool = False,<br>**kwargs) ‑> tuple[torch.nn.modules.module.Module, float]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def train_option_critic(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    env: Any,
+    num_epochs: int = 1_000,
+    batch_size: int = 32,
+    device: str = &#34;cpu&#34;,
+    beta: float = 1e-2,
+    epsilon: float = 0.2,
+    patience: int = 15,
+    verbose: bool = False,
+    **kwargs,
+) -&gt; tuple[torch.nn.Module, float]:
+    &#34;&#34;&#34;Trains an option critic model with the provided environment and hyperparameters.
+
+    Parameters
+    ----------
+    model : `nn.Module`
+        The neural network model to train.
+    optimizer : `torch.optim.Optimizer`
+        The optimizer for model updates.
+    env : `Any`
+        The environment for training.
+    num_epochs : `int`
+        Number of training epochs.
+    batch_size : `int`
+        Batch size per training step.
+    device : `str`
+        Target device (e.g., &#34;cpu&#34; or &#34;cuda&#34;).
+    beta : `float`
+        Critic learning rate hyperparameter.
+    epsilon : `float`, optional, default=0.2
+        The clipping parameter that limits how much the policy can change between updates.
+    patience : `int`
+        Early stopping patience in epochs.
+
+    Returns
+    -------
+    model : `nn.Module`
+        Trained model.
+    avg_epoch_loss : `float`
+        Average loss per epoch over training.
+    &#34;&#34;&#34;
+    losses = []
+    best_loss_so_far = float(&#34;inf&#34;)
+    best_advantage_so_far = 0.0
+    patience_counter = 0
+    patience_counter_advantage = 0
+    device = torch.device(&#34;cuda:0&#34; if torch.cuda.is_available() else &#34;cpu&#34;)
+    advantages_per_epoch = []
+
+    for epoch in range(num_epochs):
+        trajectory, returns, advantages, old_probs = collect_experience(env, model, **kwargs)
+        avg_advantage = sum(advantages) / len(advantages)
+        advantages_per_epoch.append(avg_advantage)
+
+        states = torch.tensor(np.array([t[0] for t in trajectory]), dtype=torch.float32).to(device)
+        actions = torch.tensor([t[2] for t in trajectory], dtype=torch.long).to(device)
+        returns_tensor = torch.tensor(returns, dtype=torch.float32).to(device)
+        advantages_tensor = torch.tensor(advantages, dtype=torch.float32).to(device)
+        old_probs_tensor = torch.tensor(old_probs, dtype=torch.float32).view(-1, 1).to(device)
+
+        dataset = TensorDataset(
+            states, actions, returns_tensor, advantages_tensor, old_probs_tensor
+        )
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+        epoch_loss = 0
+        num_batches = 0
+
+        for (
+            batch_states,
+            batch_actions,
+            batch_returns,
+            batch_advantages,
+            batch_old_probs,
+        ) in dataloader:
+            optimizer.zero_grad()
+
+            option_probs, action_probs, termination_probs, selected_option, action = model(
+                batch_states
+            )
+
+            batch_current_probs = action_probs.gather(1, batch_actions.unsqueeze(1))
+            ppo_loss_value = ppo_loss(
+                batch_advantages, batch_old_probs, batch_current_probs, epsilon=epsilon
+            )
+
+            entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
+
+            loss = ppo_loss_value + beta * entropy.mean()
+            avg_advantages = batch_advantages.mean().item()
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item()
+            num_batches += 1
+
+            if avg_advantages &gt; best_advantage_so_far:
+                best_advantage_so_far = avg_advantages
+                patience_counter_advantage = 0
+            else:
+                patience_counter_advantage += 1
+            if patience_counter_advantage &gt;= patience:
+                if verbose:
+                    print(
+                        f&#34;Early stopping at epoch {epoch} after {patience} epochs without advantage improvement.&#34;
+                    )
+                break
+
+            epoch_loss += loss.item()
+            num_batches += 1
+
+        if num_batches &gt; 0:
+            avg_epoch_loss = epoch_loss / num_batches
+            losses.append(avg_epoch_loss)
+
+            if avg_epoch_loss &lt; best_loss_so_far:
+                best_loss_so_far = avg_epoch_loss
+                patience_counter = 0
+            else:
+                patience_counter += 1
+
+            if patience_counter &gt;= patience:
+                if verbose:
+                    print(
+                        f&#34;Early stopping at epoch {epoch} after {patience} epochs without improvement.&#34;
+                    )
+                break
+
+            if verbose:
+                if epoch % (num_epochs // 10) == 0:
+                    print(f&#34;Epoch {epoch}/{num_epochs} - Avg Loss: {avg_epoch_loss:.4f}&#34;)
+
+    return model, avg_epoch_loss, advantages_per_epoch</code></pre>
+</details>
+<div class="desc"><p>Trains an option critic model with the provided environment and hyperparameters.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>model</code></strong> :&ensp;<code>nn.Module</code></dt>
+<dd>The neural network model to train.</dd>
+<dt><strong><code>optimizer</code></strong> :&ensp;<code>torch.optim.Optimizer</code></dt>
+<dd>The optimizer for model updates.</dd>
+<dt><strong><code>env</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The environment for training.</dd>
+<dt><strong><code>num_epochs</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of training epochs.</dd>
+<dt><strong><code>batch_size</code></strong> :&ensp;<code>int</code></dt>
+<dd>Batch size per training step.</dd>
+<dt><strong><code>device</code></strong> :&ensp;<code>str</code></dt>
+<dd>Target device (e.g., "cpu" or "cuda").</dd>
+<dt><strong><code>beta</code></strong> :&ensp;<code>float</code></dt>
+<dd>Critic learning rate hyperparameter.</dd>
+<dt><strong><code>epsilon</code></strong> :&ensp;<code>float</code>, optional, default=<code>0.2</code></dt>
+<dd>The clipping parameter that limits how much the policy can change between updates.</dd>
+<dt><strong><code>patience</code></strong> :&ensp;<code>int</code></dt>
+<dd>Early stopping patience in epochs.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>model</code></strong> :&ensp;<code>nn.Module</code></dt>
+<dd>Trained model.</dd>
+<dt><strong><code>avg_epoch_loss</code></strong> :&ensp;<code>float</code></dt>
+<dd>Average loss per epoch over training.</dd>
+</dl></div>
 </dd>
 </dl>
 </section>
@@ -976,10 +1527,15 @@ A DataFrame with the transformed range columns.</p>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
 <li><code><a title="likelihood.tools.models_tools.apply_lora" href="#likelihood.tools.models_tools.apply_lora">apply_lora</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.collect_experience" href="#likelihood.tools.models_tools.collect_experience">collect_experience</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.graph_metrics" href="#likelihood.tools.models_tools.graph_metrics">graph_metrics</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.ppo_loss" href="#likelihood.tools.models_tools.ppo_loss">ppo_loss</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.print_trajectory_info" href="#likelihood.tools.models_tools.print_trajectory_info">print_trajectory_info</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.remove_collinearity" href="#likelihood.tools.models_tools.remove_collinearity">remove_collinearity</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.suppress_warnings" href="#likelihood.tools.models_tools.suppress_warnings">suppress_warnings</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.train_and_insights" href="#likelihood.tools.models_tools.train_and_insights">train_and_insights</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.train_model_with_episodes" href="#likelihood.tools.models_tools.train_model_with_episodes">train_model_with_episodes</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.train_option_critic" href="#likelihood.tools.models_tools.train_option_critic">train_option_critic</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>

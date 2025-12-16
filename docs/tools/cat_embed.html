@@ -61,13 +61,13 @@ el.replaceWith(d);
         self.label_encoders = {}
         self.embeddings = {}
 
-    def fit(self, df: DataFrame, categorical_cols: List):
+    def fit(self, df: pd.DataFrame, categorical_cols: List):
         &#34;&#34;&#34;
         Fit the embeddings on the given data.
 
         Parameters
         ----------
-        df : `DataFrame`
+        df : `pd.DataFrame`
             Pandas DataFrame containing the tabular data.
         categorical_cols : `List`
             List of column names representing categorical features.
@@ -95,13 +95,13 @@ el.replaceWith(d);
             embedding_matrix = np.random.rand(vocab_size, self.embedding_dim)
             self.embeddings[col] = tf.Variable(embedding_matrix, dtype=tf.float32)
 
-    def transform(self, df: DataFrame, categorical_cols: List[str]):
+    def transform(self, df: pd.DataFrame, categorical_cols: List[str]):
         &#34;&#34;&#34;
         Transform the data using the fitted embeddings.
 
         Parameters
         ----------
-        df : `DataFrame`
+        df : `pd.DataFrame`
             Pandas DataFrame containing the tabular data.
         categorical_cols : `List[str]`
             List of column names representing categorical features.
@@ -144,7 +144,7 @@ el.replaceWith(d);
 
         Parameters
         ----------
-        df : `DataFrame`
+        df : `pd.DataFrame`
             Pandas DataFrame containing the tabular data with embedded representations.
         categorical_cols : `List[str]`
             List of column names representing categorical features.
@@ -219,13 +219,13 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def fit(self, df: DataFrame, categorical_cols: List):
+<pre><code class="python">def fit(self, df: pd.DataFrame, categorical_cols: List):
     &#34;&#34;&#34;
     Fit the embeddings on the given data.
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : `pd.DataFrame`
         Pandas DataFrame containing the tabular data.
     categorical_cols : `List`
         List of column names representing categorical features.
@@ -256,7 +256,7 @@ el.replaceWith(d);
 <div class="desc"><p>Fit the embeddings on the given data.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
 <dd>Pandas DataFrame containing the tabular data.</dd>
 <dt><strong><code>categorical_cols</code></strong> :&ensp;<code>List</code></dt>
 <dd>List of column names representing categorical features.</dd>
@@ -278,7 +278,7 @@ el.replaceWith(d);
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : `pd.DataFrame`
         Pandas DataFrame containing the tabular data with embedded representations.
     categorical_cols : `List[str]`
         List of column names representing categorical features.
@@ -314,7 +314,7 @@ el.replaceWith(d);
 <div class="desc"><p>Inverse transform the data using the fitted embeddings.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
 <dd>Pandas DataFrame containing the tabular data with embedded representations.</dd>
 <dt><strong><code>categorical_cols</code></strong> :&ensp;<code>List[str]</code></dt>
 <dd>List of column names representing categorical features.</dd>
@@ -391,13 +391,13 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def transform(self, df: DataFrame, categorical_cols: List[str]):
+<pre><code class="python">def transform(self, df: pd.DataFrame, categorical_cols: List[str]):
     &#34;&#34;&#34;
     Transform the data using the fitted embeddings.
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : `pd.DataFrame`
         Pandas DataFrame containing the tabular data.
     categorical_cols : `List[str]`
         List of column names representing categorical features.
@@ -437,7 +437,7 @@ el.replaceWith(d);
 <div class="desc"><p>Transform the data using the fitted embeddings.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
 <dd>Pandas DataFrame containing the tabular data.</dd>
 <dt><strong><code>categorical_cols</code></strong> :&ensp;<code>List[str]</code></dt>
 <dd>List of column names representing categorical features.</dd>

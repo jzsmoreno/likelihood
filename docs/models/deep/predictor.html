@@ -481,7 +481,7 @@ el.replaceWith(d);
 
         Returns
         -------
-        `DataFrame` : The statistical summary of the input data.
+        `pd.DataFrame` : The statistical summary of the input data.
         &#34;&#34;&#34;
         self._viz_weights(cmap=cmap, aspect=aspect, highlight=highlight, **kwargs)
         inputs = self.inputs.copy()
@@ -756,18 +756,18 @@ el.replaceWith(d);
             )
         plt.show()
 
-    def _statistics(self, data_input: DataFrame) -&gt; DataFrame:
+    def _statistics(self, data_input: pd.DataFrame) -&gt; pd.DataFrame:
         &#34;&#34;&#34;
         Compute statistical summaries of the input data.
 
         Parameters
         ----------
-        data_input : `DataFrame`
+        data_input : `pd.DataFrame`
             The data to compute statistics for.
 
         Returns
         -------
-        `DataFrame` : The statistical summary of the input data.
+        `pd.DataFrame` : The statistical summary of the input data.
         &#34;&#34;&#34;
         data = data_input.copy(deep=True)
 
@@ -843,7 +843,7 @@ of the weights, t-SNE representation, and feature statistics.</p>
 
     Returns
     -------
-    `DataFrame` : The statistical summary of the input data.
+    `pd.DataFrame` : The statistical summary of the input data.
     &#34;&#34;&#34;
     self._viz_weights(cmap=cmap, aspect=aspect, highlight=highlight, **kwargs)
     inputs = self.inputs.copy()
@@ -882,7 +882,7 @@ of the weights, t-SNE representation, and feature statistics.</p>
 <dd>Additional keyword arguments for customization.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p><code>DataFrame</code> : The statistical summary of the input data.</p></div>
+<p><code>pd.DataFrame</code> : The statistical summary of the input data.</p></div>
 </dd>
 <dt id="likelihood.models.deep.predictor.GetInsights.render_html_report"><code class="name flex">
 <span>def <span class="ident">render_html_report</span></span>(<span>self,<br>frac: float = 0.2,<br>top_k: int = 5,<br>threshold_factor: float = 1.0,<br>max_rows: int = 5,<br>**kwargs) ‑> None</span>

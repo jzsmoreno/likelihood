@@ -58,10 +58,8 @@ el.replaceWith(d);
 <pre><code class="python">class DynamicGraph(FeatureSelection):
     &#34;&#34;&#34;A class to represent a dynamic graph&#34;&#34;&#34;
 
-    def __init__(self, df: DataFrame, n_importances: int, **kwargs):
-        self.G = Network(
-            notebook=True, cdn_resources=&#34;remote&#34;, directed=True
-        )  # enable interactive visualization in Jupyter Notebooks
+    def __init__(self, df: pd.DataFrame, n_importances: int, **kwargs):
+        self.G = Network(notebook=True, cdn_resources=&#34;remote&#34;, directed=True)
         self.df = df
         self.n_importances = n_importances
         super().__init__(**kwargs)
@@ -70,7 +68,6 @@ el.replaceWith(d);
     def fit(self, **kwargs) -&gt; None:
         &#34;&#34;&#34;Fit the model according to the given data and parameters.&#34;&#34;&#34;
         self.get_digraph(self.df, self.n_importances)
-        # create a dictionary with the indexes and names of the dataframe
         self.get_index = dict(zip(self.X.columns, range(len(self.X.columns))))
         self._make_network()
 
@@ -103,8 +100,6 @@ el.replaceWith(d);
 
     def pyvis_to_networkx(self):
         nx_graph = nx.Graph()
-
-        # Adding nodes
         nodes = [d[&#34;id&#34;] for d in self.G.nodes]
         for node_dic in self.G.nodes:
             id = node_dic[&#34;label&#34;]
@@ -112,8 +107,6 @@ el.replaceWith(d);
             nx_graph.add_nodes_from([(id, node_dic)])
         self.node_edge_dict = dict(zip(nodes, self.labels))
         del nodes
-
-        # Adding edges
         for edge in self.G.edges:
             source, target = self.node_edge_dict[edge[&#34;from&#34;]], self.node_edge_dict[edge[&#34;to&#34;]]
             del edge[&#34;from&#34;]
@@ -162,7 +155,6 @@ el.replaceWith(d);
 <pre><code class="python">def fit(self, **kwargs) -&gt; None:
     &#34;&#34;&#34;Fit the model according to the given data and parameters.&#34;&#34;&#34;
     self.get_digraph(self.df, self.n_importances)
-    # create a dictionary with the indexes and names of the dataframe
     self.get_index = dict(zip(self.X.columns, range(len(self.X.columns))))
     self._make_network()</code></pre>
 </details>
@@ -178,8 +170,6 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def pyvis_to_networkx(self):
     nx_graph = nx.Graph()
-
-    # Adding nodes
     nodes = [d[&#34;id&#34;] for d in self.G.nodes]
     for node_dic in self.G.nodes:
         id = node_dic[&#34;label&#34;]
@@ -187,8 +177,6 @@ el.replaceWith(d);
         nx_graph.add_nodes_from([(id, node_dic)])
     self.node_edge_dict = dict(zip(nodes, self.labels))
     del nodes
-
-    # Adding edges
     for edge in self.G.edges:
         source, target = self.node_edge_dict[edge[&#34;from&#34;]], self.node_edge_dict[edge[&#34;to&#34;]]
         del edge[&#34;from&#34;]

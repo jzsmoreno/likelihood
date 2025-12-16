@@ -70,6 +70,7 @@ el.replaceWith(d);
         self.steps = self.config[&#34;preprocessing_steps&#34;]
         self.compute_importance = self.config.get(&#34;compute_feature_importance&#34;, False)
         self.fitted_components: Dict[str, object] = {}
+        self.fitted_idx: List[str] = []
         self.columns_bin_sizes: Dict[str, int] | None = None
 
     def _load_config(self, config_path: str) -&gt; Dict:
@@ -97,7 +98,7 @@ el.replaceWith(d);
         y : np.ndarray
             Target vector (from self.target_col).
         importances : Optional[np.ndarray]
-            Feature importance scores (if compute_feature_importance=True).
+            Feature importance scores (if compute_feature_importance=`True`).
         &#34;&#34;&#34;
         y = df[self.target_col].values
         X = df.drop(columns=[self.target_col]).copy()
@@ -113,18 +114,24 @@ el.replaceWith(d);
         for step in self.steps:
             step_name = step[&#34;name&#34;]
             params = step.get(&#34;params&#34;, {})
+            uuid_idx = uuid.uuid4()
             step_info = {
                 &#34;step_name&#34;: step_name,
                 &#34;parameters&#34;: params,
                 &#34;description&#34;: self._get_step_description(step_name),
+                &#34;id&#34;: uuid_idx,
             }
             step_info[&#34;input_columns&#34;] = list(X.columns)
+            self.fitted_idx.append(uuid_idx)
 
-            X = self._apply_step(step_name, X, fit=True, **params)
+            X = self._apply_step(step_name, uuid_idx, X, fit=True, **params)
 
             step_info[&#34;output_shape&#34;] = X.shape
             step_info[&#34;output_columns&#34;] = list(X.columns)
             step_info[&#34;output_dtypes&#34;] = X.dtypes.apply(lambda x: x.name).to_dict()
+            categorical_columns = X.select_dtypes(include=[&#34;category&#34;]).columns
+            unique_categories = {col: X[col].unique().tolist() for col in categorical_columns}
+            step_info[&#34;unique_categories&#34;] = unique_categories
 
             steps_info.append(step_info)
 
@@ -172,8 +179,9 @@ el.replaceWith(d);
             Cleaned feature matrix.
         &#34;&#34;&#34;
         X = df.copy()
-        for step_name, _ in self.fitted_components.items():
-            X = self._apply_step(step_name, X, fit=False)
+        for index, (step_name, _) in enumerate(self.fitted_components.items()):
+            step_name = re.sub(r&#34;_[a-f0-9\-]{36}&#34;, &#34;&#34;, step_name)
+            X = self._apply_step(step_name, self.fitted_idx[index], X, fit=False)
 
         return X
 
@@ -193,7 +201,9 @@ el.replaceWith(d);
 
         generate_html_pipeline(self.documentation, save_to_file=save_to_file, file_name=file_name)
 
-    def _apply_step(self, step_name: str, X: pd.DataFrame, fit: bool, **params) -&gt; pd.DataFrame:
+    def _apply_step(
+        self, step_name: str, idx: str, X: pd.DataFrame, fit: bool, **params
+    ) -&gt; pd.DataFrame:
         &#34;&#34;&#34;Dispatch to the correct handler for a preprocessing step.&#34;&#34;&#34;
         handlers = {
             &#34;DataScaler&#34;: self._handle_datascaler,
@@ -209,7 +219,7 @@ el.replaceWith(d);
                 f&#34;Step &#39;{step_name}&#39; not supported. Supported steps: {list(handlers.keys())}&#34;
             )
 
-        return handlers[step_name](X, fit=fit, **params)
+        return handlers[step_name](X, idx=idx, fit=fit, **params)
 
     def _get_step_description(self, step_name: str) -&gt; str:
         &#34;&#34;&#34;Return a description of what each preprocessing step does.&#34;&#34;&#34;
@@ -225,17 +235,17 @@ el.replaceWith(d);
         return descriptions.get(step_name, f&#34;Unknown preprocessing step: {step_name}&#34;)
 
     # ------------------------------ Step Handlers ------------------------------
-    def _handle_datascaler(self, X: pd.DataFrame, fit: bool, n: int = 1) -&gt; pd.DataFrame:
+    def _handle_datascaler(self, X: pd.DataFrame, idx: str, fit: bool, n: int = 1) -&gt; pd.DataFrame:
         &#34;&#34;&#34;Handle DataScaler (fits on training data, applies to all).&#34;&#34;&#34;
         numeric_X = X.select_dtypes(include=[&#34;float&#34;])
         numeric_columns = numeric_X.columns.tolist()
         n = None if n == 0 else n
         if fit:
             scaler = DataScaler(numeric_X.values.T, n=n)
-            self.fitted_components[&#34;DataScaler&#34;] = scaler
+            self.fitted_components[f&#34;DataScaler_{idx}&#34;] = scaler
             numeric_X = pd.DataFrame(scaler.rescale().T, columns=numeric_X.columns)
         else:
-            scaler = self.fitted_components[&#34;DataScaler&#34;]
+            scaler = self.fitted_components[f&#34;DataScaler_{idx}&#34;]
             numeric_X = pd.DataFrame(
                 scaler.rescale(numeric_X.values.T).T, columns=numeric_X.columns
             )
@@ -244,21 +254,21 @@ el.replaceWith(d);
         return X
 
     def _handle_dataframeencoder(
-        self, X: pd.DataFrame, fit: bool, norm_method: str = &#34;mean&#34;
+        self, X: pd.DataFrame, idx: str, fit: bool, norm_method: str = &#34;mean&#34;
     ) -&gt; pd.DataFrame:
         &#34;&#34;&#34;Handle DataFrameEncoder (fits encoders/normalizers).&#34;&#34;&#34;
         if fit:
             encoder = DataFrameEncoder(X)
             encoded_X = encoder.encode(norm_method=norm_method)
-            self.fitted_components[&#34;DataFrameEncoder&#34;] = encoder
+            self.fitted_components[f&#34;DataFrameEncoder_{idx}&#34;] = encoder
             return encoded_X
         else:
-            encoder = self.fitted_components[&#34;DataFrameEncoder&#34;]
+            encoder = self.fitted_components[f&#34;DataFrameEncoder_{idx}&#34;]
             encoder._df = X
             return encoder.encode()
 
     def _handle_remove_collinearity(
-        self, X: pd.DataFrame, fit: bool, threshold: float = 0.9
+        self, X: pd.DataFrame, idx: str, fit: bool, threshold: float = 0.9
     ) -&gt; pd.DataFrame:
         &#34;&#34;&#34;Handle collinearity removal (fits by selecting columns to drop).&#34;&#34;&#34;
         numeric_X = X.select_dtypes(include=[&#34;float&#34;])
@@ -267,28 +277,28 @@ el.replaceWith(d);
         if fit:
             cleaned_X = remove_collinearity(numeric_X, threshold=threshold)
             dropped_cols = set(X.columns) - set(cleaned_X.columns) - categorical_columns
-            self.fitted_components[&#34;remove_collinearity&#34;] = dropped_cols
+            self.fitted_components[f&#34;remove_collinearity_{idx}&#34;] = dropped_cols
             return X.drop(columns=dropped_cols)
         else:
-            dropped_cols = self.fitted_components[&#34;remove_collinearity&#34;]
+            dropped_cols = self.fitted_components[f&#34;remove_collinearity_{idx}&#34;]
             return X.drop(columns=dropped_cols)
 
     def _handle_transformrange(
-        self, X: pd.DataFrame, fit: bool, columns_bin_sizes: Dict[str, int] | None = None
+        self, X: pd.DataFrame, idx: str, fit: bool, columns_bin_sizes: Dict[str, int] | None = None
     ) -&gt; pd.DataFrame:
         &#34;&#34;&#34;Handle TransformRange (bin numerical features into ranges).&#34;&#34;&#34;
         if fit:
             transformer = TransformRange(columns_bin_sizes)
             cleaned_X = transformer.transform(X)
-            self.fitted_components[&#34;TransformRange&#34;] = transformer
+            self.fitted_components[f&#34;TransformRange_{idx}&#34;] = transformer
             self.columns_bin_sizes = columns_bin_sizes
             return cleaned_X
         else:
-            transformer = self.fitted_components[&#34;TransformRange&#34;]
+            transformer = self.fitted_components[f&#34;TransformRange_{idx}&#34;]
             return transformer.transform(X, fit=False)
 
     def _handle_onehotencoder(
-        self, X: pd.DataFrame, fit: bool, columns: List[str] | None = None
+        self, X: pd.DataFrame, idx: str, fit: bool, columns: List[str] | None = None
     ) -&gt; pd.DataFrame:
         &#34;&#34;&#34;Handle OneHotEncoder (fits on categorical columns).&#34;&#34;&#34;
         if fit:
@@ -304,9 +314,9 @@ el.replaceWith(d);
                     else X[col].map(category_to_indices[col])
                 )
                 tmp_df = pd.concat([tmp_df, pd.DataFrame(encoded_X, columns=unique_values)], axis=1)
-            self.fitted_components[&#34;OneHotEncoder&#34;] = (encoder, columns, category_to_indices)
+            self.fitted_components[f&#34;OneHotEncoder_{idx}&#34;] = (encoder, columns, category_to_indices)
         else:
-            encoder, columns, category_to_indices = self.fitted_components[&#34;OneHotEncoder&#34;]
+            encoder, columns, category_to_indices = self.fitted_components[f&#34;OneHotEncoder_{idx}&#34;]
             tmp_df = X.drop(columns=columns)
             for col in columns:
                 unique_values = list(category_to_indices[col].keys())
@@ -319,11 +329,13 @@ el.replaceWith(d);
                     fit=False,
                 )
                 tmp_df = pd.concat([tmp_df, pd.DataFrame(encoded_X, columns=unique_values)], axis=1)
+                tmp_df[unique_values] = tmp_df[unique_values].fillna(0)
         return tmp_df
 
     def _handle_simpleimputer(
         self,
         X: pd.DataFrame,
+        idx: str,
         fit: bool,
         use_scaler: bool = False,
         boundary: bool = True,
@@ -333,10 +345,10 @@ el.replaceWith(d);
             use_scaler = True if use_scaler == 1 else False
             imputer = SimpleImputer(use_scaler=use_scaler)
             tmp_df = imputer.fit_transform(X, boundary=boundary)
-            self.fitted_components[&#34;SimpleImputer&#34;] = imputer
+            self.fitted_components[f&#34;SimpleImputer_{idx}&#34;] = imputer
             return tmp_df
         else:
-            imputer = self.fitted_components[&#34;SimpleImputer&#34;]
+            imputer = self.fitted_components[f&#34;SimpleImputer_{idx}&#34;]
             return imputer.transform(X, boundary=boundary)
 
     def save(self, filepath: str) -&gt; None:
@@ -348,11 +360,11 @@ el.replaceWith(d);
         filepath : str
             Path where the serialized pipeline will be saved.
         &#34;&#34;&#34;
-        import pickle
 
         save_dict = {
             &#34;config&#34;: self.config,
             &#34;fitted_components&#34;: self.fitted_components,
+            &#34;fitted_idx&#34;: self.fitted_idx,
             &#34;target_col&#34;: self.target_col,
             &#34;steps&#34;: self.steps,
             &#34;compute_importance&#34;: self.compute_importance,
@@ -380,7 +392,6 @@ el.replaceWith(d);
         pipeline : Pipeline
             Reconstructed pipeline instance with fitted components.
         &#34;&#34;&#34;
-        import pickle
 
         filepath = filepath + &#34;.pkl&#34; if not filepath.endswith(&#34;.pkl&#34;) else filepath
 
@@ -391,6 +402,7 @@ el.replaceWith(d);
 
         pipeline.config = save_dict[&#34;config&#34;]
         pipeline.fitted_components = save_dict[&#34;fitted_components&#34;]
+        pipeline.fitted_idx = save_dict[&#34;fitted_idx&#34;]
         pipeline.target_col = save_dict[&#34;target_col&#34;]
         pipeline.steps = save_dict[&#34;steps&#34;]
         pipeline.compute_importance = save_dict[&#34;compute_importance&#34;]
@@ -450,7 +462,7 @@ el.replaceWith(d);
     y : np.ndarray
         Target vector (from self.target_col).
     importances : Optional[np.ndarray]
-        Feature importance scores (if compute_feature_importance=True).
+        Feature importance scores (if compute_feature_importance=`True`).
     &#34;&#34;&#34;
     y = df[self.target_col].values
     X = df.drop(columns=[self.target_col]).copy()
@@ -466,18 +478,24 @@ el.replaceWith(d);
     for step in self.steps:
         step_name = step[&#34;name&#34;]
         params = step.get(&#34;params&#34;, {})
+        uuid_idx = uuid.uuid4()
         step_info = {
             &#34;step_name&#34;: step_name,
             &#34;parameters&#34;: params,
             &#34;description&#34;: self._get_step_description(step_name),
+            &#34;id&#34;: uuid_idx,
         }
         step_info[&#34;input_columns&#34;] = list(X.columns)
+        self.fitted_idx.append(uuid_idx)
 
-        X = self._apply_step(step_name, X, fit=True, **params)
+        X = self._apply_step(step_name, uuid_idx, X, fit=True, **params)
 
         step_info[&#34;output_shape&#34;] = X.shape
         step_info[&#34;output_columns&#34;] = list(X.columns)
         step_info[&#34;output_dtypes&#34;] = X.dtypes.apply(lambda x: x.name).to_dict()
+        categorical_columns = X.select_dtypes(include=[&#34;category&#34;]).columns
+        unique_categories = {col: X[col].unique().tolist() for col in categorical_columns}
+        step_info[&#34;unique_categories&#34;] = unique_categories
 
         steps_info.append(step_info)
 
@@ -523,7 +541,7 @@ el.replaceWith(d);
 <dt><strong><code>y</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>Target vector (from self.target_col).</dd>
 <dt><strong><code>importances</code></strong> :&ensp;<code>Optional[np.ndarray]</code></dt>
-<dd>Feature importance scores (if compute_feature_importance=True).</dd>
+<dd>Feature importance scores (if compute_feature_importance=<code>True</code>).</dd>
 </dl></div>
 </dd>
 <dt id="likelihood.pipes.Pipeline.get_doc"><code class="name flex">
@@ -576,11 +594,11 @@ el.replaceWith(d);
     filepath : str
         Path where the serialized pipeline will be saved.
     &#34;&#34;&#34;
-    import pickle
 
     save_dict = {
         &#34;config&#34;: self.config,
         &#34;fitted_components&#34;: self.fitted_components,
+        &#34;fitted_idx&#34;: self.fitted_idx,
         &#34;target_col&#34;: self.target_col,
         &#34;steps&#34;: self.steps,
         &#34;compute_importance&#34;: self.compute_importance,
@@ -623,8 +641,9 @@ el.replaceWith(d);
         Cleaned feature matrix.
     &#34;&#34;&#34;
     X = df.copy()
-    for step_name, _ in self.fitted_components.items():
-        X = self._apply_step(step_name, X, fit=False)
+    for index, (step_name, _) in enumerate(self.fitted_components.items()):
+        step_name = re.sub(r&#34;_[a-f0-9\-]{36}&#34;, &#34;&#34;, step_name)
+        X = self._apply_step(step_name, self.fitted_idx[index], X, fit=False)
 
     return X</code></pre>
 </details>

@@ -60,7 +60,7 @@ el.replaceWith(d);
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : `pd.DataFrame`
         The input DataFrame containing the features.
     exclude_subset : `List[str]`, `optional`
         A list of features to exclude from the calculation of the adjacency matrix.
@@ -76,8 +76,8 @@ el.replaceWith(d);
     adjacency_matrix : `ndarray`
         The adjacency matrix.
 
-    Keyword Arguments:
-    ----------
+    Keyword Arguments
+    -----------------
     similarity: `int`
         The minimum number of features that must be the same in both arrays to be considered similar.
     threshold : `float`
@@ -131,7 +131,7 @@ el.replaceWith(d);
 <div class="desc"><p>Calculates the adjacency matrix for a given DataFrame using parallel processing.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
 <dd>The input DataFrame containing the features.</dd>
 <dt><strong><code>exclude_subset</code></strong> :&ensp;<code>List[str]<code>,</code>optional</code></dt>
 <dd>A list of features to exclude from the calculation of the adjacency matrix.</dd>
@@ -147,7 +147,7 @@ el.replaceWith(d);
 <dt><strong><code>adjacency_matrix</code></strong> :&ensp;<code>ndarray</code></dt>
 <dd>The adjacency matrix.</dd>
 </dl>
-<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
 <p>similarity: <code>int</code>
 The minimum number of features that must be the same in both arrays to be considered similar.
 threshold : <code>float</code>
@@ -224,7 +224,7 @@ The threshold value used in the <code>compare_similarity</code> function. Defaul
 <pre><code class="python">class Data:
     def __init__(
         self,
-        df: DataFrame,
+        df: pd.DataFrame,
         target: str | None = None,
         exclude_subset: List[str] = [],
         **kwargs,
@@ -626,8 +626,15 @@ If <code>False</code>, they are returned as a list.</dd>
 <h2 id="returns">Returns</h2>
 <p>Scalar test loss (if the model has a single output and no metrics)
 or list of scalars (if the model has multiple outputs
-and/or metrics). The attribute <code>model.metrics_names</code> will give you
-the display labels for the scalar outputs.</p></div>
+and/or metrics).
+Note: When using compiled metrics, <code>evaluate()</code> may return multiple
+submetric values, while <code>model.metrics_names</code> often lists only
+top-level names (e.g., 'loss', 'compile_metrics'), leading to a
+length mismatch. The order of the <code>evaluate()</code> output corresponds
+to the order of metrics specified during <code>model.compile()</code>. You can
+use this order to map the <code>evaluate()</code> results to the intended
+metric. <code>model.metrics_names</code> itself will still return only the
+top-level names.</p></div>
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNN.f1_macro"><code class="name flex">
 <span>def <span class="ident">f1_macro</span></span>(<span>self, y_true, y_pred)</span>

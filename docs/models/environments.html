@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>likelihood.models.environments API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>likelihood.models.environments</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="likelihood.models.environments.ActionSpace"><code class="flex name class">
+<span>class <span class="ident">ActionSpace</span></span>
+<span>(</span><span>num_actions)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ActionSpace:
+    def __init__(self, num_actions):
+        self._num_actions = num_actions
+
+    @property
+    def n(self):
+        return self._num_actions</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Instance variables</h3>
+<dl>
+<dt id="likelihood.models.environments.ActionSpace.n"><code class="name">prop <span class="ident">n</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def n(self):
+    return self._num_actions</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="likelihood.models.environments.OptionCriticEnv"><code class="flex name class">
+<span>class <span class="ident">OptionCriticEnv</span></span>
+<span>(</span><span>episodes: Dict[int, Dict[str, List]])</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class OptionCriticEnv:
+    &#34;&#34;&#34;
+    An environment for Option Critic reinforcement learning that processes a dataset of episodes.
+
+    Attributes
+    ----------
+    episodes : `Dict[str, Dict]`
+        Dataset of episodes with state, action, selected_option, reward, next_state, and done information.
+    observation_space : `np.ndarray`
+        Initial observation space shape (from first episode&#39;s state)
+    done : `bool`
+        Whether the current episode has terminated
+    num_options : `int`
+        Number of distinct options available in the dataset
+    actions_by_option : `defaultdict(set)`
+        Maps selected options to sets of actions that were taken with them
+    unique_actions_count : `List[int]`
+        Count of unique actions per option index (used for action space definition)
+    action_space : `ActionSpace`
+        Custom action space defined by unique actions per option
+    idx_episode : `int`
+        Current episode index being processed
+    current_state : `np.ndarray`
+        Current state observation in the environment
+    &#34;&#34;&#34;
+
+    def __init__(
+        self,
+        episodes: Dict[int, Dict[str, List]],
+    ):
+        &#34;&#34;&#34;
+        Initializes the OptionCriticEnv with a dataset of episodes.
+
+        Parameters
+        ----------
+        episodes : `Dict[int, Dict]`
+            Dataset of episodes where keys are episode identifiers and values are episode data.
+            Each episode must contain at least:
+                - &#34;state&#34;: List of state observations
+                - &#34;selected_option&#34;: List of selected options
+                - &#34;action&#34;: List of actions taken
+                - &#34;reward&#34;: List of rewards
+                - &#34;next_state&#34;: List of next states
+                - &#34;done&#34;: List of termination flags
+
+        Raises
+        ------
+        ValueError
+            If required fields (&#34;state&#34; or &#34;selected_option&#34;) are missing from episode data
+        &#34;&#34;&#34;
+        self.episodes = episodes
+
+        required_keys = [&#34;state&#34;, &#34;action&#34;, &#34;selected_option&#34;, &#34;reward&#34;, &#34;next_state&#34;, &#34;done&#34;]
+        for episode_id, data in episodes.items():
+            if not all(k in data for k in required_keys):
+                raise ValueError(
+                    f&#34;Episode {episode_id} missing keys: {set(required_keys) - set(data.keys())}&#34;
+                )
+
+        self.observation_space = np.array(episodes[0][&#34;state&#34;][0])
+        self.done = False
+        self.idx_episode = 0
+        self.current_state = None
+        self.num_options = len(set(episodes[0][&#34;selected_option&#34;]))
+        self.actions_by_option = defaultdict(set)
+
+        # Build fast lookup for transitions
+        self.state_action_option_to_transition: Dict[Tuple, Dict[str, Any]] = {}
+
+        for episode_id, data in episodes.items():
+            states = data[&#34;state&#34;]
+            actions = data[&#34;action&#34;]
+            options = data[&#34;selected_option&#34;]
+            next_states = data[&#34;next_state&#34;]
+            rewards = data[&#34;reward&#34;]
+            dones = data[&#34;done&#34;]
+
+            for i in range(len(states)):
+                state_key = tuple(states[i])
+                key = (state_key, options[i], actions[i])
+
+                self.state_action_option_to_transition[key] = {
+                    &#34;next_state&#34;: next_states[i],
+                    &#34;reward&#34;: rewards[i],
+                    &#34;done&#34;: dones[i],
+                }
+
+            for i, selected in enumerate(options):
+                self.actions_by_option[selected].add(actions[i])
+
+        self.unique_actions_count = [
+            len(self.actions_by_option.get(i, set()))
+            for i in range(max(self.actions_by_option.keys()) + 1)
+        ]
+
+        self.action_space = ActionSpace(self.unique_actions_count)
+
+    def reset(self) -&gt; tuple[np.ndarray, dict]:
+        &#34;&#34;&#34;
+        Resets the environment to a random episode and returns the initial state.
+
+        Returns
+        -------
+        observation : `np.ndarray`
+            Initial state observation
+        info : `Dict`
+            Empty dictionary (no additional information)
+        &#34;&#34;&#34;
+        episode_id = np.random.choice(list(self.episodes.keys()))
+        self.idx_episode = episode_id
+        self.current_state = self.episodes[episode_id][&#34;state&#34;][0]
+        return self.current_state, {}
+
+    def step(self, action: int, option: int) -&gt; tuple[np.ndarray, float, bool, bool, dict]:
+        &#34;&#34;&#34;
+        Takes an action with a specific option and returns the next state, reward, and termination status.
+
+        Parameters
+        ----------
+        action : `int`
+            Action index to execute
+        option : `int`
+            Selected option index
+
+        Returns
+        -------
+        next_state : `np.ndarray`
+            State after taking the action
+        reward : `float`
+            Immediate reward for the transition
+        done : `bool`
+            Whether the episode has terminated (from episode data)
+        terminated : `bool`
+            Whether the action-option pair was found in the dataset
+        info : `Dict`
+            Empty dictionary (no additional information)
+        &#34;&#34;&#34;
+        key = (tuple(self.current_state), option, action)
+        if key in self.state_action_option_to_transition:
+            trans = self.state_action_option_to_transition[key]
+            self.current_state = trans[&#34;next_state&#34;]
+            return trans[&#34;next_state&#34;].copy(), trans[&#34;reward&#34;], trans[&#34;done&#34;], True, {}
+        else:
+            return self.current_state, 0.0, False, False, {}</code></pre>
+</details>
+<div class="desc"><p>An environment for Option Critic reinforcement learning that processes a dataset of episodes.</p>
+<h2 id="attributes">Attributes</h2>
+<dl>
+<dt><strong><code>episodes</code></strong> :&ensp;<code>Dict[str, Dict]</code></dt>
+<dd>Dataset of episodes with state, action, selected_option, reward, next_state, and done information.</dd>
+<dt><strong><code>observation_space</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Initial observation space shape (from first episode's state)</dd>
+<dt><strong><code>done</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether the current episode has terminated</dd>
+<dt><strong><code>num_options</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of distinct options available in the dataset</dd>
+<dt><strong><code>actions_by_option</code></strong> :&ensp;<code>defaultdict(set)</code></dt>
+<dd>Maps selected options to sets of actions that were taken with them</dd>
+<dt><strong><code>unique_actions_count</code></strong> :&ensp;<code>List[int]</code></dt>
+<dd>Count of unique actions per option index (used for action space definition)</dd>
+<dt><strong><code>action_space</code></strong> :&ensp;<code><a title="likelihood.models.environments.ActionSpace" href="#likelihood.models.environments.ActionSpace">ActionSpace</a></code></dt>
+<dd>Custom action space defined by unique actions per option</dd>
+<dt><strong><code>idx_episode</code></strong> :&ensp;<code>int</code></dt>
+<dd>Current episode index being processed</dd>
+<dt><strong><code>current_state</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Current state observation in the environment</dd>
+</dl>
+<p>Initializes the OptionCriticEnv with a dataset of episodes.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>episodes</code></strong> :&ensp;<code>Dict[int, Dict]</code></dt>
+<dd>Dataset of episodes where keys are episode identifiers and values are episode data.
+Each episode must contain at least:
+- "state": List of state observations
+- "selected_option": List of selected options
+- "action": List of actions taken
+- "reward": List of rewards
+- "next_state": List of next states
+- "done": List of termination flags</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>ValueError</code></dt>
+<dd>If required fields ("state" or "selected_option") are missing from episode data</dd>
+</dl></div>
+<h3>Methods</h3>
+<dl>
+<dt id="likelihood.models.environments.OptionCriticEnv.reset"><code class="name flex">
+<span>def <span class="ident">reset</span></span>(<span>self) ‑> tuple[numpy.ndarray, dict]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def reset(self) -&gt; tuple[np.ndarray, dict]:
+    &#34;&#34;&#34;
+    Resets the environment to a random episode and returns the initial state.
+
+    Returns
+    -------
+    observation : `np.ndarray`
+        Initial state observation
+    info : `Dict`
+        Empty dictionary (no additional information)
+    &#34;&#34;&#34;
+    episode_id = np.random.choice(list(self.episodes.keys()))
+    self.idx_episode = episode_id
+    self.current_state = self.episodes[episode_id][&#34;state&#34;][0]
+    return self.current_state, {}</code></pre>
+</details>
+<div class="desc"><p>Resets the environment to a random episode and returns the initial state.</p>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>observation</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Initial state observation</dd>
+<dt><strong><code>info</code></strong> :&ensp;<code>Dict</code></dt>
+<dd>Empty dictionary (no additional information)</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.models.environments.OptionCriticEnv.step"><code class="name flex">
+<span>def <span class="ident">step</span></span>(<span>self, action: int, option: int) ‑> tuple[numpy.ndarray, float, bool, bool, dict]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def step(self, action: int, option: int) -&gt; tuple[np.ndarray, float, bool, bool, dict]:
+    &#34;&#34;&#34;
+    Takes an action with a specific option and returns the next state, reward, and termination status.
+
+    Parameters
+    ----------
+    action : `int`
+        Action index to execute
+    option : `int`
+        Selected option index
+
+    Returns
+    -------
+    next_state : `np.ndarray`
+        State after taking the action
+    reward : `float`
+        Immediate reward for the transition
+    done : `bool`
+        Whether the episode has terminated (from episode data)
+    terminated : `bool`
+        Whether the action-option pair was found in the dataset
+    info : `Dict`
+        Empty dictionary (no additional information)
+    &#34;&#34;&#34;
+    key = (tuple(self.current_state), option, action)
+    if key in self.state_action_option_to_transition:
+        trans = self.state_action_option_to_transition[key]
+        self.current_state = trans[&#34;next_state&#34;]
+        return trans[&#34;next_state&#34;].copy(), trans[&#34;reward&#34;], trans[&#34;done&#34;], True, {}
+    else:
+        return self.current_state, 0.0, False, False, {}</code></pre>
+</details>
+<div class="desc"><p>Takes an action with a specific option and returns the next state, reward, and termination status.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>action</code></strong> :&ensp;<code>int</code></dt>
+<dd>Action index to execute</dd>
+<dt><strong><code>option</code></strong> :&ensp;<code>int</code></dt>
+<dd>Selected option index</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>next_state</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>State after taking the action</dd>
+<dt><strong><code>reward</code></strong> :&ensp;<code>float</code></dt>
+<dd>Immediate reward for the transition</dd>
+<dt><strong><code>done</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether the episode has terminated (from episode data)</dd>
+<dt><strong><code>terminated</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether the action-option pair was found in the dataset</dd>
+<dt><strong><code>info</code></strong> :&ensp;<code>Dict</code></dt>
+<dd>Empty dictionary (no additional information)</dd>
+</dl></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="likelihood.models" href="index.html">likelihood.models</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="likelihood.models.environments.ActionSpace" href="#likelihood.models.environments.ActionSpace">ActionSpace</a></code></h4>
+<ul class="">
+<li><code><a title="likelihood.models.environments.ActionSpace.n" href="#likelihood.models.environments.ActionSpace.n">n</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="likelihood.models.environments.OptionCriticEnv" href="#likelihood.models.environments.OptionCriticEnv">OptionCriticEnv</a></code></h4>
+<ul class="">
+<li><code><a title="likelihood.models.environments.OptionCriticEnv.reset" href="#likelihood.models.environments.OptionCriticEnv.reset">reset</a></code></li>
+<li><code><a title="likelihood.models.environments.OptionCriticEnv.step" href="#likelihood.models.environments.OptionCriticEnv.step">step</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>

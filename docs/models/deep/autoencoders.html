@@ -66,8 +66,8 @@ el.replaceWith(d);
     num_classes : `int`
         The number of classes in the dataset.
 
-    Keyword Arguments:
-    ----------
+    Keyword Arguments
+    -----------------
     Additional keyword arguments to pass to the model.
 
     hyperparameters : `dict`
@@ -193,7 +193,7 @@ el.replaceWith(d);
 <dt><strong><code>num_classes</code></strong> :&ensp;<code>int</code></dt>
 <dd>The number of classes in the dataset.</dd>
 </dl>
-<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
 <p>Additional keyword arguments to pass to the model.</p>
 <p>hyperparameters : <code>dict</code>
 The hyperparameters to set.</p>
@@ -303,8 +303,8 @@ The loss value.</p></div>
     num_layers : `int`
         The number of hidden layers in the classifier. Default is 1.
 
-    Keyword Arguments:
-    ----------
+    Keyword Arguments
+    -----------------
     vae_mode : `bool`
         Whether to use variational autoencoder mode. Default is False.
     vae_units : `int`
@@ -355,7 +355,7 @@ The loss value.</p></div>
 <dt><strong><code>num_layers</code></strong> :&ensp;<code>int</code></dt>
 <dd>The number of hidden layers in the classifier. Default is 1.</dd>
 </dl>
-<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
 <p>vae_mode : <code>bool</code>
 Whether to use variational autoencoder mode. Default is False.
 vae_units : <code>int</code>
@@ -506,7 +506,7 @@ The AutoClassifier instance.</p></div>
 </summary>
 <pre><code class="python">@suppress_warnings
 def setup_model(
-    data: DataFrame,
+    data: pd.DataFrame,
     target: str,
     epochs: int,
     train_size: float = 0.7,
@@ -520,7 +520,7 @@ def setup_model(
 
     Parameters
     ----------
-    data : `DataFrame`
+    data : `pd.DataFrame`
         The dataset to train the model on.
     target : `str`
         The name of the target column.
@@ -537,8 +537,8 @@ def setup_model(
     method : `str`
         The method to use for hyperparameter tuning. Options are &#34;Hyperband&#34; and &#34;RandomSearch&#34;.
 
-    Keyword Arguments:
-    ----------
+    Keyword Arguments
+    -----------------
     Additional keyword arguments to pass to the model.
 
     max_trials : `int`
@@ -643,7 +643,7 @@ def setup_model(
 <div class="desc"><p>Setup model for training and tuning.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>data</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dt><strong><code>data</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
 <dd>The dataset to train the model on.</dd>
 <dt><strong><code>target</code></strong> :&ensp;<code>str</code></dt>
 <dd>The name of the target column.</dd>
@@ -660,7 +660,7 @@ def setup_model(
 <dt><strong><code>method</code></strong> :&ensp;<code>str</code></dt>
 <dd>The method to use for hyperparameter tuning. Options are "Hyperband" and "RandomSearch".</dd>
 </dl>
-<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
 <p>Additional keyword arguments to pass to the model.</p>
 <p>max_trials : <code>int</code>
 The maximum number of trials to perform.
@@ -824,8 +824,8 @@ class AutoClassifier(tf.keras.Model):
     activation : `str`
         The type of activation function to use for the neural network layers.
 
-    Keyword Arguments:
-    ----------
+    Keyword Arguments
+    -----------------
     Additional keyword arguments to pass to the model.
 
     classifier_activation : `str`
@@ -1008,8 +1008,8 @@ class AutoClassifier(tf.keras.Model):
         patience : `int`
             The number of epochs to wait before early stopping. Default is 10.
 
-        Keyword Arguments:
-        ----------
+        Keyword Arguments
+        -----------------
         Additional keyword arguments to pass to the model.
         &#34;&#34;&#34;
         verbose = kwargs.get(&#34;verbose&#34;, True)
@@ -1183,7 +1183,7 @@ class AutoClassifier(tf.keras.Model):
 <dt><strong><code>activation</code></strong> :&ensp;<code>str</code></dt>
 <dd>The type of activation function to use for the neural network layers.</dd>
 </dl>
-<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
 <p>Additional keyword arguments to pass to the model.</p>
 <p>classifier_activation : <code>str</code>
 The activation function to use for the classifier layer. Default is <code>softmax</code>. If the activation function is not a classification function, the model can be used in regression problems.
@@ -1556,8 +1556,8 @@ ensuring compatibility in dimensions. Only works if vae_mode is False.</p>
     patience : `int`
         The number of epochs to wait before early stopping. Default is 10.
 
-    Keyword Arguments:
-    ----------
+    Keyword Arguments
+    -----------------
     Additional keyword arguments to pass to the model.
     &#34;&#34;&#34;
     verbose = kwargs.get(&#34;verbose&#34;, True)
@@ -1614,7 +1614,7 @@ ensuring compatibility in dimensions. Only works if vae_mode is False.</p>
 <dt><strong><code>patience</code></strong> :&ensp;<code>int</code></dt>
 <dd>The number of epochs to wait before early stopping. Default is 10.</dd>
 </dl>
-<h2 id="keyword-arguments">Keyword Arguments:</h2>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
 <p>Additional keyword arguments to pass to the model.</p></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier.unfreeze_encoder_decoder"><code class="name flex">

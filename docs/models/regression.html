@@ -48,7 +48,7 @@ el.replaceWith(d);
 <dl>
 <dt id="likelihood.models.regression.AbstractArima"><code class="flex name class">
 <span>class <span class="ident">AbstractArima</span></span>
-<span>(</span><span>datapoints: numpy.ndarray,<br>n_steps: int = 0,<br>noise: float = 0,<br>tol: float = 0.0001)</span>
+<span>(</span><span>datapoints: numpy.ndarray, noise: float = 0, tol: float = 0.0001)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -56,7 +56,38 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model&#34;&#34;&#34;
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+
+    Parameters
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    noise : `float`, optional
+        Noise level for the model, by default 0
+    tol : `float`, optional
+        Tolerance for convergence, by default 1e-4
+
+    Attributes
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    n_steps : `int`
+        Number of steps to predict.
+    noise : `float`
+        Noise level for the model.
+    p : `int`
+        Order of autoregressive part.
+    q : `int`
+        Order of moving average part.
+    tol : `float`
+        Tolerance for convergence.
+    nwalkers : `int`
+        Number of walkers for sampling.
+    mov : `int`
+        Maximum number of iterations.
+    theta_trained : `np.ndarray`
+        Trained parameters of the model.
+    &#34;&#34;&#34;
 
     __slots__ = [
         &#34;datapoints&#34;,
@@ -70,42 +101,89 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+        &#34;&#34;&#34;Initialize the ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points for training.
+        noise : `float`, optional
+            Noise level for the model, by default 0
+        tol : `float`, optional
+            Tolerance for convergence, by default 1e-4
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         self.p = datapoints.shape[0]
         self.q = 0
         self.tol = tol
+        self.n_steps = 0
 
-    def model(self, datapoints: ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+        &#34;&#34;&#34;Compute the model forward pass.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        theta : `list`
+            Model parameters.
+        mode : `bool`, optional
+            Forward pass mode, by default True
+
+        Returns
+        -------
+        `np.ndarray`
+            Model output.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
         return super().forward(datapoints, theta, mode, noise)
 
-    def xvec(self, datapoints: ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+        &#34;&#34;&#34;Extract vector of data points.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        n_steps : `int`, optional
+            Number of steps to consider, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Extracted data points vector.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         self.n_steps = n_steps
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 1, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+        &#34;&#34;&#34;Train the model using sampling method.
+
+        Parameters
+        ----------
+        nwalkers : `int`, optional
+            Number of walkers for sampling, by default 10
+        mov : `int`, optional
+            Maximum number of iterations, by default 200
+        weights : `bool`, optional
+            Whether to use weights in sampling, by default False
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         xvec = self.xvec
-
         self.nwalkers = nwalkers
         self.mov = mov
 
         assert self.nwalkers &lt;= self.mov, &#34;n_walkers must be less or equal than mov&#34;
-
         model = self.model
-
         n = self.p + self.q
-
         theta = np.random.rand(n)
-
         x_vec = xvec(datapoints)
 
         if weights:
@@ -130,12 +208,22 @@ el.replaceWith(d);
         self.theta_trained = trained
 
     def predict(self, n_steps: int = 0):
-        self.n_steps = n_steps
+        &#34;&#34;&#34;Make predictions for future steps.
 
+        Parameters
+        ----------
+        n_steps : `int`, optional
+            Number of steps to predict, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Predicted values.
+        &#34;&#34;&#34;
+        self.n_steps = n_steps
         datapoints = self.datapoints
         model = self.model
         theta_trained = self.theta_trained
-
         y_pred = model(datapoints, theta_trained)
 
         for i in range(n_steps):
@@ -155,7 +243,7 @@ el.replaceWith(d);
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: ndarray, y_pred: ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -163,8 +251,11 @@ el.replaceWith(d);
         print(&#34;Accuracy: {:.4f}&#34;.format(accuracy))
         print(&#34;RMSE: {:.4f}&#34;.format(rmse))
 
-    def plot_pred(self, y_real: ndarray, y_pred: ndarray, ci: float = 0.90, mode: bool = True):
-        plt.figure()
+    def plot_pred(
+        self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
+    ):
+        sns.set_theme(style=&#34;whitegrid&#34;)
+        plt.figure(figsize=(5, 3))
         n = self.n_steps
         y_mean = np.mean(y_pred, axis=0)
         y_std = np.std(y_pred, axis=0)
@@ -172,21 +263,28 @@ el.replaceWith(d);
             Z = (ci / 0.90) * 1.64
         else:
             Z = (ci / 0.95) * 1.96
-
-        plt.plot(y_pred, label=&#34;Predicted&#34;)
-        plt.plot(y_real, &#34;.--&#34;, label=&#34;Real&#34;, alpha=0.5)
+        plt.plot(y_pred, label=&#34;Predicted&#34;, linewidth=2, color=sns.color_palette(&#34;deep&#34;)[1])
+        plt.plot(
+            y_real, &#34;.--&#34;, label=&#34;Real&#34;, color=sns.color_palette(&#34;deep&#34;)[0], alpha=0.6, markersize=6
+        )
         plt.fill_between(
-            (range(y_pred.shape[0]))[-n:],
+            range(y_pred.shape[0])[-n:],
             (y_pred - Z * y_std)[-n:],
             (y_pred + Z * y_std)[-n:],
             alpha=0.2,
+            color=sns.color_palette(&#34;deep&#34;)[1],
         )
-        plt.xlabel(&#34;Time steps&#34;)
-        plt.ylabel(&#34;y&#34;)
-        plt.legend()
-        print(&#34;Confidence Interval: {:.4f}&#34;.format(Z * y_std))
+        plt.title(&#34;Predicted vs Real Values with Confidence Interval&#34;, fontsize=12)
+        plt.xlabel(&#34;Time Steps&#34;, fontsize=12)
+        plt.ylabel(&#34;y&#34;, fontsize=12)
+        plt.grid(True, linestyle=&#34;--&#34;, alpha=0.7)
+        plt.xticks(fontsize=10)
+        plt.yticks(fontsize=10)
+        print(f&#34;Confidence Interval: ±{Z * y_std:.4f}&#34;)
+        plt.legend(loc=&#34;upper left&#34;, fontsize=9)
         if mode:
-            plt.savefig(&#34;pred_&#34; + str(n) + &#34;.png&#34;, dpi=300)
+            plt.savefig(f&#34;pred_{n}.png&#34;, dpi=300)
+        plt.tight_layout()
         plt.show()
 
     def summary(self):
@@ -196,7 +294,47 @@ el.replaceWith(d);
         print(&#34;Mean of theta: {:.4f}&#34;.format(np.mean(self.theta_trained)))
         print(&#34;-----------------------&#34;)</code></pre>
 </details>
-<div class="desc"><p>A class that implements the auto-regressive arima (1, 0, 0) model</p></div>
+<div class="desc"><p>A class that implements the auto-regressive arima (1, 0, 0) model</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The input data points for training.</dd>
+<dt><strong><code>noise</code></strong> :&ensp;<code>float</code>, optional</dt>
+<dd>Noise level for the model, by default 0</dd>
+<dt><strong><code>tol</code></strong> :&ensp;<code>float</code>, optional</dt>
+<dd>Tolerance for convergence, by default 1e-4</dd>
+</dl>
+<h2 id="attributes">Attributes</h2>
+<dl>
+<dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The input data points for training.</dd>
+<dt><strong><code>n_steps</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of steps to predict.</dd>
+<dt><strong><code>noise</code></strong> :&ensp;<code>float</code></dt>
+<dd>Noise level for the model.</dd>
+<dt><strong><code>p</code></strong> :&ensp;<code>int</code></dt>
+<dd>Order of autoregressive part.</dd>
+<dt><strong><code>q</code></strong> :&ensp;<code>int</code></dt>
+<dd>Order of moving average part.</dd>
+<dt><strong><code>tol</code></strong> :&ensp;<code>float</code></dt>
+<dd>Tolerance for convergence.</dd>
+<dt><strong><code>nwalkers</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of walkers for sampling.</dd>
+<dt><strong><code>mov</code></strong> :&ensp;<code>int</code></dt>
+<dd>Maximum number of iterations.</dd>
+<dt><strong><code>theta_trained</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Trained parameters of the model.</dd>
+</dl>
+<p>Initialize the ARIMA model.</p>
+<h2 id="parameters_1">Parameters</h2>
+<dl>
+<dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The input data points for training.</dd>
+<dt><strong><code>noise</code></strong> :&ensp;<code>float</code>, optional</dt>
+<dd>Noise level for the model, by default 0</dd>
+<dt><strong><code>tol</code></strong> :&ensp;<code>float</code>, optional</dt>
+<dd>Tolerance for convergence, by default 1e-4</dd>
+</dl></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li><a title="likelihood.models.utils.FeaturesArima" href="utils.html#likelihood.models.utils.FeaturesArima">FeaturesArima</a></li>
@@ -215,7 +353,38 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model&#34;&#34;&#34;
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+
+    Parameters
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    noise : `float`, optional
+        Noise level for the model, by default 0
+    tol : `float`, optional
+        Tolerance for convergence, by default 1e-4
+
+    Attributes
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    n_steps : `int`
+        Number of steps to predict.
+    noise : `float`
+        Noise level for the model.
+    p : `int`
+        Order of autoregressive part.
+    q : `int`
+        Order of moving average part.
+    tol : `float`
+        Tolerance for convergence.
+    nwalkers : `int`
+        Number of walkers for sampling.
+    mov : `int`
+        Maximum number of iterations.
+    theta_trained : `np.ndarray`
+        Trained parameters of the model.
+    &#34;&#34;&#34;
 
     __slots__ = [
         &#34;datapoints&#34;,
@@ -229,42 +398,89 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+        &#34;&#34;&#34;Initialize the ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points for training.
+        noise : `float`, optional
+            Noise level for the model, by default 0
+        tol : `float`, optional
+            Tolerance for convergence, by default 1e-4
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         self.p = datapoints.shape[0]
         self.q = 0
         self.tol = tol
+        self.n_steps = 0
 
-    def model(self, datapoints: ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+        &#34;&#34;&#34;Compute the model forward pass.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        theta : `list`
+            Model parameters.
+        mode : `bool`, optional
+            Forward pass mode, by default True
+
+        Returns
+        -------
+        `np.ndarray`
+            Model output.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
         return super().forward(datapoints, theta, mode, noise)
 
-    def xvec(self, datapoints: ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+        &#34;&#34;&#34;Extract vector of data points.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        n_steps : `int`, optional
+            Number of steps to consider, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Extracted data points vector.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         self.n_steps = n_steps
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 1, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+        &#34;&#34;&#34;Train the model using sampling method.
+
+        Parameters
+        ----------
+        nwalkers : `int`, optional
+            Number of walkers for sampling, by default 10
+        mov : `int`, optional
+            Maximum number of iterations, by default 200
+        weights : `bool`, optional
+            Whether to use weights in sampling, by default False
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         xvec = self.xvec
-
         self.nwalkers = nwalkers
         self.mov = mov
 
         assert self.nwalkers &lt;= self.mov, &#34;n_walkers must be less or equal than mov&#34;
-
         model = self.model
-
         n = self.p + self.q
-
         theta = np.random.rand(n)
-
         x_vec = xvec(datapoints)
 
         if weights:
@@ -289,12 +505,22 @@ el.replaceWith(d);
         self.theta_trained = trained
 
     def predict(self, n_steps: int = 0):
-        self.n_steps = n_steps
+        &#34;&#34;&#34;Make predictions for future steps.
 
+        Parameters
+        ----------
+        n_steps : `int`, optional
+            Number of steps to predict, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Predicted values.
+        &#34;&#34;&#34;
+        self.n_steps = n_steps
         datapoints = self.datapoints
         model = self.model
         theta_trained = self.theta_trained
-
         y_pred = model(datapoints, theta_trained)
 
         for i in range(n_steps):
@@ -314,7 +540,7 @@ el.replaceWith(d);
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: ndarray, y_pred: ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -322,8 +548,11 @@ el.replaceWith(d);
         print(&#34;Accuracy: {:.4f}&#34;.format(accuracy))
         print(&#34;RMSE: {:.4f}&#34;.format(rmse))
 
-    def plot_pred(self, y_real: ndarray, y_pred: ndarray, ci: float = 0.90, mode: bool = True):
-        plt.figure()
+    def plot_pred(
+        self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
+    ):
+        sns.set_theme(style=&#34;whitegrid&#34;)
+        plt.figure(figsize=(5, 3))
         n = self.n_steps
         y_mean = np.mean(y_pred, axis=0)
         y_std = np.std(y_pred, axis=0)
@@ -331,21 +560,28 @@ el.replaceWith(d);
             Z = (ci / 0.90) * 1.64
         else:
             Z = (ci / 0.95) * 1.96
-
-        plt.plot(y_pred, label=&#34;Predicted&#34;)
-        plt.plot(y_real, &#34;.--&#34;, label=&#34;Real&#34;, alpha=0.5)
+        plt.plot(y_pred, label=&#34;Predicted&#34;, linewidth=2, color=sns.color_palette(&#34;deep&#34;)[1])
+        plt.plot(
+            y_real, &#34;.--&#34;, label=&#34;Real&#34;, color=sns.color_palette(&#34;deep&#34;)[0], alpha=0.6, markersize=6
+        )
         plt.fill_between(
-            (range(y_pred.shape[0]))[-n:],
+            range(y_pred.shape[0])[-n:],
             (y_pred - Z * y_std)[-n:],
             (y_pred + Z * y_std)[-n:],
             alpha=0.2,
+            color=sns.color_palette(&#34;deep&#34;)[1],
         )
-        plt.xlabel(&#34;Time steps&#34;)
-        plt.ylabel(&#34;y&#34;)
-        plt.legend()
-        print(&#34;Confidence Interval: {:.4f}&#34;.format(Z * y_std))
+        plt.title(&#34;Predicted vs Real Values with Confidence Interval&#34;, fontsize=12)
+        plt.xlabel(&#34;Time Steps&#34;, fontsize=12)
+        plt.ylabel(&#34;y&#34;, fontsize=12)
+        plt.grid(True, linestyle=&#34;--&#34;, alpha=0.7)
+        plt.xticks(fontsize=10)
+        plt.yticks(fontsize=10)
+        print(f&#34;Confidence Interval: ±{Z * y_std:.4f}&#34;)
+        plt.legend(loc=&#34;upper left&#34;, fontsize=9)
         if mode:
-            plt.savefig(&#34;pred_&#34; + str(n) + &#34;.png&#34;, dpi=300)
+            plt.savefig(f&#34;pred_{n}.png&#34;, dpi=300)
+        plt.tight_layout()
         plt.show()
 
     def summary(self):
@@ -364,7 +600,38 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model&#34;&#34;&#34;
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+
+    Parameters
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    noise : `float`, optional
+        Noise level for the model, by default 0
+    tol : `float`, optional
+        Tolerance for convergence, by default 1e-4
+
+    Attributes
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    n_steps : `int`
+        Number of steps to predict.
+    noise : `float`
+        Noise level for the model.
+    p : `int`
+        Order of autoregressive part.
+    q : `int`
+        Order of moving average part.
+    tol : `float`
+        Tolerance for convergence.
+    nwalkers : `int`
+        Number of walkers for sampling.
+    mov : `int`
+        Maximum number of iterations.
+    theta_trained : `np.ndarray`
+        Trained parameters of the model.
+    &#34;&#34;&#34;
 
     __slots__ = [
         &#34;datapoints&#34;,
@@ -378,42 +645,89 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+        &#34;&#34;&#34;Initialize the ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points for training.
+        noise : `float`, optional
+            Noise level for the model, by default 0
+        tol : `float`, optional
+            Tolerance for convergence, by default 1e-4
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         self.p = datapoints.shape[0]
         self.q = 0
         self.tol = tol
+        self.n_steps = 0
 
-    def model(self, datapoints: ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+        &#34;&#34;&#34;Compute the model forward pass.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        theta : `list`
+            Model parameters.
+        mode : `bool`, optional
+            Forward pass mode, by default True
+
+        Returns
+        -------
+        `np.ndarray`
+            Model output.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
         return super().forward(datapoints, theta, mode, noise)
 
-    def xvec(self, datapoints: ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+        &#34;&#34;&#34;Extract vector of data points.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        n_steps : `int`, optional
+            Number of steps to consider, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Extracted data points vector.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         self.n_steps = n_steps
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 1, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+        &#34;&#34;&#34;Train the model using sampling method.
+
+        Parameters
+        ----------
+        nwalkers : `int`, optional
+            Number of walkers for sampling, by default 10
+        mov : `int`, optional
+            Maximum number of iterations, by default 200
+        weights : `bool`, optional
+            Whether to use weights in sampling, by default False
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         xvec = self.xvec
-
         self.nwalkers = nwalkers
         self.mov = mov
 
         assert self.nwalkers &lt;= self.mov, &#34;n_walkers must be less or equal than mov&#34;
-
         model = self.model
-
         n = self.p + self.q
-
         theta = np.random.rand(n)
-
         x_vec = xvec(datapoints)
 
         if weights:
@@ -438,12 +752,22 @@ el.replaceWith(d);
         self.theta_trained = trained
 
     def predict(self, n_steps: int = 0):
-        self.n_steps = n_steps
+        &#34;&#34;&#34;Make predictions for future steps.
 
+        Parameters
+        ----------
+        n_steps : `int`, optional
+            Number of steps to predict, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Predicted values.
+        &#34;&#34;&#34;
+        self.n_steps = n_steps
         datapoints = self.datapoints
         model = self.model
         theta_trained = self.theta_trained
-
         y_pred = model(datapoints, theta_trained)
 
         for i in range(n_steps):
@@ -463,7 +787,7 @@ el.replaceWith(d);
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: ndarray, y_pred: ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -471,8 +795,11 @@ el.replaceWith(d);
         print(&#34;Accuracy: {:.4f}&#34;.format(accuracy))
         print(&#34;RMSE: {:.4f}&#34;.format(rmse))
 
-    def plot_pred(self, y_real: ndarray, y_pred: ndarray, ci: float = 0.90, mode: bool = True):
-        plt.figure()
+    def plot_pred(
+        self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
+    ):
+        sns.set_theme(style=&#34;whitegrid&#34;)
+        plt.figure(figsize=(5, 3))
         n = self.n_steps
         y_mean = np.mean(y_pred, axis=0)
         y_std = np.std(y_pred, axis=0)
@@ -480,21 +807,28 @@ el.replaceWith(d);
             Z = (ci / 0.90) * 1.64
         else:
             Z = (ci / 0.95) * 1.96
-
-        plt.plot(y_pred, label=&#34;Predicted&#34;)
-        plt.plot(y_real, &#34;.--&#34;, label=&#34;Real&#34;, alpha=0.5)
+        plt.plot(y_pred, label=&#34;Predicted&#34;, linewidth=2, color=sns.color_palette(&#34;deep&#34;)[1])
+        plt.plot(
+            y_real, &#34;.--&#34;, label=&#34;Real&#34;, color=sns.color_palette(&#34;deep&#34;)[0], alpha=0.6, markersize=6
+        )
         plt.fill_between(
-            (range(y_pred.shape[0]))[-n:],
+            range(y_pred.shape[0])[-n:],
             (y_pred - Z * y_std)[-n:],
             (y_pred + Z * y_std)[-n:],
             alpha=0.2,
+            color=sns.color_palette(&#34;deep&#34;)[1],
         )
-        plt.xlabel(&#34;Time steps&#34;)
-        plt.ylabel(&#34;y&#34;)
-        plt.legend()
-        print(&#34;Confidence Interval: {:.4f}&#34;.format(Z * y_std))
+        plt.title(&#34;Predicted vs Real Values with Confidence Interval&#34;, fontsize=12)
+        plt.xlabel(&#34;Time Steps&#34;, fontsize=12)
+        plt.ylabel(&#34;y&#34;, fontsize=12)
+        plt.grid(True, linestyle=&#34;--&#34;, alpha=0.7)
+        plt.xticks(fontsize=10)
+        plt.yticks(fontsize=10)
+        print(f&#34;Confidence Interval: ±{Z * y_std:.4f}&#34;)
+        plt.legend(loc=&#34;upper left&#34;, fontsize=9)
         if mode:
-            plt.savefig(&#34;pred_&#34; + str(n) + &#34;.png&#34;, dpi=300)
+            plt.savefig(f&#34;pred_{n}.png&#34;, dpi=300)
+        plt.tight_layout()
         plt.show()
 
     def summary(self):
@@ -513,7 +847,38 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model&#34;&#34;&#34;
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+
+    Parameters
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    noise : `float`, optional
+        Noise level for the model, by default 0
+    tol : `float`, optional
+        Tolerance for convergence, by default 1e-4
+
+    Attributes
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    n_steps : `int`
+        Number of steps to predict.
+    noise : `float`
+        Noise level for the model.
+    p : `int`
+        Order of autoregressive part.
+    q : `int`
+        Order of moving average part.
+    tol : `float`
+        Tolerance for convergence.
+    nwalkers : `int`
+        Number of walkers for sampling.
+    mov : `int`
+        Maximum number of iterations.
+    theta_trained : `np.ndarray`
+        Trained parameters of the model.
+    &#34;&#34;&#34;
 
     __slots__ = [
         &#34;datapoints&#34;,
@@ -527,42 +892,89 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+        &#34;&#34;&#34;Initialize the ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points for training.
+        noise : `float`, optional
+            Noise level for the model, by default 0
+        tol : `float`, optional
+            Tolerance for convergence, by default 1e-4
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         self.p = datapoints.shape[0]
         self.q = 0
         self.tol = tol
+        self.n_steps = 0
 
-    def model(self, datapoints: ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+        &#34;&#34;&#34;Compute the model forward pass.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        theta : `list`
+            Model parameters.
+        mode : `bool`, optional
+            Forward pass mode, by default True
+
+        Returns
+        -------
+        `np.ndarray`
+            Model output.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
         return super().forward(datapoints, theta, mode, noise)
 
-    def xvec(self, datapoints: ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+        &#34;&#34;&#34;Extract vector of data points.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        n_steps : `int`, optional
+            Number of steps to consider, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Extracted data points vector.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         self.n_steps = n_steps
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 1, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+        &#34;&#34;&#34;Train the model using sampling method.
+
+        Parameters
+        ----------
+        nwalkers : `int`, optional
+            Number of walkers for sampling, by default 10
+        mov : `int`, optional
+            Maximum number of iterations, by default 200
+        weights : `bool`, optional
+            Whether to use weights in sampling, by default False
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         xvec = self.xvec
-
         self.nwalkers = nwalkers
         self.mov = mov
 
         assert self.nwalkers &lt;= self.mov, &#34;n_walkers must be less or equal than mov&#34;
-
         model = self.model
-
         n = self.p + self.q
-
         theta = np.random.rand(n)
-
         x_vec = xvec(datapoints)
 
         if weights:
@@ -587,12 +999,22 @@ el.replaceWith(d);
         self.theta_trained = trained
 
     def predict(self, n_steps: int = 0):
-        self.n_steps = n_steps
+        &#34;&#34;&#34;Make predictions for future steps.
 
+        Parameters
+        ----------
+        n_steps : `int`, optional
+            Number of steps to predict, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Predicted values.
+        &#34;&#34;&#34;
+        self.n_steps = n_steps
         datapoints = self.datapoints
         model = self.model
         theta_trained = self.theta_trained
-
         y_pred = model(datapoints, theta_trained)
 
         for i in range(n_steps):
@@ -612,7 +1034,7 @@ el.replaceWith(d);
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: ndarray, y_pred: ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -620,8 +1042,11 @@ el.replaceWith(d);
         print(&#34;Accuracy: {:.4f}&#34;.format(accuracy))
         print(&#34;RMSE: {:.4f}&#34;.format(rmse))
 
-    def plot_pred(self, y_real: ndarray, y_pred: ndarray, ci: float = 0.90, mode: bool = True):
-        plt.figure()
+    def plot_pred(
+        self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
+    ):
+        sns.set_theme(style=&#34;whitegrid&#34;)
+        plt.figure(figsize=(5, 3))
         n = self.n_steps
         y_mean = np.mean(y_pred, axis=0)
         y_std = np.std(y_pred, axis=0)
@@ -629,21 +1054,28 @@ el.replaceWith(d);
             Z = (ci / 0.90) * 1.64
         else:
             Z = (ci / 0.95) * 1.96
-
-        plt.plot(y_pred, label=&#34;Predicted&#34;)
-        plt.plot(y_real, &#34;.--&#34;, label=&#34;Real&#34;, alpha=0.5)
+        plt.plot(y_pred, label=&#34;Predicted&#34;, linewidth=2, color=sns.color_palette(&#34;deep&#34;)[1])
+        plt.plot(
+            y_real, &#34;.--&#34;, label=&#34;Real&#34;, color=sns.color_palette(&#34;deep&#34;)[0], alpha=0.6, markersize=6
+        )
         plt.fill_between(
-            (range(y_pred.shape[0]))[-n:],
+            range(y_pred.shape[0])[-n:],
             (y_pred - Z * y_std)[-n:],
             (y_pred + Z * y_std)[-n:],
             alpha=0.2,
+            color=sns.color_palette(&#34;deep&#34;)[1],
         )
-        plt.xlabel(&#34;Time steps&#34;)
-        plt.ylabel(&#34;y&#34;)
-        plt.legend()
-        print(&#34;Confidence Interval: {:.4f}&#34;.format(Z * y_std))
+        plt.title(&#34;Predicted vs Real Values with Confidence Interval&#34;, fontsize=12)
+        plt.xlabel(&#34;Time Steps&#34;, fontsize=12)
+        plt.ylabel(&#34;y&#34;, fontsize=12)
+        plt.grid(True, linestyle=&#34;--&#34;, alpha=0.7)
+        plt.xticks(fontsize=10)
+        plt.yticks(fontsize=10)
+        print(f&#34;Confidence Interval: ±{Z * y_std:.4f}&#34;)
+        plt.legend(loc=&#34;upper left&#34;, fontsize=9)
         if mode:
-            plt.savefig(&#34;pred_&#34; + str(n) + &#34;.png&#34;, dpi=300)
+            plt.savefig(f&#34;pred_{n}.png&#34;, dpi=300)
+        plt.tight_layout()
         plt.show()
 
     def summary(self):
@@ -662,7 +1094,38 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model&#34;&#34;&#34;
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+
+    Parameters
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    noise : `float`, optional
+        Noise level for the model, by default 0
+    tol : `float`, optional
+        Tolerance for convergence, by default 1e-4
+
+    Attributes
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    n_steps : `int`
+        Number of steps to predict.
+    noise : `float`
+        Noise level for the model.
+    p : `int`
+        Order of autoregressive part.
+    q : `int`
+        Order of moving average part.
+    tol : `float`
+        Tolerance for convergence.
+    nwalkers : `int`
+        Number of walkers for sampling.
+    mov : `int`
+        Maximum number of iterations.
+    theta_trained : `np.ndarray`
+        Trained parameters of the model.
+    &#34;&#34;&#34;
 
     __slots__ = [
         &#34;datapoints&#34;,
@@ -676,42 +1139,89 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+        &#34;&#34;&#34;Initialize the ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points for training.
+        noise : `float`, optional
+            Noise level for the model, by default 0
+        tol : `float`, optional
+            Tolerance for convergence, by default 1e-4
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         self.p = datapoints.shape[0]
         self.q = 0
         self.tol = tol
+        self.n_steps = 0
 
-    def model(self, datapoints: ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+        &#34;&#34;&#34;Compute the model forward pass.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        theta : `list`
+            Model parameters.
+        mode : `bool`, optional
+            Forward pass mode, by default True
+
+        Returns
+        -------
+        `np.ndarray`
+            Model output.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
         return super().forward(datapoints, theta, mode, noise)
 
-    def xvec(self, datapoints: ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+        &#34;&#34;&#34;Extract vector of data points.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        n_steps : `int`, optional
+            Number of steps to consider, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Extracted data points vector.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         self.n_steps = n_steps
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 1, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+        &#34;&#34;&#34;Train the model using sampling method.
+
+        Parameters
+        ----------
+        nwalkers : `int`, optional
+            Number of walkers for sampling, by default 10
+        mov : `int`, optional
+            Maximum number of iterations, by default 200
+        weights : `bool`, optional
+            Whether to use weights in sampling, by default False
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         xvec = self.xvec
-
         self.nwalkers = nwalkers
         self.mov = mov
 
         assert self.nwalkers &lt;= self.mov, &#34;n_walkers must be less or equal than mov&#34;
-
         model = self.model
-
         n = self.p + self.q
-
         theta = np.random.rand(n)
-
         x_vec = xvec(datapoints)
 
         if weights:
@@ -736,12 +1246,22 @@ el.replaceWith(d);
         self.theta_trained = trained
 
     def predict(self, n_steps: int = 0):
-        self.n_steps = n_steps
+        &#34;&#34;&#34;Make predictions for future steps.
 
+        Parameters
+        ----------
+        n_steps : `int`, optional
+            Number of steps to predict, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Predicted values.
+        &#34;&#34;&#34;
+        self.n_steps = n_steps
         datapoints = self.datapoints
         model = self.model
         theta_trained = self.theta_trained
-
         y_pred = model(datapoints, theta_trained)
 
         for i in range(n_steps):
@@ -761,7 +1281,7 @@ el.replaceWith(d);
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: ndarray, y_pred: ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -769,8 +1289,11 @@ el.replaceWith(d);
         print(&#34;Accuracy: {:.4f}&#34;.format(accuracy))
         print(&#34;RMSE: {:.4f}&#34;.format(rmse))
 
-    def plot_pred(self, y_real: ndarray, y_pred: ndarray, ci: float = 0.90, mode: bool = True):
-        plt.figure()
+    def plot_pred(
+        self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
+    ):
+        sns.set_theme(style=&#34;whitegrid&#34;)
+        plt.figure(figsize=(5, 3))
         n = self.n_steps
         y_mean = np.mean(y_pred, axis=0)
         y_std = np.std(y_pred, axis=0)
@@ -778,21 +1301,28 @@ el.replaceWith(d);
             Z = (ci / 0.90) * 1.64
         else:
             Z = (ci / 0.95) * 1.96
-
-        plt.plot(y_pred, label=&#34;Predicted&#34;)
-        plt.plot(y_real, &#34;.--&#34;, label=&#34;Real&#34;, alpha=0.5)
+        plt.plot(y_pred, label=&#34;Predicted&#34;, linewidth=2, color=sns.color_palette(&#34;deep&#34;)[1])
+        plt.plot(
+            y_real, &#34;.--&#34;, label=&#34;Real&#34;, color=sns.color_palette(&#34;deep&#34;)[0], alpha=0.6, markersize=6
+        )
         plt.fill_between(
-            (range(y_pred.shape[0]))[-n:],
+            range(y_pred.shape[0])[-n:],
             (y_pred - Z * y_std)[-n:],
             (y_pred + Z * y_std)[-n:],
             alpha=0.2,
+            color=sns.color_palette(&#34;deep&#34;)[1],
         )
-        plt.xlabel(&#34;Time steps&#34;)
-        plt.ylabel(&#34;y&#34;)
-        plt.legend()
-        print(&#34;Confidence Interval: {:.4f}&#34;.format(Z * y_std))
+        plt.title(&#34;Predicted vs Real Values with Confidence Interval&#34;, fontsize=12)
+        plt.xlabel(&#34;Time Steps&#34;, fontsize=12)
+        plt.ylabel(&#34;y&#34;, fontsize=12)
+        plt.grid(True, linestyle=&#34;--&#34;, alpha=0.7)
+        plt.xticks(fontsize=10)
+        plt.yticks(fontsize=10)
+        print(f&#34;Confidence Interval: ±{Z * y_std:.4f}&#34;)
+        plt.legend(loc=&#34;upper left&#34;, fontsize=9)
         if mode:
-            plt.savefig(&#34;pred_&#34; + str(n) + &#34;.png&#34;, dpi=300)
+            plt.savefig(f&#34;pred_{n}.png&#34;, dpi=300)
+        plt.tight_layout()
         plt.show()
 
     def summary(self):
@@ -811,7 +1341,38 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model&#34;&#34;&#34;
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+
+    Parameters
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    noise : `float`, optional
+        Noise level for the model, by default 0
+    tol : `float`, optional
+        Tolerance for convergence, by default 1e-4
+
+    Attributes
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    n_steps : `int`
+        Number of steps to predict.
+    noise : `float`
+        Noise level for the model.
+    p : `int`
+        Order of autoregressive part.
+    q : `int`
+        Order of moving average part.
+    tol : `float`
+        Tolerance for convergence.
+    nwalkers : `int`
+        Number of walkers for sampling.
+    mov : `int`
+        Maximum number of iterations.
+    theta_trained : `np.ndarray`
+        Trained parameters of the model.
+    &#34;&#34;&#34;
 
     __slots__ = [
         &#34;datapoints&#34;,
@@ -825,42 +1386,89 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+        &#34;&#34;&#34;Initialize the ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points for training.
+        noise : `float`, optional
+            Noise level for the model, by default 0
+        tol : `float`, optional
+            Tolerance for convergence, by default 1e-4
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         self.p = datapoints.shape[0]
         self.q = 0
         self.tol = tol
+        self.n_steps = 0
 
-    def model(self, datapoints: ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+        &#34;&#34;&#34;Compute the model forward pass.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        theta : `list`
+            Model parameters.
+        mode : `bool`, optional
+            Forward pass mode, by default True
+
+        Returns
+        -------
+        `np.ndarray`
+            Model output.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
         return super().forward(datapoints, theta, mode, noise)
 
-    def xvec(self, datapoints: ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+        &#34;&#34;&#34;Extract vector of data points.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        n_steps : `int`, optional
+            Number of steps to consider, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Extracted data points vector.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         self.n_steps = n_steps
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 1, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+        &#34;&#34;&#34;Train the model using sampling method.
+
+        Parameters
+        ----------
+        nwalkers : `int`, optional
+            Number of walkers for sampling, by default 10
+        mov : `int`, optional
+            Maximum number of iterations, by default 200
+        weights : `bool`, optional
+            Whether to use weights in sampling, by default False
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         xvec = self.xvec
-
         self.nwalkers = nwalkers
         self.mov = mov
 
         assert self.nwalkers &lt;= self.mov, &#34;n_walkers must be less or equal than mov&#34;
-
         model = self.model
-
         n = self.p + self.q
-
         theta = np.random.rand(n)
-
         x_vec = xvec(datapoints)
 
         if weights:
@@ -885,12 +1493,22 @@ el.replaceWith(d);
         self.theta_trained = trained
 
     def predict(self, n_steps: int = 0):
-        self.n_steps = n_steps
+        &#34;&#34;&#34;Make predictions for future steps.
 
+        Parameters
+        ----------
+        n_steps : `int`, optional
+            Number of steps to predict, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Predicted values.
+        &#34;&#34;&#34;
+        self.n_steps = n_steps
         datapoints = self.datapoints
         model = self.model
         theta_trained = self.theta_trained
-
         y_pred = model(datapoints, theta_trained)
 
         for i in range(n_steps):
@@ -910,7 +1528,7 @@ el.replaceWith(d);
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: ndarray, y_pred: ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -918,8 +1536,11 @@ el.replaceWith(d);
         print(&#34;Accuracy: {:.4f}&#34;.format(accuracy))
         print(&#34;RMSE: {:.4f}&#34;.format(rmse))
 
-    def plot_pred(self, y_real: ndarray, y_pred: ndarray, ci: float = 0.90, mode: bool = True):
-        plt.figure()
+    def plot_pred(
+        self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
+    ):
+        sns.set_theme(style=&#34;whitegrid&#34;)
+        plt.figure(figsize=(5, 3))
         n = self.n_steps
         y_mean = np.mean(y_pred, axis=0)
         y_std = np.std(y_pred, axis=0)
@@ -927,21 +1548,28 @@ el.replaceWith(d);
             Z = (ci / 0.90) * 1.64
         else:
             Z = (ci / 0.95) * 1.96
-
-        plt.plot(y_pred, label=&#34;Predicted&#34;)
-        plt.plot(y_real, &#34;.--&#34;, label=&#34;Real&#34;, alpha=0.5)
+        plt.plot(y_pred, label=&#34;Predicted&#34;, linewidth=2, color=sns.color_palette(&#34;deep&#34;)[1])
+        plt.plot(
+            y_real, &#34;.--&#34;, label=&#34;Real&#34;, color=sns.color_palette(&#34;deep&#34;)[0], alpha=0.6, markersize=6
+        )
         plt.fill_between(
-            (range(y_pred.shape[0]))[-n:],
+            range(y_pred.shape[0])[-n:],
             (y_pred - Z * y_std)[-n:],
             (y_pred + Z * y_std)[-n:],
             alpha=0.2,
+            color=sns.color_palette(&#34;deep&#34;)[1],
         )
-        plt.xlabel(&#34;Time steps&#34;)
-        plt.ylabel(&#34;y&#34;)
-        plt.legend()
-        print(&#34;Confidence Interval: {:.4f}&#34;.format(Z * y_std))
+        plt.title(&#34;Predicted vs Real Values with Confidence Interval&#34;, fontsize=12)
+        plt.xlabel(&#34;Time Steps&#34;, fontsize=12)
+        plt.ylabel(&#34;y&#34;, fontsize=12)
+        plt.grid(True, linestyle=&#34;--&#34;, alpha=0.7)
+        plt.xticks(fontsize=10)
+        plt.yticks(fontsize=10)
+        print(f&#34;Confidence Interval: ±{Z * y_std:.4f}&#34;)
+        plt.legend(loc=&#34;upper left&#34;, fontsize=9)
         if mode:
-            plt.savefig(&#34;pred_&#34; + str(n) + &#34;.png&#34;, dpi=300)
+            plt.savefig(f&#34;pred_{n}.png&#34;, dpi=300)
+        plt.tight_layout()
         plt.show()
 
     def summary(self):
@@ -960,7 +1588,38 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model&#34;&#34;&#34;
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+
+    Parameters
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    noise : `float`, optional
+        Noise level for the model, by default 0
+    tol : `float`, optional
+        Tolerance for convergence, by default 1e-4
+
+    Attributes
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    n_steps : `int`
+        Number of steps to predict.
+    noise : `float`
+        Noise level for the model.
+    p : `int`
+        Order of autoregressive part.
+    q : `int`
+        Order of moving average part.
+    tol : `float`
+        Tolerance for convergence.
+    nwalkers : `int`
+        Number of walkers for sampling.
+    mov : `int`
+        Maximum number of iterations.
+    theta_trained : `np.ndarray`
+        Trained parameters of the model.
+    &#34;&#34;&#34;
 
     __slots__ = [
         &#34;datapoints&#34;,
@@ -974,42 +1633,89 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+        &#34;&#34;&#34;Initialize the ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points for training.
+        noise : `float`, optional
+            Noise level for the model, by default 0
+        tol : `float`, optional
+            Tolerance for convergence, by default 1e-4
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         self.p = datapoints.shape[0]
         self.q = 0
         self.tol = tol
+        self.n_steps = 0
 
-    def model(self, datapoints: ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+        &#34;&#34;&#34;Compute the model forward pass.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        theta : `list`
+            Model parameters.
+        mode : `bool`, optional
+            Forward pass mode, by default True
+
+        Returns
+        -------
+        `np.ndarray`
+            Model output.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
         return super().forward(datapoints, theta, mode, noise)
 
-    def xvec(self, datapoints: ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+        &#34;&#34;&#34;Extract vector of data points.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        n_steps : `int`, optional
+            Number of steps to consider, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Extracted data points vector.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         self.n_steps = n_steps
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 1, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+        &#34;&#34;&#34;Train the model using sampling method.
+
+        Parameters
+        ----------
+        nwalkers : `int`, optional
+            Number of walkers for sampling, by default 10
+        mov : `int`, optional
+            Maximum number of iterations, by default 200
+        weights : `bool`, optional
+            Whether to use weights in sampling, by default False
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         xvec = self.xvec
-
         self.nwalkers = nwalkers
         self.mov = mov
 
         assert self.nwalkers &lt;= self.mov, &#34;n_walkers must be less or equal than mov&#34;
-
         model = self.model
-
         n = self.p + self.q
-
         theta = np.random.rand(n)
-
         x_vec = xvec(datapoints)
 
         if weights:
@@ -1034,12 +1740,22 @@ el.replaceWith(d);
         self.theta_trained = trained
 
     def predict(self, n_steps: int = 0):
-        self.n_steps = n_steps
+        &#34;&#34;&#34;Make predictions for future steps.
 
+        Parameters
+        ----------
+        n_steps : `int`, optional
+            Number of steps to predict, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Predicted values.
+        &#34;&#34;&#34;
+        self.n_steps = n_steps
         datapoints = self.datapoints
         model = self.model
         theta_trained = self.theta_trained
-
         y_pred = model(datapoints, theta_trained)
 
         for i in range(n_steps):
@@ -1059,7 +1775,7 @@ el.replaceWith(d);
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: ndarray, y_pred: ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -1067,8 +1783,11 @@ el.replaceWith(d);
         print(&#34;Accuracy: {:.4f}&#34;.format(accuracy))
         print(&#34;RMSE: {:.4f}&#34;.format(rmse))
 
-    def plot_pred(self, y_real: ndarray, y_pred: ndarray, ci: float = 0.90, mode: bool = True):
-        plt.figure()
+    def plot_pred(
+        self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
+    ):
+        sns.set_theme(style=&#34;whitegrid&#34;)
+        plt.figure(figsize=(5, 3))
         n = self.n_steps
         y_mean = np.mean(y_pred, axis=0)
         y_std = np.std(y_pred, axis=0)
@@ -1076,21 +1795,28 @@ el.replaceWith(d);
             Z = (ci / 0.90) * 1.64
         else:
             Z = (ci / 0.95) * 1.96
-
-        plt.plot(y_pred, label=&#34;Predicted&#34;)
-        plt.plot(y_real, &#34;.--&#34;, label=&#34;Real&#34;, alpha=0.5)
+        plt.plot(y_pred, label=&#34;Predicted&#34;, linewidth=2, color=sns.color_palette(&#34;deep&#34;)[1])
+        plt.plot(
+            y_real, &#34;.--&#34;, label=&#34;Real&#34;, color=sns.color_palette(&#34;deep&#34;)[0], alpha=0.6, markersize=6
+        )
         plt.fill_between(
-            (range(y_pred.shape[0]))[-n:],
+            range(y_pred.shape[0])[-n:],
             (y_pred - Z * y_std)[-n:],
             (y_pred + Z * y_std)[-n:],
             alpha=0.2,
+            color=sns.color_palette(&#34;deep&#34;)[1],
         )
-        plt.xlabel(&#34;Time steps&#34;)
-        plt.ylabel(&#34;y&#34;)
-        plt.legend()
-        print(&#34;Confidence Interval: {:.4f}&#34;.format(Z * y_std))
+        plt.title(&#34;Predicted vs Real Values with Confidence Interval&#34;, fontsize=12)
+        plt.xlabel(&#34;Time Steps&#34;, fontsize=12)
+        plt.ylabel(&#34;y&#34;, fontsize=12)
+        plt.grid(True, linestyle=&#34;--&#34;, alpha=0.7)
+        plt.xticks(fontsize=10)
+        plt.yticks(fontsize=10)
+        print(f&#34;Confidence Interval: ±{Z * y_std:.4f}&#34;)
+        plt.legend(loc=&#34;upper left&#34;, fontsize=9)
         if mode:
-            plt.savefig(&#34;pred_&#34; + str(n) + &#34;.png&#34;, dpi=300)
+            plt.savefig(f&#34;pred_{n}.png&#34;, dpi=300)
+        plt.tight_layout()
         plt.show()
 
     def summary(self):
@@ -1109,7 +1835,38 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model&#34;&#34;&#34;
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+
+    Parameters
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    noise : `float`, optional
+        Noise level for the model, by default 0
+    tol : `float`, optional
+        Tolerance for convergence, by default 1e-4
+
+    Attributes
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    n_steps : `int`
+        Number of steps to predict.
+    noise : `float`
+        Noise level for the model.
+    p : `int`
+        Order of autoregressive part.
+    q : `int`
+        Order of moving average part.
+    tol : `float`
+        Tolerance for convergence.
+    nwalkers : `int`
+        Number of walkers for sampling.
+    mov : `int`
+        Maximum number of iterations.
+    theta_trained : `np.ndarray`
+        Trained parameters of the model.
+    &#34;&#34;&#34;
 
     __slots__ = [
         &#34;datapoints&#34;,
@@ -1123,42 +1880,89 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+        &#34;&#34;&#34;Initialize the ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points for training.
+        noise : `float`, optional
+            Noise level for the model, by default 0
+        tol : `float`, optional
+            Tolerance for convergence, by default 1e-4
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         self.p = datapoints.shape[0]
         self.q = 0
         self.tol = tol
+        self.n_steps = 0
 
-    def model(self, datapoints: ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+        &#34;&#34;&#34;Compute the model forward pass.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        theta : `list`
+            Model parameters.
+        mode : `bool`, optional
+            Forward pass mode, by default True
+
+        Returns
+        -------
+        `np.ndarray`
+            Model output.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
         return super().forward(datapoints, theta, mode, noise)
 
-    def xvec(self, datapoints: ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+        &#34;&#34;&#34;Extract vector of data points.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        n_steps : `int`, optional
+            Number of steps to consider, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Extracted data points vector.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         self.n_steps = n_steps
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 1, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+        &#34;&#34;&#34;Train the model using sampling method.
+
+        Parameters
+        ----------
+        nwalkers : `int`, optional
+            Number of walkers for sampling, by default 10
+        mov : `int`, optional
+            Maximum number of iterations, by default 200
+        weights : `bool`, optional
+            Whether to use weights in sampling, by default False
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         xvec = self.xvec
-
         self.nwalkers = nwalkers
         self.mov = mov
 
         assert self.nwalkers &lt;= self.mov, &#34;n_walkers must be less or equal than mov&#34;
-
         model = self.model
-
         n = self.p + self.q
-
         theta = np.random.rand(n)
-
         x_vec = xvec(datapoints)
 
         if weights:
@@ -1183,12 +1987,22 @@ el.replaceWith(d);
         self.theta_trained = trained
 
     def predict(self, n_steps: int = 0):
-        self.n_steps = n_steps
+        &#34;&#34;&#34;Make predictions for future steps.
 
+        Parameters
+        ----------
+        n_steps : `int`, optional
+            Number of steps to predict, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Predicted values.
+        &#34;&#34;&#34;
+        self.n_steps = n_steps
         datapoints = self.datapoints
         model = self.model
         theta_trained = self.theta_trained
-
         y_pred = model(datapoints, theta_trained)
 
         for i in range(n_steps):
@@ -1208,7 +2022,7 @@ el.replaceWith(d);
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: ndarray, y_pred: ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -1216,8 +2030,11 @@ el.replaceWith(d);
         print(&#34;Accuracy: {:.4f}&#34;.format(accuracy))
         print(&#34;RMSE: {:.4f}&#34;.format(rmse))
 
-    def plot_pred(self, y_real: ndarray, y_pred: ndarray, ci: float = 0.90, mode: bool = True):
-        plt.figure()
+    def plot_pred(
+        self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
+    ):
+        sns.set_theme(style=&#34;whitegrid&#34;)
+        plt.figure(figsize=(5, 3))
         n = self.n_steps
         y_mean = np.mean(y_pred, axis=0)
         y_std = np.std(y_pred, axis=0)
@@ -1225,21 +2042,28 @@ el.replaceWith(d);
             Z = (ci / 0.90) * 1.64
         else:
             Z = (ci / 0.95) * 1.96
-
-        plt.plot(y_pred, label=&#34;Predicted&#34;)
-        plt.plot(y_real, &#34;.--&#34;, label=&#34;Real&#34;, alpha=0.5)
+        plt.plot(y_pred, label=&#34;Predicted&#34;, linewidth=2, color=sns.color_palette(&#34;deep&#34;)[1])
+        plt.plot(
+            y_real, &#34;.--&#34;, label=&#34;Real&#34;, color=sns.color_palette(&#34;deep&#34;)[0], alpha=0.6, markersize=6
+        )
         plt.fill_between(
-            (range(y_pred.shape[0]))[-n:],
+            range(y_pred.shape[0])[-n:],
             (y_pred - Z * y_std)[-n:],
             (y_pred + Z * y_std)[-n:],
             alpha=0.2,
+            color=sns.color_palette(&#34;deep&#34;)[1],
         )
-        plt.xlabel(&#34;Time steps&#34;)
-        plt.ylabel(&#34;y&#34;)
-        plt.legend()
-        print(&#34;Confidence Interval: {:.4f}&#34;.format(Z * y_std))
+        plt.title(&#34;Predicted vs Real Values with Confidence Interval&#34;, fontsize=12)
+        plt.xlabel(&#34;Time Steps&#34;, fontsize=12)
+        plt.ylabel(&#34;y&#34;, fontsize=12)
+        plt.grid(True, linestyle=&#34;--&#34;, alpha=0.7)
+        plt.xticks(fontsize=10)
+        plt.yticks(fontsize=10)
+        print(f&#34;Confidence Interval: ±{Z * y_std:.4f}&#34;)
+        plt.legend(loc=&#34;upper left&#34;, fontsize=9)
         if mode:
-            plt.savefig(&#34;pred_&#34; + str(n) + &#34;.png&#34;, dpi=300)
+            plt.savefig(f&#34;pred_{n}.png&#34;, dpi=300)
+        plt.tight_layout()
         plt.show()
 
     def summary(self):
@@ -1258,7 +2082,38 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model&#34;&#34;&#34;
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+
+    Parameters
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    noise : `float`, optional
+        Noise level for the model, by default 0
+    tol : `float`, optional
+        Tolerance for convergence, by default 1e-4
+
+    Attributes
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    n_steps : `int`
+        Number of steps to predict.
+    noise : `float`
+        Noise level for the model.
+    p : `int`
+        Order of autoregressive part.
+    q : `int`
+        Order of moving average part.
+    tol : `float`
+        Tolerance for convergence.
+    nwalkers : `int`
+        Number of walkers for sampling.
+    mov : `int`
+        Maximum number of iterations.
+    theta_trained : `np.ndarray`
+        Trained parameters of the model.
+    &#34;&#34;&#34;
 
     __slots__ = [
         &#34;datapoints&#34;,
@@ -1272,42 +2127,89 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+        &#34;&#34;&#34;Initialize the ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points for training.
+        noise : `float`, optional
+            Noise level for the model, by default 0
+        tol : `float`, optional
+            Tolerance for convergence, by default 1e-4
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         self.p = datapoints.shape[0]
         self.q = 0
         self.tol = tol
+        self.n_steps = 0
 
-    def model(self, datapoints: ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+        &#34;&#34;&#34;Compute the model forward pass.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        theta : `list`
+            Model parameters.
+        mode : `bool`, optional
+            Forward pass mode, by default True
+
+        Returns
+        -------
+        `np.ndarray`
+            Model output.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
         return super().forward(datapoints, theta, mode, noise)
 
-    def xvec(self, datapoints: ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+        &#34;&#34;&#34;Extract vector of data points.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        n_steps : `int`, optional
+            Number of steps to consider, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Extracted data points vector.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         self.n_steps = n_steps
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 1, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+        &#34;&#34;&#34;Train the model using sampling method.
+
+        Parameters
+        ----------
+        nwalkers : `int`, optional
+            Number of walkers for sampling, by default 10
+        mov : `int`, optional
+            Maximum number of iterations, by default 200
+        weights : `bool`, optional
+            Whether to use weights in sampling, by default False
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         xvec = self.xvec
-
         self.nwalkers = nwalkers
         self.mov = mov
 
         assert self.nwalkers &lt;= self.mov, &#34;n_walkers must be less or equal than mov&#34;
-
         model = self.model
-
         n = self.p + self.q
-
         theta = np.random.rand(n)
-
         x_vec = xvec(datapoints)
 
         if weights:
@@ -1332,12 +2234,22 @@ el.replaceWith(d);
         self.theta_trained = trained
 
     def predict(self, n_steps: int = 0):
-        self.n_steps = n_steps
+        &#34;&#34;&#34;Make predictions for future steps.
 
+        Parameters
+        ----------
+        n_steps : `int`, optional
+            Number of steps to predict, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Predicted values.
+        &#34;&#34;&#34;
+        self.n_steps = n_steps
         datapoints = self.datapoints
         model = self.model
         theta_trained = self.theta_trained
-
         y_pred = model(datapoints, theta_trained)
 
         for i in range(n_steps):
@@ -1357,7 +2269,7 @@ el.replaceWith(d);
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: ndarray, y_pred: ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -1365,8 +2277,11 @@ el.replaceWith(d);
         print(&#34;Accuracy: {:.4f}&#34;.format(accuracy))
         print(&#34;RMSE: {:.4f}&#34;.format(rmse))
 
-    def plot_pred(self, y_real: ndarray, y_pred: ndarray, ci: float = 0.90, mode: bool = True):
-        plt.figure()
+    def plot_pred(
+        self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
+    ):
+        sns.set_theme(style=&#34;whitegrid&#34;)
+        plt.figure(figsize=(5, 3))
         n = self.n_steps
         y_mean = np.mean(y_pred, axis=0)
         y_std = np.std(y_pred, axis=0)
@@ -1374,21 +2289,28 @@ el.replaceWith(d);
             Z = (ci / 0.90) * 1.64
         else:
             Z = (ci / 0.95) * 1.96
-
-        plt.plot(y_pred, label=&#34;Predicted&#34;)
-        plt.plot(y_real, &#34;.--&#34;, label=&#34;Real&#34;, alpha=0.5)
+        plt.plot(y_pred, label=&#34;Predicted&#34;, linewidth=2, color=sns.color_palette(&#34;deep&#34;)[1])
+        plt.plot(
+            y_real, &#34;.--&#34;, label=&#34;Real&#34;, color=sns.color_palette(&#34;deep&#34;)[0], alpha=0.6, markersize=6
+        )
         plt.fill_between(
-            (range(y_pred.shape[0]))[-n:],
+            range(y_pred.shape[0])[-n:],
             (y_pred - Z * y_std)[-n:],
             (y_pred + Z * y_std)[-n:],
             alpha=0.2,
+            color=sns.color_palette(&#34;deep&#34;)[1],
         )
-        plt.xlabel(&#34;Time steps&#34;)
-        plt.ylabel(&#34;y&#34;)
-        plt.legend()
-        print(&#34;Confidence Interval: {:.4f}&#34;.format(Z * y_std))
+        plt.title(&#34;Predicted vs Real Values with Confidence Interval&#34;, fontsize=12)
+        plt.xlabel(&#34;Time Steps&#34;, fontsize=12)
+        plt.ylabel(&#34;y&#34;, fontsize=12)
+        plt.grid(True, linestyle=&#34;--&#34;, alpha=0.7)
+        plt.xticks(fontsize=10)
+        plt.yticks(fontsize=10)
+        print(f&#34;Confidence Interval: ±{Z * y_std:.4f}&#34;)
+        plt.legend(loc=&#34;upper left&#34;, fontsize=9)
         if mode:
-            plt.savefig(&#34;pred_&#34; + str(n) + &#34;.png&#34;, dpi=300)
+            plt.savefig(f&#34;pred_{n}.png&#34;, dpi=300)
+        plt.tight_layout()
         plt.show()
 
     def summary(self):
@@ -1407,7 +2329,38 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model&#34;&#34;&#34;
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+
+    Parameters
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    noise : `float`, optional
+        Noise level for the model, by default 0
+    tol : `float`, optional
+        Tolerance for convergence, by default 1e-4
+
+    Attributes
+    ----------
+    datapoints : `np.ndarray`
+        The input data points for training.
+    n_steps : `int`
+        Number of steps to predict.
+    noise : `float`
+        Noise level for the model.
+    p : `int`
+        Order of autoregressive part.
+    q : `int`
+        Order of moving average part.
+    tol : `float`
+        Tolerance for convergence.
+    nwalkers : `int`
+        Number of walkers for sampling.
+    mov : `int`
+        Maximum number of iterations.
+    theta_trained : `np.ndarray`
+        Trained parameters of the model.
+    &#34;&#34;&#34;
 
     __slots__ = [
         &#34;datapoints&#34;,
@@ -1421,42 +2374,89 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+        &#34;&#34;&#34;Initialize the ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points for training.
+        noise : `float`, optional
+            Noise level for the model, by default 0
+        tol : `float`, optional
+            Tolerance for convergence, by default 1e-4
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         self.p = datapoints.shape[0]
         self.q = 0
         self.tol = tol
+        self.n_steps = 0
 
-    def model(self, datapoints: ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+        &#34;&#34;&#34;Compute the model forward pass.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        theta : `list`
+            Model parameters.
+        mode : `bool`, optional
+            Forward pass mode, by default True
+
+        Returns
+        -------
+        `np.ndarray`
+            Model output.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
         return super().forward(datapoints, theta, mode, noise)
 
-    def xvec(self, datapoints: ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+        &#34;&#34;&#34;Extract vector of data points.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            The input data points.
+        n_steps : `int`, optional
+            Number of steps to consider, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Extracted data points vector.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         self.n_steps = n_steps
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 1, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+        &#34;&#34;&#34;Train the model using sampling method.
+
+        Parameters
+        ----------
+        nwalkers : `int`, optional
+            Number of walkers for sampling, by default 10
+        mov : `int`, optional
+            Maximum number of iterations, by default 200
+        weights : `bool`, optional
+            Whether to use weights in sampling, by default False
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         xvec = self.xvec
-
         self.nwalkers = nwalkers
         self.mov = mov
 
         assert self.nwalkers &lt;= self.mov, &#34;n_walkers must be less or equal than mov&#34;
-
         model = self.model
-
         n = self.p + self.q
-
         theta = np.random.rand(n)
-
         x_vec = xvec(datapoints)
 
         if weights:
@@ -1481,12 +2481,22 @@ el.replaceWith(d);
         self.theta_trained = trained
 
     def predict(self, n_steps: int = 0):
-        self.n_steps = n_steps
+        &#34;&#34;&#34;Make predictions for future steps.
 
+        Parameters
+        ----------
+        n_steps : `int`, optional
+            Number of steps to predict, by default 0
+
+        Returns
+        -------
+        `np.ndarray`
+            Predicted values.
+        &#34;&#34;&#34;
+        self.n_steps = n_steps
         datapoints = self.datapoints
         model = self.model
         theta_trained = self.theta_trained
-
         y_pred = model(datapoints, theta_trained)
 
         for i in range(n_steps):
@@ -1506,7 +2516,7 @@ el.replaceWith(d);
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: ndarray, y_pred: ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -1514,8 +2524,11 @@ el.replaceWith(d);
         print(&#34;Accuracy: {:.4f}&#34;.format(accuracy))
         print(&#34;RMSE: {:.4f}&#34;.format(rmse))
 
-    def plot_pred(self, y_real: ndarray, y_pred: ndarray, ci: float = 0.90, mode: bool = True):
-        plt.figure()
+    def plot_pred(
+        self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
+    ):
+        sns.set_theme(style=&#34;whitegrid&#34;)
+        plt.figure(figsize=(5, 3))
         n = self.n_steps
         y_mean = np.mean(y_pred, axis=0)
         y_std = np.std(y_pred, axis=0)
@@ -1523,21 +2536,28 @@ el.replaceWith(d);
             Z = (ci / 0.90) * 1.64
         else:
             Z = (ci / 0.95) * 1.96
-
-        plt.plot(y_pred, label=&#34;Predicted&#34;)
-        plt.plot(y_real, &#34;.--&#34;, label=&#34;Real&#34;, alpha=0.5)
+        plt.plot(y_pred, label=&#34;Predicted&#34;, linewidth=2, color=sns.color_palette(&#34;deep&#34;)[1])
+        plt.plot(
+            y_real, &#34;.--&#34;, label=&#34;Real&#34;, color=sns.color_palette(&#34;deep&#34;)[0], alpha=0.6, markersize=6
+        )
         plt.fill_between(
-            (range(y_pred.shape[0]))[-n:],
+            range(y_pred.shape[0])[-n:],
             (y_pred - Z * y_std)[-n:],
             (y_pred + Z * y_std)[-n:],
             alpha=0.2,
+            color=sns.color_palette(&#34;deep&#34;)[1],
         )
-        plt.xlabel(&#34;Time steps&#34;)
-        plt.ylabel(&#34;y&#34;)
-        plt.legend()
-        print(&#34;Confidence Interval: {:.4f}&#34;.format(Z * y_std))
+        plt.title(&#34;Predicted vs Real Values with Confidence Interval&#34;, fontsize=12)
+        plt.xlabel(&#34;Time Steps&#34;, fontsize=12)
+        plt.ylabel(&#34;y&#34;, fontsize=12)
+        plt.grid(True, linestyle=&#34;--&#34;, alpha=0.7)
+        plt.xticks(fontsize=10)
+        plt.yticks(fontsize=10)
+        print(f&#34;Confidence Interval: ±{Z * y_std:.4f}&#34;)
+        plt.legend(loc=&#34;upper left&#34;, fontsize=9)
         if mode:
-            plt.savefig(&#34;pred_&#34; + str(n) + &#34;.png&#34;, dpi=300)
+            plt.savefig(f&#34;pred_{n}.png&#34;, dpi=300)
+        plt.tight_layout()
         plt.show()
 
     def summary(self):
@@ -1560,7 +2580,7 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def eval(self, y_val: ndarray, y_pred: ndarray):
+<pre><code class="python">def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
     rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
     square_error = np.sqrt((y_pred - y_val) ** 2)
     accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -1592,14 +2612,42 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def model(self, datapoints: ndarray, theta: list, mode=True):
+<pre><code class="python">def model(self, datapoints: np.ndarray, theta: list, mode=True):
+    &#34;&#34;&#34;Compute the model forward pass.
+
+    Parameters
+    ----------
+    datapoints : `np.ndarray`
+        The input data points.
+    theta : `list`
+        Model parameters.
+    mode : `bool`, optional
+        Forward pass mode, by default True
+
+    Returns
+    -------
+    `np.ndarray`
+        Model output.
+    &#34;&#34;&#34;
     datapoints = self.datapoints
     noise = self.noise
     self.theta_trained = theta
 
     return super().forward(datapoints, theta, mode, noise)</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Compute the model forward pass.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The input data points.</dd>
+<dt><strong><code>theta</code></strong> :&ensp;<code>list</code></dt>
+<dd>Model parameters.</dd>
+<dt><strong><code>mode</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Forward pass mode, by default True</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>np.ndarray</code>
+Model output.</p></div>
 </dd>
 <dt id="likelihood.models.regression.AbstractArima.plot_pred"><code class="name flex">
 <span>def <span class="ident">plot_pred</span></span>(<span>self,<br>y_real: numpy.ndarray,<br>y_pred: numpy.ndarray,<br>ci: float = 0.9,<br>mode: bool = True)</span>
@@ -1609,8 +2657,11 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def plot_pred(self, y_real: ndarray, y_pred: ndarray, ci: float = 0.90, mode: bool = True):
-    plt.figure()
+<pre><code class="python">def plot_pred(
+    self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
+):
+    sns.set_theme(style=&#34;whitegrid&#34;)
+    plt.figure(figsize=(5, 3))
     n = self.n_steps
     y_mean = np.mean(y_pred, axis=0)
     y_std = np.std(y_pred, axis=0)
@@ -1618,21 +2669,28 @@ el.replaceWith(d);
         Z = (ci / 0.90) * 1.64
     else:
         Z = (ci / 0.95) * 1.96
-
-    plt.plot(y_pred, label=&#34;Predicted&#34;)
-    plt.plot(y_real, &#34;.--&#34;, label=&#34;Real&#34;, alpha=0.5)
+    plt.plot(y_pred, label=&#34;Predicted&#34;, linewidth=2, color=sns.color_palette(&#34;deep&#34;)[1])
+    plt.plot(
+        y_real, &#34;.--&#34;, label=&#34;Real&#34;, color=sns.color_palette(&#34;deep&#34;)[0], alpha=0.6, markersize=6
+    )
     plt.fill_between(
-        (range(y_pred.shape[0]))[-n:],
+        range(y_pred.shape[0])[-n:],
         (y_pred - Z * y_std)[-n:],
         (y_pred + Z * y_std)[-n:],
         alpha=0.2,
+        color=sns.color_palette(&#34;deep&#34;)[1],
     )
-    plt.xlabel(&#34;Time steps&#34;)
-    plt.ylabel(&#34;y&#34;)
-    plt.legend()
-    print(&#34;Confidence Interval: {:.4f}&#34;.format(Z * y_std))
+    plt.title(&#34;Predicted vs Real Values with Confidence Interval&#34;, fontsize=12)
+    plt.xlabel(&#34;Time Steps&#34;, fontsize=12)
+    plt.ylabel(&#34;y&#34;, fontsize=12)
+    plt.grid(True, linestyle=&#34;--&#34;, alpha=0.7)
+    plt.xticks(fontsize=10)
+    plt.yticks(fontsize=10)
+    print(f&#34;Confidence Interval: ±{Z * y_std:.4f}&#34;)
+    plt.legend(loc=&#34;upper left&#34;, fontsize=9)
     if mode:
-        plt.savefig(&#34;pred_&#34; + str(n) + &#34;.png&#34;, dpi=300)
+        plt.savefig(f&#34;pred_{n}.png&#34;, dpi=300)
+    plt.tight_layout()
     plt.show()</code></pre>
 </details>
 <div class="desc"></div>
@@ -1646,12 +2704,22 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def predict(self, n_steps: int = 0):
-    self.n_steps = n_steps
+    &#34;&#34;&#34;Make predictions for future steps.
 
+    Parameters
+    ----------
+    n_steps : `int`, optional
+        Number of steps to predict, by default 0
+
+    Returns
+    -------
+    `np.ndarray`
+        Predicted values.
+    &#34;&#34;&#34;
+    self.n_steps = n_steps
     datapoints = self.datapoints
     model = self.model
     theta_trained = self.theta_trained
-
     y_pred = model(datapoints, theta_trained)
 
     for i in range(n_steps):
@@ -1663,7 +2731,15 @@ el.replaceWith(d);
 
     return np.array(y_pred)</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Make predictions for future steps.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>n_steps</code></strong> :&ensp;<code>int</code>, optional</dt>
+<dd>Number of steps to predict, by default 0</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>np.ndarray</code>
+Predicted values.</p></div>
 </dd>
 <dt id="likelihood.models.regression.AbstractArima.save_model"><code class="name flex">
 <span>def <span class="ident">save_model</span></span>(<span>self, name: str = 'model')</span>
@@ -1697,28 +2773,34 @@ el.replaceWith(d);
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.models.regression.AbstractArima.train"><code class="name flex">
-<span>def <span class="ident">train</span></span>(<span>self, nwalkers: int = 1, mov: int = 200, weights: bool = False)</span>
+<span>def <span class="ident">train</span></span>(<span>self, nwalkers: int = 10, mov: int = 200, weights: bool = False)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def train(self, nwalkers: int = 1, mov: int = 200, weights: bool = False):
+<pre><code class="python">def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+    &#34;&#34;&#34;Train the model using sampling method.
+
+    Parameters
+    ----------
+    nwalkers : `int`, optional
+        Number of walkers for sampling, by default 10
+    mov : `int`, optional
+        Maximum number of iterations, by default 200
+    weights : `bool`, optional
+        Whether to use weights in sampling, by default False
+    &#34;&#34;&#34;
     datapoints = self.datapoints
     xvec = self.xvec
-
     self.nwalkers = nwalkers
     self.mov = mov
 
     assert self.nwalkers &lt;= self.mov, &#34;n_walkers must be less or equal than mov&#34;
-
     model = self.model
-
     n = self.p + self.q
-
     theta = np.random.rand(n)
-
     x_vec = xvec(datapoints)
 
     if weights:
@@ -1742,7 +2824,16 @@ el.replaceWith(d);
 
     self.theta_trained = trained</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Train the model using sampling method.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>nwalkers</code></strong> :&ensp;<code>int</code>, optional</dt>
+<dd>Number of walkers for sampling, by default 10</dd>
+<dt><strong><code>mov</code></strong> :&ensp;<code>int</code>, optional</dt>
+<dd>Maximum number of iterations, by default 200</dd>
+<dt><strong><code>weights</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Whether to use weights in sampling, by default False</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.regression.AbstractArima.xvec"><code class="name flex">
 <span>def <span class="ident">xvec</span></span>(<span>self, datapoints: numpy.ndarray, n_steps: int = 0)</span>
@@ -1752,19 +2843,53 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def xvec(self, datapoints: ndarray, n_steps: int = 0):
+<pre><code class="python">def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+    &#34;&#34;&#34;Extract vector of data points.
+
+    Parameters
+    ----------
+    datapoints : `np.ndarray`
+        The input data points.
+    n_steps : `int`, optional
+        Number of steps to consider, by default 0
+
+    Returns
+    -------
+    `np.ndarray`
+        Extracted data points vector.
+    &#34;&#34;&#34;
     datapoints = self.datapoints
     self.n_steps = n_steps
 
     return datapoints[n_steps:]</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Extract vector of data points.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The input data points.</dd>
+<dt><strong><code>n_steps</code></strong> :&ensp;<code>int</code>, optional</dt>
+<dd>Number of steps to consider, by default 0</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>np.ndarray</code>
+Extracted data points vector.</p></div>
 </dd>
 </dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="likelihood.models.utils.FeaturesArima" href="utils.html#likelihood.models.utils.FeaturesArima">FeaturesArima</a></b></code>:
+<ul class="hlist">
+<li><code><a title="likelihood.models.utils.FeaturesArima.average" href="utils.html#likelihood.models.utils.FeaturesArima.average">average</a></code></li>
+<li><code><a title="likelihood.models.utils.FeaturesArima.forward" href="utils.html#likelihood.models.utils.FeaturesArima.forward">forward</a></code></li>
+<li><code><a title="likelihood.models.utils.FeaturesArima.integrated" href="utils.html#likelihood.models.utils.FeaturesArima.integrated">integrated</a></code></li>
+</ul>
+</li>
+</ul>
 </dd>
 <dt id="likelihood.models.regression.Arima"><code class="flex name class">
 <span>class <span class="ident">Arima</span></span>
-<span>(</span><span>datapoints: numpy.ndarray,<br>p: float = 1,<br>d: int = 0,<br>q: float = 0,<br>n_steps: int = 0,<br>noise: float = 0,<br>tol: float = 1e-05)</span>
+<span>(</span><span>datapoints: numpy.ndarray,<br>p: float = 1,<br>d: int = 0,<br>q: float = 0,<br>noise: float = 0,<br>tol: float = 1e-05)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1772,45 +2897,67 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Arima(AbstractArima):
-    &#34;&#34;&#34;A class that implements the (p, d, q) arima model
+    &#34;&#34;&#34;A class that implements the (p, d, q) ARIMA model.
 
     Parameters
     ----------
-
-    datapoints : np.array
-        A set of points to train the arima model.
-
+    datapoints : np.ndarray
+        A set of points to train the ARIMA model.
     p : float
-        Is the number of auto-regressive terms (ratio). By default it is set to `1`
-
+        Number of auto-regressive terms (ratio). By default it is set to `1`.
     d : int
-        Is known as the degree of differencing. By default it is set to `0`
-
+        Degree of differencing. By default it is set to `0`.
     q : float
-        Is the number of forecast errors in the model (ratio). By default it is set to `0`
+        Number of forecast errors in the model (ratio). By default it is set to `0`.
+    n_steps : int
+        Number of steps to predict ahead.
+    noise : float
+        Amount of noise added during training.
+    tol : float
+        Tolerance for convergence checks.
 
     Returns
     -------
+    None
 
-    y_pred : np.array
-        It is the number of predicted points. It is necessary
-        to apply predict(n_steps) followed by train()
+    Notes
+    -----
+    The values of `p`, `q` are scaled based on the length of `datapoints`.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints&#34;, &#34;n_steps&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
+    __slots__ = [&#34;datapoints&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
 
     def __init__(
         self,
-        datapoints: ndarray,
+        datapoints: np.ndarray,
         p: float = 1,
         d: int = 0,
         q: float = 0,
-        n_steps: int = 0,
         noise: float = 0,
         tol: float = 1e-5,
     ):
+        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        p : float
+            Auto-regressive term (scaled by length of data).
+        d : int
+            Degree of differencing.
+        q : float
+            Moving average term (scaled by length of data).
+        noise : float
+            Noise level for training.
+        tol : float
+            Tolerance for numerical convergence.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         assert p &gt; 0 and p &lt;= 1, &#34;p must be less than 1 but greater than 0&#34;
         self.p = int(p * len(datapoints))
@@ -1819,54 +2966,113 @@ el.replaceWith(d);
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: ndarray, theta: list, mode: bool = True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
+        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            The input data used for modeling.
+        theta : list
+            Model parameters.
+        mode : bool
+            If True, computes in forward mode; otherwise in backward mode.
+
+        Returns
+        -------
+        y_vec : np.ndarray
+            Predicted values according to the ARIMA model.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
-        assert type(self.d) == int, &#34;d must be 0, 1 or 2&#34;
+        assert type(self.d) == int, &#34;d must be 0 or 1&#34;
 
         if self.d != 0 or self.q != 0:
             if self.d != 0:
                 y_sum = super().integrated(datapoints)
+                norm_datapoints = np.linalg.norm(datapoints)
+                norm_y_sum = np.linalg.norm(y_sum)
+                if norm_y_sum != 0 and norm_datapoints != 0:
+                    y_sum = cal_average(
+                        np.abs(y_sum * (norm_datapoints / norm_y_sum)) * np.sign(datapoints), 0.05
+                    )
             else:
-                y_sum = datapoints
+                y_sum = datapoints.copy()
 
             y_sum_regr = y_sum[-self.p :]
             y_regr_vec = super().forward(y_sum_regr, theta[0 : self.p], mode, 0)
             if self.q != 0:
                 y_sum_average = super().average(y_sum[-self.q :])
+                y_vec_magnitude = np.linalg.norm(y_regr_vec.copy())
+                y_sum_average_magnitude = np.linalg.norm(y_sum_average)
+
+                if y_sum_average_magnitude &gt; y_vec_magnitude:
+                    scaling_factor = y_vec_magnitude / y_sum_average_magnitude
+                    y_sum_average = y_sum_average * scaling_factor
+                theta_mean = np.mean(theta[-self.q :])
+                if abs(theta_mean) &gt; 1:
+                    additional_scaling_factor = 1.0 - abs(theta_mean)
+                    y_sum_average = y_sum_average * additional_scaling_factor
                 y_average_vec = super().forward(y_sum_average, theta[-self.q :], mode, 0)
                 if mode:
-                    y_vec = y_regr_vec
+                    y_vec = y_regr_vec.copy()
                     for i in reversed(range(y_average_vec.shape[0])):
                         y_vec[i] += y_average_vec[i]
                 else:
                     y_vec = y_regr_vec + y_average_vec
             else:
                 y_vec = y_regr_vec
-
             return y_vec
         else:
             return super().forward(datapoints, theta, mode, noise)</code></pre>
 </details>
-<div class="desc"><p>A class that implements the (p, d, q) arima model</p>
+<div class="desc"><p>A class that implements the (p, d, q) ARIMA model.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>datapoints</code></strong> :&ensp;<code>np.array</code></dt>
-<dd>A set of points to train the arima model.</dd>
+<dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>A set of points to train the ARIMA model.</dd>
 <dt><strong><code>p</code></strong> :&ensp;<code>float</code></dt>
-<dd>Is the number of auto-regressive terms (ratio). By default it is set to <code>1</code></dd>
+<dd>Number of auto-regressive terms (ratio). By default it is set to <code>1</code>.</dd>
 <dt><strong><code>d</code></strong> :&ensp;<code>int</code></dt>
-<dd>Is known as the degree of differencing. By default it is set to <code>0</code></dd>
+<dd>Degree of differencing. By default it is set to <code>0</code>.</dd>
 <dt><strong><code>q</code></strong> :&ensp;<code>float</code></dt>
-<dd>Is the number of forecast errors in the model (ratio). By default it is set to <code>0</code></dd>
+<dd>Number of forecast errors in the model (ratio). By default it is set to <code>0</code>.</dd>
+<dt><strong><code>n_steps</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of steps to predict ahead.</dd>
+<dt><strong><code>noise</code></strong> :&ensp;<code>float</code></dt>
+<dd>Amount of noise added during training.</dd>
+<dt><strong><code>tol</code></strong> :&ensp;<code>float</code></dt>
+<dd>Tolerance for convergence checks.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><strong><code>y_pred</code></strong> :&ensp;<code>np.array</code></dt>
-<dd>It is the number of predicted points. It is necessary
-to apply predict(n_steps) followed by train()</dd>
+<dt><code>None</code></dt>
+<dd>&nbsp;</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>The values of <code>p</code>, <code>q</code> are scaled based on the length of <code>datapoints</code>.</p>
+<p>Initializes the ARIMA model with given parameters.</p>
+<h2 id="parameters_1">Parameters</h2>
+<dl>
+<dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>A set of points to train the ARIMA model.</dd>
+<dt><strong><code>p</code></strong> :&ensp;<code>float</code></dt>
+<dd>Auto-regressive term (scaled by length of data).</dd>
+<dt><strong><code>d</code></strong> :&ensp;<code>int</code></dt>
+<dd>Degree of differencing.</dd>
+<dt><strong><code>q</code></strong> :&ensp;<code>float</code></dt>
+<dd>Moving average term (scaled by length of data).</dd>
+<dt><strong><code>noise</code></strong> :&ensp;<code>float</code></dt>
+<dd>Noise level for training.</dd>
+<dt><strong><code>tol</code></strong> :&ensp;<code>float</code></dt>
+<dd>Tolerance for numerical convergence.</dd>
+</dl>
+<h2 id="returns_1">Returns</h2>
+<dl>
+<dt><code>None</code></dt>
+<dd>&nbsp;</dd>
 </dl></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -1882,45 +3088,67 @@ to apply predict(n_steps) followed by train()</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Arima(AbstractArima):
-    &#34;&#34;&#34;A class that implements the (p, d, q) arima model
+    &#34;&#34;&#34;A class that implements the (p, d, q) ARIMA model.
 
     Parameters
     ----------
-
-    datapoints : np.array
-        A set of points to train the arima model.
-
+    datapoints : np.ndarray
+        A set of points to train the ARIMA model.
     p : float
-        Is the number of auto-regressive terms (ratio). By default it is set to `1`
-
+        Number of auto-regressive terms (ratio). By default it is set to `1`.
     d : int
-        Is known as the degree of differencing. By default it is set to `0`
-
+        Degree of differencing. By default it is set to `0`.
     q : float
-        Is the number of forecast errors in the model (ratio). By default it is set to `0`
+        Number of forecast errors in the model (ratio). By default it is set to `0`.
+    n_steps : int
+        Number of steps to predict ahead.
+    noise : float
+        Amount of noise added during training.
+    tol : float
+        Tolerance for convergence checks.
 
     Returns
     -------
+    None
 
-    y_pred : np.array
-        It is the number of predicted points. It is necessary
-        to apply predict(n_steps) followed by train()
+    Notes
+    -----
+    The values of `p`, `q` are scaled based on the length of `datapoints`.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints&#34;, &#34;n_steps&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
+    __slots__ = [&#34;datapoints&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
 
     def __init__(
         self,
-        datapoints: ndarray,
+        datapoints: np.ndarray,
         p: float = 1,
         d: int = 0,
         q: float = 0,
-        n_steps: int = 0,
         noise: float = 0,
         tol: float = 1e-5,
     ):
+        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        p : float
+            Auto-regressive term (scaled by length of data).
+        d : int
+            Degree of differencing.
+        q : float
+            Moving average term (scaled by length of data).
+        noise : float
+            Noise level for training.
+        tol : float
+            Tolerance for numerical convergence.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         assert p &gt; 0 and p &lt;= 1, &#34;p must be less than 1 but greater than 0&#34;
         self.p = int(p * len(datapoints))
@@ -1929,33 +3157,64 @@ to apply predict(n_steps) followed by train()</dd>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: ndarray, theta: list, mode: bool = True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
+        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            The input data used for modeling.
+        theta : list
+            Model parameters.
+        mode : bool
+            If True, computes in forward mode; otherwise in backward mode.
+
+        Returns
+        -------
+        y_vec : np.ndarray
+            Predicted values according to the ARIMA model.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
-        assert type(self.d) == int, &#34;d must be 0, 1 or 2&#34;
+        assert type(self.d) == int, &#34;d must be 0 or 1&#34;
 
         if self.d != 0 or self.q != 0:
             if self.d != 0:
                 y_sum = super().integrated(datapoints)
+                norm_datapoints = np.linalg.norm(datapoints)
+                norm_y_sum = np.linalg.norm(y_sum)
+                if norm_y_sum != 0 and norm_datapoints != 0:
+                    y_sum = cal_average(
+                        np.abs(y_sum * (norm_datapoints / norm_y_sum)) * np.sign(datapoints), 0.05
+                    )
             else:
-                y_sum = datapoints
+                y_sum = datapoints.copy()
 
             y_sum_regr = y_sum[-self.p :]
             y_regr_vec = super().forward(y_sum_regr, theta[0 : self.p], mode, 0)
             if self.q != 0:
                 y_sum_average = super().average(y_sum[-self.q :])
+                y_vec_magnitude = np.linalg.norm(y_regr_vec.copy())
+                y_sum_average_magnitude = np.linalg.norm(y_sum_average)
+
+                if y_sum_average_magnitude &gt; y_vec_magnitude:
+                    scaling_factor = y_vec_magnitude / y_sum_average_magnitude
+                    y_sum_average = y_sum_average * scaling_factor
+                theta_mean = np.mean(theta[-self.q :])
+                if abs(theta_mean) &gt; 1:
+                    additional_scaling_factor = 1.0 - abs(theta_mean)
+                    y_sum_average = y_sum_average * additional_scaling_factor
                 y_average_vec = super().forward(y_sum_average, theta[-self.q :], mode, 0)
                 if mode:
-                    y_vec = y_regr_vec
+                    y_vec = y_regr_vec.copy()
                     for i in reversed(range(y_average_vec.shape[0])):
                         y_vec[i] += y_average_vec[i]
                 else:
                     y_vec = y_regr_vec + y_average_vec
             else:
                 y_vec = y_regr_vec
-
             return y_vec
         else:
             return super().forward(datapoints, theta, mode, noise)</code></pre>
@@ -1969,45 +3228,67 @@ to apply predict(n_steps) followed by train()</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Arima(AbstractArima):
-    &#34;&#34;&#34;A class that implements the (p, d, q) arima model
+    &#34;&#34;&#34;A class that implements the (p, d, q) ARIMA model.
 
     Parameters
     ----------
-
-    datapoints : np.array
-        A set of points to train the arima model.
-
+    datapoints : np.ndarray
+        A set of points to train the ARIMA model.
     p : float
-        Is the number of auto-regressive terms (ratio). By default it is set to `1`
-
+        Number of auto-regressive terms (ratio). By default it is set to `1`.
     d : int
-        Is known as the degree of differencing. By default it is set to `0`
-
+        Degree of differencing. By default it is set to `0`.
     q : float
-        Is the number of forecast errors in the model (ratio). By default it is set to `0`
+        Number of forecast errors in the model (ratio). By default it is set to `0`.
+    n_steps : int
+        Number of steps to predict ahead.
+    noise : float
+        Amount of noise added during training.
+    tol : float
+        Tolerance for convergence checks.
 
     Returns
     -------
+    None
 
-    y_pred : np.array
-        It is the number of predicted points. It is necessary
-        to apply predict(n_steps) followed by train()
+    Notes
+    -----
+    The values of `p`, `q` are scaled based on the length of `datapoints`.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints&#34;, &#34;n_steps&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
+    __slots__ = [&#34;datapoints&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
 
     def __init__(
         self,
-        datapoints: ndarray,
+        datapoints: np.ndarray,
         p: float = 1,
         d: int = 0,
         q: float = 0,
-        n_steps: int = 0,
         noise: float = 0,
         tol: float = 1e-5,
     ):
+        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        p : float
+            Auto-regressive term (scaled by length of data).
+        d : int
+            Degree of differencing.
+        q : float
+            Moving average term (scaled by length of data).
+        noise : float
+            Noise level for training.
+        tol : float
+            Tolerance for numerical convergence.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         assert p &gt; 0 and p &lt;= 1, &#34;p must be less than 1 but greater than 0&#34;
         self.p = int(p * len(datapoints))
@@ -2016,120 +3297,64 @@ to apply predict(n_steps) followed by train()</dd>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: ndarray, theta: list, mode: bool = True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
+        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            The input data used for modeling.
+        theta : list
+            Model parameters.
+        mode : bool
+            If True, computes in forward mode; otherwise in backward mode.
+
+        Returns
+        -------
+        y_vec : np.ndarray
+            Predicted values according to the ARIMA model.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
-        assert type(self.d) == int, &#34;d must be 0, 1 or 2&#34;
+        assert type(self.d) == int, &#34;d must be 0 or 1&#34;
 
         if self.d != 0 or self.q != 0:
             if self.d != 0:
                 y_sum = super().integrated(datapoints)
+                norm_datapoints = np.linalg.norm(datapoints)
+                norm_y_sum = np.linalg.norm(y_sum)
+                if norm_y_sum != 0 and norm_datapoints != 0:
+                    y_sum = cal_average(
+                        np.abs(y_sum * (norm_datapoints / norm_y_sum)) * np.sign(datapoints), 0.05
+                    )
             else:
-                y_sum = datapoints
+                y_sum = datapoints.copy()
 
             y_sum_regr = y_sum[-self.p :]
             y_regr_vec = super().forward(y_sum_regr, theta[0 : self.p], mode, 0)
             if self.q != 0:
                 y_sum_average = super().average(y_sum[-self.q :])
+                y_vec_magnitude = np.linalg.norm(y_regr_vec.copy())
+                y_sum_average_magnitude = np.linalg.norm(y_sum_average)
+
+                if y_sum_average_magnitude &gt; y_vec_magnitude:
+                    scaling_factor = y_vec_magnitude / y_sum_average_magnitude
+                    y_sum_average = y_sum_average * scaling_factor
+                theta_mean = np.mean(theta[-self.q :])
+                if abs(theta_mean) &gt; 1:
+                    additional_scaling_factor = 1.0 - abs(theta_mean)
+                    y_sum_average = y_sum_average * additional_scaling_factor
                 y_average_vec = super().forward(y_sum_average, theta[-self.q :], mode, 0)
                 if mode:
-                    y_vec = y_regr_vec
+                    y_vec = y_regr_vec.copy()
                     for i in reversed(range(y_average_vec.shape[0])):
                         y_vec[i] += y_average_vec[i]
                 else:
                     y_vec = y_regr_vec + y_average_vec
             else:
                 y_vec = y_regr_vec
-
-            return y_vec
-        else:
-            return super().forward(datapoints, theta, mode, noise)</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="likelihood.models.regression.Arima.n_steps"><code class="name">var <span class="ident">n_steps</span></code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">class Arima(AbstractArima):
-    &#34;&#34;&#34;A class that implements the (p, d, q) arima model
-
-    Parameters
-    ----------
-
-    datapoints : np.array
-        A set of points to train the arima model.
-
-    p : float
-        Is the number of auto-regressive terms (ratio). By default it is set to `1`
-
-    d : int
-        Is known as the degree of differencing. By default it is set to `0`
-
-    q : float
-        Is the number of forecast errors in the model (ratio). By default it is set to `0`
-
-    Returns
-    -------
-
-    y_pred : np.array
-        It is the number of predicted points. It is necessary
-        to apply predict(n_steps) followed by train()
-    &#34;&#34;&#34;
-
-    __slots__ = [&#34;datapoints&#34;, &#34;n_steps&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
-
-    def __init__(
-        self,
-        datapoints: ndarray,
-        p: float = 1,
-        d: int = 0,
-        q: float = 0,
-        n_steps: int = 0,
-        noise: float = 0,
-        tol: float = 1e-5,
-    ):
-        self.datapoints = datapoints
-        self.n_steps = n_steps
-        self.noise = noise
-        assert p &gt; 0 and p &lt;= 1, &#34;p must be less than 1 but greater than 0&#34;
-        self.p = int(p * len(datapoints))
-        assert d &gt;= 0 and d &lt;= 1, &#34;p must be less than 1 but greater than or equal to 0&#34;
-        self.d = d
-        self.q = int(q * len(datapoints))
-        self.tol = tol
-
-    def model(self, datapoints: ndarray, theta: list, mode: bool = True):
-        datapoints = self.datapoints
-        noise = self.noise
-        self.theta_trained = theta
-
-        assert type(self.d) == int, &#34;d must be 0, 1 or 2&#34;
-
-        if self.d != 0 or self.q != 0:
-            if self.d != 0:
-                y_sum = super().integrated(datapoints)
-            else:
-                y_sum = datapoints
-
-            y_sum_regr = y_sum[-self.p :]
-            y_regr_vec = super().forward(y_sum_regr, theta[0 : self.p], mode, 0)
-            if self.q != 0:
-                y_sum_average = super().average(y_sum[-self.q :])
-                y_average_vec = super().forward(y_sum_average, theta[-self.q :], mode, 0)
-                if mode:
-                    y_vec = y_regr_vec
-                    for i in reversed(range(y_average_vec.shape[0])):
-                        y_vec[i] += y_average_vec[i]
-                else:
-                    y_vec = y_regr_vec + y_average_vec
-            else:
-                y_vec = y_regr_vec
-
             return y_vec
         else:
             return super().forward(datapoints, theta, mode, noise)</code></pre>
@@ -2143,45 +3368,67 @@ to apply predict(n_steps) followed by train()</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Arima(AbstractArima):
-    &#34;&#34;&#34;A class that implements the (p, d, q) arima model
+    &#34;&#34;&#34;A class that implements the (p, d, q) ARIMA model.
 
     Parameters
     ----------
-
-    datapoints : np.array
-        A set of points to train the arima model.
-
+    datapoints : np.ndarray
+        A set of points to train the ARIMA model.
     p : float
-        Is the number of auto-regressive terms (ratio). By default it is set to `1`
-
+        Number of auto-regressive terms (ratio). By default it is set to `1`.
     d : int
-        Is known as the degree of differencing. By default it is set to `0`
-
+        Degree of differencing. By default it is set to `0`.
     q : float
-        Is the number of forecast errors in the model (ratio). By default it is set to `0`
+        Number of forecast errors in the model (ratio). By default it is set to `0`.
+    n_steps : int
+        Number of steps to predict ahead.
+    noise : float
+        Amount of noise added during training.
+    tol : float
+        Tolerance for convergence checks.
 
     Returns
     -------
+    None
 
-    y_pred : np.array
-        It is the number of predicted points. It is necessary
-        to apply predict(n_steps) followed by train()
+    Notes
+    -----
+    The values of `p`, `q` are scaled based on the length of `datapoints`.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints&#34;, &#34;n_steps&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
+    __slots__ = [&#34;datapoints&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
 
     def __init__(
         self,
-        datapoints: ndarray,
+        datapoints: np.ndarray,
         p: float = 1,
         d: int = 0,
         q: float = 0,
-        n_steps: int = 0,
         noise: float = 0,
         tol: float = 1e-5,
     ):
+        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        p : float
+            Auto-regressive term (scaled by length of data).
+        d : int
+            Degree of differencing.
+        q : float
+            Moving average term (scaled by length of data).
+        noise : float
+            Noise level for training.
+        tol : float
+            Tolerance for numerical convergence.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         assert p &gt; 0 and p &lt;= 1, &#34;p must be less than 1 but greater than 0&#34;
         self.p = int(p * len(datapoints))
@@ -2190,33 +3437,64 @@ to apply predict(n_steps) followed by train()</dd>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: ndarray, theta: list, mode: bool = True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
+        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            The input data used for modeling.
+        theta : list
+            Model parameters.
+        mode : bool
+            If True, computes in forward mode; otherwise in backward mode.
+
+        Returns
+        -------
+        y_vec : np.ndarray
+            Predicted values according to the ARIMA model.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
-        assert type(self.d) == int, &#34;d must be 0, 1 or 2&#34;
+        assert type(self.d) == int, &#34;d must be 0 or 1&#34;
 
         if self.d != 0 or self.q != 0:
             if self.d != 0:
                 y_sum = super().integrated(datapoints)
+                norm_datapoints = np.linalg.norm(datapoints)
+                norm_y_sum = np.linalg.norm(y_sum)
+                if norm_y_sum != 0 and norm_datapoints != 0:
+                    y_sum = cal_average(
+                        np.abs(y_sum * (norm_datapoints / norm_y_sum)) * np.sign(datapoints), 0.05
+                    )
             else:
-                y_sum = datapoints
+                y_sum = datapoints.copy()
 
             y_sum_regr = y_sum[-self.p :]
             y_regr_vec = super().forward(y_sum_regr, theta[0 : self.p], mode, 0)
             if self.q != 0:
                 y_sum_average = super().average(y_sum[-self.q :])
+                y_vec_magnitude = np.linalg.norm(y_regr_vec.copy())
+                y_sum_average_magnitude = np.linalg.norm(y_sum_average)
+
+                if y_sum_average_magnitude &gt; y_vec_magnitude:
+                    scaling_factor = y_vec_magnitude / y_sum_average_magnitude
+                    y_sum_average = y_sum_average * scaling_factor
+                theta_mean = np.mean(theta[-self.q :])
+                if abs(theta_mean) &gt; 1:
+                    additional_scaling_factor = 1.0 - abs(theta_mean)
+                    y_sum_average = y_sum_average * additional_scaling_factor
                 y_average_vec = super().forward(y_sum_average, theta[-self.q :], mode, 0)
                 if mode:
-                    y_vec = y_regr_vec
+                    y_vec = y_regr_vec.copy()
                     for i in reversed(range(y_average_vec.shape[0])):
                         y_vec[i] += y_average_vec[i]
                 else:
                     y_vec = y_regr_vec + y_average_vec
             else:
                 y_vec = y_regr_vec
-
             return y_vec
         else:
             return super().forward(datapoints, theta, mode, noise)</code></pre>
@@ -2230,45 +3508,67 @@ to apply predict(n_steps) followed by train()</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Arima(AbstractArima):
-    &#34;&#34;&#34;A class that implements the (p, d, q) arima model
+    &#34;&#34;&#34;A class that implements the (p, d, q) ARIMA model.
 
     Parameters
     ----------
-
-    datapoints : np.array
-        A set of points to train the arima model.
-
+    datapoints : np.ndarray
+        A set of points to train the ARIMA model.
     p : float
-        Is the number of auto-regressive terms (ratio). By default it is set to `1`
-
+        Number of auto-regressive terms (ratio). By default it is set to `1`.
     d : int
-        Is known as the degree of differencing. By default it is set to `0`
-
+        Degree of differencing. By default it is set to `0`.
     q : float
-        Is the number of forecast errors in the model (ratio). By default it is set to `0`
+        Number of forecast errors in the model (ratio). By default it is set to `0`.
+    n_steps : int
+        Number of steps to predict ahead.
+    noise : float
+        Amount of noise added during training.
+    tol : float
+        Tolerance for convergence checks.
 
     Returns
     -------
+    None
 
-    y_pred : np.array
-        It is the number of predicted points. It is necessary
-        to apply predict(n_steps) followed by train()
+    Notes
+    -----
+    The values of `p`, `q` are scaled based on the length of `datapoints`.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints&#34;, &#34;n_steps&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
+    __slots__ = [&#34;datapoints&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
 
     def __init__(
         self,
-        datapoints: ndarray,
+        datapoints: np.ndarray,
         p: float = 1,
         d: int = 0,
         q: float = 0,
-        n_steps: int = 0,
         noise: float = 0,
         tol: float = 1e-5,
     ):
+        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        p : float
+            Auto-regressive term (scaled by length of data).
+        d : int
+            Degree of differencing.
+        q : float
+            Moving average term (scaled by length of data).
+        noise : float
+            Noise level for training.
+        tol : float
+            Tolerance for numerical convergence.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         assert p &gt; 0 and p &lt;= 1, &#34;p must be less than 1 but greater than 0&#34;
         self.p = int(p * len(datapoints))
@@ -2277,33 +3577,64 @@ to apply predict(n_steps) followed by train()</dd>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: ndarray, theta: list, mode: bool = True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
+        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            The input data used for modeling.
+        theta : list
+            Model parameters.
+        mode : bool
+            If True, computes in forward mode; otherwise in backward mode.
+
+        Returns
+        -------
+        y_vec : np.ndarray
+            Predicted values according to the ARIMA model.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
-        assert type(self.d) == int, &#34;d must be 0, 1 or 2&#34;
+        assert type(self.d) == int, &#34;d must be 0 or 1&#34;
 
         if self.d != 0 or self.q != 0:
             if self.d != 0:
                 y_sum = super().integrated(datapoints)
+                norm_datapoints = np.linalg.norm(datapoints)
+                norm_y_sum = np.linalg.norm(y_sum)
+                if norm_y_sum != 0 and norm_datapoints != 0:
+                    y_sum = cal_average(
+                        np.abs(y_sum * (norm_datapoints / norm_y_sum)) * np.sign(datapoints), 0.05
+                    )
             else:
-                y_sum = datapoints
+                y_sum = datapoints.copy()
 
             y_sum_regr = y_sum[-self.p :]
             y_regr_vec = super().forward(y_sum_regr, theta[0 : self.p], mode, 0)
             if self.q != 0:
                 y_sum_average = super().average(y_sum[-self.q :])
+                y_vec_magnitude = np.linalg.norm(y_regr_vec.copy())
+                y_sum_average_magnitude = np.linalg.norm(y_sum_average)
+
+                if y_sum_average_magnitude &gt; y_vec_magnitude:
+                    scaling_factor = y_vec_magnitude / y_sum_average_magnitude
+                    y_sum_average = y_sum_average * scaling_factor
+                theta_mean = np.mean(theta[-self.q :])
+                if abs(theta_mean) &gt; 1:
+                    additional_scaling_factor = 1.0 - abs(theta_mean)
+                    y_sum_average = y_sum_average * additional_scaling_factor
                 y_average_vec = super().forward(y_sum_average, theta[-self.q :], mode, 0)
                 if mode:
-                    y_vec = y_regr_vec
+                    y_vec = y_regr_vec.copy()
                     for i in reversed(range(y_average_vec.shape[0])):
                         y_vec[i] += y_average_vec[i]
                 else:
                     y_vec = y_regr_vec + y_average_vec
             else:
                 y_vec = y_regr_vec
-
             return y_vec
         else:
             return super().forward(datapoints, theta, mode, noise)</code></pre>
@@ -2317,45 +3648,67 @@ to apply predict(n_steps) followed by train()</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Arima(AbstractArima):
-    &#34;&#34;&#34;A class that implements the (p, d, q) arima model
+    &#34;&#34;&#34;A class that implements the (p, d, q) ARIMA model.
 
     Parameters
     ----------
-
-    datapoints : np.array
-        A set of points to train the arima model.
-
+    datapoints : np.ndarray
+        A set of points to train the ARIMA model.
     p : float
-        Is the number of auto-regressive terms (ratio). By default it is set to `1`
-
+        Number of auto-regressive terms (ratio). By default it is set to `1`.
     d : int
-        Is known as the degree of differencing. By default it is set to `0`
-
+        Degree of differencing. By default it is set to `0`.
     q : float
-        Is the number of forecast errors in the model (ratio). By default it is set to `0`
+        Number of forecast errors in the model (ratio). By default it is set to `0`.
+    n_steps : int
+        Number of steps to predict ahead.
+    noise : float
+        Amount of noise added during training.
+    tol : float
+        Tolerance for convergence checks.
 
     Returns
     -------
+    None
 
-    y_pred : np.array
-        It is the number of predicted points. It is necessary
-        to apply predict(n_steps) followed by train()
+    Notes
+    -----
+    The values of `p`, `q` are scaled based on the length of `datapoints`.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints&#34;, &#34;n_steps&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
+    __slots__ = [&#34;datapoints&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
 
     def __init__(
         self,
-        datapoints: ndarray,
+        datapoints: np.ndarray,
         p: float = 1,
         d: int = 0,
         q: float = 0,
-        n_steps: int = 0,
         noise: float = 0,
         tol: float = 1e-5,
     ):
+        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        p : float
+            Auto-regressive term (scaled by length of data).
+        d : int
+            Degree of differencing.
+        q : float
+            Moving average term (scaled by length of data).
+        noise : float
+            Noise level for training.
+        tol : float
+            Tolerance for numerical convergence.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         assert p &gt; 0 and p &lt;= 1, &#34;p must be less than 1 but greater than 0&#34;
         self.p = int(p * len(datapoints))
@@ -2364,33 +3717,64 @@ to apply predict(n_steps) followed by train()</dd>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: ndarray, theta: list, mode: bool = True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
+        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            The input data used for modeling.
+        theta : list
+            Model parameters.
+        mode : bool
+            If True, computes in forward mode; otherwise in backward mode.
+
+        Returns
+        -------
+        y_vec : np.ndarray
+            Predicted values according to the ARIMA model.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
-        assert type(self.d) == int, &#34;d must be 0, 1 or 2&#34;
+        assert type(self.d) == int, &#34;d must be 0 or 1&#34;
 
         if self.d != 0 or self.q != 0:
             if self.d != 0:
                 y_sum = super().integrated(datapoints)
+                norm_datapoints = np.linalg.norm(datapoints)
+                norm_y_sum = np.linalg.norm(y_sum)
+                if norm_y_sum != 0 and norm_datapoints != 0:
+                    y_sum = cal_average(
+                        np.abs(y_sum * (norm_datapoints / norm_y_sum)) * np.sign(datapoints), 0.05
+                    )
             else:
-                y_sum = datapoints
+                y_sum = datapoints.copy()
 
             y_sum_regr = y_sum[-self.p :]
             y_regr_vec = super().forward(y_sum_regr, theta[0 : self.p], mode, 0)
             if self.q != 0:
                 y_sum_average = super().average(y_sum[-self.q :])
+                y_vec_magnitude = np.linalg.norm(y_regr_vec.copy())
+                y_sum_average_magnitude = np.linalg.norm(y_sum_average)
+
+                if y_sum_average_magnitude &gt; y_vec_magnitude:
+                    scaling_factor = y_vec_magnitude / y_sum_average_magnitude
+                    y_sum_average = y_sum_average * scaling_factor
+                theta_mean = np.mean(theta[-self.q :])
+                if abs(theta_mean) &gt; 1:
+                    additional_scaling_factor = 1.0 - abs(theta_mean)
+                    y_sum_average = y_sum_average * additional_scaling_factor
                 y_average_vec = super().forward(y_sum_average, theta[-self.q :], mode, 0)
                 if mode:
-                    y_vec = y_regr_vec
+                    y_vec = y_regr_vec.copy()
                     for i in reversed(range(y_average_vec.shape[0])):
                         y_vec[i] += y_average_vec[i]
                 else:
                     y_vec = y_regr_vec + y_average_vec
             else:
                 y_vec = y_regr_vec
-
             return y_vec
         else:
             return super().forward(datapoints, theta, mode, noise)</code></pre>
@@ -2404,45 +3788,67 @@ to apply predict(n_steps) followed by train()</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Arima(AbstractArima):
-    &#34;&#34;&#34;A class that implements the (p, d, q) arima model
+    &#34;&#34;&#34;A class that implements the (p, d, q) ARIMA model.
 
     Parameters
     ----------
-
-    datapoints : np.array
-        A set of points to train the arima model.
-
+    datapoints : np.ndarray
+        A set of points to train the ARIMA model.
     p : float
-        Is the number of auto-regressive terms (ratio). By default it is set to `1`
-
+        Number of auto-regressive terms (ratio). By default it is set to `1`.
     d : int
-        Is known as the degree of differencing. By default it is set to `0`
-
+        Degree of differencing. By default it is set to `0`.
     q : float
-        Is the number of forecast errors in the model (ratio). By default it is set to `0`
+        Number of forecast errors in the model (ratio). By default it is set to `0`.
+    n_steps : int
+        Number of steps to predict ahead.
+    noise : float
+        Amount of noise added during training.
+    tol : float
+        Tolerance for convergence checks.
 
     Returns
     -------
+    None
 
-    y_pred : np.array
-        It is the number of predicted points. It is necessary
-        to apply predict(n_steps) followed by train()
+    Notes
+    -----
+    The values of `p`, `q` are scaled based on the length of `datapoints`.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints&#34;, &#34;n_steps&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
+    __slots__ = [&#34;datapoints&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
 
     def __init__(
         self,
-        datapoints: ndarray,
+        datapoints: np.ndarray,
         p: float = 1,
         d: int = 0,
         q: float = 0,
-        n_steps: int = 0,
         noise: float = 0,
         tol: float = 1e-5,
     ):
+        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        p : float
+            Auto-regressive term (scaled by length of data).
+        d : int
+            Degree of differencing.
+        q : float
+            Moving average term (scaled by length of data).
+        noise : float
+            Noise level for training.
+        tol : float
+            Tolerance for numerical convergence.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         assert p &gt; 0 and p &lt;= 1, &#34;p must be less than 1 but greater than 0&#34;
         self.p = int(p * len(datapoints))
@@ -2451,33 +3857,64 @@ to apply predict(n_steps) followed by train()</dd>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: ndarray, theta: list, mode: bool = True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
+        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            The input data used for modeling.
+        theta : list
+            Model parameters.
+        mode : bool
+            If True, computes in forward mode; otherwise in backward mode.
+
+        Returns
+        -------
+        y_vec : np.ndarray
+            Predicted values according to the ARIMA model.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
-        assert type(self.d) == int, &#34;d must be 0, 1 or 2&#34;
+        assert type(self.d) == int, &#34;d must be 0 or 1&#34;
 
         if self.d != 0 or self.q != 0:
             if self.d != 0:
                 y_sum = super().integrated(datapoints)
+                norm_datapoints = np.linalg.norm(datapoints)
+                norm_y_sum = np.linalg.norm(y_sum)
+                if norm_y_sum != 0 and norm_datapoints != 0:
+                    y_sum = cal_average(
+                        np.abs(y_sum * (norm_datapoints / norm_y_sum)) * np.sign(datapoints), 0.05
+                    )
             else:
-                y_sum = datapoints
+                y_sum = datapoints.copy()
 
             y_sum_regr = y_sum[-self.p :]
             y_regr_vec = super().forward(y_sum_regr, theta[0 : self.p], mode, 0)
             if self.q != 0:
                 y_sum_average = super().average(y_sum[-self.q :])
+                y_vec_magnitude = np.linalg.norm(y_regr_vec.copy())
+                y_sum_average_magnitude = np.linalg.norm(y_sum_average)
+
+                if y_sum_average_magnitude &gt; y_vec_magnitude:
+                    scaling_factor = y_vec_magnitude / y_sum_average_magnitude
+                    y_sum_average = y_sum_average * scaling_factor
+                theta_mean = np.mean(theta[-self.q :])
+                if abs(theta_mean) &gt; 1:
+                    additional_scaling_factor = 1.0 - abs(theta_mean)
+                    y_sum_average = y_sum_average * additional_scaling_factor
                 y_average_vec = super().forward(y_sum_average, theta[-self.q :], mode, 0)
                 if mode:
-                    y_vec = y_regr_vec
+                    y_vec = y_regr_vec.copy()
                     for i in reversed(range(y_average_vec.shape[0])):
                         y_vec[i] += y_average_vec[i]
                 else:
                     y_vec = y_regr_vec + y_average_vec
             else:
                 y_vec = y_regr_vec
-
             return y_vec
         else:
             return super().forward(datapoints, theta, mode, noise)</code></pre>
@@ -2491,45 +3928,67 @@ to apply predict(n_steps) followed by train()</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Arima(AbstractArima):
-    &#34;&#34;&#34;A class that implements the (p, d, q) arima model
+    &#34;&#34;&#34;A class that implements the (p, d, q) ARIMA model.
 
     Parameters
     ----------
-
-    datapoints : np.array
-        A set of points to train the arima model.
-
+    datapoints : np.ndarray
+        A set of points to train the ARIMA model.
     p : float
-        Is the number of auto-regressive terms (ratio). By default it is set to `1`
-
+        Number of auto-regressive terms (ratio). By default it is set to `1`.
     d : int
-        Is known as the degree of differencing. By default it is set to `0`
-
+        Degree of differencing. By default it is set to `0`.
     q : float
-        Is the number of forecast errors in the model (ratio). By default it is set to `0`
+        Number of forecast errors in the model (ratio). By default it is set to `0`.
+    n_steps : int
+        Number of steps to predict ahead.
+    noise : float
+        Amount of noise added during training.
+    tol : float
+        Tolerance for convergence checks.
 
     Returns
     -------
+    None
 
-    y_pred : np.array
-        It is the number of predicted points. It is necessary
-        to apply predict(n_steps) followed by train()
+    Notes
+    -----
+    The values of `p`, `q` are scaled based on the length of `datapoints`.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints&#34;, &#34;n_steps&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
+    __slots__ = [&#34;datapoints&#34;, &#34;noise&#34;, &#34;p&#34;, &#34;d&#34;, &#34;q&#34;, &#34;tol&#34;, &#34;theta_trained&#34;]
 
     def __init__(
         self,
-        datapoints: ndarray,
+        datapoints: np.ndarray,
         p: float = 1,
         d: int = 0,
         q: float = 0,
-        n_steps: int = 0,
         noise: float = 0,
         tol: float = 1e-5,
     ):
+        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        p : float
+            Auto-regressive term (scaled by length of data).
+        d : int
+            Degree of differencing.
+        q : float
+            Moving average term (scaled by length of data).
+        noise : float
+            Noise level for training.
+        tol : float
+            Tolerance for numerical convergence.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         self.datapoints = datapoints
-        self.n_steps = n_steps
         self.noise = noise
         assert p &gt; 0 and p &lt;= 1, &#34;p must be less than 1 but greater than 0&#34;
         self.p = int(p * len(datapoints))
@@ -2538,33 +3997,64 @@ to apply predict(n_steps) followed by train()</dd>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: ndarray, theta: list, mode: bool = True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
+        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            The input data used for modeling.
+        theta : list
+            Model parameters.
+        mode : bool
+            If True, computes in forward mode; otherwise in backward mode.
+
+        Returns
+        -------
+        y_vec : np.ndarray
+            Predicted values according to the ARIMA model.
+        &#34;&#34;&#34;
         datapoints = self.datapoints
         noise = self.noise
         self.theta_trained = theta
 
-        assert type(self.d) == int, &#34;d must be 0, 1 or 2&#34;
+        assert type(self.d) == int, &#34;d must be 0 or 1&#34;
 
         if self.d != 0 or self.q != 0:
             if self.d != 0:
                 y_sum = super().integrated(datapoints)
+                norm_datapoints = np.linalg.norm(datapoints)
+                norm_y_sum = np.linalg.norm(y_sum)
+                if norm_y_sum != 0 and norm_datapoints != 0:
+                    y_sum = cal_average(
+                        np.abs(y_sum * (norm_datapoints / norm_y_sum)) * np.sign(datapoints), 0.05
+                    )
             else:
-                y_sum = datapoints
+                y_sum = datapoints.copy()
 
             y_sum_regr = y_sum[-self.p :]
             y_regr_vec = super().forward(y_sum_regr, theta[0 : self.p], mode, 0)
             if self.q != 0:
                 y_sum_average = super().average(y_sum[-self.q :])
+                y_vec_magnitude = np.linalg.norm(y_regr_vec.copy())
+                y_sum_average_magnitude = np.linalg.norm(y_sum_average)
+
+                if y_sum_average_magnitude &gt; y_vec_magnitude:
+                    scaling_factor = y_vec_magnitude / y_sum_average_magnitude
+                    y_sum_average = y_sum_average * scaling_factor
+                theta_mean = np.mean(theta[-self.q :])
+                if abs(theta_mean) &gt; 1:
+                    additional_scaling_factor = 1.0 - abs(theta_mean)
+                    y_sum_average = y_sum_average * additional_scaling_factor
                 y_average_vec = super().forward(y_sum_average, theta[-self.q :], mode, 0)
                 if mode:
-                    y_vec = y_regr_vec
+                    y_vec = y_regr_vec.copy()
                     for i in reversed(range(y_average_vec.shape[0])):
                         y_vec[i] += y_average_vec[i]
                 else:
                     y_vec = y_regr_vec + y_average_vec
             else:
                 y_vec = y_regr_vec
-
             return y_vec
         else:
             return super().forward(datapoints, theta, mode, noise)</code></pre>
@@ -2582,44 +4072,102 @@ to apply predict(n_steps) followed by train()</dd>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def model(self, datapoints: ndarray, theta: list, mode: bool = True):
+<pre><code class="python">def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
+    &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+
+    Parameters
+    ----------
+    datapoints : np.ndarray
+        The input data used for modeling.
+    theta : list
+        Model parameters.
+    mode : bool
+        If True, computes in forward mode; otherwise in backward mode.
+
+    Returns
+    -------
+    y_vec : np.ndarray
+        Predicted values according to the ARIMA model.
+    &#34;&#34;&#34;
     datapoints = self.datapoints
     noise = self.noise
     self.theta_trained = theta
 
-    assert type(self.d) == int, &#34;d must be 0, 1 or 2&#34;
+    assert type(self.d) == int, &#34;d must be 0 or 1&#34;
 
     if self.d != 0 or self.q != 0:
         if self.d != 0:
             y_sum = super().integrated(datapoints)
+            norm_datapoints = np.linalg.norm(datapoints)
+            norm_y_sum = np.linalg.norm(y_sum)
+            if norm_y_sum != 0 and norm_datapoints != 0:
+                y_sum = cal_average(
+                    np.abs(y_sum * (norm_datapoints / norm_y_sum)) * np.sign(datapoints), 0.05
+                )
         else:
-            y_sum = datapoints
+            y_sum = datapoints.copy()
 
         y_sum_regr = y_sum[-self.p :]
         y_regr_vec = super().forward(y_sum_regr, theta[0 : self.p], mode, 0)
         if self.q != 0:
             y_sum_average = super().average(y_sum[-self.q :])
+            y_vec_magnitude = np.linalg.norm(y_regr_vec.copy())
+            y_sum_average_magnitude = np.linalg.norm(y_sum_average)
+
+            if y_sum_average_magnitude &gt; y_vec_magnitude:
+                scaling_factor = y_vec_magnitude / y_sum_average_magnitude
+                y_sum_average = y_sum_average * scaling_factor
+            theta_mean = np.mean(theta[-self.q :])
+            if abs(theta_mean) &gt; 1:
+                additional_scaling_factor = 1.0 - abs(theta_mean)
+                y_sum_average = y_sum_average * additional_scaling_factor
             y_average_vec = super().forward(y_sum_average, theta[-self.q :], mode, 0)
             if mode:
-                y_vec = y_regr_vec
+                y_vec = y_regr_vec.copy()
                 for i in reversed(range(y_average_vec.shape[0])):
                     y_vec[i] += y_average_vec[i]
             else:
                 y_vec = y_regr_vec + y_average_vec
         else:
             y_vec = y_regr_vec
-
         return y_vec
     else:
         return super().forward(datapoints, theta, mode, noise)</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Computes the prior probability or prediction based on ARIMA model.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The input data used for modeling.</dd>
+<dt><strong><code>theta</code></strong> :&ensp;<code>list</code></dt>
+<dd>Model parameters.</dd>
+<dt><strong><code>mode</code></strong> :&ensp;<code>bool</code></dt>
+<dd>If True, computes in forward mode; otherwise in backward mode.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>y_vec</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Predicted values according to the ARIMA model.</dd>
+</dl></div>
 </dd>
 </dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="likelihood.models.regression.AbstractArima" href="#likelihood.models.regression.AbstractArima">AbstractArima</a></b></code>:
+<ul class="hlist">
+<li><code><a title="likelihood.models.regression.AbstractArima.average" href="utils.html#likelihood.models.utils.FeaturesArima.average">average</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.forward" href="utils.html#likelihood.models.utils.FeaturesArima.forward">forward</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.integrated" href="utils.html#likelihood.models.utils.FeaturesArima.integrated">integrated</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.predict" href="#likelihood.models.regression.AbstractArima.predict">predict</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.train" href="#likelihood.models.regression.AbstractArima.train">train</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.xvec" href="#likelihood.models.regression.AbstractArima.xvec">xvec</a></code></li>
+</ul>
+</li>
+</ul>
 </dd>
 <dt id="likelihood.models.regression.FourierRegression"><code class="flex name class">
 <span>class <span class="ident">FourierRegression</span></span>
-<span>(</span><span>datapoints: numpy.ndarray, n_steps: int = 0)</span>
+<span>(</span><span>datapoints: numpy.ndarray)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -2631,28 +4179,21 @@ to apply predict(n_steps) followed by train()</dd>
 
     Parameters
     ----------
-
     datapoints : np.array
         A set of points to train the arima model.
 
-    n_steps : int
-        Is the number of points that in predict(n_steps)
-        stage will estimate foward. By default it is set to `0`.
-
     Returns
     -------
-
     new_datapoints : np.array
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
 
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints_&#34;, &#34;n_steps&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
+    __slots__ = [&#34;datapoints_&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0):
+    def __init__(self, datapoints: np.ndarray):
         self.datapoints_ = datapoints
-        self.n_steps = n_steps
 
     def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
         self.sigma = sigma
@@ -2663,9 +4204,8 @@ to apply predict(n_steps) followed by train()</dd>
         self.datapoints_, _ = fft_denoise(datapoints, sigma, mode)
 
     def predict(
-        self, n_steps: int = 0, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
+        self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
     ):
-        self.n_steps = n_steps
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -2686,9 +4226,7 @@ to apply predict(n_steps) followed by train()</dd>
 
         return new_datapoints
 
-    def load_predict(self, name: str = &#34;fourier_model&#34;):
-        n_steps = self.n_steps
-
+    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -2707,15 +4245,22 @@ to apply predict(n_steps) followed by train()</dd>
 <dl>
 <dt><strong><code>datapoints</code></strong> :&ensp;<code>np.array</code></dt>
 <dd>A set of points to train the arima model.</dd>
-<dt><strong><code>n_steps</code></strong> :&ensp;<code>int</code></dt>
-<dd>Is the number of points that in predict(n_steps)
-stage will estimate foward. By default it is set to <code>0</code>.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><strong><code>new_datapoints</code></strong> :&ensp;<code>np.array</code></dt>
 <dd>It is the number of predicted points. It is necessary
 to apply predict(n_steps) followed by fit()</dd>
+</dl>
+<p>Initialize the ARIMA model.</p>
+<h2 id="parameters_1">Parameters</h2>
+<dl>
+<dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The input data points for training.</dd>
+<dt><strong><code>noise</code></strong> :&ensp;<code>float</code>, optional</dt>
+<dd>Noise level for the model, by default 0</dd>
+<dt><strong><code>tol</code></strong> :&ensp;<code>float</code>, optional</dt>
+<dd>Tolerance for convergence, by default 1e-4</dd>
 </dl></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -2735,28 +4280,21 @@ to apply predict(n_steps) followed by fit()</dd>
 
     Parameters
     ----------
-
     datapoints : np.array
         A set of points to train the arima model.
 
-    n_steps : int
-        Is the number of points that in predict(n_steps)
-        stage will estimate foward. By default it is set to `0`.
-
     Returns
     -------
-
     new_datapoints : np.array
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
 
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints_&#34;, &#34;n_steps&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
+    __slots__ = [&#34;datapoints_&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0):
+    def __init__(self, datapoints: np.ndarray):
         self.datapoints_ = datapoints
-        self.n_steps = n_steps
 
     def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
         self.sigma = sigma
@@ -2767,9 +4305,8 @@ to apply predict(n_steps) followed by fit()</dd>
         self.datapoints_, _ = fft_denoise(datapoints, sigma, mode)
 
     def predict(
-        self, n_steps: int = 0, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
+        self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
     ):
-        self.n_steps = n_steps
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -2790,9 +4327,7 @@ to apply predict(n_steps) followed by fit()</dd>
 
         return new_datapoints
 
-    def load_predict(self, name: str = &#34;fourier_model&#34;):
-        n_steps = self.n_steps
-
+    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -2819,28 +4354,21 @@ to apply predict(n_steps) followed by fit()</dd>
 
     Parameters
     ----------
-
     datapoints : np.array
         A set of points to train the arima model.
 
-    n_steps : int
-        Is the number of points that in predict(n_steps)
-        stage will estimate foward. By default it is set to `0`.
-
     Returns
     -------
-
     new_datapoints : np.array
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
 
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints_&#34;, &#34;n_steps&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
+    __slots__ = [&#34;datapoints_&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0):
+    def __init__(self, datapoints: np.ndarray):
         self.datapoints_ = datapoints
-        self.n_steps = n_steps
 
     def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
         self.sigma = sigma
@@ -2851,9 +4379,8 @@ to apply predict(n_steps) followed by fit()</dd>
         self.datapoints_, _ = fft_denoise(datapoints, sigma, mode)
 
     def predict(
-        self, n_steps: int = 0, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
+        self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
     ):
-        self.n_steps = n_steps
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -2874,9 +4401,7 @@ to apply predict(n_steps) followed by fit()</dd>
 
         return new_datapoints
 
-    def load_predict(self, name: str = &#34;fourier_model&#34;):
-        n_steps = self.n_steps
-
+    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -2903,28 +4428,21 @@ to apply predict(n_steps) followed by fit()</dd>
 
     Parameters
     ----------
-
     datapoints : np.array
         A set of points to train the arima model.
 
-    n_steps : int
-        Is the number of points that in predict(n_steps)
-        stage will estimate foward. By default it is set to `0`.
-
     Returns
     -------
-
     new_datapoints : np.array
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
 
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints_&#34;, &#34;n_steps&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
+    __slots__ = [&#34;datapoints_&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0):
+    def __init__(self, datapoints: np.ndarray):
         self.datapoints_ = datapoints
-        self.n_steps = n_steps
 
     def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
         self.sigma = sigma
@@ -2935,9 +4453,8 @@ to apply predict(n_steps) followed by fit()</dd>
         self.datapoints_, _ = fft_denoise(datapoints, sigma, mode)
 
     def predict(
-        self, n_steps: int = 0, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
+        self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
     ):
-        self.n_steps = n_steps
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -2958,93 +4475,7 @@ to apply predict(n_steps) followed by fit()</dd>
 
         return new_datapoints
 
-    def load_predict(self, name: str = &#34;fourier_model&#34;):
-        n_steps = self.n_steps
-
-        new_datapoints = []
-
-        for i in range(self.datapoints_.shape[0]):
-            super().__init__(self.datapoints_[i, :])
-            super().load_model(str(i) + &#34;_&#34; + name)
-            y_pred_ = super().predict(n_steps)
-            new_datapoints.append(y_pred_)
-
-        new_datapoints = np.array(new_datapoints)
-        new_datapoints = np.reshape(new_datapoints, (len(new_datapoints), -1))
-
-        return new_datapoints</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="likelihood.models.regression.FourierRegression.n_steps"><code class="name">var <span class="ident">n_steps</span></code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">class FourierRegression(AbstractArima):
-    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering
-
-    Parameters
-    ----------
-
-    datapoints : np.array
-        A set of points to train the arima model.
-
-    n_steps : int
-        Is the number of points that in predict(n_steps)
-        stage will estimate foward. By default it is set to `0`.
-
-    Returns
-    -------
-
-    new_datapoints : np.array
-        It is the number of predicted points. It is necessary
-        to apply predict(n_steps) followed by fit()
-
-    &#34;&#34;&#34;
-
-    __slots__ = [&#34;datapoints_&#34;, &#34;n_steps&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
-
-    def __init__(self, datapoints: ndarray, n_steps: int = 0):
-        self.datapoints_ = datapoints
-        self.n_steps = n_steps
-
-    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
-        self.sigma = sigma
-        self.mode = mode
-        self.mov = mov
-
-        datapoints = self.datapoints_
-        self.datapoints_, _ = fft_denoise(datapoints, sigma, mode)
-
-    def predict(
-        self, n_steps: int = 0, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
-    ):
-        self.n_steps = n_steps
-        self.n_walkers = n_walkers
-        self.name = name
-        mov = self.mov
-
-        assert self.n_walkers &lt;= mov, &#34;n_walkers must be less or equal than mov&#34;
-
-        new_datapoints = []
-        for i in range(self.datapoints_.shape[0]):
-            super().__init__(self.datapoints_[i, :])
-            super().train(n_walkers, mov)
-            if save:
-                super().save_model(str(i) + &#34;_&#34; + name)
-            y_pred_ = super().predict(n_steps)
-            new_datapoints.append(y_pred_)
-
-        new_datapoints = np.array(new_datapoints)
-        new_datapoints = np.reshape(new_datapoints, (len(new_datapoints), -1))
-
-        return new_datapoints
-
-    def load_predict(self, name: str = &#34;fourier_model&#34;):
-        n_steps = self.n_steps
-
+    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -3071,28 +4502,21 @@ to apply predict(n_steps) followed by fit()</dd>
 
     Parameters
     ----------
-
     datapoints : np.array
         A set of points to train the arima model.
 
-    n_steps : int
-        Is the number of points that in predict(n_steps)
-        stage will estimate foward. By default it is set to `0`.
-
     Returns
     -------
-
     new_datapoints : np.array
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
 
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints_&#34;, &#34;n_steps&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
+    __slots__ = [&#34;datapoints_&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0):
+    def __init__(self, datapoints: np.ndarray):
         self.datapoints_ = datapoints
-        self.n_steps = n_steps
 
     def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
         self.sigma = sigma
@@ -3103,9 +4527,8 @@ to apply predict(n_steps) followed by fit()</dd>
         self.datapoints_, _ = fft_denoise(datapoints, sigma, mode)
 
     def predict(
-        self, n_steps: int = 0, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
+        self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
     ):
-        self.n_steps = n_steps
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -3126,9 +4549,7 @@ to apply predict(n_steps) followed by fit()</dd>
 
         return new_datapoints
 
-    def load_predict(self, name: str = &#34;fourier_model&#34;):
-        n_steps = self.n_steps
-
+    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -3155,28 +4576,21 @@ to apply predict(n_steps) followed by fit()</dd>
 
     Parameters
     ----------
-
     datapoints : np.array
         A set of points to train the arima model.
 
-    n_steps : int
-        Is the number of points that in predict(n_steps)
-        stage will estimate foward. By default it is set to `0`.
-
     Returns
     -------
-
     new_datapoints : np.array
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
 
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints_&#34;, &#34;n_steps&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
+    __slots__ = [&#34;datapoints_&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0):
+    def __init__(self, datapoints: np.ndarray):
         self.datapoints_ = datapoints
-        self.n_steps = n_steps
 
     def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
         self.sigma = sigma
@@ -3187,9 +4601,8 @@ to apply predict(n_steps) followed by fit()</dd>
         self.datapoints_, _ = fft_denoise(datapoints, sigma, mode)
 
     def predict(
-        self, n_steps: int = 0, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
+        self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
     ):
-        self.n_steps = n_steps
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -3210,9 +4623,7 @@ to apply predict(n_steps) followed by fit()</dd>
 
         return new_datapoints
 
-    def load_predict(self, name: str = &#34;fourier_model&#34;):
-        n_steps = self.n_steps
-
+    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -3239,28 +4650,21 @@ to apply predict(n_steps) followed by fit()</dd>
 
     Parameters
     ----------
-
     datapoints : np.array
         A set of points to train the arima model.
 
-    n_steps : int
-        Is the number of points that in predict(n_steps)
-        stage will estimate foward. By default it is set to `0`.
-
     Returns
     -------
-
     new_datapoints : np.array
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
 
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;datapoints_&#34;, &#34;n_steps&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
+    __slots__ = [&#34;datapoints_&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
 
-    def __init__(self, datapoints: ndarray, n_steps: int = 0):
+    def __init__(self, datapoints: np.ndarray):
         self.datapoints_ = datapoints
-        self.n_steps = n_steps
 
     def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
         self.sigma = sigma
@@ -3271,9 +4675,8 @@ to apply predict(n_steps) followed by fit()</dd>
         self.datapoints_, _ = fft_denoise(datapoints, sigma, mode)
 
     def predict(
-        self, n_steps: int = 0, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
+        self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
     ):
-        self.n_steps = n_steps
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -3294,9 +4697,7 @@ to apply predict(n_steps) followed by fit()</dd>
 
         return new_datapoints
 
-    def load_predict(self, name: str = &#34;fourier_model&#34;):
-        n_steps = self.n_steps
-
+    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -3334,16 +4735,14 @@ to apply predict(n_steps) followed by fit()</dd>
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.models.regression.FourierRegression.load_predict"><code class="name flex">
-<span>def <span class="ident">load_predict</span></span>(<span>self, name: str = 'fourier_model')</span>
+<span>def <span class="ident">load_predict</span></span>(<span>self, n_steps: int, name: str = 'fourier_model')</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def load_predict(self, name: str = &#34;fourier_model&#34;):
-    n_steps = self.n_steps
-
+<pre><code class="python">def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
     new_datapoints = []
 
     for i in range(self.datapoints_.shape[0]):
@@ -3359,41 +4758,21 @@ to apply predict(n_steps) followed by fit()</dd>
 </details>
 <div class="desc"></div>
 </dd>
-<dt id="likelihood.models.regression.FourierRegression.predict"><code class="name flex">
-<span>def <span class="ident">predict</span></span>(<span>self,<br>n_steps: int = 0,<br>n_walkers: int = 1,<br>name: str = 'fourier_model',<br>save: bool = True)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def predict(
-    self, n_steps: int = 0, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
-):
-    self.n_steps = n_steps
-    self.n_walkers = n_walkers
-    self.name = name
-    mov = self.mov
-
-    assert self.n_walkers &lt;= mov, &#34;n_walkers must be less or equal than mov&#34;
-
-    new_datapoints = []
-    for i in range(self.datapoints_.shape[0]):
-        super().__init__(self.datapoints_[i, :])
-        super().train(n_walkers, mov)
-        if save:
-            super().save_model(str(i) + &#34;_&#34; + name)
-        y_pred_ = super().predict(n_steps)
-        new_datapoints.append(y_pred_)
-
-    new_datapoints = np.array(new_datapoints)
-    new_datapoints = np.reshape(new_datapoints, (len(new_datapoints), -1))
-
-    return new_datapoints</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
 </dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="likelihood.models.regression.AbstractArima" href="#likelihood.models.regression.AbstractArima">AbstractArima</a></b></code>:
+<ul class="hlist">
+<li><code><a title="likelihood.models.regression.AbstractArima.average" href="utils.html#likelihood.models.utils.FeaturesArima.average">average</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.forward" href="utils.html#likelihood.models.utils.FeaturesArima.forward">forward</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.integrated" href="utils.html#likelihood.models.utils.FeaturesArima.integrated">integrated</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.model" href="#likelihood.models.regression.AbstractArima.model">model</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.predict" href="#likelihood.models.regression.AbstractArima.predict">predict</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.train" href="#likelihood.models.regression.AbstractArima.train">train</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.xvec" href="#likelihood.models.regression.AbstractArima.xvec">xvec</a></code></li>
+</ul>
+</li>
+</ul>
 </dd>
 </dl>
 </section>
@@ -3439,7 +4818,6 @@ to apply predict(n_steps) followed by fit()</dd>
 <li><code><a title="likelihood.models.regression.Arima.d" href="#likelihood.models.regression.Arima.d">d</a></code></li>
 <li><code><a title="likelihood.models.regression.Arima.datapoints" href="#likelihood.models.regression.Arima.datapoints">datapoints</a></code></li>
 <li><code><a title="likelihood.models.regression.Arima.model" href="#likelihood.models.regression.Arima.model">model</a></code></li>
-<li><code><a title="likelihood.models.regression.Arima.n_steps" href="#likelihood.models.regression.Arima.n_steps">n_steps</a></code></li>
 <li><code><a title="likelihood.models.regression.Arima.noise" href="#likelihood.models.regression.Arima.noise">noise</a></code></li>
 <li><code><a title="likelihood.models.regression.Arima.p" href="#likelihood.models.regression.Arima.p">p</a></code></li>
 <li><code><a title="likelihood.models.regression.Arima.q" href="#likelihood.models.regression.Arima.q">q</a></code></li>
@@ -3455,10 +4833,8 @@ to apply predict(n_steps) followed by fit()</dd>
 <li><code><a title="likelihood.models.regression.FourierRegression.load_predict" href="#likelihood.models.regression.FourierRegression.load_predict">load_predict</a></code></li>
 <li><code><a title="likelihood.models.regression.FourierRegression.mode" href="#likelihood.models.regression.FourierRegression.mode">mode</a></code></li>
 <li><code><a title="likelihood.models.regression.FourierRegression.mov" href="#likelihood.models.regression.FourierRegression.mov">mov</a></code></li>
-<li><code><a title="likelihood.models.regression.FourierRegression.n_steps" href="#likelihood.models.regression.FourierRegression.n_steps">n_steps</a></code></li>
 <li><code><a title="likelihood.models.regression.FourierRegression.n_walkers" href="#likelihood.models.regression.FourierRegression.n_walkers">n_walkers</a></code></li>
 <li><code><a title="likelihood.models.regression.FourierRegression.name" href="#likelihood.models.regression.FourierRegression.name">name</a></code></li>
-<li><code><a title="likelihood.models.regression.FourierRegression.predict" href="#likelihood.models.regression.FourierRegression.predict">predict</a></code></li>
 <li><code><a title="likelihood.models.regression.FourierRegression.sigma" href="#likelihood.models.regression.FourierRegression.sigma">sigma</a></code></li>
 </ul>
 </li>
