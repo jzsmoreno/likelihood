@@ -1,10 +1,6 @@
-from typing import Dict
-
 import numpy as np
 import pandas as pd
-from numpy import arange, array, ndarray, random
 from numpy.linalg import solve
-from pandas.core.frame import DataFrame
 
 
 # -------------------------------------------------------------------------
@@ -100,12 +96,12 @@ def xi_corr(df: pd.DataFrame) -> pd.DataFrame:
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : `pd.DataFrame`
         Input data containing the variables to be correlated.
 
     Returns
     -------
-    `DataFrame`
+    correlations : `pd.DataFrame`
         A square dataframe with variable names as both index and columns,
         containing their corresponding correlation coefficients.
     """
@@ -205,7 +201,7 @@ def xicor(X: np.ndarray, Y: np.ndarray, ties: bool = True, random_seed: int = No
 # -------------------------------------------------------------------------
 
 
-def ecprint(A: ndarray) -> None:
+def ecprint(A: np.ndarray) -> None:
     """Function that prints the augmented matrix.
 
     Parameters
@@ -231,14 +227,14 @@ def ecprint(A: ndarray) -> None:
 
 
 def sor_elimination(
-    A: ndarray,
-    b: ndarray,
+    A: np.ndarray,
+    b: np.ndarray,
     n: int,
     max_iterations: int,
     w: float,
     error: float = 1e-3,
     verbose: bool = True,
-) -> ndarray:
+) -> np.ndarray:
     """Computes the Successive Over-Relaxation algorithm.
 
     Parameters
@@ -283,7 +279,7 @@ def sor_elimination(
     raise RuntimeError("Convergence not achieved within the maximum number of iterations.")
 
 
-def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
+def gauss_elimination(A: np.ndarray | list, pr: int = 2) -> np.ndarray:
     """Computes the Gauss elimination algorithm.
 
     Parameters
@@ -291,7 +287,6 @@ def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
     A : `np.array` or `list`
         An array containing the parameters of the $n$ equations
         with the equalities.
-
     pr : `int`
         significant numbers of decimals.
 
@@ -346,7 +341,8 @@ def gauss_elimination(A: ndarray | list, pr: int = 2) -> ndarray:
 
 
 def find_multiples(target: int) -> tuple[int, int] | None:
-    """Find two factors of a given target number.
+    """
+    Find two factors of a given target number that are as close to each other as possible.
 
     Parameters
     ----------
@@ -356,16 +352,13 @@ def find_multiples(target: int) -> tuple[int, int] | None:
     Returns
     -------
     tuple[int, int] | None
-        If `i` and `i+1` both divide target, returns (i, i+1).
+        If `i` and `target // i` both divide target, returns (i, target // i).
         Otherwise, returns `(i, target // i)`.
         Returns `None` if no factors are found.
     """
-    for i in range(2, target + 1):
+    for i in range(1, int(target**0.5) + 1):
         if target % i == 0:
-            if (i + 1) <= target and target % (i + 1) == 0:
-                return i + 1, target // (i + 1)
-            else:
-                return i, target // i
+            return max(i, target // i), min(i, target // i)
     return None
 
 
@@ -381,13 +374,13 @@ if __name__ == "__main__":
     A = np.array([[1, 1, 1], [1, -1, 2], [1, -1, -3]])
     Ag = A.copy()
     b = np.array([6, 5, -10])
-    print("b : ", b)
+    print("b :", b)
     # Solve Ax=b, x = [1, 2, 3]
     x = solve(A, b)
     x_hat_sor = sor_elimination(A, b, 3, 200, 0.05)
     # assert np.allclose(x, x_hat_sor), f"Expected:\n{x}\ngot\n{x_hat_sor}"
 
-    print("Using Gaussian elimination : ")
+    print("Using Gaussian elimination :")
     Ag = np.insert(Ag, len(Ag), b, axis=1)
     print(Ag)
     x_hat_gaus = gauss_elimination(Ag)
@@ -395,7 +388,7 @@ if __name__ == "__main__":
     print("New correlation coefficient test")
     X = np.random.rand(100, 1)
     Y = X * X
-    print("coefficient for Y = X * X : ", xicor(X, Y, False))
+    print("coefficient for Y = X * X :", xicor(X, Y, False))
     df["index"] = ["A", "B", "C", "D"]
     print("New correlation coefficient test for pandas DataFrame")
     values_df = xi_corr(df)

@@ -2,7 +2,6 @@ from typing import List
 
 import networkx as nx
 from IPython.display import HTML, display
-from pandas.core.frame import DataFrame
 from pyvis.network import Network
 
 from likelihood.tools import FeatureSelection
@@ -11,10 +10,8 @@ from likelihood.tools import FeatureSelection
 class DynamicGraph(FeatureSelection):
     """A class to represent a dynamic graph"""
 
-    def __init__(self, df: DataFrame, n_importances: int, **kwargs):
-        self.G = Network(
-            notebook=True, cdn_resources="remote", directed=True
-        )  # enable interactive visualization in Jupyter Notebooks
+    def __init__(self, df: pd.DataFrame, n_importances: int, **kwargs):
+        self.G = Network(notebook=True, cdn_resources="remote", directed=True)
         self.df = df
         self.n_importances = n_importances
         super().__init__(**kwargs)
@@ -23,7 +20,6 @@ class DynamicGraph(FeatureSelection):
     def fit(self, **kwargs) -> None:
         """Fit the model according to the given data and parameters."""
         self.get_digraph(self.df, self.n_importances)
-        # create a dictionary with the indexes and names of the dataframe
         self.get_index = dict(zip(self.X.columns, range(len(self.X.columns))))
         self._make_network()
 
@@ -56,8 +52,6 @@ class DynamicGraph(FeatureSelection):
 
     def pyvis_to_networkx(self):
         nx_graph = nx.Graph()
-
-        # Adding nodes
         nodes = [d["id"] for d in self.G.nodes]
         for node_dic in self.G.nodes:
             id = node_dic["label"]
@@ -65,8 +59,6 @@ class DynamicGraph(FeatureSelection):
             nx_graph.add_nodes_from([(id, node_dic)])
         self.node_edge_dict = dict(zip(nodes, self.labels))
         del nodes
-
-        # Adding edges
         for edge in self.G.edges:
             source, target = self.node_edge_dict[edge["from"]], self.node_edge_dict[edge["to"]]
             del edge["from"]

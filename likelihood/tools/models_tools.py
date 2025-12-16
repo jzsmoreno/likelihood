@@ -3,7 +3,6 @@ import os
 
 import networkx as nx
 import pandas as pd
-from pandas.core.frame import DataFrame
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
@@ -11,11 +10,15 @@ logging.getLogger("tensorflow").setLevel(logging.ERROR)
 import sys
 import warnings
 from functools import wraps
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
+import seaborn as sns
 import tensorflow as tf
-from pandas.core.frame import DataFrame
+import torch
+from torch.utils.data import DataLoader, TensorDataset
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 from .figures import *
 
@@ -248,7 +251,7 @@ class TransformRange:
         }
 
 
-def remove_collinearity(df: DataFrame, threshold: float = 0.9):
+def remove_collinearity(df: pd.DataFrame, threshold: float = 0.9):
     """
     Removes highly collinear features from the DataFrame based on a correlation threshold.
 
@@ -258,14 +261,15 @@ def remove_collinearity(df: DataFrame, threshold: float = 0.9):
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : `pd.DataFrame`
         The input DataFrame containing numerical data.
     threshold : `float`
         The correlation threshold above which features will be removed. Default is `0.9`.
 
     Returns
     -------
-        DataFrame : A DataFrame with highly collinear features removed.
+    df_reduced : `pd.DataFrame`
+        A DataFrame with highly collinear features removed.
     """
     corr_matrix = df.corr().abs()
     upper_triangle = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
@@ -304,8 +308,8 @@ def train_and_insights(
     frac : `float`
         Fraction of data to use (default is 1.0).
 
-    Keyword Arguments:
-    ------------------
+    Keyword Arguments
+    -----------------
     Additional keyword arguments passed to the `model.fit` function, such as validation split and callbacks.
 
     Returns
@@ -403,7 +407,7 @@ def apply_lora(model, rank=4):
     return new_model
 
 
-def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -> DataFrame:
+def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -> pd.DataFrame:
     """
     Calculate various graph metrics based on the given adjacency matrix and return them in a single DataFrame.
 
@@ -416,13 +420,14 @@ def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -
 
     Returns
     -------
-    DataFrame : A DataFrame containing the following graph metrics as columns.
-        - `Degree Centrality`: Degree centrality values for each node, indicating the number of direct connections each node has.
-        - `Clustering Coefficient`: Clustering coefficient values for each node, representing the degree to which nodes cluster together.
-        - `Eigenvector Centrality`: Eigenvector centrality values, indicating the influence of a node in the graph based on the eigenvectors of the adjacency matrix.
+    metrics_df : pd.DataFrame
+        A DataFrame containing the following graph metrics as columns.
         - `Degree`: The degree of each node, representing the number of edges connected to each node.
-        - `Betweenness Centrality`: Betweenness centrality values, representing the extent to which a node lies on the shortest paths between other nodes.
-        - `Closeness Centrality`: Closeness centrality values, indicating the inverse of the average shortest path distance from a node to all other nodes in the graph.
+        - `DegreeCentrality`: Degree centrality values for each node, indicating the number of direct connections each node has.
+        - `ClusteringCoefficient`: Clustering coefficient values for each node, representing the degree to which nodes cluster together.
+        - `EigenvectorCentrality`: Eigenvector centrality values, indicating the influence of a node in the graph based on the eigenvectors of the adjacency matrix.
+        - `BetweennessCentrality`: Betweenness centrality values, representing the extent to which a node lies on the shortest paths between other nodes.
+        - `ClosenessCentrality`: Closeness centrality values, indicating the inverse of the average shortest path distance from a node to all other nodes in the graph.
         - `Assortativity`: The assortativity coefficient of the graph, measuring the tendency of nodes to connect to similar nodes.
 
     Notes
@@ -449,16 +454,415 @@ def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -
     metrics_df = pd.DataFrame(
         {
             "Degree": degree,
-            "Degree Centrality": degree_centrality,
-            "Clustering Coefficient": clustering_coeff,
-            "Eigenvector Centrality": eigenvector_centrality,
-            "Betweenness Centrality": betweenness_centrality,
-            "Closeness Centrality": closeness_centrality,
+            "DegreeCentrality": degree_centrality,
+            "ClusteringCoefficient": clustering_coeff,
+            "EigenvectorCentrality": eigenvector_centrality,
+            "BetweennessCentrality": betweenness_centrality,
+            "ClosenessCentrality": closeness_centrality,
         }
     )
     metrics_df["Assortativity"] = assortativity
 
     return metrics_df
+
+
+def print_trajectory_info(state, selected_option, action, reward, next_state, terminate, done):
+    print("=" * 50)
+    print("TRAJECTORY INFO".center(50, "="))
+    print("=" * 50)
+    print(f"State: {state}")
+    print(f"Selected Option: {selected_option}")
+    print(f"Action: {action}")
+    print(f"Reward: {reward}")
+    print(f"Next State: {next_state}")
+    print(f"Terminate: {terminate}")
+    print(f"Done: {done}")
+    print("=" * 50)
+
+
+def collect_experience(
+    env: Any,
+    model: torch.nn.Module,
+    gamma: float = 0.99,
+    lambda_parameter: float = 0.95,
+    penalty_for_done_state: float = -1.0,
+    tolerance: int = float("inf"),
+    verbose: bool = False,
+) -> tuple[List[tuple], List[float], List[float], List[float]]:
+    """Gathers experience samples from an environment using a reinforcement learning model.
+
+    Parameters
+    ----------
+    env : `Any`
+        The environment to collect experience from.
+    model : `torch.nn.Module`
+        The reinforcement learning model (e.g., a torch neural network).
+    gamma : float, optional
+        Discount factor for future rewards, default=0.99.
+    lambda_parameter : float, optional
+        TD error correction parameter, default=0.95.
+    penalty_for_done_state : float, optional
+        Penalty applied to the state when the environment reaches a terminal state, default=-1.0.
+
+    Returns
+    -------
+    trajectory : `list[tuple]`
+        The return trajectory (state, selected_option, action, reward, next_state, terminate, done).
+    returns : `list[float]`
+        The list of cumulative returns.
+    advantages : `list[float]`
+        The list of advantage terms for each step.
+    old_probs : `list[float]`
+        The list of old policy probabilities for each step.
+    """
+    state = env.reset()
+    done = False
+    trajectory = []
+    old_probs = []
+    tolerance_count = 0
+
+    while not done and tolerance_count < tolerance:
+        state = state[0] if isinstance(state, tuple) else state
+        state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+
+        option_probs, action_probs, termination_probs, selected_option, action = model(state_tensor)
+
+        action = torch.multinomial(action_probs, 1).item()
+        option = torch.multinomial(option_probs, 1).item()
+        old_probs.append(action_probs[0, action].item())
+
+        terminate = torch.bernoulli(termination_probs).item() > 0.5
+        signature = env.step.__code__
+        if signature.co_argcount > 2:
+            next_state, reward, done, truncated, info = env.step(action, option)
+        else:
+            next_state, reward, done, truncated, info = env.step(action)
+
+        if done:
+            reward = penalty_for_done_state
+        tolerance_count += 1
+        trajectory.append((state, selected_option, action, reward, next_state, terminate, done))
+        state = next_state
+        if verbose:
+            print_trajectory_info(
+                state, selected_option, action, reward, next_state, terminate, done
+            )
+
+    returns = []
+    advantages = []
+    G = 0
+    delta = 0
+
+    for t in reversed(range(len(trajectory))):
+        state, selected_option, action, reward, next_state, terminate, done = trajectory[t]
+
+        state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+        _, action_probs, _, _, _ = model(state_tensor)
+
+        if t == len(trajectory) - 1:
+            G = reward
+            advantages.insert(0, G - action_probs[0, action].item())
+        else:
+            next_state_tensor = torch.tensor(next_state, dtype=torch.float32).unsqueeze(0)
+            _, next_action_probs, _, _, _ = model(next_state_tensor)
+
+            delta = (
+                reward
+                + gamma * next_action_probs[0, action].item()
+                - action_probs[0, action].item()
+            )
+            G = reward + gamma * G
+            advantages.insert(
+                0, delta + gamma * lambda_parameter * advantages[0] if advantages else delta
+            )
+
+        returns.insert(0, G)
+
+    return trajectory, returns, advantages, old_probs
+
+
+def ppo_loss(
+    advantages: torch.Tensor,
+    old_action_probs: torch.Tensor,
+    action_probs: torch.Tensor,
+    epsilon: float = 0.2,
+):
+    """Computes the Proximal Policy Optimization (PPO) loss using the clipped objective.
+
+    Parameters
+    ----------
+    advantages : `torch.Tensor`
+        The advantages (delta) for each action taken, calculated as the difference between returns and value predictions.
+    old_action_probs : `torch.Tensor`
+        The action probabilities from the previous policy (before the current update).
+    action_probs : `torch.Tensor`
+        The action probabilities from the current policy (after the update).
+    epsilon : `float`, optional, default=0.2
+        The clipping parameter that limits how much the policy can change between updates.
+
+    Returns
+    -------
+    loss : `torch.Tensor`
+        The PPO loss, averaged across the batch of samples. The loss is computed using the clipped objective to penalize large policy updates.
+    """
+
+    if advantages.dim() == 1:
+        advantages = advantages.unsqueeze(-1)
+
+    log_ratio = torch.log(action_probs + 1e-8) - torch.log(old_action_probs + 1e-8)
+    ratio = torch.exp(log_ratio)  # π(a|s) / π_old(a|s)
+
+    clipped_ratio = torch.clamp(ratio, 1 - epsilon, 1 + epsilon)
+
+    loss = -torch.min(ratio * advantages, clipped_ratio * advantages)
+
+    return loss.mean()
+
+
+def train_option_critic(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    env: Any,
+    num_epochs: int = 1_000,
+    batch_size: int = 32,
+    device: str = "cpu",
+    beta: float = 1e-2,
+    epsilon: float = 0.2,
+    patience: int = 15,
+    verbose: bool = False,
+    **kwargs,
+) -> tuple[torch.nn.Module, float]:
+    """Trains an option critic model with the provided environment and hyperparameters.
+
+    Parameters
+    ----------
+    model : `nn.Module`
+        The neural network model to train.
+    optimizer : `torch.optim.Optimizer`
+        The optimizer for model updates.
+    env : `Any`
+        The environment for training.
+    num_epochs : `int`
+        Number of training epochs.
+    batch_size : `int`
+        Batch size per training step.
+    device : `str`
+        Target device (e.g., "cpu" or "cuda").
+    beta : `float`
+        Critic learning rate hyperparameter.
+    epsilon : `float`, optional, default=0.2
+        The clipping parameter that limits how much the policy can change between updates.
+    patience : `int`
+        Early stopping patience in epochs.
+
+    Returns
+    -------
+    model : `nn.Module`
+        Trained model.
+    avg_epoch_loss : `float`
+        Average loss per epoch over training.
+    """
+    losses = []
+    best_loss_so_far = float("inf")
+    best_advantage_so_far = 0.0
+    patience_counter = 0
+    patience_counter_advantage = 0
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    advantages_per_epoch = []
+
+    for epoch in range(num_epochs):
+        trajectory, returns, advantages, old_probs = collect_experience(env, model, **kwargs)
+        avg_advantage = sum(advantages) / len(advantages)
+        advantages_per_epoch.append(avg_advantage)
+
+        states = torch.tensor(np.array([t[0] for t in trajectory]), dtype=torch.float32).to(device)
+        actions = torch.tensor([t[2] for t in trajectory], dtype=torch.long).to(device)
+        returns_tensor = torch.tensor(returns, dtype=torch.float32).to(device)
+        advantages_tensor = torch.tensor(advantages, dtype=torch.float32).to(device)
+        old_probs_tensor = torch.tensor(old_probs, dtype=torch.float32).view(-1, 1).to(device)
+
+        dataset = TensorDataset(
+            states, actions, returns_tensor, advantages_tensor, old_probs_tensor
+        )
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+        epoch_loss = 0
+        num_batches = 0
+
+        for (
+            batch_states,
+            batch_actions,
+            batch_returns,
+            batch_advantages,
+            batch_old_probs,
+        ) in dataloader:
+            optimizer.zero_grad()
+
+            option_probs, action_probs, termination_probs, selected_option, action = model(
+                batch_states
+            )
+
+            batch_current_probs = action_probs.gather(1, batch_actions.unsqueeze(1))
+            ppo_loss_value = ppo_loss(
+                batch_advantages, batch_old_probs, batch_current_probs, epsilon=epsilon
+            )
+
+            entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
+
+            loss = ppo_loss_value + beta * entropy.mean()
+            avg_advantages = batch_advantages.mean().item()
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item()
+            num_batches += 1
+
+            if avg_advantages > best_advantage_so_far:
+                best_advantage_so_far = avg_advantages
+                patience_counter_advantage = 0
+            else:
+                patience_counter_advantage += 1
+            if patience_counter_advantage >= patience:
+                if verbose:
+                    print(
+                        f"Early stopping at epoch {epoch} after {patience} epochs without advantage improvement."
+                    )
+                break
+
+            epoch_loss += loss.item()
+            num_batches += 1
+
+        if num_batches > 0:
+            avg_epoch_loss = epoch_loss / num_batches
+            losses.append(avg_epoch_loss)
+
+            if avg_epoch_loss < best_loss_so_far:
+                best_loss_so_far = avg_epoch_loss
+                patience_counter = 0
+            else:
+                patience_counter += 1
+
+            if patience_counter >= patience:
+                if verbose:
+                    print(
+                        f"Early stopping at epoch {epoch} after {patience} epochs without improvement."
+                    )
+                break
+
+            if verbose:
+                if epoch % (num_epochs // 10) == 0:
+                    print(f"Epoch {epoch}/{num_epochs} - Avg Loss: {avg_epoch_loss:.4f}")
+
+    return model, avg_epoch_loss, advantages_per_epoch
+
+
+def train_model_with_episodes(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    env: Any,
+    num_episodes: int,
+    episode_patience: int = 5,
+    **kwargs,
+):
+    """Trains a model via reinforcement learning episodes.
+
+    Parameters
+    ----------
+    model : `torch.nn.Module`
+        The model to be trained.
+    optimizer : `torch.optim.Optimizer`
+        The optimizer for the model.
+    env : `Any`
+        The environment used for the episodes.
+    num_episodes : `int`
+        The number of episodes to train.
+
+    Keyword Arguments
+    -----------------
+    Additional keyword arguments passed to the `train_option_critic` function.
+
+    num_epochs : `int`
+        Number of training epochs.
+    batch_size : `int`
+        Batch size per training step.
+    gamma : `float`
+        Discount factor for future rewards.
+    device : `str`
+        Target device (e.g., "cpu" or "cuda").
+    beta : `float`
+        Critic learning rate hyperparameter.
+    patience : `int`
+        Early stopping patience in epochs.
+
+    Returns
+    -------
+    model : `torch.nn.Module`
+        The trained model.
+    best_loss_so_far : `float`
+        The best loss value observed during training.
+    """
+    previous_weights = model.state_dict()
+    best_loss_so_far = float("inf")
+    loss_window = []
+    average_loss = 0.0
+    no_improvement_count = 0
+
+    print(f"{'Episode':<12} {'Loss':<8} {'Best Loss':<17} {'Status':<15} {'Avg Loss':<4}")
+    print("=" * 70)
+
+    NEW_BEST_COLOR = "\033[92m"
+    REVERT_COLOR = "\033[91m"
+    RESET_COLOR = "\033[0m"
+    advantages_per_episode = []
+
+    for episode in range(num_episodes):
+        model, loss, advantages = train_option_critic(model, optimizer, env, **kwargs)
+        advantages_per_episode.extend(advantages)
+
+        loss_window.append(loss)
+        average_loss = sum(loss_window) / len(loss_window)
+
+        if loss < best_loss_so_far:
+            best_loss_so_far = loss
+            previous_weights = model.state_dict()
+            no_improvement_count = 0
+            status = f"{NEW_BEST_COLOR}Updated{RESET_COLOR}"
+        else:
+            model.load_state_dict(previous_weights)
+            no_improvement_count += 1
+            status = f"{REVERT_COLOR}No Improvement{RESET_COLOR}"
+
+        # Printing the results for each episode
+        print(
+            f"{episode + 1:<8} {loss:<12.4f} {best_loss_so_far:<15.4f} {status:<25} {average_loss:<12.4f}"
+        )
+        print("=" * 70)
+
+        if no_improvement_count >= episode_patience:
+            print(f"\nNo improvement for {episode_patience} episodes. Stopping early.")
+            break
+
+    print(f"\nTraining complete. Final best loss: {best_loss_so_far:.4f}")
+    sns.set_theme(style="whitegrid")
+    plt.figure(figsize=(5, 3))
+    plt.plot(
+        range(len(advantages_per_episode)),
+        advantages_per_episode,
+        marker=None,
+        markersize=6,
+        color=sns.color_palette("deep")[0],
+        linestyle="-",
+        linewidth=2,
+    )
+    plt.xscale("log")
+
+    plt.xlabel("Epoch", fontsize=12)
+    plt.ylabel("Average Advantages", fontsize=12)
+    plt.grid(True, which="both", axis="both", linestyle="--", linewidth=0.5, alpha=0.6)
+    plt.tight_layout()
+    plt.show()
+
+    return model, best_loss_so_far
 
 
 if __name__ == "__main__":

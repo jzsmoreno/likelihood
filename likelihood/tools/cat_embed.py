@@ -8,7 +8,6 @@ import pandas as pd
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 import tensorflow as tf
-from pandas.core.frame import DataFrame
 from sklearn.preprocessing import LabelEncoder
 
 tf.get_logger().setLevel("ERROR")
@@ -20,13 +19,13 @@ class CategoricalEmbedder:
         self.label_encoders = {}
         self.embeddings = {}
 
-    def fit(self, df: DataFrame, categorical_cols: List):
+    def fit(self, df: pd.DataFrame, categorical_cols: List):
         """
         Fit the embeddings on the given data.
 
         Parameters
         ----------
-        df : `DataFrame`
+        df : `pd.DataFrame`
             Pandas DataFrame containing the tabular data.
         categorical_cols : `List`
             List of column names representing categorical features.
@@ -54,13 +53,13 @@ class CategoricalEmbedder:
             embedding_matrix = np.random.rand(vocab_size, self.embedding_dim)
             self.embeddings[col] = tf.Variable(embedding_matrix, dtype=tf.float32)
 
-    def transform(self, df: DataFrame, categorical_cols: List[str]):
+    def transform(self, df: pd.DataFrame, categorical_cols: List[str]):
         """
         Transform the data using the fitted embeddings.
 
         Parameters
         ----------
-        df : `DataFrame`
+        df : `pd.DataFrame`
             Pandas DataFrame containing the tabular data.
         categorical_cols : `List[str]`
             List of column names representing categorical features.
@@ -103,7 +102,7 @@ class CategoricalEmbedder:
 
         Parameters
         ----------
-        df : `DataFrame`
+        df : `pd.DataFrame`
             Pandas DataFrame containing the tabular data with embedded representations.
         categorical_cols : `List[str]`
             List of column names representing categorical features.

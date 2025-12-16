@@ -12,7 +12,6 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from IPython.display import clear_output
-from pandas.core.frame import DataFrame
 from sklearn.metrics import f1_score
 
 tf.get_logger().setLevel("ERROR")
@@ -64,7 +63,7 @@ def cal_adjacency_matrix(
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : `pd.DataFrame`
         The input DataFrame containing the features.
     exclude_subset : `List[str]`, `optional`
         A list of features to exclude from the calculation of the adjacency matrix.
@@ -80,8 +79,8 @@ def cal_adjacency_matrix(
     adjacency_matrix : `ndarray`
         The adjacency matrix.
 
-    Keyword Arguments:
-    ----------
+    Keyword Arguments
+    -----------------
     similarity: `int`
         The minimum number of features that must be the same in both arrays to be considered similar.
     threshold : `float`
@@ -136,7 +135,7 @@ def cal_adjacency_matrix(
 class Data:
     def __init__(
         self,
-        df: DataFrame,
+        df: pd.DataFrame,
         target: str | None = None,
         exclude_subset: List[str] = [],
         **kwargs,

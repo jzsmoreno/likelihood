@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 import yaml
 from packaging import version
-from pandas.core.frame import DataFrame
 
 if version.parse(np.__version__) < version.parse("2.0.0"):
     filter = np.RankWarning
@@ -125,7 +124,7 @@ def estimate_gradient(f: Callable, v: np.ndarray, h: float = 1e-4) -> List[np.nd
 
 
 def generate_feature_yaml(
-    df: DataFrame, ignore_features: List[str] = None, yaml_string: bool = False
+    df: pd.DataFrame, ignore_features: List[str] = None, yaml_string: bool = False
 ) -> Dict | str:
     """
     Generate a YAML string containing information about ordinal, numeric, and categorical features
@@ -174,12 +173,12 @@ def generate_feature_yaml(
     return feature_info
 
 
-def cal_missing_values(df: DataFrame) -> None:
-    """Calculate the percentage of missing (`NaN`/`NaT`) values per column in a dataframe.
+def cal_missing_values(df: pd.DataFrame) -> None:
+    """Calculate the percentage of missing (`NaN`/`NaT`) values per column in a DataFrame.
 
     Parameters
     ----------
-    df : `DataFrame`
+    df : `pd.DataFrame`
         The input dataframe.
 
     Returns
@@ -188,7 +187,7 @@ def cal_missing_values(df: DataFrame) -> None:
     """
 
     col = df.columns
-    print("Total size : ", "{:,}".format(len(df)))
+    print("Total size :", "{:,}".format(len(df)))
     for i in col:
         print(
             str(i) + " : " f"{(df.isnull().sum()[i]/(df.isnull().sum()[i]+df[i].count()))*100:.2f}%"
@@ -196,7 +195,12 @@ def cal_missing_values(df: DataFrame) -> None:
 
 
 def cdf(
-    x: np.ndarray, poly: int = 9, inv: bool = False, plot: bool = False, savename: str = None
+    x: np.ndarray,
+    poly: int = 9,
+    inv: bool = False,
+    plot: bool = False,
+    savename: str | None = None,
+    key: str | None = None,
 ) -> tuple:
     """Calculates the cumulative distribution function of the data.
 
@@ -210,8 +214,10 @@ def cdf(
         If True, calculate the inverse CDF (quantile function).
     plot : `bool`
         If True, plot the results.
-    savename : `str`, optional
+    savename : `str` or `None`, optional
         Filename to save the plot.
+    key : `str` or `None`, optional
+        Additional information to display with the chart title.
 
     Returns
     -------
@@ -240,7 +246,11 @@ def cdf(
     else:
         fit = np.polyfit(sorted_x, probabilities, poly)
         f = np.poly1d(fit)
-        plot_label = "Cumulative Distribution Function"
+        plot_label = (
+            "Cumulative Distribution Function"
+            if key is None
+            else f"Cumulative Distribution Function ({key})"
+        )
         x_values = sorted_x
         y_values = cdf_values
 
@@ -412,7 +422,7 @@ def fft_denoise(
         denoised_dataset[i, :] = denoised_signal
 
         peak_index = L[np.argmax(np.abs(fhat[L]))]
-        periods[i] = 1 / (2 * freq[peak_index])
+        periods[i] = 1 / freq[peak_index]
 
         if mode:
             print(f"The {i+1}-th row of the dataset has been denoised.")
@@ -649,10 +659,16 @@ def cal_average(y: np.ndarray, alpha: float = 1):
         The average of the data.
     """
 
-    n = int(alpha * len(y))
-    w = np.ones(n) / n
-    average = np.convolve(y, w, mode="same") / np.convolve(np.ones_like(y), w, mode="same")
-    return average
+    window_size = int(alpha * len(y))
+    if len(y) < 2:
+        return y
+
+    n = min(window_size, len(y))
+    if n <= 1:
+        return y
+
+    padded = np.pad(y, n // 2, mode="edge")
+    return np.convolve(padded, np.ones(n) / n, mode="valid")[: len(y)]
 
 
 class DataScaler:
@@ -800,7 +816,7 @@ class DataFrameEncoder:
         "median_list",
     ]
 
-    def __init__(self, data: DataFrame) -> None:
+    def __init__(self, data: pd.DataFrame) -> None:
         """Sets the columns of the `DataFrame`"""
         self._df = data.copy()
         self._names = data.columns
@@ -812,8 +828,8 @@ class DataFrameEncoder:
     def load_config(self, path_to_dictionaries: str = "./", **kwargs) -> None:
         """Loads dictionaries from a given directory
 
-        Keyword Arguments:
-        ----------
+        Keyword Arguments
+        -----------------
         - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
         """
         dictionary_name = (
@@ -857,11 +873,11 @@ class DataFrameEncoder:
         if save_mode:
             self._save_encoder(path_to_save, dictionary_name)
 
-    def encode(self, path_to_save: str = "./", **kwargs) -> DataFrame:
+    def encode(self, path_to_save: str = "./", **kwargs) -> pd.DataFrame:
         """Encodes the `object` type columns of the dataframe
 
-        Keyword Arguments:
-        ------------------
+        Keyword Arguments
+        -----------------
         - save_mode (`bool`): An optional integer parameter. By default it is set to `True`
         - dictionary_name (`str`): An optional string parameter. By default it is set to `labelencoder_dictionary`
         - norm_method (`str`): An optional string parameter to perform normalization. By default it is set to `None`
@@ -887,7 +903,7 @@ class DataFrameEncoder:
                         self._df[colname] = self._df[colname] / self.median_list[num]
             return self._df
 
-    def decode(self) -> DataFrame:
+    def decode(self) -> pd.DataFrame:
         """Decodes the `int` type columns of the `DataFrame`"""
         j = 0
         df_decoded = self._df.copy()
@@ -1027,27 +1043,28 @@ class OneHotEncoder:
     __slots__ = ["num_categories"]
 
     def __init__(self) -> None:
-        pass
+        self.num_categories = None
 
     def encode(self, x: np.ndarray | list, fit: bool = True):
         if not isinstance(x, np.ndarray):
             x = np.array(x)
+        x = x[~np.isnan(x)]
         x = x.astype(int)
+
         if fit:
             self.num_categories = x.max() + 1
-
+        else:
+            if np.any(x >= self.num_categories):
+                new_max_category = x.max() + 1
+                self.num_categories = max(self.num_categories, new_max_category)
         y = np.zeros((x.size, self.num_categories))
-
         y[np.arange(x.size), x] = 1
-
         return y
 
     def decode(self, x: np.ndarray | list) -> np.ndarray:
         if not isinstance(x, np.ndarray):
             x = np.array(x)
-
         y = np.argmax(x, axis=1)
-
         return y
 
 
@@ -1066,13 +1083,15 @@ class FeatureSelection:
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
 
-    def get_digraph(self, dataset: DataFrame, n_importances: int, use_scaler: bool = False) -> str:
+    def get_digraph(
+        self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
+    ) -> str:
         """
         Get directed graph showing importance of features.
 
         Parameters
         ----------
-        dataset : `DataFrame`
+        dataset : `pd.DataFrame`
             Dataset to be used for generating the graph.
         n_importances : `int`
             Number of top importances to show in the graph.
@@ -1152,7 +1171,7 @@ class FeatureSelection:
 
         return feature_string + "} "
 
-    def _load_data(self, dataset: DataFrame):
+    def _load_data(self, dataset: pd.DataFrame):
         if len(self.not_features) > 0:
             self.X = dataset.drop(columns=self.not_features)
 
@@ -1166,18 +1185,18 @@ class FeatureSelection:
         self.X = self.X.drop(columns=["index"])
 
 
-def check_nan_inf(df: DataFrame, verbose: bool = False) -> DataFrame:
+def check_nan_inf(df: pd.DataFrame, verbose: bool = False) -> pd.DataFrame:
     """
     Checks for NaN and Inf values in the DataFrame. If any are found, they will be removed.
 
     Parameters
     ----------
-    df : DataFrame
+    df : pd.DataFrame
         The input DataFrame to be checked.
 
     Returns
     ----------
-    DataFrame
+    pd.DataFrame
         A new DataFrame with NaN and Inf values removed.
     """
 

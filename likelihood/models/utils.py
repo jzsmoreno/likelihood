@@ -4,7 +4,27 @@ from likelihood.tools import cal_average
 
 
 class FeaturesArima:
+    """Base class for ARIMA feature computations."""
+
     def forward(self, y_sum: np.ndarray, theta: list, mode: bool, noise: float):
+        """Compute the forward pass of the model.
+
+        Parameters
+        ----------
+        y_sum : `np.ndarray`
+            Summed data points.
+        theta : `list`
+            Model parameters.
+        mode : `bool`
+            Forward pass mode.
+        noise : `float`
+            Noise level.
+
+        Returns
+        -------
+        `np.ndarray`
+            Computed values.
+        """
         if mode:
             y_vec = []
 
@@ -30,6 +50,18 @@ class FeaturesArima:
         return np.array(y_vec)
 
     def integrated(self, datapoints: np.ndarray):
+        """Compute integrated values.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            Input data points.
+
+        Returns
+        -------
+        `np.ndarray`
+            Integrated values.
+        """
         datapoints = self.datapoints
         y_sum = list(np.diff(datapoints, self.d))
         y_sum.insert(0, datapoints[0])
@@ -37,6 +69,18 @@ class FeaturesArima:
         return np.array(y_sum)
 
     def average(self, datapoints: np.ndarray):
+        """Compute average values.
+
+        Parameters
+        ----------
+        datapoints : `np.ndarray`
+            Input data points.
+
+        Returns
+        -------
+        `np.ndarray`
+            Average values.
+        """
         y_sum_average = cal_average(datapoints)
         y_sum_eps = datapoints - y_sum_average
 

@@ -1,5 +1,4 @@
 import pickle
-import warnings
 from typing import Dict, List, Tuple, Union
 
 import numpy as np
@@ -63,11 +62,9 @@ class SimulationEngine(FeatureSelection):
         super().__init__(**kwargs)
 
     def predict(self, df: DataFrame, column: str) -> np.ndarray | list:
-        # Let us assign the dictionary entries corresponding to the column
         w, quick_encoder, names_cols, dfe, numeric_dict = self.w_dict[column]
 
         df = df[names_cols].copy()
-        # Change the scale of the DataFrame
         dataset = self.df.copy()
         dataset.drop(columns=column, inplace=True)
         numeric_df = dataset.select_dtypes(include="number")
@@ -81,7 +78,6 @@ class SimulationEngine(FeatureSelection):
             for col in numeric_df.columns:
                 df[col] = numeric_df[col].values
 
-        # Encoding the DataFrame
         for num, colname in enumerate(dfe._encode_columns):
             if df[colname].dtype == "object":
                 encode_dict = dfe.encoding_list[num]
@@ -89,19 +85,15 @@ class SimulationEngine(FeatureSelection):
                     dfe._code_transformation_to, dictionary_list=encode_dict
                 )
 
-        # Prediction
         y = df.to_numpy() @ w
 
-        # Categorical column
         if quick_encoder != None:
             one_hot = OneHotEncoder()
             y = one_hot.decode(y)
             encoding_dic = quick_encoder.decoding_list[0]
             y = [encoding_dic[item] for item in y]
-        # Numeric column
         else:
             if self.use_scaler:
-                # scale output
                 y += 1
                 y /= 2
                 y = y * (self.df[column].max() - self.df[column].min())
@@ -121,7 +113,6 @@ class SimulationEngine(FeatureSelection):
     def fit(self, df: DataFrame, n_importances: int, **kwargs) -> None:
         self.df = df
         self.n_importances = n_importances
-        # We run the feature selection algorithm
         self.get_digraph(self.df, self.n_importances, self.use_scaler)
         proba_dict_keys = list(self.w_dict.keys())
         self.proba_dict = dict(zip(proba_dict_keys, [i for i in range(len(proba_dict_keys))]))
@@ -138,9 +129,7 @@ class SimulationEngine(FeatureSelection):
                 standard_deviation = self.df[key].std()
                 lower_limit = media - bandwidth * standard_deviation
                 upper_limit = media + bandwidth * standard_deviation
-                if plot:
-                    print(f"Cumulative Distribution Function ({key})")
-                f, _, ox = cdf(x[0].flatten(), poly=poly, plot=plot)
+                f, _, ox = cdf(x[0].flatten(), poly=poly, plot=plot, key=key)
             else:
                 f, ox = None, None
                 least_frequent_category, most_frequent_category = categories_by_quartile(
@@ -195,8 +184,10 @@ class SimulationEngine(FeatureSelection):
         """
         Save the state of the SimulationEngine to a file.
 
-        Parameters:
-            filename (str): The name of the file where the object will be saved.
+        Parameters
+        ----------
+        filename : str
+            The name of the file where the object will be saved.
         """
         filename = filename if filename.endswith(".pkl") else filename + ".pkl"
         with open(filename, "wb") as f:
@@ -207,11 +198,15 @@ class SimulationEngine(FeatureSelection):
         """
         Load the state of a SimulationEngine from a file.
 
-        Parameters:
-            filename (str): The name of the file containing the saved object.
+        Parameters
+        ----------
+        filename : str
+            The name of the file containing the saved object.
 
-        Returns:
-            SimulationEngine: A new instance of SimulationEngine with the loaded state.
+        Returns
+        -------
+        SimulationEngine : Any
+            A new instance of SimulationEngine with the loaded state.
         """
         filename = filename + ".pkl" if not filename.endswith(".pkl") else filename
         with open(filename, "rb") as f:
