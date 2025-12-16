@@ -4,9 +4,8 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
-import warnings
 from multiprocessing import Pool, cpu_count
-from typing import Any, List, Tuple
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd

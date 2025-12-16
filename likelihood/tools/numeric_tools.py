@@ -341,7 +341,8 @@ def gauss_elimination(A: np.ndarray | list, pr: int = 2) -> np.ndarray:
 
 
 def find_multiples(target: int) -> tuple[int, int] | None:
-    """Find two factors of a given target number.
+    """
+    Find two factors of a given target number that are as close to each other as possible.
 
     Parameters
     ----------
@@ -351,16 +352,13 @@ def find_multiples(target: int) -> tuple[int, int] | None:
     Returns
     -------
     tuple[int, int] | None
-        If `i` and `i+1` both divide target, returns (i, i+1).
+        If `i` and `target // i` both divide target, returns (i, target // i).
         Otherwise, returns `(i, target // i)`.
         Returns `None` if no factors are found.
     """
-    for i in range(2, target + 1):
+    for i in range(1, int(target**0.5) + 1):
         if target % i == 0:
-            if (i + 1) <= target and target % (i + 1) == 0:
-                return i + 1, target // (i + 1)
-            else:
-                return i, target // i
+            return max(i, target // i), min(i, target // i)
     return None
 
 

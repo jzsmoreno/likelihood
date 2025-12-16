@@ -3,7 +3,6 @@ import os
 
 import networkx as nx
 import pandas as pd
-from IPython.display import clear_output
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
