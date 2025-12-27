@@ -57,7 +57,7 @@ el.replaceWith(d);
 
     Parameters
     ----------
-    y : `np.array`
+    y : `np.ndarray`
         An array containing the data.
     alpha : `float`
         A `float` between `0` and `1`. By default it is set to `1`.
@@ -82,7 +82,7 @@ el.replaceWith(d);
 <div class="desc"><p>Calculates the moving average of the data</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>y</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>y</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the data.</dd>
 <dt><strong><code>alpha</code></strong> :&ensp;<code>float</code></dt>
 <dd>A <code>float</code> between <code>0</code> and <code>1</code>. By default it is set to <code>1</code>.</dd>
@@ -143,7 +143,7 @@ el.replaceWith(d);
 
     Parameters
     ----------
-    x : `np.array`
+    x : `np.ndarray`
         An array containing the data.
     points : `int`
         Number of points to consider for the final probability calculation.
@@ -152,7 +152,7 @@ el.replaceWith(d);
 
     Returns
     -------
-    p : `np.array`
+    p : `np.ndarray`
         Array containing the probabilities of the data.
     &#34;&#34;&#34;
 
@@ -179,7 +179,7 @@ el.replaceWith(d);
 <div class="desc"><p>Calculates the probability of the data based on the CDF fit.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>x</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>x</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the data.</dd>
 <dt><strong><code>points</code></strong> :&ensp;<code>int</code></dt>
 <dd>Number of points to consider for the final probability calculation.</dd>
@@ -188,7 +188,7 @@ el.replaceWith(d);
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><strong><code>p</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>p</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>Array containing the probabilities of the data.</dd>
 </dl></div>
 </dd>
@@ -212,7 +212,7 @@ el.replaceWith(d);
 
     Parameters
     ----------
-    x : `np.array`
+    x : `np.ndarray`
         An array containing the data.
     poly : `int`
         Degree of the polynomial fit. By default it is set to `9`.
@@ -229,9 +229,9 @@ el.replaceWith(d);
     -------
     fit : `np.poly1d`
         Polynomial fit of the CDF or quantile function.
-    cdf_values : `np.array`
+    cdf_values : `np.ndarray`
         Cumulative distribution values.
-    sorted_x : `np.array`
+    sorted_x : `np.ndarray`
         Sorted input data.
     &#34;&#34;&#34;
 
@@ -277,7 +277,7 @@ el.replaceWith(d);
 <div class="desc"><p>Calculates the cumulative distribution function of the data.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>x</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>x</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the data.</dd>
 <dt><strong><code>poly</code></strong> :&ensp;<code>int</code></dt>
 <dd>Degree of the polynomial fit. By default it is set to <code>9</code>.</dd>
@@ -294,9 +294,9 @@ el.replaceWith(d);
 <dl>
 <dt><strong><code>fit</code></strong> :&ensp;<code>np.poly1d</code></dt>
 <dd>Polynomial fit of the CDF or quantile function.</dd>
-<dt><strong><code>cdf_values</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>cdf_values</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>Cumulative distribution values.</dd>
-<dt><strong><code>sorted_x</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>sorted_x</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>Sorted input data.</dd>
 </dl></div>
 </dd>
@@ -318,7 +318,7 @@ el.replaceWith(d);
         The input DataFrame to be checked.
 
     Returns
-    ----------
+    -------
     pd.DataFrame
         A new DataFrame with NaN and Inf values removed.
     &#34;&#34;&#34;
@@ -392,9 +392,7 @@ el.replaceWith(d);
     -------
     `(f(x + h) - f(x)) / h` : `float`
         Difference quotient of `f` evaluated at `x`.
-
     &#34;&#34;&#34;
-
     return (f(x + h) - f(x)) / h</code></pre>
 </details>
 <div class="desc"><p>Calculates the difference quotient of <code>f</code> evaluated at <code>x</code> and <code>x + h</code></p>
@@ -649,7 +647,7 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 
     Parameters
     ----------
-    dataset : `ndarray`
+    dataset : `np.ndarray`
         the `dataset` describing the function over which the period is calculated.
 
     Returns
@@ -682,7 +680,7 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 <div class="desc"><p>Calculates the periodicity of a <code>dataset</code>.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>dataset</code></strong> :&ensp;<code>ndarray</code></dt>
+<dt><strong><code>dataset</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>the <code>dataset</code> describing the function over which the period is calculated.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
@@ -704,9 +702,9 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 
     Parameters
     ----------
-    y_true : `np.array`
+    y_true : `np.ndarray`
         An array containing the true values.
-    y_pred : `np.array`
+    y_pred : `np.ndarray`
         An array containing the predicted values.
 
     Returns
@@ -722,9 +720,9 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 <div class="desc"><p>Calculates the Root Mean Squared Error</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>y_true</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>y_true</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the true values.</dd>
-<dt><strong><code>y_pred</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>y_pred</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the predicted values.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
@@ -755,7 +753,7 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 
     Returns
     -------
-    `List[List]`
+    `Generator`
         A list of lists containing the mini-batches. Each sublist is a separate mini-batch with length `batch_size`.
     &#34;&#34;&#34;
 
@@ -780,7 +778,7 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 <dd>If set <code>True</code>, the data will be shuffled before dividing it into mini-batches.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p><code>List[List]</code>
+<p><code>Generator</code>
 A list of lists containing the mini-batches. Each sublist is a separate mini-batch with length <code>batch_size</code>.</p></div>
 </dd>
 <dt id="likelihood.tools.tools.partial_difference_quotient"><code class="name flex">
@@ -807,9 +805,7 @@ A list of lists containing the mini-batches. Each sublist is a separate mini-bat
     -------
     `(f(w) - f(v)) / h` : `np.array`
         the `i-th` partial difference quotient of `f` at `v`
-
     &#34;&#34;&#34;
-
     w = [
         v_j + (h if j == i else 0) for j, v_j in enumerate(v)  # add h to just the ith element of v
     ]
@@ -955,7 +951,6 @@ value of evaluated function.</p></div>
     -------
     z : `np.ndarray`
         An array containing the correlation of `x` and `y`.
-
     &#34;&#34;&#34;
 
     def __init__(self, x: np.ndarray, y: np.ndarray):
@@ -2086,7 +2081,7 @@ value of evaluated function.</p></div>
 
         Returns
         -------
-        data_scaled : `np.array`
+        data_scaled : `np.ndarray`
             An array containing the scaled data.
         &#34;&#34;&#34;
         if isinstance(dataset_, np.ndarray):
@@ -2145,12 +2140,12 @@ value of evaluated function.</p></div>
 
         Parameters
         ----------
-        dataset_ : `np.array`
+        dataset_ : `np.ndarray`
             An array containing the scaled values.
 
         Returns
         -------
-        dataset_ : `np.array`
+        dataset_ : `np.ndarray`
             An array containing the rescaled data.
         &#34;&#34;&#34;
         for i in range(dataset_.shape[0]):
@@ -2188,7 +2183,7 @@ value of evaluated function.</p></div>
 
         Returns
         -------
-        data_scaled : `np.array`
+        data_scaled : `np.ndarray`
             An array containing the scaled data.
         &#34;&#34;&#34;
         if isinstance(dataset_, np.ndarray):
@@ -2247,12 +2242,12 @@ value of evaluated function.</p></div>
 
         Parameters
         ----------
-        dataset_ : `np.array`
+        dataset_ : `np.ndarray`
             An array containing the scaled values.
 
         Returns
         -------
-        dataset_ : `np.array`
+        dataset_ : `np.ndarray`
             An array containing the rescaled data.
         &#34;&#34;&#34;
         for i in range(dataset_.shape[0]):
@@ -2288,7 +2283,7 @@ value of evaluated function.</p></div>
 
         Returns
         -------
-        data_scaled : `np.array`
+        data_scaled : `np.ndarray`
             An array containing the scaled data.
         &#34;&#34;&#34;
         if isinstance(dataset_, np.ndarray):
@@ -2347,12 +2342,12 @@ value of evaluated function.</p></div>
 
         Parameters
         ----------
-        dataset_ : `np.array`
+        dataset_ : `np.ndarray`
             An array containing the scaled values.
 
         Returns
         -------
-        dataset_ : `np.array`
+        dataset_ : `np.ndarray`
             An array containing the rescaled data.
         &#34;&#34;&#34;
         for i in range(dataset_.shape[0]):
@@ -2388,7 +2383,7 @@ value of evaluated function.</p></div>
 
         Returns
         -------
-        data_scaled : `np.array`
+        data_scaled : `np.ndarray`
             An array containing the scaled data.
         &#34;&#34;&#34;
         if isinstance(dataset_, np.ndarray):
@@ -2447,12 +2442,12 @@ value of evaluated function.</p></div>
 
         Parameters
         ----------
-        dataset_ : `np.array`
+        dataset_ : `np.ndarray`
             An array containing the scaled values.
 
         Returns
         -------
-        dataset_ : `np.array`
+        dataset_ : `np.ndarray`
             An array containing the rescaled data.
         &#34;&#34;&#34;
         for i in range(dataset_.shape[0]):
@@ -2488,7 +2483,7 @@ value of evaluated function.</p></div>
 
         Returns
         -------
-        data_scaled : `np.array`
+        data_scaled : `np.ndarray`
             An array containing the scaled data.
         &#34;&#34;&#34;
         if isinstance(dataset_, np.ndarray):
@@ -2547,12 +2542,12 @@ value of evaluated function.</p></div>
 
         Parameters
         ----------
-        dataset_ : `np.array`
+        dataset_ : `np.ndarray`
             An array containing the scaled values.
 
         Returns
         -------
-        dataset_ : `np.array`
+        dataset_ : `np.ndarray`
             An array containing the rescaled data.
         &#34;&#34;&#34;
         for i in range(dataset_.shape[0]):
@@ -2583,7 +2578,7 @@ value of evaluated function.</p></div>
 
     Returns
     -------
-    data_scaled : `np.array`
+    data_scaled : `np.ndarray`
         An array containing the scaled data.
     &#34;&#34;&#34;
     if isinstance(dataset_, np.ndarray):
@@ -2640,7 +2635,7 @@ value of evaluated function.</p></div>
 <div class="desc"><p>Perform a standard rescaling of the data</p>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><strong><code>data_scaled</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>data_scaled</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the scaled data.</dd>
 </dl></div>
 </dd>
@@ -2657,12 +2652,12 @@ value of evaluated function.</p></div>
 
     Parameters
     ----------
-    dataset_ : `np.array`
+    dataset_ : `np.ndarray`
         An array containing the scaled values.
 
     Returns
     -------
-    dataset_ : `np.array`
+    dataset_ : `np.ndarray`
         An array containing the rescaled data.
     &#34;&#34;&#34;
     for i in range(dataset_.shape[0]):
@@ -2678,12 +2673,12 @@ value of evaluated function.</p></div>
 <div class="desc"><p>Performs the inverse operation to the rescale function</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>dataset_</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>dataset_</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the scaled values.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><strong><code>dataset_</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>dataset_</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the rescaled data.</dd>
 </dl></div>
 </dd>
@@ -3582,7 +3577,7 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        dataset : `np.array`
+        dataset : `np.ndarray`
             An array containing the scaled data.
         values : `np.ndarray`
             A set of values returned by the linear function.
@@ -3614,7 +3609,7 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        datapoints : `np.array`
+        datapoints : `np.ndarray`
             An array containing the values of the independent variable.
 
         &#34;&#34;&#34;
@@ -3631,7 +3626,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
         &#34;&#34;&#34;
         if print_important_features:
@@ -3664,7 +3659,7 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        dataset : `np.array`
+        dataset : `np.ndarray`
             An array containing the scaled data.
         values : `np.ndarray`
             A set of values returned by the linear function.
@@ -3696,7 +3691,7 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        datapoints : `np.array`
+        datapoints : `np.ndarray`
             An array containing the values of the independent variable.
 
         &#34;&#34;&#34;
@@ -3713,7 +3708,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
         &#34;&#34;&#34;
         if print_important_features:
@@ -3744,7 +3739,7 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        dataset : `np.array`
+        dataset : `np.ndarray`
             An array containing the scaled data.
         values : `np.ndarray`
             A set of values returned by the linear function.
@@ -3776,7 +3771,7 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        datapoints : `np.array`
+        datapoints : `np.ndarray`
             An array containing the values of the independent variable.
 
         &#34;&#34;&#34;
@@ -3793,7 +3788,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
         &#34;&#34;&#34;
         if print_important_features:
@@ -3824,7 +3819,7 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        dataset : `np.array`
+        dataset : `np.ndarray`
             An array containing the scaled data.
         values : `np.ndarray`
             A set of values returned by the linear function.
@@ -3856,7 +3851,7 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        datapoints : `np.array`
+        datapoints : `np.ndarray`
             An array containing the values of the independent variable.
 
         &#34;&#34;&#34;
@@ -3873,7 +3868,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
         &#34;&#34;&#34;
         if print_important_features:
@@ -3904,7 +3899,7 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        dataset : `np.array`
+        dataset : `np.ndarray`
             An array containing the scaled data.
         values : `np.ndarray`
             A set of values returned by the linear function.
@@ -3936,7 +3931,7 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        datapoints : `np.array`
+        datapoints : `np.ndarray`
             An array containing the values of the independent variable.
 
         &#34;&#34;&#34;
@@ -3953,7 +3948,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
         &#34;&#34;&#34;
         if print_important_features:
@@ -3979,7 +3974,7 @@ A string representation of the directed graph.</p></div>
 
     Parameters
     ----------
-    dataset : `np.array`
+    dataset : `np.ndarray`
         An array containing the scaled data.
     values : `np.ndarray`
         A set of values returned by the linear function.
@@ -4008,7 +4003,7 @@ A string representation of the directed graph.</p></div>
 <div class="desc"><p>Performs linear multiple model training</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>dataset</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>dataset</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the scaled data.</dd>
 <dt><strong><code>values</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>A set of values returned by the linear function.</dd>
@@ -4035,7 +4030,7 @@ A string representation of the directed graph.</p></div>
 
     Returns
     -------
-    importance : `np.array`
+    importance : `np.ndarray`
         An array containing the importance of each feature.
     &#34;&#34;&#34;
     if print_important_features:
@@ -4051,7 +4046,7 @@ A string representation of the directed graph.</p></div>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><strong><code>importance</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>importance</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the importance of each feature.</dd>
 </dl></div>
 </dd>
@@ -4069,7 +4064,7 @@ A string representation of the directed graph.</p></div>
 
     Parameters
     ----------
-    datapoints : `np.array`
+    datapoints : `np.ndarray`
         An array containing the values of the independent variable.
 
     &#34;&#34;&#34;
@@ -4078,7 +4073,7 @@ A string representation of the directed graph.</p></div>
 <div class="desc"><p>Performs predictions for a set of points</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>datapoints</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the values of the independent variable.</dd>
 </dl></div>
 </dd>
@@ -4107,14 +4102,14 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        dataset : `np.array`
+        dataset : `np.ndarray`
             An array containing the scaled data.
         values : `np.ndarray`
             A set of values returned by the linear function.
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
 
         &#34;&#34;&#34;
@@ -4141,12 +4136,12 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        datapoints : `np.array`
+        datapoints : `np.ndarray`
             An array containing the values of the independent variable.
 
         Returns
         -------
-        `np.array`
+        `np.ndarray`
 
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
@@ -4164,7 +4159,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
         &#34;&#34;&#34;
         if print_important_features:
@@ -4197,14 +4192,14 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        dataset : `np.array`
+        dataset : `np.ndarray`
             An array containing the scaled data.
         values : `np.ndarray`
             A set of values returned by the linear function.
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
 
         &#34;&#34;&#34;
@@ -4231,12 +4226,12 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        datapoints : `np.array`
+        datapoints : `np.ndarray`
             An array containing the values of the independent variable.
 
         Returns
         -------
-        `np.array`
+        `np.ndarray`
 
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
@@ -4254,7 +4249,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
         &#34;&#34;&#34;
         if print_important_features:
@@ -4285,14 +4280,14 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        dataset : `np.array`
+        dataset : `np.ndarray`
             An array containing the scaled data.
         values : `np.ndarray`
             A set of values returned by the linear function.
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
 
         &#34;&#34;&#34;
@@ -4319,12 +4314,12 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        datapoints : `np.array`
+        datapoints : `np.ndarray`
             An array containing the values of the independent variable.
 
         Returns
         -------
-        `np.array`
+        `np.ndarray`
 
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
@@ -4342,7 +4337,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
         &#34;&#34;&#34;
         if print_important_features:
@@ -4373,14 +4368,14 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        dataset : `np.array`
+        dataset : `np.ndarray`
             An array containing the scaled data.
         values : `np.ndarray`
             A set of values returned by the linear function.
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
 
         &#34;&#34;&#34;
@@ -4407,12 +4402,12 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        datapoints : `np.array`
+        datapoints : `np.ndarray`
             An array containing the values of the independent variable.
 
         Returns
         -------
-        `np.array`
+        `np.ndarray`
 
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
@@ -4430,7 +4425,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
         &#34;&#34;&#34;
         if print_important_features:
@@ -4461,14 +4456,14 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        dataset : `np.array`
+        dataset : `np.ndarray`
             An array containing the scaled data.
         values : `np.ndarray`
             A set of values returned by the linear function.
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
 
         &#34;&#34;&#34;
@@ -4495,12 +4490,12 @@ A string representation of the directed graph.</p></div>
 
         Parameters
         ----------
-        datapoints : `np.array`
+        datapoints : `np.ndarray`
             An array containing the values of the independent variable.
 
         Returns
         -------
-        `np.array`
+        `np.ndarray`
 
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
@@ -4518,7 +4513,7 @@ A string representation of the directed graph.</p></div>
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
         &#34;&#34;&#34;
         if print_important_features:
@@ -4544,14 +4539,14 @@ A string representation of the directed graph.</p></div>
 
     Parameters
     ----------
-    dataset : `np.array`
+    dataset : `np.ndarray`
         An array containing the scaled data.
     values : `np.ndarray`
         A set of values returned by the linear function.
 
     Returns
     -------
-    importance : `np.array`
+    importance : `np.ndarray`
         An array containing the importance of each feature.
 
     &#34;&#34;&#34;
@@ -4575,14 +4570,14 @@ A string representation of the directed graph.</p></div>
 <div class="desc"><p>Performs linear multiple model training</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>dataset</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>dataset</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the scaled data.</dd>
 <dt><strong><code>values</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>A set of values returned by the linear function.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><strong><code>importance</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>importance</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the importance of each feature.</dd>
 </dl></div>
 </dd>
@@ -4605,7 +4600,7 @@ A string representation of the directed graph.</p></div>
 
     Returns
     -------
-    importance : `np.array`
+    importance : `np.ndarray`
         An array containing the importance of each feature.
     &#34;&#34;&#34;
     if print_important_features:
@@ -4621,7 +4616,7 @@ A string representation of the directed graph.</p></div>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><strong><code>importance</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>importance</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the importance of each feature.</dd>
 </dl></div>
 </dd>
@@ -4639,12 +4634,12 @@ A string representation of the directed graph.</p></div>
 
     Parameters
     ----------
-    datapoints : `np.array`
+    datapoints : `np.ndarray`
         An array containing the values of the independent variable.
 
     Returns
     -------
-    `np.array`
+    `np.ndarray`
 
     &#34;&#34;&#34;
     sig = np.vectorize(sigmoide)
@@ -4654,11 +4649,11 @@ A string representation of the directed graph.</p></div>
 <div class="desc"><p>Performs predictions for a set of points</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>datapoints</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>An array containing the values of the independent variable.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p><code>np.array</code></p></div>
+<p><code>np.ndarray</code></p></div>
 </dd>
 </dl>
 </dd>

@@ -57,7 +57,7 @@ el.replaceWith(d);
 
     Parameters
     ----------
-    A : `np.array`
+    A : `np.ndarray`
         The augmented matrix.
 
     Returns
@@ -65,7 +65,6 @@ el.replaceWith(d);
     `None`
         Prints the matrix to console.
     &#34;&#34;&#34;
-
     n = len(A)
     for i in range(0, n):
         line = &#34;&#34;
@@ -79,7 +78,7 @@ el.replaceWith(d);
 <div class="desc"><p>Function that prints the augmented matrix.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>A</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>A</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>The augmented matrix.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
@@ -110,7 +109,7 @@ Prints the matrix to console.</p></div>
         Otherwise, returns `(i, target // i)`.
         Returns `None` if no factors are found.
     &#34;&#34;&#34;
-    for i in range(1, int(target**0.5) + 1):
+    for i in reversed(range(1, int(target**0.5) + 1)):
         if target % i == 0:
             return max(i, target // i), min(i, target // i)
     return None</code></pre>
@@ -142,7 +141,7 @@ Returns <code>None</code> if no factors are found.</dd>
 
     Parameters
     ----------
-    A : `np.array` or `list`
+    A : `np.ndarray` or `list`
         An array containing the parameters of the $n$ equations
         with the equalities.
     pr : `int`
@@ -150,9 +149,8 @@ Returns <code>None</code> if no factors are found.</dd>
 
     Returns
     -------
-    X : `np.array`
-        The solution of the system of $n$ equations
-
+    X : `np.ndarray`
+        The solution of the system of $n$ equationsS
     &#34;&#34;&#34;
 
     n = len(A)
@@ -200,7 +198,7 @@ Returns <code>None</code> if no factors are found.</dd>
 <div class="desc"><p>Computes the Gauss elimination algorithm.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>A</code></strong> :&ensp;<code>np.array</code> or <code>list</code></dt>
+<dt><strong><code>A</code></strong> :&ensp;<code>np.ndarray</code> or <code>list</code></dt>
 <dd>An array containing the parameters of the $n$ equations
 with the equalities.</dd>
 <dt><strong><code>pr</code></strong> :&ensp;<code>int</code></dt>
@@ -208,8 +206,8 @@ with the equalities.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><strong><code>X</code></strong> :&ensp;<code>np.array</code></dt>
-<dd>The solution of the system of $n$ equations</dd>
+<dt><strong><code>X</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The solution of the system of $n$ equationsS</dd>
 </dl></div>
 </dd>
 <dt id="likelihood.tools.numeric_tools.get_metrics"><code class="name flex">
@@ -329,9 +327,9 @@ with the equalities.</dd>
 
     Parameters
     ----------
-    A : `np.array`
+    A : `np.ndarray`
         Coefficient matrix of the system of equations.
-    b : `np.array`
+    b : `np.ndarray`
         Right-hand side vector of the system of equations.
     n : `int`
         Dimension of the system of equations.
@@ -346,7 +344,7 @@ with the equalities.</dd>
 
     Returns
     -------
-    xi : `np.array`
+    xi : `np.ndarray`
         The solution of the system of equations.
     &#34;&#34;&#34;
     xin = np.zeros(n)
@@ -371,9 +369,9 @@ with the equalities.</dd>
 <div class="desc"><p>Computes the Successive Over-Relaxation algorithm.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>A</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>A</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>Coefficient matrix of the system of equations.</dd>
-<dt><strong><code>b</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>b</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>Right-hand side vector of the system of equations.</dd>
 <dt><strong><code>n</code></strong> :&ensp;<code>int</code></dt>
 <dd>Dimension of the system of equations.</dd>
@@ -388,7 +386,7 @@ with the equalities.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><strong><code>xi</code></strong> :&ensp;<code>np.array</code></dt>
+<dt><strong><code>xi</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>The solution of the system of equations.</dd>
 </dl></div>
 </dd>
@@ -476,35 +474,27 @@ containing their corresponding correlation coefficients.</dd>
     xi : `float`
         The estimated value of the new coefficient of correlation.
     &#34;&#34;&#34;
-
     # Early return for identical arrays
     if np.array_equal(X, Y):
         return 1.0
-
     n = len(X)
-
     # Early return for cases with less than 2 elements
     if n &lt; 2:
         return 0.0
-
     # Flatten the input arrays if they are multidimensional
     X = X.flatten()
     Y = Y.flatten()
-
     # Get the sorted order of X
     order = np.argsort(X)
-
     if ties:
         np.random.seed(random_seed)  # Set seed for reproducibility if needed
         ranks = np.argsort(np.argsort(Y[order]))  # Get ranks
         unique_ranks, counts = np.unique(ranks, return_counts=True)
-
         # Adjust ranks for ties by shuffling
         for rank, count in zip(unique_ranks, counts):
             if count &gt; 1:
                 tie_indices = np.where(ranks == rank)[0]
                 np.random.shuffle(ranks[tie_indices])  # Randomize ties
-
         cumulative_counts = np.array([np.sum(y &gt;= Y[order]) for y in Y[order]])
         return 1 - n * np.sum(np.abs(ranks[1:] - ranks[: n - 1])) / (
             2 * np.sum(cumulative_counts * (n - cumulative_counts))

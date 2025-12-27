@@ -69,7 +69,7 @@ el.replaceWith(d);
 <dl>
 <dt id="likelihood.models.deep.rl.AutoQL"><code class="flex name class">
 <span>class <span class="ident">AutoQL</span></span>
-<span>(</span><span>env, model, maxlen=2000)</span>
+<span>(</span><span>env: Any, model: keras.src.models.model.Model, maxlen: int = 2000)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -88,9 +88,9 @@ el.replaceWith(d);
 
     def __init__(
         self,
-        env,
-        model,
-        maxlen=2000,
+        env: Any,
+        model: tf.keras.Model,
+        maxlen: int = 2000,
     ):
         &#34;&#34;&#34;Initialize AutoQL agent
 
@@ -107,7 +107,7 @@ el.replaceWith(d);
         self.maxlen = maxlen
         self.replay_buffer = deque(maxlen=self.maxlen)
 
-    def epsilon_greedy_policy(self, state, action, epsilon=0):
+    def epsilon_greedy_policy(self, state: np.ndarray, action: int, epsilon: float = 0.0) -&gt; tuple:
         &#34;&#34;&#34;
         Epsilon-greedy policy for action selection
 
@@ -118,7 +118,7 @@ el.replaceWith(d);
         action : `int`
             Expected action to process.
         epsilon : `float`
-            Exploration probability. By default it is set to `0`
+            Exploration probability. By default it is set to `0.0`
 
         Returns
         -------
@@ -134,7 +134,7 @@ el.replaceWith(d);
 
         return _state[0], greedy_action[0], _reward[0], _next_action[0], _done[0]
 
-    def play_one_step(self, state, action, epsilon):
+    def play_one_step(self, state: np.ndarray, action: int, epsilon: float):
         &#34;&#34;&#34;
         Perform one step in the environment and add experience to buffer
 
@@ -337,14 +337,14 @@ el.replaceWith(d);
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.deep.rl.AutoQL.epsilon_greedy_policy"><code class="name flex">
-<span>def <span class="ident">epsilon_greedy_policy</span></span>(<span>self, state, action, epsilon=0)</span>
+<span>def <span class="ident">epsilon_greedy_policy</span></span>(<span>self, state: numpy.ndarray, action: int, epsilon: float = 0.0) ‑> tuple</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def epsilon_greedy_policy(self, state, action, epsilon=0):
+<pre><code class="python">def epsilon_greedy_policy(self, state: np.ndarray, action: int, epsilon: float = 0.0) -&gt; tuple:
     &#34;&#34;&#34;
     Epsilon-greedy policy for action selection
 
@@ -355,7 +355,7 @@ el.replaceWith(d);
     action : `int`
         Expected action to process.
     epsilon : `float`
-        Exploration probability. By default it is set to `0`
+        Exploration probability. By default it is set to `0.0`
 
     Returns
     -------
@@ -379,7 +379,7 @@ el.replaceWith(d);
 <dt><strong><code>action</code></strong> :&ensp;<code>int</code></dt>
 <dd>Expected action to process.</dd>
 <dt><strong><code>epsilon</code></strong> :&ensp;<code>float</code></dt>
-<dd>Exploration probability. By default it is set to <code>0</code></dd>
+<dd>Exploration probability. By default it is set to <code>0.0</code></dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
@@ -388,14 +388,14 @@ el.replaceWith(d);
 </dl></div>
 </dd>
 <dt id="likelihood.models.deep.rl.AutoQL.play_one_step"><code class="name flex">
-<span>def <span class="ident">play_one_step</span></span>(<span>self, state, action, epsilon)</span>
+<span>def <span class="ident">play_one_step</span></span>(<span>self, state: numpy.ndarray, action: int, epsilon: float)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def play_one_step(self, state, action, epsilon):
+<pre><code class="python">def play_one_step(self, state: np.ndarray, action: int, epsilon: float):
     &#34;&#34;&#34;
     Perform one step in the environment and add experience to buffer
 
@@ -588,7 +588,7 @@ el.replaceWith(d);
 </dd>
 <dt id="likelihood.models.deep.rl.Env"><code class="flex name class">
 <span>class <span class="ident">Env</span></span>
-<span>(</span><span>model, maxlen=100, name='likenasium')</span>
+<span>(</span><span>model: Any, maxlen: int = 100, name: str = 'likenasium')</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -596,7 +596,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Env:
-    def __init__(self, model, maxlen=100, name=&#34;likenasium&#34;):
+    def __init__(self, model: Any, maxlen: int = 100, name: str = &#34;likenasium&#34;):
         &#34;&#34;&#34;
         Initialize the environment with a model.
 
@@ -618,7 +618,7 @@ el.replaceWith(d);
         self.current_step = 0
         self.done = False
 
-    def step(self, state, action, verbose=0):
+    def step(self, state: np.ndarray, action: int, verbose: int = 0):
         &#34;&#34;&#34;
         Perform an environment step with the given action.
 
@@ -719,14 +719,14 @@ el.replaceWith(d);
 <div class="desc"><p>Reset the environment to initial state.</p></div>
 </dd>
 <dt id="likelihood.models.deep.rl.Env.step"><code class="name flex">
-<span>def <span class="ident">step</span></span>(<span>self, state, action, verbose=0)</span>
+<span>def <span class="ident">step</span></span>(<span>self, state: numpy.ndarray, action: int, verbose: int = 0)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def step(self, state, action, verbose=0):
+<pre><code class="python">def step(self, state: np.ndarray, action: int, verbose: int = 0):
     &#34;&#34;&#34;
     Perform an environment step with the given action.
 

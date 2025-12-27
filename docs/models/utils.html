@@ -57,7 +57,7 @@ el.replaceWith(d);
 <pre><code class="python">class FeaturesArima:
     &#34;&#34;&#34;Base class for ARIMA feature computations.&#34;&#34;&#34;
 
-    def forward(self, y_sum: np.ndarray, theta: list, mode: bool, noise: float):
+    def forward(self, y_sum: np.ndarray, theta: list, mode: bool, noise: float) -&gt; np.ndarray:
         &#34;&#34;&#34;Compute the forward pass of the model.
 
         Parameters
@@ -100,7 +100,7 @@ el.replaceWith(d);
 
         return np.array(y_vec)
 
-    def integrated(self, datapoints: np.ndarray):
+    def integrated(self, datapoints: np.ndarray) -&gt; np.ndarray:
         &#34;&#34;&#34;Compute integrated values.
 
         Parameters
@@ -119,7 +119,7 @@ el.replaceWith(d);
 
         return np.array(y_sum)
 
-    def average(self, datapoints: np.ndarray):
+    def average(self, datapoints: np.ndarray) -&gt; np.ndarray:
         &#34;&#34;&#34;Compute average values.
 
         Parameters
@@ -145,14 +145,14 @@ el.replaceWith(d);
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.utils.FeaturesArima.average"><code class="name flex">
-<span>def <span class="ident">average</span></span>(<span>self, datapoints: numpy.ndarray)</span>
+<span>def <span class="ident">average</span></span>(<span>self, datapoints: numpy.ndarray) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def average(self, datapoints: np.ndarray):
+<pre><code class="python">def average(self, datapoints: np.ndarray) -&gt; np.ndarray:
     &#34;&#34;&#34;Compute average values.
 
     Parameters
@@ -181,14 +181,14 @@ el.replaceWith(d);
 Average values.</p></div>
 </dd>
 <dt id="likelihood.models.utils.FeaturesArima.forward"><code class="name flex">
-<span>def <span class="ident">forward</span></span>(<span>self, y_sum: numpy.ndarray, theta: list, mode: bool, noise: float)</span>
+<span>def <span class="ident">forward</span></span>(<span>self, y_sum: numpy.ndarray, theta: list, mode: bool, noise: float) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def forward(self, y_sum: np.ndarray, theta: list, mode: bool, noise: float):
+<pre><code class="python">def forward(self, y_sum: np.ndarray, theta: list, mode: bool, noise: float) -&gt; np.ndarray:
     &#34;&#34;&#34;Compute the forward pass of the model.
 
     Parameters
@@ -248,14 +248,14 @@ Average values.</p></div>
 Computed values.</p></div>
 </dd>
 <dt id="likelihood.models.utils.FeaturesArima.integrated"><code class="name flex">
-<span>def <span class="ident">integrated</span></span>(<span>self, datapoints: numpy.ndarray)</span>
+<span>def <span class="ident">integrated</span></span>(<span>self, datapoints: numpy.ndarray) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def integrated(self, datapoints: np.ndarray):
+<pre><code class="python">def integrated(self, datapoints: np.ndarray) -&gt; np.ndarray:
     &#34;&#34;&#34;Compute integrated values.
 
     Parameters

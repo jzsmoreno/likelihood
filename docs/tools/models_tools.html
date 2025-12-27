@@ -493,7 +493,6 @@ correlation value greater than the specified threshold to identify which columns
     `tf.keras.Model`
         The trained model after fitting.
     &#34;&#34;&#34;
-
     validation_split = kwargs.get(&#34;validation_split&#34;, 0.2)
     callback = kwargs.get(
         &#34;callback&#34;, [tf.keras.callbacks.EarlyStopping(monitor=&#34;val_loss&#34;, patience=patience)]
@@ -639,8 +638,6 @@ The trained model after fitting.</p></div>
             model.load_state_dict(previous_weights)
             no_improvement_count += 1
             status = f&#34;{REVERT_COLOR}No Improvement{RESET_COLOR}&#34;
-
-        # Printing the results for each episode
         print(
             f&#34;{episode + 1:&lt;8} {loss:&lt;12.4f} {best_loss_so_far:&lt;15.4f} {status:&lt;25} {average_loss:&lt;12.4f}&#34;
         )
