@@ -1,11 +1,14 @@
 import datetime
 from html import escape
+from typing import Any
 
 from IPython.display import HTML, display
 
 
 def generate_html_pipeline(
-    data_dict, save_to_file=False, file_name="data_processing_report_improved.html"
+    data_dict: Any,
+    save_to_file: bool = False,
+    file_name: str = "data_processing_report_improved.html",
 ):
     """
     Generates an HTML report for a data processing pipeline with an improved

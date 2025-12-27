@@ -76,7 +76,7 @@ def cal_adjacency_matrix(
     -------
     adj_dict : `dict`
         A dictionary containing the features.
-    adjacency_matrix : `ndarray`
+    adjacency_matrix : `np.ndarray`
         The adjacency matrix.
 
     Keyword Arguments

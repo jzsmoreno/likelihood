@@ -256,12 +256,12 @@ class FourierRegression(AbstractArima):
 
     Parameters
     ----------
-    datapoints : np.array
+    datapoints : np.ndarray
         A set of points to train the arima model.
 
     Returns
     -------
-    new_datapoints : np.array
+    new_datapoints : np.ndarray
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
 

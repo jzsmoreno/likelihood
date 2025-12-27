@@ -38,7 +38,7 @@ def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -> Generat
 
     Returns
     -------
-    `List[List]`
+    `Generator`
         A list of lists containing the mini-batches. Each sublist is a separate mini-batch with length `batch_size`.
     """
 
@@ -69,9 +69,7 @@ def difference_quotient(f: Callable, x: float, h: float) -> Callable:
     -------
     `(f(x + h) - f(x)) / h` : `float`
         Difference quotient of `f` evaluated at `x`.
-
     """
-
     return (f(x + h) - f(x)) / h
 
 
@@ -91,9 +89,7 @@ def partial_difference_quotient(f: Callable, v: np.ndarray, i: int, h: float) ->
     -------
     `(f(w) - f(v)) / h` : `np.array`
         the `i-th` partial difference quotient of `f` at `v`
-
     """
-
     w = [
         v_j + (h if j == i else 0) for j, v_j in enumerate(v)  # add h to just the ith element of v
     ]
@@ -206,7 +202,7 @@ def cdf(
 
     Parameters
     ----------
-    x : `np.array`
+    x : `np.ndarray`
         An array containing the data.
     poly : `int`
         Degree of the polynomial fit. By default it is set to `9`.
@@ -223,9 +219,9 @@ def cdf(
     -------
     fit : `np.poly1d`
         Polynomial fit of the CDF or quantile function.
-    cdf_values : `np.array`
+    cdf_values : `np.ndarray`
         Cumulative distribution values.
-    sorted_x : `np.array`
+    sorted_x : `np.ndarray`
         Sorted input data.
     """
 
@@ -274,7 +270,7 @@ def calculate_probability(x: np.ndarray, points: int = 1, cond: bool = True) -> 
 
     Parameters
     ----------
-    x : `np.array`
+    x : `np.ndarray`
         An array containing the data.
     points : `int`
         Number of points to consider for the final probability calculation.
@@ -283,7 +279,7 @@ def calculate_probability(x: np.ndarray, points: int = 1, cond: bool = True) -> 
 
     Returns
     -------
-    p : `np.array`
+    p : `np.ndarray`
         Array containing the probabilities of the data.
     """
 
@@ -352,7 +348,6 @@ class Correlation(CorrelationBase):
     -------
     z : `np.ndarray`
         An array containing the correlation of `x` and `y`.
-
     """
 
     def __init__(self, x: np.ndarray, y: np.ndarray):
@@ -436,7 +431,7 @@ def get_period(dataset: np.ndarray) -> float:
 
     Parameters
     ----------
-    dataset : `ndarray`
+    dataset : `np.ndarray`
         the `dataset` describing the function over which the period is calculated.
 
     Returns
@@ -504,14 +499,14 @@ class LogisticRegression:
 
         Parameters
         ----------
-        dataset : `np.array`
+        dataset : `np.ndarray`
             An array containing the scaled data.
         values : `np.ndarray`
             A set of values returned by the linear function.
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
 
         """
@@ -538,12 +533,12 @@ class LogisticRegression:
 
         Parameters
         ----------
-        datapoints : `np.array`
+        datapoints : `np.ndarray`
             An array containing the values of the independent variable.
 
         Returns
         -------
-        `np.array`
+        `np.ndarray`
 
         """
         sig = np.vectorize(sigmoide)
@@ -561,7 +556,7 @@ class LogisticRegression:
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
         """
         if print_important_features:
@@ -585,7 +580,7 @@ class LinearRegression:
 
         Parameters
         ----------
-        dataset : `np.array`
+        dataset : `np.ndarray`
             An array containing the scaled data.
         values : `np.ndarray`
             A set of values returned by the linear function.
@@ -617,7 +612,7 @@ class LinearRegression:
 
         Parameters
         ----------
-        datapoints : `np.array`
+        datapoints : `np.ndarray`
             An array containing the values of the independent variable.
 
         """
@@ -634,7 +629,7 @@ class LinearRegression:
 
         Returns
         -------
-        importance : `np.array`
+        importance : `np.ndarray`
             An array containing the importance of each feature.
         """
         if print_important_features:
@@ -648,7 +643,7 @@ def cal_average(y: np.ndarray, alpha: float = 1):
 
     Parameters
     ----------
-    y : `np.array`
+    y : `np.ndarray`
         An array containing the data.
     alpha : `float`
         A `float` between `0` and `1`. By default it is set to `1`.
@@ -686,7 +681,7 @@ class DataScaler:
 
         Returns
         -------
-        data_scaled : `np.array`
+        data_scaled : `np.ndarray`
             An array containing the scaled data.
         """
         if isinstance(dataset_, np.ndarray):
@@ -745,12 +740,12 @@ class DataScaler:
 
         Parameters
         ----------
-        dataset_ : `np.array`
+        dataset_ : `np.ndarray`
             An array containing the scaled values.
 
         Returns
         -------
-        dataset_ : `np.array`
+        dataset_ : `np.ndarray`
             An array containing the rescaled data.
         """
         for i in range(dataset_.shape[0]):
@@ -788,9 +783,9 @@ def mean_square_error(y_true: np.ndarray, y_pred: np.ndarray, print_error: bool 
 
     Parameters
     ----------
-    y_true : `np.array`
+    y_true : `np.ndarray`
         An array containing the true values.
-    y_pred : `np.array`
+    y_pred : `np.ndarray`
         An array containing the predicted values.
 
     Returns
@@ -1195,7 +1190,7 @@ def check_nan_inf(df: pd.DataFrame, verbose: bool = False) -> pd.DataFrame:
         The input DataFrame to be checked.
 
     Returns
-    ----------
+    -------
     pd.DataFrame
         A new DataFrame with NaN and Inf values removed.
     """

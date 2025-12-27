@@ -160,35 +160,27 @@ def xicor(X: np.ndarray, Y: np.ndarray, ties: bool = True, random_seed: int = No
     xi : `float`
         The estimated value of the new coefficient of correlation.
     """
-
     # Early return for identical arrays
     if np.array_equal(X, Y):
         return 1.0
-
     n = len(X)
-
     # Early return for cases with less than 2 elements
     if n < 2:
         return 0.0
-
     # Flatten the input arrays if they are multidimensional
     X = X.flatten()
     Y = Y.flatten()
-
     # Get the sorted order of X
     order = np.argsort(X)
-
     if ties:
         np.random.seed(random_seed)  # Set seed for reproducibility if needed
         ranks = np.argsort(np.argsort(Y[order]))  # Get ranks
         unique_ranks, counts = np.unique(ranks, return_counts=True)
-
         # Adjust ranks for ties by shuffling
         for rank, count in zip(unique_ranks, counts):
             if count > 1:
                 tie_indices = np.where(ranks == rank)[0]
                 np.random.shuffle(ranks[tie_indices])  # Randomize ties
-
         cumulative_counts = np.array([np.sum(y >= Y[order]) for y in Y[order]])
         return 1 - n * np.sum(np.abs(ranks[1:] - ranks[: n - 1])) / (
             2 * np.sum(cumulative_counts * (n - cumulative_counts))
@@ -206,7 +198,7 @@ def ecprint(A: np.ndarray) -> None:
 
     Parameters
     ----------
-    A : `np.array`
+    A : `np.ndarray`
         The augmented matrix.
 
     Returns
@@ -214,7 +206,6 @@ def ecprint(A: np.ndarray) -> None:
     `None`
         Prints the matrix to console.
     """
-
     n = len(A)
     for i in range(0, n):
         line = ""
@@ -239,9 +230,9 @@ def sor_elimination(
 
     Parameters
     ----------
-    A : `np.array`
+    A : `np.ndarray`
         Coefficient matrix of the system of equations.
-    b : `np.array`
+    b : `np.ndarray`
         Right-hand side vector of the system of equations.
     n : `int`
         Dimension of the system of equations.
@@ -256,7 +247,7 @@ def sor_elimination(
 
     Returns
     -------
-    xi : `np.array`
+    xi : `np.ndarray`
         The solution of the system of equations.
     """
     xin = np.zeros(n)
@@ -284,7 +275,7 @@ def gauss_elimination(A: np.ndarray | list, pr: int = 2) -> np.ndarray:
 
     Parameters
     ----------
-    A : `np.array` or `list`
+    A : `np.ndarray` or `list`
         An array containing the parameters of the $n$ equations
         with the equalities.
     pr : `int`
@@ -292,9 +283,8 @@ def gauss_elimination(A: np.ndarray | list, pr: int = 2) -> np.ndarray:
 
     Returns
     -------
-    X : `np.array`
-        The solution of the system of $n$ equations
-
+    X : `np.ndarray`
+        The solution of the system of $n$ equationsS
     """
 
     n = len(A)
@@ -356,7 +346,7 @@ def find_multiples(target: int) -> tuple[int, int] | None:
         Otherwise, returns `(i, target // i)`.
         Returns `None` if no factors are found.
     """
-    for i in range(1, int(target**0.5) + 1):
+    for i in reversed(range(1, int(target**0.5) + 1)):
         if target % i == 0:
             return max(i, target // i), min(i, target // i)
     return None
