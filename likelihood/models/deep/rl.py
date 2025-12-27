@@ -1,5 +1,6 @@
 import random
 from collections import deque
+from typing import Any
 
 import numpy as np
 import tensorflow as tf
@@ -15,7 +16,7 @@ def print_progress_bar(iteration, total, length=30):
 
 
 class Env:
-    def __init__(self, model, maxlen=100, name="likenasium"):
+    def __init__(self, model: Any, maxlen: int = 100, name: str = "likenasium"):
         """
         Initialize the environment with a model.
 
@@ -37,7 +38,7 @@ class Env:
         self.current_step = 0
         self.done = False
 
-    def step(self, state, action, verbose=0):
+    def step(self, state: np.ndarray, action: int, verbose: int = 0):
         """
         Perform an environment step with the given action.
 
@@ -106,9 +107,9 @@ class AutoQL:
 
     def __init__(
         self,
-        env,
-        model,
-        maxlen=2000,
+        env: Any,
+        model: tf.keras.Model,
+        maxlen: int = 2000,
     ):
         """Initialize AutoQL agent
 
@@ -125,7 +126,7 @@ class AutoQL:
         self.maxlen = maxlen
         self.replay_buffer = deque(maxlen=self.maxlen)
 
-    def epsilon_greedy_policy(self, state, action, epsilon=0):
+    def epsilon_greedy_policy(self, state: np.ndarray, action: int, epsilon: float = 0.0) -> tuple:
         """
         Epsilon-greedy policy for action selection
 
@@ -136,7 +137,7 @@ class AutoQL:
         action : `int`
             Expected action to process.
         epsilon : `float`
-            Exploration probability. By default it is set to `0`
+            Exploration probability. By default it is set to `0.0`
 
         Returns
         -------
@@ -152,7 +153,7 @@ class AutoQL:
 
         return _state[0], greedy_action[0], _reward[0], _next_action[0], _done[0]
 
-    def play_one_step(self, state, action, epsilon):
+    def play_one_step(self, state: np.ndarray, action: int, epsilon: float):
         """
         Perform one step in the environment and add experience to buffer
 

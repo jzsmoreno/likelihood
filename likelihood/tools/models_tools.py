@@ -317,7 +317,6 @@ def train_and_insights(
     `tf.keras.Model`
         The trained model after fitting.
     """
-
     validation_split = kwargs.get("validation_split", 0.2)
     callback = kwargs.get(
         "callback", [tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=patience)]
@@ -831,8 +830,6 @@ def train_model_with_episodes(
             model.load_state_dict(previous_weights)
             no_improvement_count += 1
             status = f"{REVERT_COLOR}No Improvement{RESET_COLOR}"
-
-        # Printing the results for each episode
         print(
             f"{episode + 1:<8} {loss:<12.4f} {best_loss_so_far:<15.4f} {status:<25} {average_loss:<12.4f}"
         )

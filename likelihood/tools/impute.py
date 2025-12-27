@@ -59,7 +59,7 @@ class SimpleImputer:
         Impute missing values in the data.
 
         Parameters
-        -----------
+        ----------
         X: pd.DataFrame
             Dataframe to impute missing values.
         boundary: bool
@@ -115,7 +115,7 @@ class SimpleImputer:
         Fit and transform the data.
 
         Parameters
-        -----------
+        ----------
         X: pd.DataFrame
             Dataframe to fit and transform.
         boundary: bool
@@ -132,7 +132,7 @@ class SimpleImputer:
         Set missing values to zero, except for `column_exception`.
 
         Parameters
-        -----------
+        ----------
         X: pd.Series
             Series to set missing values to zero.
         """
@@ -148,7 +148,7 @@ class SimpleImputer:
         Check if the value is an integer and convert it to float if it is.
 
         Parameters
-        -----------
+        ----------
         value: Union[int, float]
             Value to check and convert.
         to_compare: Union[int, float]
@@ -166,7 +166,7 @@ class SimpleImputer:
         Get the parameters for the imputer.
 
         Parameters
-        -----------
+        ----------
         df: pd.DataFrame
             Dataframe to get the parameters from.
         """
@@ -187,7 +187,7 @@ class SimpleImputer:
         Create a histogram of the imputed values.
 
         Parameters
-        -----------
+        ----------
         X: pd.DataFrame
             Dataframe to create the histogram from.
         """
@@ -255,7 +255,7 @@ class SimpleImputer:
         Save the state of the SimpleImputer to a file.
 
         Parameters
-        -----------
+        ----------
         filename: str
             Name of the file to save the imputer to. Default is "./imputer".
         """
@@ -269,7 +269,7 @@ class SimpleImputer:
         Load the state of a SimpleImputer from a file.
 
         Parameters
-        -----------
+        ----------
         filename: str
             Name of the file to load the imputer from. Default is "./imputer".
         """

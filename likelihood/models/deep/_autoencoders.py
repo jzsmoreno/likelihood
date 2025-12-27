@@ -781,7 +781,7 @@ def setup_model(
         The number of epochs to train the model for.
     train_size : `float`
         The proportion of the dataset to use for training.
-    seed : `Any` | `int`
+    seed : `None` | `int`
         The random seed to use for reproducibility.
     train_mode : `bool`
         Whether to train the model or not.

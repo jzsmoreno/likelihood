@@ -484,12 +484,12 @@ class AutoClassifier(tf.keras.Model):
         ensuring compatibility in dimensions. Only works if vae_mode is False.
 
         Parameters
-        -----------
+        ----------
         source_model : AutoClassifier
             The source model to copy the encoder and decoder layers from.
 
         Raises
-        -------
+        ------
         ValueError
             If the input shape or units of the source model do not match.
         """
@@ -790,7 +790,7 @@ def setup_model(
         The number of epochs to train the model for.
     train_size : `float`
         The proportion of the dataset to use for training.
-    seed : `Any` | `int`
+    seed : `None` | `int`
         The random seed to use for reproducibility.
     train_mode : `bool`
         Whether to train the model or not.
