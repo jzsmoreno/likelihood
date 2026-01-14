@@ -1043,23 +1043,28 @@ class OneHotEncoder:
     def encode(self, x: np.ndarray | list, fit: bool = True):
         if not isinstance(x, np.ndarray):
             x = np.array(x)
-        x = x[~np.isnan(x)]
-        x = x.astype(int)
+        valid_mask = ~np.isnan(x)
+        x_int = x[valid_mask].astype(int)
 
         if fit:
-            self.num_categories = x.max() + 1
+            self.num_categories = x_int.max() + 1
         else:
-            if np.any(x >= self.num_categories):
-                new_max_category = x.max() + 1
-                self.num_categories = max(self.num_categories, new_max_category)
-        y = np.zeros((x.size, self.num_categories))
-        y[np.arange(x.size), x] = 1
+            if np.any(x_int >= self.num_categories):
+                self.num_categories = max(self.num_categories, x_int.max() + 1)
+        y = np.zeros((x.shape[0], self.num_categories))
+        y[np.where(valid_mask)[0], x_int] = 1
+
         return y
 
     def decode(self, x: np.ndarray | list) -> np.ndarray:
         if not isinstance(x, np.ndarray):
             x = np.array(x)
-        y = np.argmax(x, axis=1)
+
+        # rows that have at least one 1 (i.e., were valid)
+        valid_mask = x.sum(axis=1) > 0
+
+        y = np.full(x.shape[0], np.nan)
+        y[valid_mask] = np.argmax(x[valid_mask], axis=1)
         return y
 
 

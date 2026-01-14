@@ -265,29 +265,41 @@ class Pipeline:
             category_to_indices = {}
             for col in columns:
                 unique_values = X[col].unique()
-                category_to_indices[col] = {value: i for i, value in enumerate(unique_values)}
+                category_to_indices[col] = {
+                    value: i
+                    for i, value in enumerate(
+                        X[col].cat.codes.unique()
+                        if pd.api.types.is_categorical_dtype(X[col])
+                        else X[col].unique()
+                    )
+                }
                 encoded_X = encoder.encode(
                     X[col].values
                     if isinstance(unique_values[0], int)
-                    else X[col].map(category_to_indices[col])
+                    else X[col].cat.codes.map(category_to_indices[col])
                 )
                 tmp_df = pd.concat([tmp_df, pd.DataFrame(encoded_X, columns=unique_values)], axis=1)
-            self.fitted_components[f"OneHotEncoder_{idx}"] = (encoder, columns, category_to_indices)
+            self.fitted_components[f"OneHotEncoder_{idx}"] = (
+                encoder,
+                columns,
+                category_to_indices,
+                unique_values,
+            )
         else:
-            encoder, columns, category_to_indices = self.fitted_components[f"OneHotEncoder_{idx}"]
+            encoder, columns, category_to_indices, unique_values = self.fitted_components[
+                f"OneHotEncoder_{idx}"
+            ]
             tmp_df = X.drop(columns=columns)
             for col in columns:
-                unique_values = list(category_to_indices[col].keys())
                 encoded_X = encoder.encode(
                     (
                         X[col].values
                         if isinstance(unique_values[0], int)
-                        else X[col].map(category_to_indices[col])
+                        else X[col].cat.codes.map(category_to_indices[col])
                     ),
                     fit=False,
                 )
                 tmp_df = pd.concat([tmp_df, pd.DataFrame(encoded_X, columns=unique_values)], axis=1)
-                tmp_df[unique_values] = tmp_df[unique_values].fillna(0)
         return tmp_df
 
     def _handle_simpleimputer(
