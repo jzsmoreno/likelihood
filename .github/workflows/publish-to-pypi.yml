@@ -11,13 +11,25 @@ jobs:
   build-and-publish-to-pypi:
     name: Build distribution
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: "3.10"
+
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        components: rustfmt, cargo
+
+    - name: Run cargo check
+      uses: actions-rs/cargo@v1
+      with:
+        command: check
 
     - name: Install pypa/build
       run: >-
