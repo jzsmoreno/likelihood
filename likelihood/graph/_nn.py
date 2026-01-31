@@ -4,9 +4,8 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
-import warnings
 from multiprocessing import Pool, cpu_count
-from typing import Any, List, Tuple
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -18,143 +17,7 @@ tf.get_logger().setLevel("ERROR")
 
 from likelihood.tools import LoRALayer
 
-
-def compare_similarity_np(arr1: np.ndarray, arr2: np.ndarray, threshold: float = 0.05) -> int:
-    """Vectorized similarity comparison between two numeric/categorical arrays."""
-    arr1 = np.asarray(arr1)
-    arr2 = np.asarray(arr2)
-
-    is_numeric = np.vectorize(
-        lambda a, b: isinstance(a, (int, float)) and isinstance(b, (int, float))
-    )(arr1, arr2)
-
-    similarity = np.zeros_like(arr1, dtype=bool)
-
-    if np.any(is_numeric):
-        a_num = arr1[is_numeric].astype(float)
-        b_num = arr2[is_numeric].astype(float)
-
-        both_zero = (a_num == 0) & (b_num == 0)
-        nonzero = ~both_zero & (a_num != 0) & (b_num != 0)
-        ratio = np.zeros_like(a_num)
-        ratio[nonzero] = np.maximum(a_num[nonzero], b_num[nonzero]) / np.minimum(
-            a_num[nonzero], b_num[nonzero]
-        )
-        numeric_similar = both_zero | ((1 - threshold <= ratio) & (ratio <= 1 + threshold))
-
-        similarity[is_numeric] = numeric_similar
-
-    similarity[~is_numeric] = arr1[~is_numeric] == arr2[~is_numeric]
-
-    return np.count_nonzero(similarity)
-
-
-def compare_pair(pair, data, similarity, threshold):
-    i, j = pair
-    sim = compare_similarity_np(data[i], data[j], threshold=threshold)
-    return (i, j, 1 if sim >= similarity else 0)
-
-
-def cal_adjacency_matrix(
-    df: pd.DataFrame, exclude_subset: List[str] = [], sparse: bool = True, **kwargs
-) -> Tuple[dict, np.ndarray]:
-    """
-    Calculates the adjacency matrix for a given DataFrame using parallel processing.
-
-    Parameters
-    ----------
-    df : `pd.DataFrame`
-        The input DataFrame containing the features.
-    exclude_subset : `List[str]`, `optional`
-        A list of features to exclude from the calculation of the adjacency matrix.
-    sparse : `bool`, `optional`
-        Whether to return a sparse matrix or a dense matrix.
-    **kwargs : `dict`
-        Additional keyword arguments to pass to the `compare_similarity` function.
-
-    Returns
-    -------
-    adj_dict : `dict`
-        A dictionary containing the features.
-    adjacency_matrix : `np.ndarray`
-        The adjacency matrix.
-
-    Keyword Arguments
-    -----------------
-    similarity: `int`
-        The minimum number of features that must be the same in both arrays to be considered similar.
-    threshold : `float`
-        The threshold value used in the `compare_similarity` function. Default is 0.0
-    """
-    if len(exclude_subset) > 0:
-        columns = [col for col in df.columns if col not in exclude_subset]
-        df_ = df[columns].copy()
-    else:
-        df_ = df.copy()
-
-    assert len(df_) > 0
-
-    similarity = kwargs.get("similarity", len(df_.columns) - 1)
-    threshold = kwargs.get("threshold", 0.05)
-    assert similarity <= df_.shape[1]
-
-    data = df_.to_numpy()
-    n = len(data)
-
-    adj_dict = {i: data[i].tolist() for i in range(n)}
-
-    def pair_generator():
-        for i in range(n):
-            for j in range(i, n):
-                yield (i, j)
-
-    with Pool(cpu_count()) as pool:
-        results = pool.starmap(
-            compare_pair, ((pair, data, similarity, threshold) for pair in pair_generator())
-        )
-
-    adjacency_matrix = np.zeros((n, n), dtype=np.uint8)
-    for i, j, val in results:
-        if val:
-            adjacency_matrix[i, j] = 1
-            adjacency_matrix[j, i] = 1
-
-    if sparse:
-        num_nodes = adjacency_matrix.shape[0]
-
-        indices = np.argwhere(adjacency_matrix != 0.0)
-        indices = tf.constant(indices, dtype=tf.int64)
-        values = tf.constant(adjacency_matrix[indices[:, 0], indices[:, 1]], dtype=tf.float32)
-        adjacency_matrix = tf.sparse.SparseTensor(
-            indices=indices, values=values, dense_shape=(num_nodes, num_nodes)
-        )
-
-    return adj_dict, adjacency_matrix
-
-
-class Data:
-    def __init__(
-        self,
-        df: pd.DataFrame,
-        target: str | None = None,
-        exclude_subset: List[str] = [],
-        **kwargs,
-    ):
-        sparse = kwargs.get("sparse", True)
-        threshold = kwargs.get("threshold", 0.05)
-        _, adjacency = cal_adjacency_matrix(
-            df, exclude_subset=exclude_subset, sparse=sparse, threshold=threshold
-        )
-        if target is not None:
-            X = df.drop(columns=[target] + exclude_subset)
-        else:
-            X = df.drop(columns=exclude_subset)
-        self.columns = X.columns
-        X = X.to_numpy()
-        self.x = np.asarray(X).astype(np.float32)
-        self.adjacency = adjacency
-        if target is not None:
-            self.y = np.asarray(df[target].values).astype(np.int32)
+from .nn import Data, cal_adjacency_matrix, compare_pair, compare_similarity_np
 
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="VanillaGNNLayer")

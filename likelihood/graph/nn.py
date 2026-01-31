@@ -15,6 +15,7 @@ from sklearn.metrics import f1_score
 
 tf.get_logger().setLevel("ERROR")
 
+from likelihood import rust_py_integration
 from likelihood.tools import LoRALayer
 
 
