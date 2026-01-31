@@ -11,7 +11,7 @@ jobs:
   build-and-publish-to-pypi:
     name: Build distribution
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
@@ -19,21 +19,36 @@ jobs:
       with:
         python-version: "3.10"
 
-    - name: Install pypa/build
-      run: >-
-        python3 -m
-        pip install
-        build
-        --user
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        components: rustfmt, cargo
 
-    - name: Build a binary wheel and a source tarball
-      run: >-
-        python -m
-        build
-        --sdist
-        --wheel
-        --outdir dist/
-        .
+    - name: Run cargo check
+      uses: actions-rs/cargo@v1
+      with:
+        command: check
+
+    - name: Upgrade pip and install setuptools-rust
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install setuptools-rust
+
+    - name: Install build + cibuildwheel
+      run: |
+        python3 -m pip install build cibuildwheel
+  
+    - name: Build source distribution
+      run: |
+        python3 -m build --sdist --outdir dist/
+
+    - name: Build wheels (manylinux)
+      env:
+        CIBW_BEFORE_BUILD: "curl https://sh.rustup.rs -sSf | sh -s -- -y"
+        CIBW_ENVIRONMENT: 'PATH=\"$HOME/.cargo/bin:$PATH\"'
+      run: cibuildwheel --output-dir dist
 
     - name: Publish Python distribution to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
