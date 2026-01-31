@@ -44,9 +44,11 @@ jobs:
       run: |
         python3 -m build --sdist --outdir dist/
 
-    - name: Build manylinux wheels
-      run: |
-        cibuildwheel --output-dir dist
+    - name: Build wheels (manylinux)
+      env:
+        CIBW_BEFORE_BUILD: "curl https://sh.rustup.rs -sSf | sh -s -- -y"
+        CIBW_ENVIRONMENT: 'PATH=\"$HOME/.cargo/bin:$PATH\"'
+      run: cibuildwheel --output-dir dist
 
     - name: Publish Python distribution to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
