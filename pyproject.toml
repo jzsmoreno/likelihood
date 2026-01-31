@@ -1,0 +1,46 @@
+[build-system]
+requires = [
+  "setuptools>=61",
+  "wheel",
+  "setuptools-rust>=1.8",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "likelihood"
+authors = [
+  { name = "J. A. Moreno-Guerra", email = "jzs.gm27@gmail.com" }
+]
+maintainers = [
+  { name = "Jafet Castañeda", email = "jafetcc17@gmail.com" }
+]
+description = "A package that performs the maximum likelihood algorithm."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.10"
+license = { text = "MIT" }
+urls = { Homepage = "https://github.com/jzsmoreno/likelihood/" }
+
+dynamic = ["version", "dependencies"]
+
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+full = [
+  "networkx",
+  "pyvis",
+  "tensorflow>=2.15.0",
+  "keras-tuner",
+  "scikit-learn",
+  "torch",
+]
+
+[tool.setuptools]
+packages = { find = {} }
+
+[tool.setuptools.dynamic]
+version = { file = ["likelihood/VERSION"] }
+dependencies = { file = ["requirements.txt"] }
