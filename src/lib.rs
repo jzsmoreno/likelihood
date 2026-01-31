@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 
 #[pyfunction]
 fn print_hello() {
-    println!("Hello from Rust!");
+    println!("Hello from Rust integration!");
 }
 
 #[pymodule]

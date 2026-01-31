@@ -18,7 +18,3 @@ from likelihood.main import *
 from likelihood.models import *
 from likelihood.pipes import Pipeline
 from likelihood.tools import *
-
-from . import rust_py_integration
-
-__all__ = ["rust_py_integration"]
