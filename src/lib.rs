@@ -6,7 +6,7 @@ fn print_hello() {
 }
 
 #[pymodule]
-fn rust_py_integration(_py: Python, m: &PyModule) -> PyResult<()> {
+fn rust_py_integration(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(print_hello, m)?)?;
     Ok(())
 }

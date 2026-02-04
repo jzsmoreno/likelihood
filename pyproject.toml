@@ -16,15 +16,14 @@ maintainers = [
 ]
 description = "A package that performs the maximum likelihood algorithm."
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.10"
-license = { text = "MIT" }
+requires-python = ">=3.10,<3.13"
+license = "MIT"
 urls = { Homepage = "https://github.com/jzsmoreno/likelihood/" }
 
 dynamic = ["version", "dependencies"]
 
 classifiers = [
   "Programming Language :: Python :: 3",
-  "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
 
