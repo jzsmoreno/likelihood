@@ -8,60 +8,130 @@ on:
       - 'likelihood/VERSION'
 
 jobs:
-  build-and-publish-to-pypi:
-    name: Build distribution
-    runs-on: ubuntu-latest
-    
+  build:
+    name: Build Wheels
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10"]
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+
+    env:
+      PYO3_PYTHON: "${{ matrix.python-version }}"
+
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.10"
+      - uses: actions/checkout@v4
 
-    - name: Install Rust
-      run: |
-        curl https://sh.rustup.rs -sSf | sh -s -- -y
-        source $HOME/.cargo/env
-        rustup update stable
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Install build tools
-      run: python -m pip install --upgrade pip build auditwheel setuptools-rust
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade setuptools wheel
 
-    - name: Build a binary wheel and a source tarball
-      run: >-
-        python -m
-        build
-        --sdist
-        --wheel
-        --outdir dist/
-        .
+      - name: Set PYO3_PYTHON
+        run: |
+          if ($env:RUNNER_OS -eq "Windows") {
+            # Use the pythonLocation environment variable set by setup-python
+            $python_path = "C:\\hostedtoolcache\\windows\\Python\\3.10.11\\x64\\python.EXE"
+            
+            # Check if pythonPath is valid
+            if (-not $python_path) {
+              Write-Host "ERROR: Python not found at $python_path"
+              exit 1
+            }
 
-    - name: Repair wheel for manylinux
-      run: |
-        auditwheel repair dist/*.whl -w dist/
-        rm dist/*-linux_x86_64.whl  # remove the un-repaired wheel
+            # Set PYO3_PYTHON environment variable
+            echo "PYO3_PYTHON=$python_path"
+            echo "PYO3_PYTHON=$python_path" >> $env:GITHUB_ENV
+          } else {
+            $python_path = (which python)
+            echo "PYO3_PYTHON=$python_path"
+            echo "PYO3_PYTHON=$python_path" >> $env:GITHUB_ENV
+          }
+        shell: pwsh
 
-    - name: Publish Python distribution to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        password: ${{ secrets.PYPI_API_TOKEN }}
-      continue-on-error: true
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install cibuildwheel setuptools-rust
 
-    - name: Get package version
-      id: get_version
-      run: |
-        version=$(python setup.py --version)
-        echo "::set-output name=version::$version"
+      - name: Skip Windows 32-bit build
+        run: echo "CIBW_SKIP=*-win32" >> $GITHUB_ENV
 
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.TOKEN }}
-      with:
-        tag_name: ${{ steps.get_version.outputs.version }}
-        release_name: Release ${{ steps.get_version.outputs.version }}
-        draft: false
-        prerelease: false
-      continue-on-error: true
+      - name: Skip musllinux build
+        run: echo "CIBW_SKIP=cp*-musllinux_*" >> $GITHUB_ENV
+
+      - name: Build wheels with cibuildwheel
+        env:
+          CIBW_BEFORE_ALL: |
+            curl https://sh.rustup.rs -sSf | sh -s -- -y
+            rustup update stable
+            if [ "$RUNNER_OS" == "Windows" ]; then
+              echo "C:\\Users\\runneradmin\\.cargo\\bin" >> $GITHUB_ENV
+            else
+              . "$HOME/.cargo/env"
+            fi
+            rustc --version
+          CIBW_ENVIRONMENT: "PATH=$HOME/.cargo/bin:$PATH"
+          CIBW_OUTPUT_DIR: dist
+          CIBW_ARCHS_WINDOWS: AMD64
+        run: |
+          echo "Starting cibuildwheel..."
+          cibuildwheel --output-dir dist
+
+      - name: Upload all wheels into a single package
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.python-version }}
+          path: dist/*.whl
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10"]
+    steps:
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.python-version }}
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get package version
+        id: get_version
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools-rust
+          version=$(python setup.py --version)
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          release_name: Release ${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
