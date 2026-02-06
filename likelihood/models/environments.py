@@ -1,7 +1,12 @@
 from collections import defaultdict
+from itertools import chain
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
+
+
+def flatten_chain(matrix):
+    return list(chain.from_iterable(matrix))
 
 
 class ActionSpace:
@@ -76,7 +81,11 @@ class OptionCriticEnv:
         self.done = False
         self.idx_episode = 0
         self.current_state = None
-        self.num_options = len(set(episodes[0]["selected_option"]))
+        self.num_options = len(
+            set(flatten_chain(episodes[0]["selected_option"]))
+            if isinstance(episodes[0]["selected_option"][0], list)
+            else episodes[0]["selected_option"]
+        )
         self.actions_by_option = defaultdict(set)
 
         # Build fast lookup for transitions
@@ -92,7 +101,13 @@ class OptionCriticEnv:
 
             for i in range(len(states)):
                 state_key = tuple(states[i])
-                key = (state_key, options[i], actions[i])
+                key = (
+                    (state_key, options[i], actions[i])
+                    if not isinstance(actions[i], list)
+                    else (state_key,)
+                    + tuple(option for option in options[i])
+                    + tuple(action for action in actions[i])
+                )
 
                 self.state_action_option_to_transition[key] = {
                     "next_state": next_states[i],
@@ -101,11 +116,34 @@ class OptionCriticEnv:
                 }
 
             for i, selected in enumerate(options):
-                self.actions_by_option[selected].add(actions[i])
+                self.actions_by_option[
+                    tuple(selected) if isinstance(options[0], list) else selected
+                ].add(tuple(actions[i]) if isinstance(actions[i], list) else actions[i])
+
+        check_type = list(set([key for key in self.actions_by_option.keys()]))
+        keys_actions_by_option = list(self.actions_by_option.keys())
+        actions = self.actions_by_option[keys_actions_by_option[0]]
 
         self.unique_actions_count = [
-            len(self.actions_by_option.get(i, set()))
-            for i in range(max(self.actions_by_option.keys()) + 1)
+            len(
+                set(
+                    flatten_chain(
+                        [
+                            list(action)
+                            for action in self.actions_by_option.get(
+                                keys_actions_by_option[i], set()
+                            )
+                        ]
+                    )
+                )
+                if isinstance(keys_actions_by_option[i], tuple)
+                else self.actions_by_option.get(keys_actions_by_option[i], set())
+            )
+            for i in range(
+                max(self.actions_by_option.keys()) + 1
+                if not isinstance(check_type[0], tuple)
+                else len(set(keys_actions_by_option))
+            )
         ]
 
         self.action_space = ActionSpace(self.unique_actions_count)
