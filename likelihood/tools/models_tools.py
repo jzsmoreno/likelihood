@@ -514,6 +514,8 @@ def collect_experience(
     old_probs : `list[float]`
         The list of old policy probabilities for each step.
     """
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
     state = env.reset()
     done = False
     trajectory = []
@@ -522,7 +524,7 @@ def collect_experience(
 
     while not done and tolerance_count < tolerance:
         state = state[0] if isinstance(state, tuple) else state
-        state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+        state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
 
         option_probs, action_probs, termination_probs, selected_option, action = model(state_tensor)
 
@@ -555,14 +557,16 @@ def collect_experience(
     for t in reversed(range(len(trajectory))):
         state, selected_option, action, reward, next_state, terminate, done = trajectory[t]
 
-        state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+        state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
         _, action_probs, _, _, _ = model(state_tensor)
 
         if t == len(trajectory) - 1:
             G = reward
             advantages.insert(0, G - action_probs[0, action].item())
         else:
-            next_state_tensor = torch.tensor(next_state, dtype=torch.float32).unsqueeze(0)
+            next_state_tensor = (
+                torch.tensor(next_state, dtype=torch.float32).unsqueeze(0).to(device)
+            )
             _, next_action_probs, _, _, _ = model(next_state_tensor)
 
             delta = (
@@ -667,6 +671,7 @@ def train_option_critic(
     patience_counter = 0
     patience_counter_advantage = 0
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
     advantages_per_epoch = []
 
     for epoch in range(num_epochs):

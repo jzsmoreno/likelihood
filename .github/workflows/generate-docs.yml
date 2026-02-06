@@ -3,7 +3,7 @@ name: Auto-documentation Generation
 on:
   push:
     branches:
-      - 'main'
+      - 'py-dev'
     paths:
       - 'likelihood/**'
 
@@ -17,6 +17,9 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        ref: ${{ github.ref_name }}
+        fetch-depth: 0
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -67,10 +70,10 @@ jobs:
     - name: Commit documentation changes
       run: |
         if git status --porcelain | grep .; then
-          echo "Changes detected, proceeding with workflow steps..."
           git add docs/
           git commit -m "Auto-generated documentation"
-          git push origin main
+          git push origin ${{ github.ref_name }}
         else
           echo "No changes detected, skipping workflow steps."
         fi
+

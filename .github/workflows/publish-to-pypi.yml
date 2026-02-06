@@ -3,7 +3,7 @@ name: Publish Python distribution to PyPI
 on:
   push:
     branches:
-      - 'main'
+      - 'py-dev'
     paths:
       - 'likelihood/VERSION'
 
