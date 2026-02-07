@@ -55,43 +55,80 @@ class MultiBanditNet(nn.Module):
             nn.Sigmoid(),
         )
 
-    def forward(self, state):
+    def forward(self, state, multiple_option=False):
         if state.dim() == 1:
             state = state.unsqueeze(0)
 
         batch_size = state.shape[0]
         option_probs = torch.softmax(self.option_network(state), dim=-1)
 
-        action_probs = []
-        selected_actions = []
+        if multiple_option:
+            all_action_probs = []
+            all_selected_actions = []
 
-        for i in range(batch_size):
-            selected_option = torch.multinomial(option_probs[i], 1).item()
+            for option_idx in range(self.num_options):
+                # Get Q-values for this option for all batch items
+                q_values = self.action_networks[option_idx](state)
+                action_prob = torch.softmax(q_values, dim=-1)
+                all_action_probs.append(action_prob)
+                selected_action = torch.argmax(action_prob, dim=-1)
+                all_selected_actions.append(selected_action)
 
-            # Get Q-values for this option
-            q_values = self.action_networks[selected_option](state[i].unsqueeze(0))
-            action_prob = torch.softmax(q_values, dim=-1)
-            action_probs.append(action_prob)
-            selected_action = torch.argmax(action_prob, dim=-1)
-            selected_actions.append(selected_action)
+            # shape (batch_size, num_options, num_actions)
+            action_probs = torch.stack(all_action_probs, dim=1)
+            # shape (batch_size, num_options)
+            selected_actions = torch.stack(all_selected_actions, dim=1)
 
-        if len(action_probs) > 0:
-            action_probs = torch.cat(action_probs, dim=0).squeeze(1)
-            selected_actions = torch.stack(selected_actions, dim=0).squeeze(1)
+            selected_options = torch.argmax(option_probs, dim=-1)
+            selected_action_probs = []
+            for i in range(batch_size):
+                selected_option = selected_options[i].item()
+                selected_action_probs.append(action_probs[i, selected_option, :])
+            selected_action_probs = torch.stack(selected_action_probs, dim=0)
+
         else:
-            warnings.warn(
-                "The list of action probabilities is empty, initializing with default values.",
-                UserWarning,
-            )
-            action_probs = torch.empty((batch_size, 1))
-            selected_actions = torch.zeros(batch_size, dtype=torch.long)
+            action_probs = []
+            selected_actions = []
+
+            for i in range(batch_size):
+                selected_option = torch.multinomial(option_probs[i], 1).item()
+
+                # Get Q-values for this option
+                q_values = self.action_networks[selected_option](state[i].unsqueeze(0))
+                action_prob = torch.softmax(q_values, dim=-1)
+                action_probs.append(action_prob)
+                selected_action = torch.argmax(action_prob, dim=-1)
+                selected_actions.append(selected_action)
+
+            if len(action_probs) > 0:
+                action_probs = torch.cat(action_probs, dim=0).squeeze(1)
+                selected_actions = torch.stack(selected_actions, dim=0).squeeze(1)
+            else:
+                warnings.warn(
+                    "The list of action probabilities is empty, initializing with default values.",
+                    UserWarning,
+                )
+                action_probs = torch.empty((batch_size, 1))
+                selected_actions = torch.zeros(batch_size, dtype=torch.long)
+
+            selected_action_probs = action_probs
 
         termination_prob = self.termination_network(state)
 
-        return (
-            option_probs,
-            action_probs,
-            termination_prob,
-            torch.argmax(option_probs, dim=-1),  # selected_options
-            selected_actions,
-        )
+        if multiple_option:
+            return (
+                option_probs,
+                action_probs,  # (batch_size, num_options, num_actions)
+                termination_prob,
+                torch.argmax(option_probs, dim=-1),
+                selected_actions,  # (batch_size, num_options)
+                selected_action_probs,  # (batch_size, num_actions)
+            )
+        else:
+            return (
+                option_probs,
+                selected_action_probs,  # (batch_size, num_actions)
+                termination_prob,
+                torch.argmax(option_probs, dim=-1),  # selected_options
+                selected_actions,  # (batch_size,)
+            )
