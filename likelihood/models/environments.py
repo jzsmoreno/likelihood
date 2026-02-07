@@ -208,7 +208,6 @@ class OptionCriticEnv:
         )
 
         if key in self.state_action_option_to_transition:
-            print("LOOKUP KEY:", key, type(key))
             trans = self.state_action_option_to_transition[key]
             self.current_state = trans["next_state"]
             return trans["next_state"].copy(), trans["reward"], trans["done"], True, {}
