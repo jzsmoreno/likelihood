@@ -69,6 +69,7 @@ class OptionCriticEnv:
             If required fields ("state" or "selected_option") are missing from episode data
         """
         self.episodes = episodes
+        self.multiple_option = False
 
         required_keys = ["state", "action", "selected_option", "reward", "next_state", "done"]
         for episode_id, data in episodes.items():
@@ -155,6 +156,7 @@ class OptionCriticEnv:
         state_key = tuple(round(float(x), decimals) for x in state)
 
         if isinstance(action, (list, tuple)):
+            self.multiple_option = True
             return (state_key,) + tuple(int(o) for o in option) + tuple(int(a) for a in action)
         else:
             return (state_key, int(option), int(action))
