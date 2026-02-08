@@ -3,6 +3,7 @@ from itertools import chain
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
+from scipy.spatial import KDTree
 
 
 def flatten_chain(matrix):
@@ -145,6 +146,11 @@ class OptionCriticEnv:
         ]
 
         self.action_space = ActionSpace(self.unique_actions_count)
+        next_states = np.array(
+            [trans["next_state"] for trans in self.state_action_option_to_transition.values()]
+        )
+        self.kdtree = KDTree(next_states)
+        self.trans_list = list(self.state_action_option_to_transition.values())
 
     def _make_transition_key(
         self, state, option: int | list[int], action: int | list[int], decimals=6
@@ -202,6 +208,10 @@ class OptionCriticEnv:
             Whether the action-option pair was found in the dataset
         info : `Dict`
             Empty dictionary (no additional information)
+
+        Notes
+        -----
+        - Uses a KD-tree for efficient nearest-neighbor lookup of next states.
         """
         key = self._make_transition_key(
             self.current_state,
@@ -214,7 +224,19 @@ class OptionCriticEnv:
             self.current_state = trans["next_state"]
             return trans["next_state"].copy(), trans["reward"], trans["done"], True, {}
         else:
-            return self.current_state, 0.0, False, False, {}
+            # Query KD-tree for nearest neighbor
+            distance, idx = self.kdtree.query(self.current_state)
+            closest_trans = self.trans_list[idx]
+            closest_state = closest_trans["next_state"]
+
+            self.current_state = closest_state.copy()
+            return (
+                closest_state.copy(),
+                closest_trans.get("reward", 0.0),
+                closest_trans.get("done", False),
+                False,
+                {},
+            )
 
 
 if __name__ == "__main__":

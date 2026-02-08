@@ -560,12 +560,13 @@ def collect_experience(
         else:
             action = torch.multinomial(action_probs, 1).item()
             option = torch.multinomial(option_probs, 1).item()
+
         old_probs.append(get_selected_probs(action_probs, action))
 
         terminate = torch.bernoulli(termination_probs).item() > 0.5
         signature = env.step.__code__
-        if signature.co_argcount > 2:
 
+        if signature.co_argcount > 2:
             next_state, reward, done, truncated, info = env.step(
                 action if isinstance(option, int) else action.tolist(),
                 option if isinstance(option, int) else list(range(option_probs.size(0) + 1)),
@@ -575,9 +576,11 @@ def collect_experience(
 
         if done:
             reward = penalty_for_done_state
+
         tolerance_count += 1
         trajectory.append((state, selected_option, action, reward, next_state, terminate, done))
         state = next_state
+
         if verbose:
             print_trajectory_info(
                 state, selected_option, action, reward, next_state, terminate, done
@@ -611,22 +614,14 @@ def collect_experience(
             selected_probs = get_selected_probs(action_probs, action)
             next_selected_probs = get_selected_probs(next_action_probs, action)
 
-            # Compute delta
             if isinstance(selected_probs, list):
-                delta = sum(
-                    [
-                        r + gamma * np
-                        for r, np, sp in zip(
-                            [reward] * len(action), next_selected_probs, selected_probs
-                        )
-                    ]
-                ) - sum(selected_probs)
+                reward_tensor = torch.tensor([reward] * len(action), dtype=torch.float32).to(device)
+                np_tensor = torch.tensor(next_selected_probs, dtype=torch.float32).to(device)
+                sp_tensor = torch.tensor(selected_probs, dtype=torch.float32).to(device)
+                deltas = reward_tensor + gamma * np_tensor - sp_tensor
+                delta = torch.mean(deltas).item()
             else:
-                delta = (
-                    reward
-                    + gamma * next_action_probs[0, action].item()
-                    - action_probs[0, action].item()
-                )
+                delta = reward + gamma * next_selected_probs - selected_probs
 
             G = reward + gamma * G
             advantages.insert(
