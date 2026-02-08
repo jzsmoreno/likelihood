@@ -479,6 +479,29 @@ def print_trajectory_info(state, selected_option, action, reward, next_state, te
     print("=" * 50)
 
 
+def get_selected_probs(action_probs: torch.Tensor, action: torch.Tensor | int):
+    """
+    Retrieves the probabilities of selected actions from a single-batch action probability distribution.
+
+    Parameters
+    ----------
+    action_probs : `torch.Tensor`
+        Tensor containing action probabilities for each timestep.
+    action : `torch.Tensor` or `int`
+        Tensor containing selected actions, or an integer for a single action.
+
+    Returns
+    -------
+    selected_probs : `list[float]` or `float`
+        List containing the probabilities of the selected actions per timestep, or a single float if action is an integer.
+    """
+    if not torch.is_tensor(action):
+        return action_probs[0, action].item()
+
+    selected_probs = action_probs.squeeze(0).gather(1, action.unsqueeze(1)).squeeze(-1)
+    return selected_probs.tolist()
+
+
 def collect_experience(
     env: Any,
     model: torch.nn.Module,
@@ -521,21 +544,32 @@ def collect_experience(
     trajectory = []
     old_probs = []
     tolerance_count = 0
+    multiple_option = getattr(env, "multiple_option", False)
 
     while not done and tolerance_count < tolerance:
         state = state[0] if isinstance(state, tuple) else state
         state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
 
-        option_probs, action_probs, termination_probs, selected_option, action = model(state_tensor)
+        option_probs, action_probs, termination_probs, selected_option, action = model(
+            state_tensor, multiple_option
+        )
 
-        action = torch.multinomial(action_probs, 1).item()
-        option = torch.multinomial(option_probs, 1).item()
-        old_probs.append(action_probs[0, action].item())
+        if multiple_option:
+            action = torch.multinomial(action_probs.squeeze(0), 1).squeeze(-1)
+            option = torch.multinomial(option_probs.squeeze(0), 1).squeeze(-1)
+        else:
+            action = torch.multinomial(action_probs, 1).item()
+            option = torch.multinomial(option_probs, 1).item()
+        old_probs.append(get_selected_probs(action_probs, action))
 
         terminate = torch.bernoulli(termination_probs).item() > 0.5
         signature = env.step.__code__
         if signature.co_argcount > 2:
-            next_state, reward, done, truncated, info = env.step(action, option)
+
+            next_state, reward, done, truncated, info = env.step(
+                action if isinstance(option, int) else action.tolist(),
+                option if isinstance(option, int) else list(range(option_probs.size(0) + 1)),
+            )
         else:
             next_state, reward, done, truncated, info = env.step(action)
 
@@ -553,27 +587,47 @@ def collect_experience(
     advantages = []
     G = 0
     delta = 0
-
     for t in reversed(range(len(trajectory))):
         state, selected_option, action, reward, next_state, terminate, done = trajectory[t]
 
         state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
-        _, action_probs, _, _, _ = model(state_tensor)
+        _, action_probs, _, _, _ = model(state_tensor, multiple_option)
 
         if t == len(trajectory) - 1:
             G = reward
-            advantages.insert(0, G - action_probs[0, action].item())
+            adv = 0
+            selected_probs = get_selected_probs(action_probs, action)
+            if isinstance(selected_probs, list):
+                adv = sum([G - p for p in selected_probs])
+            else:
+                adv = G - selected_probs
+            advantages.insert(0, adv)
         else:
             next_state_tensor = (
                 torch.tensor(next_state, dtype=torch.float32).unsqueeze(0).to(device)
             )
-            _, next_action_probs, _, _, _ = model(next_state_tensor)
+            _, next_action_probs, _, _, _ = model(next_state_tensor, multiple_option)
 
-            delta = (
-                reward
-                + gamma * next_action_probs[0, action].item()
-                - action_probs[0, action].item()
-            )
+            selected_probs = get_selected_probs(action_probs, action)
+            next_selected_probs = get_selected_probs(next_action_probs, action)
+
+            # Compute delta
+            if isinstance(selected_probs, list):
+                delta = sum(
+                    [
+                        r + gamma * np
+                        for r, np, sp in zip(
+                            [reward] * len(action), next_selected_probs, selected_probs
+                        )
+                    ]
+                ) - sum(selected_probs)
+            else:
+                delta = (
+                    reward
+                    + gamma * next_action_probs[0, action].item()
+                    - action_probs[0, action].item()
+                )
+
             G = reward + gamma * G
             advantages.insert(
                 0, delta + gamma * lambda_parameter * advantages[0] if advantages else delta
@@ -611,10 +665,12 @@ def ppo_loss(
 
     if advantages.dim() == 1:
         advantages = advantages.unsqueeze(-1)
-
+    action_probs = action_probs.view(old_action_probs.shape)
     log_ratio = torch.log(action_probs + 1e-8) - torch.log(old_action_probs + 1e-8)
     ratio = torch.exp(log_ratio)  # π(a|s) / π_old(a|s)
-
+    if log_ratio.ndim > 1:
+        ratio = ratio.mean(dim=1)
+    ratio = ratio.view(advantages.shape)
     clipped_ratio = torch.clamp(ratio, 1 - epsilon, 1 + epsilon)
 
     loss = -torch.min(ratio * advantages, clipped_ratio * advantages)
@@ -680,10 +736,16 @@ def train_option_critic(
         advantages_per_epoch.append(avg_advantage)
 
         states = torch.tensor(np.array([t[0] for t in trajectory]), dtype=torch.float32).to(device)
-        actions = torch.tensor([t[2] for t in trajectory], dtype=torch.long).to(device)
+        actions = (
+            torch.stack([t[2] for t in trajectory]).to(device)
+            if isinstance(trajectory[0][2], torch.Tensor)
+            else torch.tensor([t[2] for t in trajectory], dtype=torch.long).to(device)
+        )
         returns_tensor = torch.tensor(returns, dtype=torch.float32).to(device)
         advantages_tensor = torch.tensor(advantages, dtype=torch.float32).to(device)
-        old_probs_tensor = torch.tensor(old_probs, dtype=torch.float32).view(-1, 1).to(device)
+        old_probs_tensor = (
+            torch.tensor(old_probs, dtype=torch.float32).view(actions.shape).to(device)
+        )
 
         dataset = TensorDataset(
             states, actions, returns_tensor, advantages_tensor, old_probs_tensor
@@ -705,11 +767,15 @@ def train_option_critic(
             option_probs, action_probs, termination_probs, selected_option, action = model(
                 batch_states
             )
-
-            batch_current_probs = action_probs.gather(1, batch_actions.unsqueeze(1))
-            ppo_loss_value = ppo_loss(
-                batch_advantages, batch_old_probs, batch_current_probs, epsilon=epsilon
-            )
+            if action_probs.ndim == 2 and batch_actions.ndim == 1:
+                batch_current_probs = action_probs.gather(1, batch_actions.unsqueeze(1))
+                ppo_loss_value = ppo_loss(
+                    batch_advantages, batch_old_probs, batch_current_probs, epsilon=epsilon
+                )
+            else:
+                ppo_loss_value = ppo_loss(
+                    batch_advantages, batch_old_probs, action_probs, epsilon=epsilon
+                )
 
             entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
 

@@ -55,7 +55,13 @@ class MultiBanditNet(nn.Module):
             nn.Sigmoid(),
         )
 
-    def forward(self, state, multiple_option=False):
+    def forward(self, state, multiple_option: bool = False):
+        """
+        Parameters
+        ----------
+        multiple_option : `bool`
+            Whether the result of the model is a multiple choice option or not. By default it is set to `False`.
+        """
         if state.dim() == 1:
             state = state.unsqueeze(0)
 
@@ -122,7 +128,6 @@ class MultiBanditNet(nn.Module):
                 termination_prob,
                 torch.argmax(option_probs, dim=-1),
                 selected_actions,  # (batch_size, num_options)
-                selected_action_probs,  # (batch_size, num_actions)
             )
         else:
             return (
