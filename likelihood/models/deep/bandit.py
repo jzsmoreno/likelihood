@@ -55,43 +55,68 @@ class MultiBanditNet(nn.Module):
             nn.Sigmoid(),
         )
 
-    def forward(self, state):
+    def forward(self, state: torch.Tensor, multiple_option: bool = False):
+        """
+        Parameters
+        ----------
+        state : torch.Tensor
+            Tensor of shape (batch_size, state_dim) or (state_dim,)
+        multiple_option : bool, default False
+            Whether the model should return probabilities for multiple options.
+
+        Returns
+        -------
+        option_probs : torch.Tensor
+            Tensor of shape (batch_size, num_options)
+        action_probs : torch.Tensor
+            - If multiple_option=False: shape (batch_size, num_actions)
+            - If multiple_option=True: shape (batch_size, num_options, num_actions)
+        termination_prob : torch.Tensor
+            Tensor of shape (batch_size, 1)
+        selected_options : torch.Tensor
+            Tensor of shape (batch_size,) indicating the selected option per batch item
+        selected_actions : torch.Tensor
+            - If multiple_option=False: shape (batch_size,)
+            - If multiple_option=True: shape (batch_size, num_options)
+        """
         if state.dim() == 1:
             state = state.unsqueeze(0)
+        batch_size = state.size(0)
 
-        batch_size = state.shape[0]
-        option_probs = torch.softmax(self.option_network(state), dim=-1)
+        # Option probabilities
+        option_probs = torch.softmax(
+            self.option_network(state), dim=-1
+        )  # (batch_size, num_options)
 
-        action_probs = []
-        selected_actions = []
-
-        for i in range(batch_size):
-            selected_option = torch.multinomial(option_probs[i], 1).item()
-
-            # Get Q-values for this option
-            q_values = self.action_networks[selected_option](state[i].unsqueeze(0))
-            action_prob = torch.softmax(q_values, dim=-1)
-            action_probs.append(action_prob)
-            selected_action = torch.argmax(action_prob, dim=-1)
-            selected_actions.append(selected_action)
-
-        if len(action_probs) > 0:
-            action_probs = torch.cat(action_probs, dim=0).squeeze(1)
-            selected_actions = torch.stack(selected_actions, dim=0).squeeze(1)
+        if multiple_option:
+            all_action_probs = [
+                torch.softmax(self.action_networks[i](state), dim=-1)  # (batch_size, num_actions)
+                for i in range(self.num_options)
+            ]
+            action_probs = torch.stack(all_action_probs, dim=1)
+            selected_actions = torch.argmax(action_probs, dim=-1)
+            selected_options = torch.argmax(option_probs, dim=-1)
+            selected_action_probs = action_probs[torch.arange(batch_size), selected_options, :]
         else:
-            warnings.warn(
-                "The list of action probabilities is empty, initializing with default values.",
-                UserWarning,
-            )
-            action_probs = torch.empty((batch_size, 1))
-            selected_actions = torch.zeros(batch_size, dtype=torch.long)
+            selected_options = torch.multinomial(option_probs, 1).squeeze(-1)  # (batch_size,)
+            action_probs = torch.stack(
+                [
+                    torch.softmax(
+                        self.action_networks[selected_options[i]](state[i].unsqueeze(0)), dim=-1
+                    ).squeeze(0)
+                    for i in range(batch_size)
+                ],
+                dim=0,
+            )  # (batch_size, num_actions)
+            selected_actions = torch.argmax(action_probs, dim=-1)
+            selected_action_probs = action_probs
 
-        termination_prob = self.termination_network(state)
+        termination_prob = self.termination_network(state)  # (batch_size, 1)
 
         return (
             option_probs,
-            action_probs,
+            selected_action_probs if not multiple_option else action_probs,
             termination_prob,
-            torch.argmax(option_probs, dim=-1),  # selected_options
+            selected_options,
             selected_actions,
         )

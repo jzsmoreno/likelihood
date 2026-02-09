@@ -3,6 +3,7 @@ from itertools import chain
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
+from scipy.spatial import KDTree
 
 
 def flatten_chain(matrix):
@@ -56,12 +57,12 @@ class OptionCriticEnv:
         episodes : `Dict[int, Dict]`
             Dataset of episodes where keys are episode identifiers and values are episode data.
             Each episode must contain at least:
-                - "state": List of state observations
-                - "selected_option": List of selected options
-                - "action": List of actions taken
-                - "reward": List of rewards
-                - "next_state": List of next states
-                - "done": List of termination flags
+                - *state*: `List` of state observations
+                - *selected_option*: `List[int]` or `List[List[int]]` of selected options
+                - *action*: `List[int]` or `List[List[int]]` of actions taken
+                - *reward*: `List` of rewards
+                - *next_state*: `List` of next states
+                - *done*: `List` of termination flags
 
         Raises
         ------
@@ -69,6 +70,7 @@ class OptionCriticEnv:
             If required fields ("state" or "selected_option") are missing from episode data
         """
         self.episodes = episodes
+        self.multiple_option = False
 
         required_keys = ["state", "action", "selected_option", "reward", "next_state", "done"]
         for episode_id, data in episodes.items():
@@ -100,13 +102,10 @@ class OptionCriticEnv:
             dones = data["done"]
 
             for i in range(len(states)):
-                state_key = tuple(states[i])
-                key = (
-                    (state_key, options[i], actions[i])
-                    if not isinstance(actions[i], list)
-                    else (state_key,)
-                    + tuple(option for option in options[i])
-                    + tuple(action for action in actions[i])
+                key = self._make_transition_key(
+                    states[i],
+                    options[i],
+                    actions[i],
                 )
 
                 self.state_action_option_to_transition[key] = {
@@ -147,6 +146,26 @@ class OptionCriticEnv:
         ]
 
         self.action_space = ActionSpace(self.unique_actions_count)
+        next_states = np.array(
+            [trans["next_state"] for trans in self.state_action_option_to_transition.values()]
+        )
+        self.kdtree = KDTree(next_states)
+        self.trans_list = list(self.state_action_option_to_transition.values())
+
+    def _make_transition_key(
+        self, state, option: int | list[int], action: int | list[int], decimals=6
+    ) -> tuple:
+        """
+        Builds a canonical transition key:
+        ((state_tuple), option(s)..., action(s)...)
+        """
+        state_key = tuple(round(float(x), decimals) for x in state)
+
+        if isinstance(action, (list, tuple)):
+            self.multiple_option = True
+            return (state_key,) + tuple(int(o) for o in option) + tuple(int(a) for a in action)
+        else:
+            return (state_key, int(option), int(action))
 
     def reset(self) -> tuple[np.ndarray, dict]:
         """
@@ -164,15 +183,17 @@ class OptionCriticEnv:
         self.current_state = self.episodes[episode_id]["state"][0]
         return self.current_state, {}
 
-    def step(self, action: int, option: int) -> tuple[np.ndarray, float, bool, bool, dict]:
+    def step(
+        self, action: int | List[int], option: int | List[int]
+    ) -> tuple[np.ndarray, float, bool, bool, dict]:
         """
         Takes an action with a specific option and returns the next state, reward, and termination status.
 
         Parameters
         ----------
-        action : `int`
+        action : `int` | `List[int]`
             Action index to execute
-        option : `int`
+        option : `int` | `List[int]`
             Selected option index
 
         Returns
@@ -187,14 +208,35 @@ class OptionCriticEnv:
             Whether the action-option pair was found in the dataset
         info : `Dict`
             Empty dictionary (no additional information)
+
+        Notes
+        -----
+        - Uses a KD-tree for efficient nearest-neighbor lookup of next states.
         """
-        key = (tuple(self.current_state), option, action)
+        key = self._make_transition_key(
+            self.current_state,
+            option,
+            action,
+        )
+
         if key in self.state_action_option_to_transition:
             trans = self.state_action_option_to_transition[key]
             self.current_state = trans["next_state"]
             return trans["next_state"].copy(), trans["reward"], trans["done"], True, {}
         else:
-            return self.current_state, 0.0, False, False, {}
+            # Query KD-tree for nearest neighbor
+            distance, idx = self.kdtree.query(self.current_state)
+            closest_trans = self.trans_list[idx]
+            closest_state = closest_trans["next_state"]
+
+            self.current_state = closest_state.copy()
+            return (
+                closest_state.copy(),
+                closest_trans.get("reward", 0.0),
+                closest_trans.get("done", False),
+                False,
+                {},
+            )
 
 
 if __name__ == "__main__":
