@@ -42,6 +42,22 @@ el.replaceWith(d);
 <section>
 </section>
 <section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="likelihood.models.environments.flatten_chain"><code class="name flex">
+<span>def <span class="ident">flatten_chain</span></span>(<span>matrix)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def flatten_chain(matrix):
+    return list(chain.from_iterable(matrix))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
 </section>
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
@@ -127,12 +143,12 @@ def n(self):
         episodes : `Dict[int, Dict]`
             Dataset of episodes where keys are episode identifiers and values are episode data.
             Each episode must contain at least:
-                - &#34;state&#34;: List of state observations
-                - &#34;selected_option&#34;: List of selected options
-                - &#34;action&#34;: List of actions taken
-                - &#34;reward&#34;: List of rewards
-                - &#34;next_state&#34;: List of next states
-                - &#34;done&#34;: List of termination flags
+                - *state*: `List` of state observations
+                - *selected_option*: `List[int]` or `List[List[int]]` of selected options
+                - *action*: `List[int]` or `List[List[int]]` of actions taken
+                - *reward*: `List` of rewards
+                - *next_state*: `List` of next states
+                - *done*: `List` of termination flags
 
         Raises
         ------
@@ -140,6 +156,7 @@ def n(self):
             If required fields (&#34;state&#34; or &#34;selected_option&#34;) are missing from episode data
         &#34;&#34;&#34;
         self.episodes = episodes
+        self.multiple_option = False
 
         required_keys = [&#34;state&#34;, &#34;action&#34;, &#34;selected_option&#34;, &#34;reward&#34;, &#34;next_state&#34;, &#34;done&#34;]
         for episode_id, data in episodes.items():
@@ -152,7 +169,11 @@ def n(self):
         self.done = False
         self.idx_episode = 0
         self.current_state = None
-        self.num_options = len(set(episodes[0][&#34;selected_option&#34;]))
+        self.num_options = len(
+            set(flatten_chain(episodes[0][&#34;selected_option&#34;]))
+            if isinstance(episodes[0][&#34;selected_option&#34;][0], list)
+            else episodes[0][&#34;selected_option&#34;]
+        )
         self.actions_by_option = defaultdict(set)
 
         # Build fast lookup for transitions
@@ -167,8 +188,11 @@ def n(self):
             dones = data[&#34;done&#34;]
 
             for i in range(len(states)):
-                state_key = tuple(states[i])
-                key = (state_key, options[i], actions[i])
+                key = self._make_transition_key(
+                    states[i],
+                    options[i],
+                    actions[i],
+                )
 
                 self.state_action_option_to_transition[key] = {
                     &#34;next_state&#34;: next_states[i],
@@ -177,14 +201,57 @@ def n(self):
                 }
 
             for i, selected in enumerate(options):
-                self.actions_by_option[selected].add(actions[i])
+                self.actions_by_option[
+                    tuple(selected) if isinstance(options[0], list) else selected
+                ].add(tuple(actions[i]) if isinstance(actions[i], list) else actions[i])
+
+        check_type = list(set([key for key in self.actions_by_option.keys()]))
+        keys_actions_by_option = list(self.actions_by_option.keys())
+        actions = self.actions_by_option[keys_actions_by_option[0]]
 
         self.unique_actions_count = [
-            len(self.actions_by_option.get(i, set()))
-            for i in range(max(self.actions_by_option.keys()) + 1)
+            len(
+                set(
+                    flatten_chain(
+                        [
+                            list(action)
+                            for action in self.actions_by_option.get(
+                                keys_actions_by_option[i], set()
+                            )
+                        ]
+                    )
+                )
+                if isinstance(keys_actions_by_option[i], tuple)
+                else self.actions_by_option.get(keys_actions_by_option[i], set())
+            )
+            for i in range(
+                max(self.actions_by_option.keys()) + 1
+                if not isinstance(check_type[0], tuple)
+                else len(set(keys_actions_by_option))
+            )
         ]
 
         self.action_space = ActionSpace(self.unique_actions_count)
+        next_states = np.array(
+            [trans[&#34;next_state&#34;] for trans in self.state_action_option_to_transition.values()]
+        )
+        self.kdtree = KDTree(next_states)
+        self.trans_list = list(self.state_action_option_to_transition.values())
+
+    def _make_transition_key(
+        self, state, option: int | list[int], action: int | list[int], decimals=6
+    ) -&gt; tuple:
+        &#34;&#34;&#34;
+        Builds a canonical transition key:
+        ((state_tuple), option(s)..., action(s)...)
+        &#34;&#34;&#34;
+        state_key = tuple(round(float(x), decimals) for x in state)
+
+        if isinstance(action, (list, tuple)):
+            self.multiple_option = True
+            return (state_key,) + tuple(int(o) for o in option) + tuple(int(a) for a in action)
+        else:
+            return (state_key, int(option), int(action))
 
     def reset(self) -&gt; tuple[np.ndarray, dict]:
         &#34;&#34;&#34;
@@ -202,15 +269,17 @@ def n(self):
         self.current_state = self.episodes[episode_id][&#34;state&#34;][0]
         return self.current_state, {}
 
-    def step(self, action: int, option: int) -&gt; tuple[np.ndarray, float, bool, bool, dict]:
+    def step(
+        self, action: int | List[int], option: int | List[int]
+    ) -&gt; tuple[np.ndarray, float, bool, bool, dict]:
         &#34;&#34;&#34;
         Takes an action with a specific option and returns the next state, reward, and termination status.
 
         Parameters
         ----------
-        action : `int`
+        action : `int` | `List[int]`
             Action index to execute
-        option : `int`
+        option : `int` | `List[int]`
             Selected option index
 
         Returns
@@ -225,14 +294,35 @@ def n(self):
             Whether the action-option pair was found in the dataset
         info : `Dict`
             Empty dictionary (no additional information)
+
+        Notes
+        -----
+        - Uses a KD-tree for efficient nearest-neighbor lookup of next states.
         &#34;&#34;&#34;
-        key = (tuple(self.current_state), option, action)
+        key = self._make_transition_key(
+            self.current_state,
+            option,
+            action,
+        )
+
         if key in self.state_action_option_to_transition:
             trans = self.state_action_option_to_transition[key]
             self.current_state = trans[&#34;next_state&#34;]
             return trans[&#34;next_state&#34;].copy(), trans[&#34;reward&#34;], trans[&#34;done&#34;], True, {}
         else:
-            return self.current_state, 0.0, False, False, {}</code></pre>
+            # Query KD-tree for nearest neighbor
+            distance, idx = self.kdtree.query(self.current_state)
+            closest_trans = self.trans_list[idx]
+            closest_state = closest_trans[&#34;next_state&#34;]
+
+            self.current_state = closest_state.copy()
+            return (
+                closest_state.copy(),
+                closest_trans.get(&#34;reward&#34;, 0.0),
+                closest_trans.get(&#34;done&#34;, False),
+                False,
+                {},
+            )</code></pre>
 </details>
 <div class="desc"><p>An environment for Option Critic reinforcement learning that processes a dataset of episodes.</p>
 <h2 id="attributes">Attributes</h2>
@@ -262,12 +352,12 @@ def n(self):
 <dt><strong><code>episodes</code></strong> :&ensp;<code>Dict[int, Dict]</code></dt>
 <dd>Dataset of episodes where keys are episode identifiers and values are episode data.
 Each episode must contain at least:
-- "state": List of state observations
-- "selected_option": List of selected options
-- "action": List of actions taken
-- "reward": List of rewards
-- "next_state": List of next states
-- "done": List of termination flags</dd>
+- <em>state</em>: <code>List</code> of state observations
+- <em>selected_option</em>: <code>List[int]</code> or <code>List[List[int]]</code> of selected options
+- <em>action</em>: <code>List[int]</code> or <code>List[List[int]]</code> of actions taken
+- <em>reward</em>: <code>List</code> of rewards
+- <em>next_state</em>: <code>List</code> of next states
+- <em>done</em>: <code>List</code> of termination flags</dd>
 </dl>
 <h2 id="raises">Raises</h2>
 <dl>
@@ -310,22 +400,24 @@ Each episode must contain at least:
 </dl></div>
 </dd>
 <dt id="likelihood.models.environments.OptionCriticEnv.step"><code class="name flex">
-<span>def <span class="ident">step</span></span>(<span>self, action: int, option: int) ‑> tuple[numpy.ndarray, float, bool, bool, dict]</span>
+<span>def <span class="ident">step</span></span>(<span>self, action: int | List[int], option: int | List[int]) ‑> tuple[numpy.ndarray, float, bool, bool, dict]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def step(self, action: int, option: int) -&gt; tuple[np.ndarray, float, bool, bool, dict]:
+<pre><code class="python">def step(
+    self, action: int | List[int], option: int | List[int]
+) -&gt; tuple[np.ndarray, float, bool, bool, dict]:
     &#34;&#34;&#34;
     Takes an action with a specific option and returns the next state, reward, and termination status.
 
     Parameters
     ----------
-    action : `int`
+    action : `int` | `List[int]`
         Action index to execute
-    option : `int`
+    option : `int` | `List[int]`
         Selected option index
 
     Returns
@@ -340,21 +432,42 @@ Each episode must contain at least:
         Whether the action-option pair was found in the dataset
     info : `Dict`
         Empty dictionary (no additional information)
+
+    Notes
+    -----
+    - Uses a KD-tree for efficient nearest-neighbor lookup of next states.
     &#34;&#34;&#34;
-    key = (tuple(self.current_state), option, action)
+    key = self._make_transition_key(
+        self.current_state,
+        option,
+        action,
+    )
+
     if key in self.state_action_option_to_transition:
         trans = self.state_action_option_to_transition[key]
         self.current_state = trans[&#34;next_state&#34;]
         return trans[&#34;next_state&#34;].copy(), trans[&#34;reward&#34;], trans[&#34;done&#34;], True, {}
     else:
-        return self.current_state, 0.0, False, False, {}</code></pre>
+        # Query KD-tree for nearest neighbor
+        distance, idx = self.kdtree.query(self.current_state)
+        closest_trans = self.trans_list[idx]
+        closest_state = closest_trans[&#34;next_state&#34;]
+
+        self.current_state = closest_state.copy()
+        return (
+            closest_state.copy(),
+            closest_trans.get(&#34;reward&#34;, 0.0),
+            closest_trans.get(&#34;done&#34;, False),
+            False,
+            {},
+        )</code></pre>
 </details>
 <div class="desc"><p>Takes an action with a specific option and returns the next state, reward, and termination status.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>action</code></strong> :&ensp;<code>int</code></dt>
+<dt><strong><code>action</code></strong> :&ensp;<code>int` | `List[int]</code></dt>
 <dd>Action index to execute</dd>
-<dt><strong><code>option</code></strong> :&ensp;<code>int</code></dt>
+<dt><strong><code>option</code></strong> :&ensp;<code>int` | `List[int]</code></dt>
 <dd>Selected option index</dd>
 </dl>
 <h2 id="returns">Returns</h2>
@@ -369,7 +482,11 @@ Each episode must contain at least:
 <dd>Whether the action-option pair was found in the dataset</dd>
 <dt><strong><code>info</code></strong> :&ensp;<code>Dict</code></dt>
 <dd>Empty dictionary (no additional information)</dd>
-</dl></div>
+</dl>
+<h2 id="notes">Notes</h2>
+<ul>
+<li>Uses a KD-tree for efficient nearest-neighbor lookup of next states.</li>
+</ul></div>
 </dd>
 </dl>
 </dd>
@@ -384,6 +501,11 @@ Each episode must contain at least:
 <li><h3>Super-module</h3>
 <ul>
 <li><code><a title="likelihood.models" href="index.html">likelihood.models</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="likelihood.models.environments.flatten_chain" href="#likelihood.models.environments.flatten_chain">flatten_chain</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
