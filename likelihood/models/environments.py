@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from itertools import chain
 from typing import Any, Dict, List, Tuple
 
@@ -120,19 +120,21 @@ class OptionCriticEnv:
                 ].add(tuple(actions[i]) if isinstance(actions[i], list) else actions[i])
 
         check_type = list(set([key for key in self.actions_by_option.keys()]))
-        keys_actions_by_option = list(self.actions_by_option.keys())
+        keys_actions_by_option = list(sorted(self.actions_by_option.keys(), reverse=True))
         actions = self.actions_by_option[keys_actions_by_option[0]]
 
         self.unique_actions_count = [
             len(
-                set(
-                    flatten_chain(
-                        [
-                            list(action)
-                            for action in self.actions_by_option.get(
-                                keys_actions_by_option[i], set()
-                            )
-                        ]
+                list(
+                    OrderedDict.fromkeys(
+                        flatten_chain(
+                            [
+                                list(action)
+                                for action in self.actions_by_option.get(
+                                    keys_actions_by_option[i], set()
+                                )
+                            ]
+                        )
                     )
                 )
                 if isinstance(keys_actions_by_option[i], tuple)
