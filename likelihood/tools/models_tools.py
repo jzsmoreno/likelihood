@@ -553,14 +553,12 @@ def collect_experience(
         option_probs, action_probs, termination_probs, selected_option, action = model(
             state_tensor, multiple_option
         )
-
         if multiple_option:
             action = torch.multinomial(action_probs.squeeze(0), 1).squeeze(-1)
             option = torch.multinomial(option_probs.squeeze(0), 1).squeeze(-1)
         else:
             action = torch.multinomial(action_probs, 1).item()
             option = torch.multinomial(option_probs, 1).item()
-
         old_probs.append(get_selected_probs(action_probs, action))
 
         terminate = torch.bernoulli(termination_probs).item() > 0.5
@@ -579,12 +577,12 @@ def collect_experience(
 
         tolerance_count += 1
         trajectory.append((state, selected_option, action, reward, next_state, terminate, done))
-        state = next_state
 
         if verbose:
             print_trajectory_info(
                 state, selected_option, action, reward, next_state, terminate, done
             )
+        state = next_state
 
     returns = []
     advantages = []
@@ -660,8 +658,11 @@ def ppo_loss(
 
     if advantages.dim() == 1:
         advantages = advantages.unsqueeze(-1)
-    action_probs = action_probs.view(old_action_probs.shape)
-    log_ratio = torch.log(action_probs + 1e-8) - torch.log(old_action_probs + 1e-8)
+
+    action_probs = torch.clamp(action_probs, min=1e-8)
+    old_action_probs = torch.clamp(old_action_probs, min=1e-8)
+    log_ratio = torch.log(action_probs) - torch.log(old_action_probs)
+
     ratio = torch.exp(log_ratio)  # π(a|s) / π_old(a|s)
     if log_ratio.ndim > 1:
         ratio = ratio.mean(dim=1)
@@ -724,7 +725,7 @@ def train_option_critic(
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     advantages_per_epoch = []
-
+    multiple_option = getattr(env, "multiple_option", False)
     for epoch in range(num_epochs):
         trajectory, returns, advantages, old_probs = collect_experience(env, model, **kwargs)
         avg_advantage = sum(advantages) / len(advantages)
@@ -741,7 +742,6 @@ def train_option_critic(
         old_probs_tensor = (
             torch.tensor(old_probs, dtype=torch.float32).view(actions.shape).to(device)
         )
-
         dataset = TensorDataset(
             states, actions, returns_tensor, advantages_tensor, old_probs_tensor
         )
@@ -749,7 +749,6 @@ def train_option_critic(
 
         epoch_loss = 0
         num_batches = 0
-
         for (
             batch_states,
             batch_actions,
@@ -760,20 +759,15 @@ def train_option_critic(
             optimizer.zero_grad()
 
             option_probs, action_probs, termination_probs, selected_option, action = model(
-                batch_states
+                batch_states, multiple_option
             )
-            if action_probs.ndim == 2 and batch_actions.ndim == 1:
-                batch_current_probs = action_probs.gather(1, batch_actions.unsqueeze(1))
-                ppo_loss_value = ppo_loss(
-                    batch_advantages, batch_old_probs, batch_current_probs, epsilon=epsilon
-                )
-            else:
-                ppo_loss_value = ppo_loss(
-                    batch_advantages, batch_old_probs, action_probs, epsilon=epsilon
-                )
-
+            batch_current_probs = action_probs.gather(
+                batch_actions.ndim, batch_actions.unsqueeze(-1)
+            ).squeeze(-1)
+            ppo_loss_value = ppo_loss(
+                batch_advantages, batch_old_probs, batch_current_probs, epsilon=epsilon
+            )
             entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
-
             loss = ppo_loss_value + beta * entropy.mean()
             avg_advantages = batch_advantages.mean().item()
             loss.backward()
