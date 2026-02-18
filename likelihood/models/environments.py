@@ -45,7 +45,7 @@ class OptionCriticEnv:
     current_state : `np.ndarray`
         Current state observation in the environment
     epsilon : `float`
-        Probability of choosing the reward from the nearest state. By default it is set to `0.5`.
+        Probability of choosing the reward from the nearest state. By default it is set to `0.1`.
     """
 
     def __init__(
@@ -161,7 +161,14 @@ class OptionCriticEnv:
         self.count_step_nearest = 0
         self.threshold = 0.5
         self.rate = 0.1
-        self.epsilon = 0.5
+        self.epsilon = 0.1
+        self.states = np.array(
+            [
+                self.state_action_option_to_transition[k]["next_state"]
+                for k in self.state_action_option_to_transition
+            ]
+        )
+        self.std_per_dim = np.std(states, axis=0)
 
     def _make_transition_key(
         self, state, option: int | list[int], action: int | list[int], decimals=6
@@ -262,14 +269,25 @@ class OptionCriticEnv:
             closest_reward = closest_trans["reward"]
             closest_reward_prob = random.random()
             self.epsilon = self._check_condition(self.epsilon, self.stats)
+            if np.array_equal(self.current_state, closest_state):
+                if self.count_step_nearest > 1:
+                    done = True
+                    reward = -1.0
+                else:
+                    done = False
+                    reward = 0.0
+                    closest_state = closest_state + np.random.normal(
+                        0, self.std_per_dim, size=closest_state.shape
+                    )
+            else:
+                done = False
+                reward = 0.0
 
             self.current_state = closest_state.copy()
             return (
                 closest_state.copy(),
-                closest_trans.get(
-                    "reward", 0.0 if closest_reward_prob < self.epsilon else closest_reward
-                ),
-                closest_trans.get("done", False),
+                reward if closest_reward_prob < self.epsilon else closest_reward,
+                done if done else closest_trans.get("done", False),
                 False,
                 {},
             )
