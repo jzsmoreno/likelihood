@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 from scipy.spatial import KDTree
+import random
 
 
 def flatten_chain(matrix):
@@ -153,6 +154,9 @@ class OptionCriticEnv:
         )
         self.kdtree = KDTree(next_states)
         self.trans_list = list(self.state_action_option_to_transition.values())
+        self.stats = 0.0
+        self.count_step_found = 0
+        self.count_step_nearest = 0
 
     def _make_transition_key(
         self, state, option: int | list[int], action: int | list[int], decimals=6
@@ -180,13 +184,15 @@ class OptionCriticEnv:
         info : `Dict`
             Empty dictionary (no additional information)
         """
+        self.count_step_found = 0
+        self.count_step_nearest = 0
         episode_id = np.random.choice(list(self.episodes.keys()))
         self.idx_episode = episode_id
         self.current_state = self.episodes[episode_id]["state"][0]
         return self.current_state, {}
 
     def step(
-        self, action: int | List[int], option: int | List[int]
+        self, action: int | List[int], option: int | List[int], epsilon: float = 0.8
     ) -> tuple[np.ndarray, float, bool, bool, dict]:
         """
         Takes an action with a specific option and returns the next state, reward, and termination status.
@@ -210,6 +216,8 @@ class OptionCriticEnv:
             Whether the action-option pair was found in the dataset
         info : `Dict`
             Empty dictionary (no additional information)
+        epsilon : `float`
+            Probability of choosing the reward from the nearest state. By default it is set to `0.8`.
 
         Notes
         -----
@@ -220,21 +228,36 @@ class OptionCriticEnv:
             option,
             action,
         )
+        self.stats = round(
+            self.count_step_found
+            / (
+                (self.count_step_found + self.count_step_nearest)
+                if (self.count_step_found + self.count_step_nearest) > 0.0
+                else 1.0
+            ),
+            6,
+        )
 
         if key in self.state_action_option_to_transition:
+            self.count_step_found += 1
             trans = self.state_action_option_to_transition[key]
             self.current_state = trans["next_state"]
             return trans["next_state"].copy(), trans["reward"], trans["done"], True, {}
         else:
             # Query KD-tree for nearest neighbor
+            self.count_step_nearest += 1
             distance, idx = self.kdtree.query(self.current_state)
             closest_trans = self.trans_list[idx]
             closest_state = closest_trans["next_state"]
+            closest_reward = closest_trans["reward"]
+            closest_reward_prob = random.random()
 
             self.current_state = closest_state.copy()
             return (
                 closest_state.copy(),
-                closest_trans.get("reward", 0.0),
+                closest_trans.get(
+                    "reward", 0.0 if closest_reward_prob < epsilon else closest_reward
+                ),
                 closest_trans.get("done", False),
                 False,
                 {},

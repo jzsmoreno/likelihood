@@ -86,60 +86,39 @@ class MultiBanditNet(nn.Module):
             state = state.unsqueeze(0)
         batch_size = state.size(0)
 
-        # Option probabilities
         option_probs = torch.softmax(
             self.option_network(state), dim=-1
         )  # (batch_size, num_options)
 
+        device = state.device
+        num_options = len(self.action_networks)
+
         if multiple_option:
-            padded_action_probs = []
-            selected_actions_list = []
+            action_probs = torch.zeros(batch_size, num_options, self.max_num_actions, device=device)
+            selected_actions = torch.zeros(batch_size, num_options, dtype=torch.long, device=device)
 
             for i, net in enumerate(self.action_networks):
                 probs = torch.softmax(net(state), dim=-1)
                 num_actions_i = probs.size(-1)
+                action_probs[:, i, :num_actions_i] = probs
+                selected_actions[:, i] = torch.argmax(probs, dim=-1)
 
-                if num_actions_i < self.max_num_actions:
-                    padding = torch.zeros(
-                        batch_size, self.max_num_actions - num_actions_i, device=state.device
-                    )
-                    probs = torch.cat([probs, padding], dim=-1)
-
-                padded_action_probs.append(probs)
-                selected_actions_list.append(torch.argmax(probs[:, :num_actions_i], dim=-1))
-
-            # Stack to (batch_size, num_options, max_num_actions)
-            action_probs = torch.stack(padded_action_probs, dim=1)
-            selected_actions = torch.stack(
-                selected_actions_list, dim=1
-            )  # (batch_size, num_options)
             selected_options = torch.argmax(option_probs, dim=-1)
+
         else:
             selected_options = torch.multinomial(option_probs, 1).squeeze(-1)
-            action_probs_list = []
-            selected_actions_list = []
+            action_probs = torch.zeros(batch_size, self.max_num_actions, device=device)
+            selected_actions = torch.zeros(batch_size, dtype=torch.long, device=device)
 
-            for i in range(batch_size):
-                net = self.action_networks[selected_options[i]]
-                probs = torch.softmax(net(state[i].unsqueeze(0)), dim=-1).squeeze(0)
-                num_actions_i = probs.size(-1)
+            for opt_idx in torch.unique(selected_options):
+                mask = selected_options == opt_idx
+                if mask.any():
+                    states_opt = state[mask]
+                    probs = torch.softmax(self.action_networks[opt_idx](states_opt), dim=-1)
+                    num_actions_i = probs.size(-1)
+                    action_probs[mask, :num_actions_i] = probs
+                    selected_actions[mask] = torch.argmax(probs, dim=-1)
 
-                if num_actions_i < self.max_num_actions:
-                    padding = torch.zeros(self.max_num_actions - num_actions_i, device=state.device)
-                    probs = torch.cat([probs, padding], dim=-1)
+        termination_prob = self.termination_network(state)
 
-                action_probs_list.append(probs)
-                selected_actions_list.append(torch.argmax(probs[:num_actions_i]))
-
-            action_probs = torch.stack(action_probs_list, dim=0)  # (batch_size, max_num_actions)
-            selected_actions = torch.tensor(selected_actions_list, device=state.device)
-
-        termination_prob = self.termination_network(state)  # (batch_size, 1)
-
-        return (
-            option_probs,
-            action_probs,
-            termination_prob,
-            selected_options,
-            selected_actions,
-        )
+        return option_probs, action_probs, termination_prob, selected_options, selected_actions
