@@ -129,6 +129,8 @@ def n(self):
         Current episode index being processed
     current_state : `np.ndarray`
         Current state observation in the environment
+    epsilon : `float`
+        Probability of choosing the reward from the nearest state. By default it is set to `0.1`.
     &#34;&#34;&#34;
 
     def __init__(
@@ -206,19 +208,21 @@ def n(self):
                 ].add(tuple(actions[i]) if isinstance(actions[i], list) else actions[i])
 
         check_type = list(set([key for key in self.actions_by_option.keys()]))
-        keys_actions_by_option = list(self.actions_by_option.keys())
+        keys_actions_by_option = list(sorted(self.actions_by_option.keys(), reverse=True))
         actions = self.actions_by_option[keys_actions_by_option[0]]
 
         self.unique_actions_count = [
             len(
-                set(
-                    flatten_chain(
-                        [
-                            list(action)
-                            for action in self.actions_by_option.get(
-                                keys_actions_by_option[i], set()
-                            )
-                        ]
+                list(
+                    OrderedDict.fromkeys(
+                        flatten_chain(
+                            [
+                                list(action)
+                                for action in self.actions_by_option.get(
+                                    keys_actions_by_option[i], set()
+                                )
+                            ]
+                        )
                     )
                 )
                 if isinstance(keys_actions_by_option[i], tuple)
@@ -237,6 +241,19 @@ def n(self):
         )
         self.kdtree = KDTree(next_states)
         self.trans_list = list(self.state_action_option_to_transition.values())
+        self.stats = 0.0
+        self.count_step_found = 0
+        self.count_step_nearest = 0
+        self.threshold = 0.5
+        self.rate = 0.1
+        self.epsilon = 0.1
+        self.states = np.array(
+            [
+                self.state_action_option_to_transition[k][&#34;next_state&#34;]
+                for k in self.state_action_option_to_transition
+            ]
+        )
+        self.std_per_dim = np.std(states, axis=0)
 
     def _make_transition_key(
         self, state, option: int | list[int], action: int | list[int], decimals=6
@@ -253,6 +270,13 @@ def n(self):
         else:
             return (state_key, int(option), int(action))
 
+    def _check_condition(self, value, other) -&gt; float:
+        if other &lt; self.threshold:
+            increment = self.rate * (self.threshold - other)
+            value += increment
+            value = min(value, 1.0)
+        return value
+
     def reset(self) -&gt; tuple[np.ndarray, dict]:
         &#34;&#34;&#34;
         Resets the environment to a random episode and returns the initial state.
@@ -264,6 +288,8 @@ def n(self):
         info : `Dict`
             Empty dictionary (no additional information)
         &#34;&#34;&#34;
+        self.count_step_found = 0
+        self.count_step_nearest = 0
         episode_id = np.random.choice(list(self.episodes.keys()))
         self.idx_episode = episode_id
         self.current_state = self.episodes[episode_id][&#34;state&#34;][0]
@@ -304,22 +330,49 @@ def n(self):
             option,
             action,
         )
+        self.stats = round(
+            self.count_step_found
+            / (
+                (self.count_step_found + self.count_step_nearest)
+                if (self.count_step_found + self.count_step_nearest) &gt; 0.0
+                else 1.0
+            ),
+            6,
+        )
 
         if key in self.state_action_option_to_transition:
+            self.count_step_found += 1
             trans = self.state_action_option_to_transition[key]
             self.current_state = trans[&#34;next_state&#34;]
             return trans[&#34;next_state&#34;].copy(), trans[&#34;reward&#34;], trans[&#34;done&#34;], True, {}
         else:
             # Query KD-tree for nearest neighbor
+            self.count_step_nearest += 1
             distance, idx = self.kdtree.query(self.current_state)
             closest_trans = self.trans_list[idx]
             closest_state = closest_trans[&#34;next_state&#34;]
+            closest_reward = closest_trans[&#34;reward&#34;]
+            closest_reward_prob = random.random()
+            self.epsilon = self._check_condition(self.epsilon, self.stats)
+            if np.array_equal(self.current_state, closest_state):
+                if self.count_step_nearest &gt; 1:
+                    done = True
+                    reward = -1.0
+                else:
+                    done = False
+                    reward = 0.0
+                    closest_state = closest_state + np.random.normal(
+                        0, self.std_per_dim, size=closest_state.shape
+                    )
+            else:
+                done = False
+                reward = 0.0
 
             self.current_state = closest_state.copy()
             return (
                 closest_state.copy(),
-                closest_trans.get(&#34;reward&#34;, 0.0),
-                closest_trans.get(&#34;done&#34;, False),
+                reward if closest_reward_prob &lt; self.epsilon else closest_reward,
+                done if done else closest_trans.get(&#34;done&#34;, False),
                 False,
                 {},
             )</code></pre>
@@ -345,6 +398,8 @@ def n(self):
 <dd>Current episode index being processed</dd>
 <dt><strong><code>current_state</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>Current state observation in the environment</dd>
+<dt><strong><code>epsilon</code></strong> :&ensp;<code>float</code></dt>
+<dd>Probability of choosing the reward from the nearest state. By default it is set to <code>0.1</code>.</dd>
 </dl>
 <p>Initializes the OptionCriticEnv with a dataset of episodes.</p>
 <h2 id="parameters">Parameters</h2>
@@ -385,6 +440,8 @@ Each episode must contain at least:
     info : `Dict`
         Empty dictionary (no additional information)
     &#34;&#34;&#34;
+    self.count_step_found = 0
+    self.count_step_nearest = 0
     episode_id = np.random.choice(list(self.episodes.keys()))
     self.idx_episode = episode_id
     self.current_state = self.episodes[episode_id][&#34;state&#34;][0]
@@ -442,22 +499,49 @@ Each episode must contain at least:
         option,
         action,
     )
+    self.stats = round(
+        self.count_step_found
+        / (
+            (self.count_step_found + self.count_step_nearest)
+            if (self.count_step_found + self.count_step_nearest) &gt; 0.0
+            else 1.0
+        ),
+        6,
+    )
 
     if key in self.state_action_option_to_transition:
+        self.count_step_found += 1
         trans = self.state_action_option_to_transition[key]
         self.current_state = trans[&#34;next_state&#34;]
         return trans[&#34;next_state&#34;].copy(), trans[&#34;reward&#34;], trans[&#34;done&#34;], True, {}
     else:
         # Query KD-tree for nearest neighbor
+        self.count_step_nearest += 1
         distance, idx = self.kdtree.query(self.current_state)
         closest_trans = self.trans_list[idx]
         closest_state = closest_trans[&#34;next_state&#34;]
+        closest_reward = closest_trans[&#34;reward&#34;]
+        closest_reward_prob = random.random()
+        self.epsilon = self._check_condition(self.epsilon, self.stats)
+        if np.array_equal(self.current_state, closest_state):
+            if self.count_step_nearest &gt; 1:
+                done = True
+                reward = -1.0
+            else:
+                done = False
+                reward = 0.0
+                closest_state = closest_state + np.random.normal(
+                    0, self.std_per_dim, size=closest_state.shape
+                )
+        else:
+            done = False
+            reward = 0.0
 
         self.current_state = closest_state.copy()
         return (
             closest_state.copy(),
-            closest_trans.get(&#34;reward&#34;, 0.0),
-            closest_trans.get(&#34;done&#34;, False),
+            reward if closest_reward_prob &lt; self.epsilon else closest_reward,
+            done if done else closest_trans.get(&#34;done&#34;, False),
             False,
             {},
         )</code></pre>
