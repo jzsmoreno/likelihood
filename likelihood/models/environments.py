@@ -44,6 +44,8 @@ class OptionCriticEnv:
         Current episode index being processed
     current_state : `np.ndarray`
         Current state observation in the environment
+    epsilon : `float`
+        Probability of choosing the reward from the nearest state. By default it is set to `0.5`.
     """
 
     def __init__(
@@ -157,6 +159,9 @@ class OptionCriticEnv:
         self.stats = 0.0
         self.count_step_found = 0
         self.count_step_nearest = 0
+        self.threshold = 0.5
+        self.rate = 0.1
+        self.epsilon = 0.5
 
     def _make_transition_key(
         self, state, option: int | list[int], action: int | list[int], decimals=6
@@ -172,6 +177,13 @@ class OptionCriticEnv:
             return (state_key,) + tuple(int(o) for o in option) + tuple(int(a) for a in action)
         else:
             return (state_key, int(option), int(action))
+
+    def _check_condition(self, value, other) -> float:
+        if other < self.threshold:
+            increment = self.rate * (self.threshold - other)
+            value += increment
+            value = min(value, 1.0)
+        return value
 
     def reset(self) -> tuple[np.ndarray, dict]:
         """
@@ -192,7 +204,7 @@ class OptionCriticEnv:
         return self.current_state, {}
 
     def step(
-        self, action: int | List[int], option: int | List[int], epsilon: float = 0.8
+        self, action: int | List[int], option: int | List[int]
     ) -> tuple[np.ndarray, float, bool, bool, dict]:
         """
         Takes an action with a specific option and returns the next state, reward, and termination status.
@@ -216,8 +228,6 @@ class OptionCriticEnv:
             Whether the action-option pair was found in the dataset
         info : `Dict`
             Empty dictionary (no additional information)
-        epsilon : `float`
-            Probability of choosing the reward from the nearest state. By default it is set to `0.8`.
 
         Notes
         -----
@@ -251,12 +261,13 @@ class OptionCriticEnv:
             closest_state = closest_trans["next_state"]
             closest_reward = closest_trans["reward"]
             closest_reward_prob = random.random()
+            self.epsilon = self._check_condition(self.epsilon, self.stats)
 
             self.current_state = closest_state.copy()
             return (
                 closest_state.copy(),
                 closest_trans.get(
-                    "reward", 0.0 if closest_reward_prob < epsilon else closest_reward
+                    "reward", 0.0 if closest_reward_prob < self.epsilon else closest_reward
                 ),
                 closest_trans.get("done", False),
                 False,
