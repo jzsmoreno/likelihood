@@ -1,10 +1,10 @@
+import random
 from collections import OrderedDict, defaultdict
 from itertools import chain
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
 from scipy.spatial import KDTree
-import random
 
 
 def flatten_chain(matrix):

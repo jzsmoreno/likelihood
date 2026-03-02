@@ -100,10 +100,17 @@ class Pipeline:
             "missing_values": X.isnull().sum().to_dict(),
         }
 
+        sample_df = X.sample(n=min(500, len(X)), random_state=42)
+        sample_data = {
+            "columns": list(sample_df.columns),
+            "rows": sample_df.values.tolist(),
+        }
+
         self.documentation = {
             "initial_dataset": initial_info,
             "processing_steps": steps_info,
             "final_dataset": final_info,
+            "sample_data": sample_data,
         }
 
         importances = None

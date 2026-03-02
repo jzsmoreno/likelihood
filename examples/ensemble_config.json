@@ -1,0 +1,36 @@
+{
+  "target_column": "Heart Disease",
+  "compute_feature_importance": true,  
+  "preprocessing_steps": [
+    {
+      "name": "TransformRange",
+      "params": {
+        "columns_bin_sizes": {"Age": 10}  
+      }
+    },
+    {
+      "name": "DataScaler",
+      "params": {
+        "n": 0  
+      }
+    },
+    {
+      "name": "remove_collinearity",
+      "params": {
+        "threshold": 1.0  
+      }
+    },
+    {
+      "name": "OneHotEncoder",
+      "params": {
+        "columns": ["Sex"]  
+      }
+    },
+    {
+      "name": "OneHotEncoder",
+      "params": {
+        "columns": ["Age_range"]  
+      }
+    }
+  ]
+}
