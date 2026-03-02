@@ -1,3 +1,4 @@
+import json
 import os
 import pickle
 from typing import Dict, List, Optional
@@ -6,7 +7,6 @@ import numpy as np
 import tensorflow as tf
 from packaging import version
 from sklearn.base import BaseEstimator, ClassifierMixin
-import json
 
 
 class EnsembleClassifier(BaseEstimator, ClassifierMixin):
