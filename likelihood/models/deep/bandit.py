@@ -13,7 +13,8 @@ class MultiBanditNet(nn.Module):
         num_actions_per_option: int | List[int],
         num_neurons: int = 128,
         num_layers: int = 1,
-        activation: nn.Module = nn.ReLU(),
+        activation: nn.Module = nn.SELU(),
+        dropout_rate: float = 0.3,
     ):
         super(MultiBanditNet, self).__init__()
         self.state_dim = state_dim
@@ -22,10 +23,12 @@ class MultiBanditNet(nn.Module):
         self.num_neurons = num_neurons
         self.num_layers = num_layers
         self.activation = activation
+        self.dropout_rate = dropout_rate
 
         self.option_network = nn.Sequential(
             nn.Linear(state_dim, self.num_neurons),
-            nn.ReLU(),
+            nn.SELU(),
+            nn.Dropout(self.dropout_rate) if self.dropout_rate > 0 else nn.Identity(),  # Dropout
             nn.Linear(
                 self.num_neurons, num_options
             ),  # Output a probability distribution over options
@@ -36,9 +39,18 @@ class MultiBanditNet(nn.Module):
         for i in range(num_options):
             action_network_layers = [nn.Linear(state_dim, self.num_neurons), self.activation]
             for _ in range(self.num_layers - 1):
-                action_network_layers.extend(
-                    [nn.Linear(self.num_neurons, self.num_neurons), self.activation]
-                )
+                if self.dropout_rate > 0:
+                    action_network_layers.extend(
+                        [
+                            nn.Dropout(self.dropout_rate),
+                            nn.Linear(self.num_neurons, self.num_neurons),
+                            self.activation,
+                        ]
+                    )
+                else:
+                    action_network_layers.extend(
+                        [nn.Linear(self.num_neurons, self.num_neurons), self.activation]
+                    )
             num_actions = (
                 num_actions_per_option
                 if not isinstance(num_actions_per_option, list)
@@ -50,7 +62,8 @@ class MultiBanditNet(nn.Module):
         # Option termination network
         self.termination_network = nn.Sequential(
             nn.Linear(state_dim, self.num_neurons),
-            nn.ReLU(),
+            nn.SELU(),
+            nn.Dropout(self.dropout_rate) if self.dropout_rate > 0 else nn.Identity(),  # Dropout
             nn.Linear(self.num_neurons, 1),  # Single output for termination probability (0-1)
             nn.Sigmoid(),
         )
