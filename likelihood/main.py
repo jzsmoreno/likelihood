@@ -256,18 +256,34 @@ def walkers(
     if figname:
         plt.show()
 
-    if len(theta) == 2 and figname:
-        corner.hist2d(
-            nwalk[:, 0],
-            nwalk[:, 1],
-            range=None,
-            bins=18,
-            smooth=True,
-            plot_datapoints=True,
-            plot_density=True,
-        )
-        plt.ylabel("$\\theta_{1}$")
-        plt.xlabel("$\\theta_{0}$")
-        plt.savefig(f"theta_{figname}", dpi=300, transparent=True)
+    if figname:
+        n_params = len(theta)
+
+        if n_params == 2:
+            corner.hist2d(
+                nwalk[:, 0],
+                nwalk[:, 1],
+                range=None,
+                bins=18,
+                smooth=True,
+                plot_datapoints=True,
+                plot_density=True,
+            )
+            plt.ylabel("$\\theta_{1}$")
+            plt.xlabel("$\\theta_{0}$")
+            plt.savefig(f"theta_{figname}", dpi=300, transparent=True)
+        elif n_params > 2:
+            param_names = [f"$\\theta _{i}$" for i in range(n_params)]
+            corner.corner(
+                nwalk,
+                labels=param_names,
+                bins=18,
+                smooth=True,
+                plot_datapoints=True,
+                plot_density=True,
+                max_n_ticks=3,
+                hist2d_kwargs={"smooth": True},
+            )
+            plt.savefig(f"theta_{figname}", dpi=300, transparent=True)
 
     return par, error
