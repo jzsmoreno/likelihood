@@ -71,6 +71,43 @@ class MultiBanditNet(nn.Module):
         self.equal_action_sizes = len(set(self.num_actions)) == 1
         self.max_num_actions = max(self.num_actions)
 
+    def apply_initialization(self, method: str = "xavier_uniform"):
+        """
+        Applies a specific initialization method to all linear layers in the network.
+
+        Parameters
+        ----------
+        method : str, default "xavier_uniform"
+            The initialization method to use. Supported methods:
+            'xavier_uniform', 'xavier_normal', 'kaiming_uniform', 'kaiming_normal',
+            'orthogonal', 'uniform', 'normal', 'zeros', 'ones'
+        """
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                if method == "xavier_uniform":
+                    nn.init.xavier_uniform_(m.weight)
+                elif method == "xavier_normal":
+                    nn.init.xavier_normal_(m.weight)
+                elif method == "kaiming_uniform":
+                    nn.init.kaiming_uniform_(m.weight)
+                elif method == "kaiming_normal":
+                    nn.init.kaiming_normal_(m.weight)
+                elif method == "orthogonal":
+                    nn.init.orthogonal_(m.weight)
+                elif method == "uniform":
+                    nn.init.uniform_(m.weight)
+                elif method == "normal":
+                    nn.init.normal_(m.weight)
+                elif method == "zeros":
+                    nn.init.zeros_(m.weight)
+                elif method == "ones":
+                    nn.init.ones_(m.weight)
+                else:
+                    raise ValueError(f"Unsupported initialization method: {method}")
+
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
     def forward(self, state: torch.Tensor, multiple_option: bool = False):
         """
         Parameters
