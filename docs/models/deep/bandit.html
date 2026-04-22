@@ -121,6 +121,43 @@ el.replaceWith(d);
         self.equal_action_sizes = len(set(self.num_actions)) == 1
         self.max_num_actions = max(self.num_actions)
 
+    def apply_initialization(self, method: str = &#34;xavier_uniform&#34;):
+        &#34;&#34;&#34;
+        Applies a specific initialization method to all linear layers in the network.
+
+        Parameters
+        ----------
+        method : str, default &#34;xavier_uniform&#34;
+            The initialization method to use. Supported methods:
+            &#39;xavier_uniform&#39;, &#39;xavier_normal&#39;, &#39;kaiming_uniform&#39;, &#39;kaiming_normal&#39;,
+            &#39;orthogonal&#39;, &#39;uniform&#39;, &#39;normal&#39;, &#39;zeros&#39;, &#39;ones&#39;
+        &#34;&#34;&#34;
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                if method == &#34;xavier_uniform&#34;:
+                    nn.init.xavier_uniform_(m.weight)
+                elif method == &#34;xavier_normal&#34;:
+                    nn.init.xavier_normal_(m.weight)
+                elif method == &#34;kaiming_uniform&#34;:
+                    nn.init.kaiming_uniform_(m.weight)
+                elif method == &#34;kaiming_normal&#34;:
+                    nn.init.kaiming_normal_(m.weight)
+                elif method == &#34;orthogonal&#34;:
+                    nn.init.orthogonal_(m.weight)
+                elif method == &#34;uniform&#34;:
+                    nn.init.uniform_(m.weight)
+                elif method == &#34;normal&#34;:
+                    nn.init.normal_(m.weight)
+                elif method == &#34;zeros&#34;:
+                    nn.init.zeros_(m.weight)
+                elif method == &#34;ones&#34;:
+                    nn.init.ones_(m.weight)
+                else:
+                    raise ValueError(f&#34;Unsupported initialization method: {method}&#34;)
+
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
     def forward(self, state: torch.Tensor, multiple_option: bool = False):
         &#34;&#34;&#34;
         Parameters
@@ -221,6 +258,60 @@ evaluation mode.
 </ul>
 <h3>Methods</h3>
 <dl>
+<dt id="likelihood.models.deep.bandit.MultiBanditNet.apply_initialization"><code class="name flex">
+<span>def <span class="ident">apply_initialization</span></span>(<span>self, method: str = 'xavier_uniform')</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def apply_initialization(self, method: str = &#34;xavier_uniform&#34;):
+    &#34;&#34;&#34;
+    Applies a specific initialization method to all linear layers in the network.
+
+    Parameters
+    ----------
+    method : str, default &#34;xavier_uniform&#34;
+        The initialization method to use. Supported methods:
+        &#39;xavier_uniform&#39;, &#39;xavier_normal&#39;, &#39;kaiming_uniform&#39;, &#39;kaiming_normal&#39;,
+        &#39;orthogonal&#39;, &#39;uniform&#39;, &#39;normal&#39;, &#39;zeros&#39;, &#39;ones&#39;
+    &#34;&#34;&#34;
+    for m in self.modules():
+        if isinstance(m, nn.Linear):
+            if method == &#34;xavier_uniform&#34;:
+                nn.init.xavier_uniform_(m.weight)
+            elif method == &#34;xavier_normal&#34;:
+                nn.init.xavier_normal_(m.weight)
+            elif method == &#34;kaiming_uniform&#34;:
+                nn.init.kaiming_uniform_(m.weight)
+            elif method == &#34;kaiming_normal&#34;:
+                nn.init.kaiming_normal_(m.weight)
+            elif method == &#34;orthogonal&#34;:
+                nn.init.orthogonal_(m.weight)
+            elif method == &#34;uniform&#34;:
+                nn.init.uniform_(m.weight)
+            elif method == &#34;normal&#34;:
+                nn.init.normal_(m.weight)
+            elif method == &#34;zeros&#34;:
+                nn.init.zeros_(m.weight)
+            elif method == &#34;ones&#34;:
+                nn.init.ones_(m.weight)
+            else:
+                raise ValueError(f&#34;Unsupported initialization method: {method}&#34;)
+
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)</code></pre>
+</details>
+<div class="desc"><p>Applies a specific initialization method to all linear layers in the network.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>method</code></strong> :&ensp;<code>str</code>, default <code>"xavier_uniform"</code></dt>
+<dd>The initialization method to use. Supported methods:
+'xavier_uniform', 'xavier_normal', 'kaiming_uniform', 'kaiming_normal',
+'orthogonal', 'uniform', 'normal', 'zeros', 'ones'</dd>
+</dl></div>
+</dd>
 <dt id="likelihood.models.deep.bandit.MultiBanditNet.forward"><code class="name flex">
 <span>def <span class="ident">forward</span></span>(<span>self, state: torch.Tensor, multiple_option: bool = False) ‑> Callable[..., typing.Any]</span>
 </code></dt>
@@ -345,6 +436,7 @@ evaluation mode.
 <li>
 <h4><code><a title="likelihood.models.deep.bandit.MultiBanditNet" href="#likelihood.models.deep.bandit.MultiBanditNet">MultiBanditNet</a></code></h4>
 <ul class="">
+<li><code><a title="likelihood.models.deep.bandit.MultiBanditNet.apply_initialization" href="#likelihood.models.deep.bandit.MultiBanditNet.apply_initialization">apply_initialization</a></code></li>
 <li><code><a title="likelihood.models.deep.bandit.MultiBanditNet.forward" href="#likelihood.models.deep.bandit.MultiBanditNet.forward">forward</a></code></li>
 </ul>
 </li>
