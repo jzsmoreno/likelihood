@@ -45,7 +45,7 @@ el.replaceWith(d);
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.tools.models_tools.analyze_network_variations"><code class="name flex">
-<span>def <span class="ident">analyze_network_variations</span></span>(<span>model: torch.nn.modules.module.Module,<br>sample_data: numpy.ndarray,<br>train_option: bool = False) ‑> Tuple[pandas.core.frame.DataFrame, pandas.core.frame.DataFrame, int]</span>
+<span>def <span class="ident">analyze_network_variations</span></span>(<span>model: torch.nn.modules.module.Module,<br>sample_data: numpy.ndarray,<br>train_option: bool = False,<br>temperature: float = 1.0,<br>plot_graph: bool = False) ‑> Tuple[pandas.core.frame.DataFrame, pandas.core.frame.DataFrame, int]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -56,6 +56,8 @@ el.replaceWith(d);
     model: torch.nn.Module,
     sample_data: np.ndarray,
     train_option: bool = False,
+    temperature: float = 1.0,
+    plot_graph: bool = False,
 ) -&gt; Tuple[pd.DataFrame, pd.DataFrame, int]:
     &#34;&#34;&#34;
     Analyzes the output variations of option_network and action_networks for a given sample.
@@ -68,6 +70,15 @@ el.replaceWith(d);
         Input sample data of shape (n_samples, state_dim).
     train_option : `bool`, optional
         Whether to use train mode, by default False.
+    temperature : float, default 1.0
+        Temperature used to control the sharpness of the output probability
+        distribution. A value of ``1.0`` preserves the default behavior.
+        Values greater than ``1.0`` produce a softer (more uniform)
+        distribution, while values between ``0`` and ``1.0`` produce a
+        sharper (more peaked) distribution. Must be strictly positive.
+    plot_graph : bool, default False
+        Whether to generate and display plots visualizing the variation
+        statistics of the option and action network outputs.
 
     Returns
     -------
@@ -89,42 +100,65 @@ el.replaceWith(d);
     model.to(&#34;cpu&#34;)
     state_tensor = state_tensor.to(&#34;cpu&#34;)
 
-    option_outputs = {}
-    for i in range(model.num_options):
-        layer_output = model.option_network(state_tensor)[..., i]
-        option_outputs[f&#34;Option {i}&#34;] = layer_output.detach().numpy()
+    # Get raw outputs from option_network and apply softmax with temperature
+    option_raw_outputs = model.option_network(state_tensor)
+    option_probs = torch.softmax(option_raw_outputs / temperature, dim=-1)
 
+    option_outputs = {}
+    option_prob_outputs = {}
+
+    for i in range(model.num_options):
+        option_outputs[f&#34;Option {i}&#34;] = option_raw_outputs[..., i].detach().numpy()
+        option_prob_outputs[f&#34;Option {i}&#34;] = option_probs[..., i].detach().numpy()
+
+    # Get raw outputs from action_networks and apply softmax with temperature
     action_outputs = {}
+    action_prob_outputs = {}
+
     for opt_idx, net in enumerate(model.action_networks):
         network_output = net(state_tensor)
-        num_actions = network_output.shape[-1]
+        network_probs = torch.softmax(network_output / temperature, dim=-1)
+
+        num_actions = network_probs.shape[-1]
         for act_idx in range(num_actions):
             key = f&#34;Option {opt_idx}, Action {act_idx}&#34;
+
             action_outputs[key] = network_output[..., act_idx].detach().numpy()
-    plot_two_region_histograms_boxplots(option_outputs, action_outputs)
+
+            action_prob_outputs[key] = network_probs[..., act_idx].detach().numpy()
+    if plot_graph:
+        plot_two_region_histograms_boxplots(option_outputs, action_outputs)
     option_stats = {}
-    for opt_name, values in option_outputs.items():
-        stats = {
-            &#34;Mean&#34;: np.mean(values),
-            &#34;Std&#34;: np.std(values),
-            &#34;Min&#34;: np.min(values),
-            &#34;Max&#34;: np.max(values),
-            &#34;Range&#34;: np.ptp(values),  # Peak-to-peak (max - min)
-            &#34;Variance&#34;: np.var(values),
+    for opt_name in option_outputs:
+        logits = option_outputs[opt_name]
+        probs = option_prob_outputs[opt_name]
+
+        option_stats[opt_name] = {
+            &#34;Mean&#34;: np.mean(logits),
+            &#34;Std&#34;: np.std(logits),
+            &#34;Min&#34;: np.min(logits),
+            &#34;Max&#34;: np.max(logits),
+            &#34;Range&#34;: np.ptp(logits),
+            &#34;Variance&#34;: np.var(logits),
+            &#34;Prob Mean&#34;: np.mean(probs),
+            &#34;Prob Std&#34;: np.std(probs),
         }
-        option_stats[opt_name] = stats
 
     action_stats = {}
-    for act_name, values in action_outputs.items():
-        stats = {
-            &#34;Mean&#34;: np.mean(values),
-            &#34;Std&#34;: np.std(values),
-            &#34;Min&#34;: np.min(values),
-            &#34;Max&#34;: np.max(values),
-            &#34;Range&#34;: np.ptp(values),  # Peak-to-peak (max - min)
-            &#34;Variance&#34;: np.var(values),
+    for act_name in action_outputs:
+        logits = action_outputs[act_name]
+        probs = action_prob_outputs[act_name]
+
+        action_stats[act_name] = {
+            &#34;Mean&#34;: np.mean(logits),
+            &#34;Std&#34;: np.std(logits),
+            &#34;Min&#34;: np.min(logits),
+            &#34;Max&#34;: np.max(logits),
+            &#34;Range&#34;: np.ptp(logits),
+            &#34;Variance&#34;: np.var(logits),
+            &#34;Prob Mean&#34;: np.mean(probs),
+            &#34;Prob Std&#34;: np.std(probs),
         }
-        action_stats[act_name] = stats
 
     option_df = pd.DataFrame(option_stats).T
     action_df = pd.DataFrame(action_stats).T
@@ -156,6 +190,15 @@ el.replaceWith(d);
 <dd>Input sample data of shape (n_samples, state_dim).</dd>
 <dt><strong><code>train_option</code></strong> :&ensp;<code>bool</code>, optional</dt>
 <dd>Whether to use train mode, by default False.</dd>
+<dt><strong><code>temperature</code></strong> :&ensp;<code>float</code>, default <code>1.0</code></dt>
+<dd>Temperature used to control the sharpness of the output probability
+distribution. A value of <code>1.0</code> preserves the default behavior.
+Values greater than <code>1.0</code> produce a softer (more uniform)
+distribution, while values between <code>0</code> and <code>1.0</code> produce a
+sharper (more peaked) distribution. Must be strictly positive.</dd>
+<dt><strong><code>plot_graph</code></strong> :&ensp;<code>bool</code>, default <code>False</code></dt>
+<dd>Whether to generate and display plots visualizing the variation
+statistics of the option and action network outputs.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
@@ -355,7 +398,7 @@ el.replaceWith(d);
 </dl></div>
 </dd>
 <dt id="likelihood.tools.models_tools.display_network_analysis"><code class="name flex">
-<span>def <span class="ident">display_network_analysis</span></span>(<span>model, sample_data, multiple_option=False)</span>
+<span>def <span class="ident">display_network_analysis</span></span>(<span>model,<br>sample_data,<br>multiple_option=False,<br>temperature: float = 1.0,<br>plot_graph: bool = True)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -366,11 +409,11 @@ el.replaceWith(d);
     model,
     sample_data,
     multiple_option=False,
+    temperature: float = 1.0,
+    plot_graph: bool = True,
 ):
     option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
-        model,
-        sample_data,
-        multiple_option,
+        model, sample_data, multiple_option, temperature, plot_graph
     )
 
     def highlight_row(row, target):
@@ -378,26 +421,37 @@ el.replaceWith(d);
             return [&#34;background-color: #ffec99; font-weight: bold&#34;] * len(row)
         return [&#34;&#34;] * len(row)
 
+    option_format = {col: &#34;{:.5f}&#34; for col in option_df.columns}
+    action_format = {col: &#34;{:.5f}&#34; for col in action_df.columns}
+
     option_style = (
-        option_df.style.format(&#34;{:.5f}&#34;)
+        option_df.style.format(option_format)
         .apply(highlight_row, axis=1, target=max_opt_dim)
-        .set_caption(&#34;🧠 Option Network Statistics&#34;)
         .background_gradient(cmap=&#34;Blues&#34;)
+        .set_caption(&#34;🧠 Option Network Statistics&#34;)
     )
 
     action_style = (
-        action_df.style.format(&#34;{:.5f}&#34;)
+        action_df.style.format(action_format)
         .apply(highlight_row, axis=1, target=max_act_dim)
-        .set_caption(&#34;🎯 Action Network Statistics&#34;)
         .background_gradient(cmap=&#34;Greens&#34;)
+        .set_caption(&#34;🎯 Action Network Statistics&#34;)
     )
+
+    if &#34;Probability&#34; in option_df.columns:
+        option_style = option_style.background_gradient(
+            cmap=&#34;Oranges&#34;, subset=[&#34;Prob Mean&#34;, &#34;Prob Std&#34;]
+        )
+
+    if &#34;Probability&#34; in action_df.columns:
+        action_style = action_style.background_gradient(
+            cmap=&#34;Oranges&#34;, subset=[&#34;Prob Mean&#34;, &#34;Prob Std&#34;]
+        )
 
     display(option_style)
     display(action_style)
 
-    display(
-        HTML(
-            f&#34;&#34;&#34;
+    display(HTML(f&#34;&#34;&#34;
     &lt;div style=&#34;
         margin-top:20px;
         padding:15px;
@@ -406,12 +460,11 @@ el.replaceWith(d);
     &#34;&gt;
         &lt;b&gt;Summary&lt;/b&gt;&lt;br&gt;
         Samples analyzed: {len(sample_data):,}&lt;br&gt;
+        Temperature: {temperature}&lt;br&gt;
         Most variable option dimension: {max_opt_dim}&lt;br&gt;
         Most variable action dimension: {max_act_dim}
     &lt;/div&gt;
-    &#34;&#34;&#34;
-        )
-    )</code></pre>
+    &#34;&#34;&#34;))</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -549,7 +602,7 @@ el.replaceWith(d);
 <p>The returned DataFrame will have one row for each node and one column for each of the computed metrics.</p></div>
 </dd>
 <dt id="likelihood.tools.models_tools.network_analysis_table"><code class="name flex">
-<span>def <span class="ident">network_analysis_table</span></span>(<span>model: torch.nn.modules.module.Module,<br>sample_data: numpy.ndarray,<br>train_option: bool = False) ‑> str</span>
+<span>def <span class="ident">network_analysis_table</span></span>(<span>model: torch.nn.modules.module.Module,<br>sample_data: numpy.ndarray,<br>train_option: bool = False,<br>temperature: float = 1.0) ‑> str</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -560,6 +613,7 @@ el.replaceWith(d);
     model: torch.nn.Module,
     sample_data: np.ndarray,
     train_option: bool = False,
+    temperature: float = 1.0,
 ) -&gt; str:
     &#34;&#34;&#34;
     Creates a well-formatted table showing statistics for option_network and action_networks.
@@ -572,6 +626,12 @@ el.replaceWith(d);
         Input sample data of shape (n_samples, state_dim).
     train_option : `bool`, optional
         Whether to use train mode, by default False.
+    temperature : float, default 1.0
+        Temperature used to control the sharpness of the output probability
+        distribution. A value of ``1.0`` preserves the default behavior.
+        Values greater than ``1.0`` produce a softer (more uniform)
+        distribution, while values between ``0`` and ``1.0`` produce a
+        sharper (more peaked) distribution. Must be strictly positive.
 
     Returns
     -------
@@ -583,6 +643,7 @@ el.replaceWith(d);
         model,
         sample_data,
         train_option,
+        temperature,
     )
 
     def format_df(df, highlight_idx=None):
@@ -665,6 +726,12 @@ el.replaceWith(d);
 <dd>Input sample data of shape (n_samples, state_dim).</dd>
 <dt><strong><code>train_option</code></strong> :&ensp;<code>bool</code>, optional</dt>
 <dd>Whether to use train mode, by default False.</dd>
+<dt><strong><code>temperature</code></strong> :&ensp;<code>float</code>, default <code>1.0</code></dt>
+<dd>Temperature used to control the sharpness of the output probability
+distribution. A value of <code>1.0</code> preserves the default behavior.
+Values greater than <code>1.0</code> produce a softer (more uniform)
+distribution, while values between <code>0</code> and <code>1.0</code> produce a
+sharper (more peaked) distribution. Must be strictly positive.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
