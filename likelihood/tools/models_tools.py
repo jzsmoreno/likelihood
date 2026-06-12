@@ -924,6 +924,167 @@ def train_model_with_episodes(
     return model, best_loss_so_far
 
 
+def plot_two_region_histograms_boxplots(
+    option_outputs: Dict[str, np.ndarray],
+    action_outputs: Dict[str, np.ndarray],
+) -> None:
+    """
+    Creates a figure with:
+      - Top panel: overlaid histograms for option outputs.
+      - Bottom panel: boxplots for action outputs.
+
+    Parameters
+    ----------
+    option_outputs : dict[str, np.ndarray]
+        Mapping from option name to array of output values.
+
+    action_outputs : dict[str, np.ndarray]
+        Mapping from action name to array of output values.
+
+    Returns
+    -------
+    None
+    """
+
+    sns.set_theme(style="whitegrid", context="notebook")
+    show_actions = len(action_outputs) <= 5
+    is_dark = plt.rcParams.get("figure.facecolor") not in ["#ffffff", "white"]
+    palette = sns.color_palette("viridis", max(len(option_outputs), 1))
+
+    if is_dark:
+        bg = "#121212"
+        fg = "#EAEAEA"
+        grid_alpha = 0.12
+        spine_color = "#666666"
+        legend_bg = "#1e1e1e"
+    else:
+        bg = "#ffffff"
+        fg = "#111111"
+        grid_alpha = 0.08
+        spine_color = "#333333"
+        legend_bg = "#ffffff"
+
+    plt.rcParams.update(
+        {
+            "figure.facecolor": bg,
+            "axes.facecolor": bg,
+            "axes.edgecolor": spine_color,
+            "axes.labelcolor": fg,
+            "xtick.color": fg,
+            "ytick.color": fg,
+            "text.color": fg,
+        }
+    )
+
+    if show_actions:
+        fig, (ax_top, ax_bottom) = plt.subplots(
+            2,
+            1,
+            figsize=(9, 4.3),
+            gridspec_kw={"height_ratios": [3.2, 1.3]},
+        )
+        fig.subplots_adjust(hspace=0.18)
+    else:
+        fig, ax_top = plt.subplots(figsize=(9, 3.2))
+
+    fig.patch.set_facecolor(bg)
+    ax_top.set_facecolor(bg)
+    if show_actions:
+        ax_bottom.set_facecolor(bg)
+
+    for color, (opt_name, values) in zip(palette, option_outputs.items()):
+        values = np.asarray(values).ravel()
+
+        sns.histplot(
+            values,
+            bins=35,
+            stat="density",
+            alpha=0.22,
+            color=color,
+            edgecolor=None,
+            ax=ax_top,
+            label=opt_name,
+        )
+
+        sns.kdeplot(
+            values,
+            color=color,
+            linewidth=1.8,
+            ax=ax_top,
+        )
+
+    ax_top.grid(axis="y", alpha=grid_alpha)
+    ax_top.grid(axis="x", visible=False)
+
+    ax_top.spines["top"].set_visible(False)
+    ax_top.spines["right"].set_visible(False)
+    ax_top.spines["left"].set_color(spine_color)
+    ax_top.spines["bottom"].set_color(spine_color)
+
+    ax_top.tick_params(labelsize=9)
+
+    if option_outputs:
+        leg = ax_top.legend(
+            frameon=True,
+            fontsize=8.5,
+            ncol=min(4, len(option_outputs)),
+            loc="upper right",
+        )
+        leg.get_frame().set_facecolor(legend_bg)
+        leg.get_frame().set_edgecolor("none")
+        leg.get_frame().set_alpha(0.6)
+
+    if show_actions:
+        labels, action_data = [], []
+
+        for act_name, values in action_outputs.items():
+            values = np.asarray(values).squeeze().ravel()
+            if values.size == 0:
+                continue
+            labels.append(act_name)
+            action_data.append(values)
+
+        if action_data:
+            bp = ax_bottom.boxplot(
+                action_data,
+                labels=labels,
+                patch_artist=True,
+                widths=0.55,
+                showfliers=False,
+                medianprops={"linewidth": 1.8, "color": fg},
+                whiskerprops={"color": spine_color},
+                capprops={"color": spine_color},
+            )
+
+            box_colors = sns.color_palette("viridis", len(bp["boxes"]))
+
+            for box, color in zip(bp["boxes"], box_colors):
+                box.set_facecolor(color)
+                box.set_alpha(0.85)
+                box.set_edgecolor("none")
+
+            ax_bottom.grid(axis="y", alpha=grid_alpha)
+            ax_bottom.grid(axis="x", visible=False)
+
+            ax_bottom.spines["top"].set_visible(False)
+            ax_bottom.spines["right"].set_visible(False)
+
+            ax_bottom.tick_params(labelsize=9)
+
+            plt.setp(
+                ax_bottom.get_xticklabels(),
+                rotation=20,
+                ha="right",
+                fontsize=8.5,
+                color=fg,
+            )
+        else:
+            ax_bottom.set_visible(False)
+
+    plt.tight_layout(pad=0.5)
+    plt.show()
+
+
 def analyze_network_variations(
     model: torch.nn.Module,
     sample_data: np.ndarray,
@@ -973,7 +1134,7 @@ def analyze_network_variations(
         for act_idx in range(num_actions):
             key = f"Option {opt_idx}, Action {act_idx}"
             action_outputs[key] = network_output[..., act_idx].detach().numpy()
-
+    plot_two_region_histograms_boxplots(option_outputs, action_outputs)
     option_stats = {}
     for opt_name, values in option_outputs.items():
         stats = {
