@@ -44,6 +44,131 @@ el.replaceWith(d);
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
+<dt id="likelihood.tools.models_tools.analyze_network_variations"><code class="name flex">
+<span>def <span class="ident">analyze_network_variations</span></span>(<span>model: torch.nn.modules.module.Module,<br>sample_data: numpy.ndarray,<br>train_option: bool = False) ‑> Tuple[pandas.core.frame.DataFrame, pandas.core.frame.DataFrame, int]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def analyze_network_variations(
+    model: torch.nn.Module,
+    sample_data: np.ndarray,
+    train_option: bool = False,
+) -&gt; Tuple[pd.DataFrame, pd.DataFrame, int]:
+    &#34;&#34;&#34;
+    Analyzes the output variations of option_network and action_networks for a given sample.
+
+    Parameters
+    ----------
+    model : `torch.nn.Module`
+        The MultiBanditNet model to analyze.
+    sample_data : `np.ndarray`
+        Input sample data of shape (n_samples, state_dim).
+    train_option : `bool`, optional
+        Whether to use train mode, by default False.
+
+    Returns
+    -------
+    `pd.DataFrame`
+        Table with statistics for option_network dimensions.
+    `pd.DataFrame`
+        Table with statistics for action_networks dimensions.
+    int
+        Index of the dimension with maximum variation in option_network.
+    int
+        Index of the dimension with maximum variation in action_networks.
+    &#34;&#34;&#34;
+    if train_option:
+        model.train()
+    else:
+        model.eval()
+
+    state_tensor = torch.tensor(sample_data, dtype=torch.float32)
+    model.to(&#34;cpu&#34;)
+    state_tensor = state_tensor.to(&#34;cpu&#34;)
+
+    option_outputs = {}
+    for i in range(model.num_options):
+        layer_output = model.option_network(state_tensor)[..., i]
+        option_outputs[f&#34;Option {i}&#34;] = layer_output.detach().numpy()
+
+    action_outputs = {}
+    for opt_idx, net in enumerate(model.action_networks):
+        network_output = net(state_tensor)
+        num_actions = network_output.shape[-1]
+        for act_idx in range(num_actions):
+            key = f&#34;Option {opt_idx}, Action {act_idx}&#34;
+            action_outputs[key] = network_output[..., act_idx].detach().numpy()
+    plot_two_region_histograms_boxplots(option_outputs, action_outputs)
+    option_stats = {}
+    for opt_name, values in option_outputs.items():
+        stats = {
+            &#34;Mean&#34;: np.mean(values),
+            &#34;Std&#34;: np.std(values),
+            &#34;Min&#34;: np.min(values),
+            &#34;Max&#34;: np.max(values),
+            &#34;Range&#34;: np.ptp(values),  # Peak-to-peak (max - min)
+            &#34;Variance&#34;: np.var(values),
+        }
+        option_stats[opt_name] = stats
+
+    action_stats = {}
+    for act_name, values in action_outputs.items():
+        stats = {
+            &#34;Mean&#34;: np.mean(values),
+            &#34;Std&#34;: np.std(values),
+            &#34;Min&#34;: np.min(values),
+            &#34;Max&#34;: np.max(values),
+            &#34;Range&#34;: np.ptp(values),  # Peak-to-peak (max - min)
+            &#34;Variance&#34;: np.var(values),
+        }
+        action_stats[act_name] = stats
+
+    option_df = pd.DataFrame(option_stats).T
+    action_df = pd.DataFrame(action_stats).T
+
+    max_variation_opt_dim = None
+    max_range = -float(&#34;inf&#34;)
+
+    for opt_name, stats in option_stats.items():
+        if stats[&#34;Range&#34;] &gt; max_range:
+            max_range = stats[&#34;Range&#34;]
+            max_variation_opt_dim = int(opt_name.split()[-1])
+
+    max_variation_act_dim = None
+    max_action_range = -float(&#34;inf&#34;)
+
+    for act_name, stats in action_stats.items():
+        if stats[&#34;Range&#34;] &gt; max_action_range:
+            max_action_range = stats[&#34;Range&#34;]
+            max_variation_act_dim = act_name
+
+    return option_df, action_df, max_variation_opt_dim, max_variation_act_dim</code></pre>
+</details>
+<div class="desc"><p>Analyzes the output variations of option_network and action_networks for a given sample.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>model</code></strong> :&ensp;<code>torch.nn.Module</code></dt>
+<dd>The MultiBanditNet model to analyze.</dd>
+<dt><strong><code>sample_data</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Input sample data of shape (n_samples, state_dim).</dd>
+<dt><strong><code>train_option</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Whether to use train mode, by default False.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>pd.DataFrame</code></dt>
+<dt>Table with statistics for option_network dimensions.</dt>
+<dt><code>pd.DataFrame</code></dt>
+<dt>Table with statistics for action_networks dimensions.</dt>
+<dt><code>int</code></dt>
+<dd>Index of the dimension with maximum variation in option_network.</dd>
+<dt><code>int</code></dt>
+<dd>Index of the dimension with maximum variation in action_networks.</dd>
+</dl></div>
+</dd>
 <dt id="likelihood.tools.models_tools.apply_lora"><code class="name flex">
 <span>def <span class="ident">apply_lora</span></span>(<span>model, rank=4)</span>
 </code></dt>
@@ -229,6 +354,67 @@ el.replaceWith(d);
 <dd>The list of old policy probabilities for each step.</dd>
 </dl></div>
 </dd>
+<dt id="likelihood.tools.models_tools.display_network_analysis"><code class="name flex">
+<span>def <span class="ident">display_network_analysis</span></span>(<span>model, sample_data, multiple_option=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def display_network_analysis(
+    model,
+    sample_data,
+    multiple_option=False,
+):
+    option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
+        model,
+        sample_data,
+        multiple_option,
+    )
+
+    def highlight_row(row, target):
+        if row.name == target:
+            return [&#34;background-color: #ffec99; font-weight: bold&#34;] * len(row)
+        return [&#34;&#34;] * len(row)
+
+    option_style = (
+        option_df.style.format(&#34;{:.5f}&#34;)
+        .apply(highlight_row, axis=1, target=max_opt_dim)
+        .set_caption(&#34;🧠 Option Network Statistics&#34;)
+        .background_gradient(cmap=&#34;Blues&#34;)
+    )
+
+    action_style = (
+        action_df.style.format(&#34;{:.5f}&#34;)
+        .apply(highlight_row, axis=1, target=max_act_dim)
+        .set_caption(&#34;🎯 Action Network Statistics&#34;)
+        .background_gradient(cmap=&#34;Greens&#34;)
+    )
+
+    display(option_style)
+    display(action_style)
+
+    display(
+        HTML(
+            f&#34;&#34;&#34;
+    &lt;div style=&#34;
+        margin-top:20px;
+        padding:15px;
+        border-left:5px solid #1976d2;
+        border-radius:4px;
+    &#34;&gt;
+        &lt;b&gt;Summary&lt;/b&gt;&lt;br&gt;
+        Samples analyzed: {len(sample_data):,}&lt;br&gt;
+        Most variable option dimension: {max_opt_dim}&lt;br&gt;
+        Most variable action dimension: {max_act_dim}
+    &lt;/div&gt;
+    &#34;&#34;&#34;
+        )
+    )</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="likelihood.tools.models_tools.get_selected_probs"><code class="name flex">
 <span>def <span class="ident">get_selected_probs</span></span>(<span>action_probs: torch.Tensor, action: torch.Tensor | int)</span>
 </code></dt>
@@ -361,6 +547,314 @@ el.replaceWith(d);
 </dl>
 <h2 id="notes">Notes</h2>
 <p>The returned DataFrame will have one row for each node and one column for each of the computed metrics.</p></div>
+</dd>
+<dt id="likelihood.tools.models_tools.network_analysis_table"><code class="name flex">
+<span>def <span class="ident">network_analysis_table</span></span>(<span>model: torch.nn.modules.module.Module,<br>sample_data: numpy.ndarray,<br>train_option: bool = False) ‑> str</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def network_analysis_table(
+    model: torch.nn.Module,
+    sample_data: np.ndarray,
+    train_option: bool = False,
+) -&gt; str:
+    &#34;&#34;&#34;
+    Creates a well-formatted table showing statistics for option_network and action_networks.
+
+    Parameters
+    ----------
+    model : `torch.nn.Module`
+        The MultiBanditNet model to analyze.
+    sample_data : `np.ndarray`
+        Input sample data of shape (n_samples, state_dim).
+    train_option : `bool`, optional
+        Whether to use train mode, by default False.
+
+    Returns
+    -------
+    str
+        Formatted string with network analysis tables.
+    &#34;&#34;&#34;
+
+    option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
+        model,
+        sample_data,
+        train_option,
+    )
+
+    def format_df(df, highlight_idx=None):
+        df = df.copy()
+
+        numeric_cols = df.select_dtypes(include=[&#34;number&#34;]).columns
+        df[numeric_cols] = df[numeric_cols].round(5)
+
+        index_labels = []
+        for idx in df.index:
+            if highlight_idx is not None and idx == highlight_idx:
+                index_labels.append(f&#34;★ {idx}&#34;)
+            else:
+                index_labels.append(str(idx))
+
+        df.index = index_labels
+
+        return tabulate(
+            df,
+            headers=&#34;keys&#34;,
+            tablefmt=&#34;rounded_outline&#34;,
+            floatfmt=&#34;.5f&#34;,
+            showindex=True,
+        )
+
+    report = []
+
+    report.append(&#34;═&#34; * 80)
+    report.append(&#34;                 NETWORK OUTPUT VARIATION ANALYSIS&#34;)
+    report.append(&#34;═&#34; * 80)
+    report.append(&#34;&#34;)
+    report.append(&#34;┌──────────────────────────────────────────────────────────────┐&#34;)
+    report.append(&#34;│ OPTION NETWORK                                               │&#34;)
+    report.append(&#34;└──────────────────────────────────────────────────────────────┘&#34;)
+    report.append(&#34;&#34;)
+
+    report.append(format_df(option_df, max_opt_dim))
+    report.append(&#34;&#34;)
+
+    if max_opt_dim is not None:
+        report.append(f&#34;★ Most variable option dimension : {max_opt_dim}&#34;)
+
+    report.append(&#34;&#34;)
+    report.append(&#34;┌──────────────────────────────────────────────────────────────┐&#34;)
+    report.append(&#34;│ ACTION NETWORKS                                              │&#34;)
+    report.append(&#34;└──────────────────────────────────────────────────────────────┘&#34;)
+    report.append(&#34;&#34;)
+
+    report.append(format_df(action_df, max_act_dim))
+    report.append(&#34;&#34;)
+
+    if max_act_dim is not None:
+        report.append(f&#34;★ Most variable action dimension : {max_act_dim}&#34;)
+
+    report.append(&#34;&#34;)
+    report.append(&#34;─&#34; * 80)
+    report.append(&#34;SUMMARY&#34;)
+    report.append(&#34;─&#34; * 80)
+
+    report.append(f&#34;Option dimensions analyzed : {len(option_df)}&#34;)
+    report.append(f&#34;Action dimensions analyzed : {len(action_df)}&#34;)
+    report.append(f&#34;Samples analyzed           : {len(sample_data):,}&#34;)
+
+    if max_opt_dim is not None:
+        report.append(f&#34;Highest option variation   : {max_opt_dim}&#34;)
+
+    if max_act_dim is not None:
+        report.append(f&#34;Highest action variation   : {max_act_dim}&#34;)
+
+    report.append(&#34;─&#34; * 80)
+
+    return &#34;\n&#34;.join(report)</code></pre>
+</details>
+<div class="desc"><p>Creates a well-formatted table showing statistics for option_network and action_networks.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>model</code></strong> :&ensp;<code>torch.nn.Module</code></dt>
+<dd>The MultiBanditNet model to analyze.</dd>
+<dt><strong><code>sample_data</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Input sample data of shape (n_samples, state_dim).</dd>
+<dt><strong><code>train_option</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Whether to use train mode, by default False.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>str</code></dt>
+<dd>Formatted string with network analysis tables.</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.tools.models_tools.plot_two_region_histograms_boxplots"><code class="name flex">
+<span>def <span class="ident">plot_two_region_histograms_boxplots</span></span>(<span>option_outputs: Dict[str, numpy.ndarray],<br>action_outputs: Dict[str, numpy.ndarray]) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def plot_two_region_histograms_boxplots(
+    option_outputs: Dict[str, np.ndarray],
+    action_outputs: Dict[str, np.ndarray],
+) -&gt; None:
+    &#34;&#34;&#34;
+    Creates a figure with:
+      - Top panel: overlaid histograms for option outputs.
+      - Bottom panel: boxplots for action outputs.
+
+    Parameters
+    ----------
+    option_outputs : dict[str, np.ndarray]
+        Mapping from option name to array of output values.
+
+    action_outputs : dict[str, np.ndarray]
+        Mapping from action name to array of output values.
+
+    Returns
+    -------
+    None
+    &#34;&#34;&#34;
+
+    sns.set_theme(style=&#34;whitegrid&#34;, context=&#34;notebook&#34;)
+    show_actions = len(action_outputs) &lt;= 5
+    is_dark = plt.rcParams.get(&#34;figure.facecolor&#34;) not in [&#34;#ffffff&#34;, &#34;white&#34;]
+    palette = sns.color_palette(&#34;viridis&#34;, max(len(option_outputs), 1))
+
+    if is_dark:
+        bg = &#34;#121212&#34;
+        fg = &#34;#EAEAEA&#34;
+        grid_alpha = 0.12
+        spine_color = &#34;#666666&#34;
+        legend_bg = &#34;#1e1e1e&#34;
+    else:
+        bg = &#34;#ffffff&#34;
+        fg = &#34;#111111&#34;
+        grid_alpha = 0.08
+        spine_color = &#34;#333333&#34;
+        legend_bg = &#34;#ffffff&#34;
+
+    plt.rcParams.update(
+        {
+            &#34;figure.facecolor&#34;: bg,
+            &#34;axes.facecolor&#34;: bg,
+            &#34;axes.edgecolor&#34;: spine_color,
+            &#34;axes.labelcolor&#34;: fg,
+            &#34;xtick.color&#34;: fg,
+            &#34;ytick.color&#34;: fg,
+            &#34;text.color&#34;: fg,
+        }
+    )
+
+    if show_actions:
+        fig, (ax_top, ax_bottom) = plt.subplots(
+            2,
+            1,
+            figsize=(9, 4.3),
+            gridspec_kw={&#34;height_ratios&#34;: [3.2, 1.3]},
+        )
+        fig.subplots_adjust(hspace=0.18)
+    else:
+        fig, ax_top = plt.subplots(figsize=(9, 3.2))
+
+    fig.patch.set_facecolor(bg)
+    ax_top.set_facecolor(bg)
+    if show_actions:
+        ax_bottom.set_facecolor(bg)
+
+    for color, (opt_name, values) in zip(palette, option_outputs.items()):
+        values = np.asarray(values).ravel()
+
+        sns.histplot(
+            values,
+            bins=35,
+            stat=&#34;density&#34;,
+            alpha=0.22,
+            color=color,
+            edgecolor=None,
+            ax=ax_top,
+            label=opt_name,
+        )
+
+        sns.kdeplot(
+            values,
+            color=color,
+            linewidth=1.8,
+            ax=ax_top,
+        )
+
+    ax_top.grid(axis=&#34;y&#34;, alpha=grid_alpha)
+    ax_top.grid(axis=&#34;x&#34;, visible=False)
+
+    ax_top.spines[&#34;top&#34;].set_visible(False)
+    ax_top.spines[&#34;right&#34;].set_visible(False)
+    ax_top.spines[&#34;left&#34;].set_color(spine_color)
+    ax_top.spines[&#34;bottom&#34;].set_color(spine_color)
+
+    ax_top.tick_params(labelsize=9)
+
+    if option_outputs:
+        leg = ax_top.legend(
+            frameon=True,
+            fontsize=8.5,
+            ncol=min(4, len(option_outputs)),
+            loc=&#34;upper right&#34;,
+        )
+        leg.get_frame().set_facecolor(legend_bg)
+        leg.get_frame().set_edgecolor(&#34;none&#34;)
+        leg.get_frame().set_alpha(0.6)
+
+    if show_actions:
+        labels, action_data = [], []
+
+        for act_name, values in action_outputs.items():
+            values = np.asarray(values).squeeze().ravel()
+            if values.size == 0:
+                continue
+            labels.append(act_name)
+            action_data.append(values)
+
+        if action_data:
+            bp = ax_bottom.boxplot(
+                action_data,
+                labels=labels,
+                patch_artist=True,
+                widths=0.55,
+                showfliers=False,
+                medianprops={&#34;linewidth&#34;: 1.8, &#34;color&#34;: fg},
+                whiskerprops={&#34;color&#34;: spine_color},
+                capprops={&#34;color&#34;: spine_color},
+            )
+
+            box_colors = sns.color_palette(&#34;viridis&#34;, len(bp[&#34;boxes&#34;]))
+
+            for box, color in zip(bp[&#34;boxes&#34;], box_colors):
+                box.set_facecolor(color)
+                box.set_alpha(0.85)
+                box.set_edgecolor(&#34;none&#34;)
+
+            ax_bottom.grid(axis=&#34;y&#34;, alpha=grid_alpha)
+            ax_bottom.grid(axis=&#34;x&#34;, visible=False)
+
+            ax_bottom.spines[&#34;top&#34;].set_visible(False)
+            ax_bottom.spines[&#34;right&#34;].set_visible(False)
+
+            ax_bottom.tick_params(labelsize=9)
+
+            plt.setp(
+                ax_bottom.get_xticklabels(),
+                rotation=20,
+                ha=&#34;right&#34;,
+                fontsize=8.5,
+                color=fg,
+            )
+        else:
+            ax_bottom.set_visible(False)
+
+    plt.tight_layout(pad=0.5)
+    plt.show()</code></pre>
+</details>
+<div class="desc"><p>Creates a figure with:
+- Top panel: overlaid histograms for option outputs.
+- Bottom panel: boxplots for action outputs.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>option_outputs</code></strong> :&ensp;<code>dict[str, np.ndarray]</code></dt>
+<dd>Mapping from option name to array of output values.</dd>
+<dt><strong><code>action_outputs</code></strong> :&ensp;<code>dict[str, np.ndarray]</code></dt>
+<dd>Mapping from action name to array of output values.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>None</code></dt>
+<dd>&nbsp;</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.tools.models_tools.ppo_loss"><code class="name flex">
 <span>def <span class="ident">ppo_loss</span></span>(<span>advantages: torch.Tensor,<br>old_action_probs: torch.Tensor,<br>action_probs: torch.Tensor,<br>epsilon: float = 0.2)</span>
@@ -1604,10 +2098,14 @@ A DataFrame with the transformed range columns.</p>
 </li>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
+<li><code><a title="likelihood.tools.models_tools.analyze_network_variations" href="#likelihood.tools.models_tools.analyze_network_variations">analyze_network_variations</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.apply_lora" href="#likelihood.tools.models_tools.apply_lora">apply_lora</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.collect_experience" href="#likelihood.tools.models_tools.collect_experience">collect_experience</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.display_network_analysis" href="#likelihood.tools.models_tools.display_network_analysis">display_network_analysis</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.get_selected_probs" href="#likelihood.tools.models_tools.get_selected_probs">get_selected_probs</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.graph_metrics" href="#likelihood.tools.models_tools.graph_metrics">graph_metrics</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.network_analysis_table" href="#likelihood.tools.models_tools.network_analysis_table">network_analysis_table</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.plot_two_region_histograms_boxplots" href="#likelihood.tools.models_tools.plot_two_region_histograms_boxplots">plot_two_region_histograms_boxplots</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.ppo_loss" href="#likelihood.tools.models_tools.ppo_loss">ppo_loss</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.print_trajectory_info" href="#likelihood.tools.models_tools.print_trajectory_info">print_trajectory_info</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.remove_collinearity" href="#likelihood.tools.models_tools.remove_collinearity">remove_collinearity</a></code></li>
