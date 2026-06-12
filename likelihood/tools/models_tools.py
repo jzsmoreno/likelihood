@@ -927,7 +927,7 @@ def train_model_with_episodes(
 def analyze_network_variations(
     model: torch.nn.Module,
     sample_data: np.ndarray,
-    multiple_option: bool = False,
+    train_option: bool = False,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, int]:
     """
     Analyzes the output variations of option_network and action_networks for a given sample.
@@ -938,8 +938,8 @@ def analyze_network_variations(
         The MultiBanditNet model to analyze.
     sample_data : `np.ndarray`
         Input sample data of shape (n_samples, state_dim).
-    multiple_option : `bool`, optional
-        Whether to use multiple_option mode, by default False.
+    train_option : `bool`, optional
+        Whether to use train mode, by default False.
 
     Returns
     -------
@@ -952,21 +952,20 @@ def analyze_network_variations(
     int
         Index of the dimension with maximum variation in action_networks.
     """
-    model.eval()
+    if train_option:
+        model.train()
+    else:
+        model.eval()
 
-    # Prepare input tensor
     state_tensor = torch.tensor(sample_data, dtype=torch.float32)
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to("cpu")
     state_tensor = state_tensor.to("cpu")
 
-    # Get option_network outputs
     option_outputs = {}
     for i in range(model.num_options):
         layer_output = model.option_network(state_tensor)[..., i]
         option_outputs[f"Option {i}"] = layer_output.detach().numpy()
 
-    # Get action_networks outputs
     action_outputs = {}
     for opt_idx, net in enumerate(model.action_networks):
         network_output = net(state_tensor)
@@ -975,7 +974,6 @@ def analyze_network_variations(
             key = f"Option {opt_idx}, Action {act_idx}"
             action_outputs[key] = network_output[..., act_idx].detach().numpy()
 
-    # Calculate statistics for option_network
     option_stats = {}
     for opt_name, values in option_outputs.items():
         stats = {
@@ -988,7 +986,6 @@ def analyze_network_variations(
         }
         option_stats[opt_name] = stats
 
-    # Calculate statistics for action_networks
     action_stats = {}
     for act_name, values in action_outputs.items():
         stats = {
@@ -1001,11 +998,9 @@ def analyze_network_variations(
         }
         action_stats[act_name] = stats
 
-    # Create DataFrames for statistics
     option_df = pd.DataFrame(option_stats).T
     action_df = pd.DataFrame(action_stats).T
 
-    # Find dimension with greatest variation (maximum range) in option_network
     max_variation_opt_dim = None
     max_range = -float("inf")
 
@@ -1014,7 +1009,6 @@ def analyze_network_variations(
             max_range = stats["Range"]
             max_variation_opt_dim = int(opt_name.split()[-1])
 
-    # Find dimension with greatest variation in action_networks
     max_variation_act_dim = None
     max_action_range = -float("inf")
 
@@ -1029,7 +1023,7 @@ def analyze_network_variations(
 def network_analysis_table(
     model: torch.nn.Module,
     sample_data: np.ndarray,
-    multiple_option: bool = False,
+    train_option: bool = False,
 ) -> str:
     """
     Creates a well-formatted table showing statistics for option_network and action_networks.
@@ -1040,8 +1034,8 @@ def network_analysis_table(
         The MultiBanditNet model to analyze.
     sample_data : `np.ndarray`
         Input sample data of shape (n_samples, state_dim).
-    multiple_option : `bool`, optional
-        Whether to use multiple_option mode, by default False.
+    train_option : `bool`, optional
+        Whether to use train mode, by default False.
 
     Returns
     -------
@@ -1052,7 +1046,7 @@ def network_analysis_table(
     option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
         model,
         sample_data,
-        multiple_option,
+        train_option,
     )
 
     def format_df(df, highlight_idx=None):
@@ -1160,7 +1154,9 @@ def display_network_analysis(
     display(option_style)
     display(action_style)
 
-    display(HTML(f"""
+    display(
+        HTML(
+            f"""
     <div style="
         margin-top:20px;
         padding:15px;
@@ -1172,7 +1168,9 @@ def display_network_analysis(
         Most variable option dimension: {max_opt_dim}<br>
         Most variable action dimension: {max_act_dim}
     </div>
-    """))
+    """
+        )
+    )
 
 
 if __name__ == "__main__":
