@@ -1089,6 +1089,8 @@ def analyze_network_variations(
     model: torch.nn.Module,
     sample_data: np.ndarray,
     train_option: bool = False,
+    temperature: float = 1.0,
+    plot_graph: bool = False,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, int]:
     """
     Analyzes the output variations of option_network and action_networks for a given sample.
@@ -1101,6 +1103,15 @@ def analyze_network_variations(
         Input sample data of shape (n_samples, state_dim).
     train_option : `bool`, optional
         Whether to use train mode, by default False.
+    temperature : float, default 1.0
+        Temperature used to control the sharpness of the output probability
+        distribution. A value of ``1.0`` preserves the default behavior.
+        Values greater than ``1.0`` produce a softer (more uniform)
+        distribution, while values between ``0`` and ``1.0`` produce a
+        sharper (more peaked) distribution. Must be strictly positive.
+    plot_graph : bool, default False
+        Whether to generate and display plots visualizing the variation
+        statistics of the option and action network outputs.
 
     Returns
     -------
@@ -1122,42 +1133,65 @@ def analyze_network_variations(
     model.to("cpu")
     state_tensor = state_tensor.to("cpu")
 
-    option_outputs = {}
-    for i in range(model.num_options):
-        layer_output = model.option_network(state_tensor)[..., i]
-        option_outputs[f"Option {i}"] = layer_output.detach().numpy()
+    # Get raw outputs from option_network and apply softmax with temperature
+    option_raw_outputs = model.option_network(state_tensor)
+    option_probs = torch.softmax(option_raw_outputs / temperature, dim=-1)
 
+    option_outputs = {}
+    option_prob_outputs = {}
+
+    for i in range(model.num_options):
+        option_outputs[f"Option {i}"] = option_raw_outputs[..., i].detach().numpy()
+        option_prob_outputs[f"Option {i}"] = option_probs[..., i].detach().numpy()
+
+    # Get raw outputs from action_networks and apply softmax with temperature
     action_outputs = {}
+    action_prob_outputs = {}
+
     for opt_idx, net in enumerate(model.action_networks):
         network_output = net(state_tensor)
-        num_actions = network_output.shape[-1]
+        network_probs = torch.softmax(network_output / temperature, dim=-1)
+
+        num_actions = network_probs.shape[-1]
         for act_idx in range(num_actions):
             key = f"Option {opt_idx}, Action {act_idx}"
+
             action_outputs[key] = network_output[..., act_idx].detach().numpy()
-    plot_two_region_histograms_boxplots(option_outputs, action_outputs)
+
+            action_prob_outputs[key] = network_probs[..., act_idx].detach().numpy()
+    if plot_graph:
+        plot_two_region_histograms_boxplots(option_outputs, action_outputs)
     option_stats = {}
-    for opt_name, values in option_outputs.items():
-        stats = {
-            "Mean": np.mean(values),
-            "Std": np.std(values),
-            "Min": np.min(values),
-            "Max": np.max(values),
-            "Range": np.ptp(values),  # Peak-to-peak (max - min)
-            "Variance": np.var(values),
+    for opt_name in option_outputs:
+        logits = option_outputs[opt_name]
+        probs = option_prob_outputs[opt_name]
+
+        option_stats[opt_name] = {
+            "Mean": np.mean(logits),
+            "Std": np.std(logits),
+            "Min": np.min(logits),
+            "Max": np.max(logits),
+            "Range": np.ptp(logits),
+            "Variance": np.var(logits),
+            "Prob Mean": np.mean(probs),
+            "Prob Std": np.std(probs),
         }
-        option_stats[opt_name] = stats
 
     action_stats = {}
-    for act_name, values in action_outputs.items():
-        stats = {
-            "Mean": np.mean(values),
-            "Std": np.std(values),
-            "Min": np.min(values),
-            "Max": np.max(values),
-            "Range": np.ptp(values),  # Peak-to-peak (max - min)
-            "Variance": np.var(values),
+    for act_name in action_outputs:
+        logits = action_outputs[act_name]
+        probs = action_prob_outputs[act_name]
+
+        action_stats[act_name] = {
+            "Mean": np.mean(logits),
+            "Std": np.std(logits),
+            "Min": np.min(logits),
+            "Max": np.max(logits),
+            "Range": np.ptp(logits),
+            "Variance": np.var(logits),
+            "Prob Mean": np.mean(probs),
+            "Prob Std": np.std(probs),
         }
-        action_stats[act_name] = stats
 
     option_df = pd.DataFrame(option_stats).T
     action_df = pd.DataFrame(action_stats).T
@@ -1185,6 +1219,7 @@ def network_analysis_table(
     model: torch.nn.Module,
     sample_data: np.ndarray,
     train_option: bool = False,
+    temperature: float = 1.0,
 ) -> str:
     """
     Creates a well-formatted table showing statistics for option_network and action_networks.
@@ -1197,6 +1232,12 @@ def network_analysis_table(
         Input sample data of shape (n_samples, state_dim).
     train_option : `bool`, optional
         Whether to use train mode, by default False.
+    temperature : float, default 1.0
+        Temperature used to control the sharpness of the output probability
+        distribution. A value of ``1.0`` preserves the default behavior.
+        Values greater than ``1.0`` produce a softer (more uniform)
+        distribution, while values between ``0`` and ``1.0`` produce a
+        sharper (more peaked) distribution. Must be strictly positive.
 
     Returns
     -------
@@ -1208,6 +1249,7 @@ def network_analysis_table(
         model,
         sample_data,
         train_option,
+        temperature,
     )
 
     def format_df(df, highlight_idx=None):
@@ -1286,11 +1328,11 @@ def display_network_analysis(
     model,
     sample_data,
     multiple_option=False,
+    temperature: float = 1.0,
+    plot_graph: bool = True,
 ):
     option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
-        model,
-        sample_data,
-        multiple_option,
+        model, sample_data, multiple_option, temperature, plot_graph
     )
 
     def highlight_row(row, target):
@@ -1298,26 +1340,37 @@ def display_network_analysis(
             return ["background-color: #ffec99; font-weight: bold"] * len(row)
         return [""] * len(row)
 
+    option_format = {col: "{:.5f}" for col in option_df.columns}
+    action_format = {col: "{:.5f}" for col in action_df.columns}
+
     option_style = (
-        option_df.style.format("{:.5f}")
+        option_df.style.format(option_format)
         .apply(highlight_row, axis=1, target=max_opt_dim)
-        .set_caption("🧠 Option Network Statistics")
         .background_gradient(cmap="Blues")
+        .set_caption("🧠 Option Network Statistics")
     )
 
     action_style = (
-        action_df.style.format("{:.5f}")
+        action_df.style.format(action_format)
         .apply(highlight_row, axis=1, target=max_act_dim)
-        .set_caption("🎯 Action Network Statistics")
         .background_gradient(cmap="Greens")
+        .set_caption("🎯 Action Network Statistics")
     )
+
+    if "Probability" in option_df.columns:
+        option_style = option_style.background_gradient(
+            cmap="Oranges", subset=["Prob Mean", "Prob Std"]
+        )
+
+    if "Probability" in action_df.columns:
+        action_style = action_style.background_gradient(
+            cmap="Oranges", subset=["Prob Mean", "Prob Std"]
+        )
 
     display(option_style)
     display(action_style)
 
-    display(
-        HTML(
-            f"""
+    display(HTML(f"""
     <div style="
         margin-top:20px;
         padding:15px;
@@ -1326,12 +1379,11 @@ def display_network_analysis(
     ">
         <b>Summary</b><br>
         Samples analyzed: {len(sample_data):,}<br>
+        Temperature: {temperature}<br>
         Most variable option dimension: {max_opt_dim}<br>
         Most variable action dimension: {max_act_dim}
     </div>
-    """
-        )
-    )
+    """))
 
 
 if __name__ == "__main__":
