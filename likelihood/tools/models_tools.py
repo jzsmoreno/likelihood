@@ -949,6 +949,8 @@ def analyze_network_variations(
         Table with statistics for action_networks dimensions.
     int
         Index of the dimension with maximum variation in option_network.
+    int
+        Index of the dimension with maximum variation in action_networks.
     """
     model.eval()
 
