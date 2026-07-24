@@ -14,7 +14,7 @@ from likelihood.tools.tools import DataFrameEncoder, DataScaler, LinearRegressio
 
 
 class Pipeline:
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str) -> None:
         """
         Initialize the pipeline with a JSON configuration file.
 

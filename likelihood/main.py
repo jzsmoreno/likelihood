@@ -1,4 +1,4 @@
-from typing import Callable, List, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import corner
 import matplotlib.pyplot as plt
@@ -105,13 +105,13 @@ def walk(
     y: np.ndarray,
     model: Callable,
     theta: np.ndarray,
-    conditions: List[Tuple[float, float]] = None,
+    conditions: Optional[List[Tuple[float, float]]] = None,
     var2: float = 0.01,
     mov: int = 100,
     d: float = 1.0,
     tol: float = 1e-4,
     mode: bool = True,
-):
+) -> Tuple[np.ndarray, List[np.ndarray], float]:
     """Executes the walker implementation.
 
     Parameters
@@ -186,14 +186,14 @@ def walkers(
     y: np.ndarray,
     model: Callable,
     theta: np.ndarray,
-    conditions: List[Tuple[float, float]] = None,
+    conditions: Optional[List[Tuple[float, float]]] = None,
     var2: float = 0.01,
     mov: int = 100,
     d: float = 1.0,
     tol: float = 1e-4,
     mode: bool = False,
     figname: str = "fig_out.png",
-):
+) -> Tuple[List[np.ndarray], List[float]]:
     """Executes multiple walkers.
 
     Parameters

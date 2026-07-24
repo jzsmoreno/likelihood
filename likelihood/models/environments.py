@@ -1,22 +1,22 @@
 import random
 from collections import OrderedDict, defaultdict
 from itertools import chain
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 from scipy.spatial import KDTree
 
 
-def flatten_chain(matrix):
+def flatten_chain(matrix: List[List[Any]]) -> List[Any]:
     return list(chain.from_iterable(matrix))
 
 
 class ActionSpace:
-    def __init__(self, num_actions):
+    def __init__(self, num_actions: int) -> None:
         self._num_actions = num_actions
 
     @property
-    def n(self):
+    def n(self) -> int:
         return self._num_actions
 
 
@@ -51,7 +51,7 @@ class OptionCriticEnv:
     def __init__(
         self,
         episodes: Dict[int, Dict[str, List]],
-    ):
+    ) -> None:
         """
         Initializes the OptionCriticEnv with a dataset of episodes.
 
@@ -171,8 +171,12 @@ class OptionCriticEnv:
         self.std_per_dim = np.std(states, axis=0)
 
     def _make_transition_key(
-        self, state, option: int | list[int], action: int | list[int], decimals=6
-    ) -> tuple:
+        self,
+        state: List[float],
+        option: Union[int, List[int]],
+        action: Union[int, List[int]],
+        decimals: int = 6,
+    ) -> Tuple:
         """
         Builds a canonical transition key:
         ((state_tuple), option(s)..., action(s)...)
@@ -185,7 +189,7 @@ class OptionCriticEnv:
         else:
             return (state_key, int(option), int(action))
 
-    def _check_condition(self, value, other) -> float:
+    def _check_condition(self, value: float, other: float) -> float:
         if other < self.threshold:
             increment = self.rate * (self.threshold - other)
             value += increment

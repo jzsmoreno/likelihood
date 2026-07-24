@@ -421,12 +421,12 @@ class GetInsights:
 
     def predictor_analyzer(
         self,
-        frac: float = None,
+        frac: float | None = None,
         cmap: str = "viridis",
         aspect: str = "auto",
         highlight: bool = True,
         **kwargs,
-    ) -> None:
+    ) -> pd.DataFrame:
         """
         Analyze the model's predictions and visualize data.
 
