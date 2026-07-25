@@ -8,7 +8,7 @@ from IPython.display import clear_output
 
 
 class HMM:
-    def __init__(self, n_states: int, n_observations: int):
+    def __init__(self, n_states: int, n_observations: int) -> None:
         self.n_states = n_states
         self.n_observations = n_observations
 

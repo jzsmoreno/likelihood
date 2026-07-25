@@ -57,7 +57,7 @@ class AbstractArima(FeaturesArima):
         "theta_trained",
     ]
 
-    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4) -> None:
         """Initialize the ARIMA model.
 
         Parameters
@@ -319,7 +319,7 @@ class FourierRegression(AbstractArima):
 
         return new_datapoints
 
-    def load_predict(self, n_steps: int, name: str = "fourier_model"):
+    def load_predict(self, n_steps: int, name: str = "fourier_model") -> np.ndarray:
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -373,7 +373,7 @@ class Arima(AbstractArima):
         q: float = 0,
         noise: float = 0,
         tol: float = 1e-5,
-    ):
+    ) -> None:
         """Initializes the ARIMA model with given parameters.
 
         Parameters

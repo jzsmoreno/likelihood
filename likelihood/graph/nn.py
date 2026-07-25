@@ -104,7 +104,7 @@ def cal_adjacency_matrix(
 
     adj_dict = {i: data[i].tolist() for i in range(n)}
 
-    def pair_generator():
+    def pair_generator() -> None:
         for i in range(n):
             for j in range(i, n):
                 yield (i, j)
@@ -140,7 +140,7 @@ class Data:
         target: str | None = None,
         exclude_subset: List[str] = [],
         **kwargs,
-    ):
+    ) -> None:
         sparse = kwargs.get("sparse", True)
         threshold = kwargs.get("threshold", 0.05)
         _, adjacency = cal_adjacency_matrix(
@@ -188,7 +188,7 @@ class VanillaGNNLayer(tf.keras.layers.Layer):
         x = tf.sparse.sparse_dense_matmul(adjacency, x)
         return x
 
-    def get_config(self):
+    def get_config(self) -> Dict[str, Any]:
         config = super(VanillaGNNLayer, self).get_config()
         config.update(
             {
