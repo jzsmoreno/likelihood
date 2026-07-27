@@ -58,7 +58,7 @@ class GANRegressor(tf.keras.Model):
         self.gan.compile(optimizer=self.optimizer, loss="binary_crossentropy")
         super(GANRegressor, self).build(input_shape)
 
-    def _build_generator(self):
+    def _build_generator(self) -> tf.keras.Model:
         generator = tf.keras.Sequential(name="generator")
         generator.add(
             tf.keras.layers.Dense(
@@ -79,7 +79,7 @@ class GANRegressor(tf.keras.Model):
         generator.add(tf.keras.layers.Dense(2 * self.output_shape_parm, activation=self.activation))
         return generator
 
-    def _build_discriminator(self):
+    def _build_discriminator(self) -> tf.keras.Model:
         discriminator = tf.keras.Sequential(name="discriminator")
         for _ in range(self.depth):
             discriminator.add(
@@ -301,7 +301,7 @@ class GANRegressor(tf.keras.Model):
         return dict(list(base_config.items()) + list(config.items()))
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config: Dict[str, Any]) -> "GANRegressor":
         return cls(
             input_shape_parm=config["input_shape_parm"],
             output_shape_parm=config["output_shape_parm"],

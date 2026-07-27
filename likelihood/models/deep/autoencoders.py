@@ -2,7 +2,7 @@ import logging
 import os
 from functools import partial
 from shutil import rmtree
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -572,7 +572,7 @@ class AutoClassifier(tf.keras.Model):
         return dict(list(base_config.items()) + list(config.items()))
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config: Dict[str, Any]) -> "AutoClassifier":
         return cls(
             input_shape_parm=config["input_shape_parm"],
             num_classes=config["num_classes"],
@@ -655,7 +655,7 @@ def call_existing_code(
 
 
 def build_model(
-    hp, input_shape_parm: None | int, num_classes: None | int, **kwargs
+    hp: keras_tuner.HyperParameters, input_shape_parm: None | int, num_classes: None | int, **kwargs
 ) -> AutoClassifier:
     """Builds a neural network model using Keras Tuner's search algorithm.
 
@@ -792,12 +792,12 @@ def setup_model(
     target: str,
     epochs: int,
     train_size: float = 0.7,
-    seed=None,
+    seed: None | int = None,
     train_mode: bool = True,
     filepath: str = "./my_dir/best_model",
     method: str = "Hyperband",
     **kwargs,
-) -> AutoClassifier:
+) -> Tuple[AutoClassifier, pd.DataFrame]:
     """Setup model for training and tuning.
 
     Parameters
@@ -838,8 +838,8 @@ def setup_model(
 
     Returns
     -------
-    model : `AutoClassifier`
-        The trained model.
+    model, hps : (`AutoClassifier`, `pd.DataFrame`)
+        The trained model and best hyperparameter results.
     """
     max_trials = kwargs.get("max_trials", 10)
     directory = kwargs.get("directory", "./my_dir")
@@ -870,7 +870,7 @@ def setup_model(
         y_encoder = OneHotEncoder()
         y = y_encoder.encode(y.to_list())
         X = X.to_numpy()
-        input_sample.to_numpy()
+        input_sample = input_sample.to_numpy()
         X = np.asarray(X).astype(np.float32)
         input_sample = np.asarray(input_sample).astype(np.float32)
         y = np.asarray(y).astype(np.float32)
