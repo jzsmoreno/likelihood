@@ -1,9 +1,15 @@
+import os
 import random
 from collections import deque
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple
 
 import numpy as np
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
 def print_progress_bar(iteration: int, total: int, length: int = 30) -> None:
@@ -281,6 +287,7 @@ class AutoQL:
         }
         self.optimizer = optimizers[optimizer]
         losses = {
+            "huber": tf.keras.losses.Huber(),
             "mse": tf.keras.losses.MeanSquaredError(),
             "mae": tf.keras.losses.MeanAbsoluteError(),
             "mape": tf.keras.losses.MeanAbsolutePercentageError(),

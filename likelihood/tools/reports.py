@@ -3,7 +3,7 @@ import json
 import math
 import re
 from html import escape
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from IPython.display import HTML, display
 
@@ -12,7 +12,7 @@ def generate_html_pipeline(
     data_dict: Any,
     save_to_file: bool = False,
     file_name: str = "data_processing_report.html",
-):
+) -> str:
     """
     Generates an HTML report for a data processing pipeline with:
       - Tabbed interface (Initial / Steps / Final / Visualizations)
@@ -758,7 +758,7 @@ def generate_html_pipeline(
     """
 
     # ── Python helpers ──
-    def render_value(val):
+    def render_value(val: Any) -> str:
         if isinstance(val, dict):
             return dict_to_table(val, nested=True)
         if isinstance(val, list):
@@ -771,7 +771,7 @@ def generate_html_pipeline(
             )
         return escape(str(val))
 
-    def dict_to_table(d, nested=False):
+    def dict_to_table(d: Dict[Any, Any], nested: bool = False) -> str:
         if not isinstance(d, dict):
             d = {"Error": "Data not available or incorrect format"}
         cls = "nested-table" if nested else ""
@@ -788,7 +788,7 @@ def generate_html_pipeline(
     final = data_dict.get("final_dataset", {})
     steps = data_dict.get("processing_steps", [])
 
-    def extract_shape(ds):
+    def extract_shape(ds: Dict[str, Any]) -> Tuple[Optional[int], Optional[int]]:
         shape = ds.get("shape") or ds.get("Shape")
         if isinstance(shape, (list, tuple)) and len(shape) == 2:
             return shape

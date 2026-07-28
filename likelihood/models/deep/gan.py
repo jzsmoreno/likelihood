@@ -1,8 +1,14 @@
+import os
 from typing import Any, Dict, Tuple
 
 import numpy as np
 import pandas as pd
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 from IPython.display import clear_output
 from tensorflow.keras.regularizers import l2
 from tqdm import tqdm

@@ -108,6 +108,7 @@ class AutoClassifier:
 
     def _build_encoder(self) -> None:
         """Build the encoder model."""
+        inputs = tf.keras.Input(shape=(self.input_shape_parm,), name="encoder_input")
         if self.vae_mode:
             x = tf.keras.layers.Dense(
                 units=self.units,

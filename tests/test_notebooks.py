@@ -10,17 +10,40 @@ Requirements:
     - jupyter (for nbconvert)
     - nbconvert
     - nbclient
+
+Run with increased verbosity for easier debugging:
+
+pytest -vv -s
 """
+
+import sys
+from pathlib import Path
+
+repo_root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(repo_root))
+
+print(f"repo_root = {repo_root}")
+print(f"sys.path[0] = {sys.path[0]}")
+print(f"Existe likelihood: {(repo_root / 'likelihood').exists()}")
+print(f"Existe __init__.py: {(repo_root / 'likelihood' / '__init__.py').exists()}")
 
 from pathlib import Path
 from shutil import copy2, copytree
 from tempfile import TemporaryDirectory
-from urllib.error import URLError
 
 import nbformat
 import pytest
 from nbclient import NotebookClient
 from nbclient.exceptions import CellExecutionError
+
+import likelihood
+
+print("\n" + "=" * 80)
+print("Repository package")
+print("=" * 80)
+print(f"Version : {likelihood.__version__}")
+print(f"Location: {likelihood.__file__}")
+print("=" * 80)
 
 EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
 
@@ -74,6 +97,12 @@ def test_notebook_execution(notebook_path: Path):
             if item.is_file() and item.suffix != ".ipynb":
                 copy2(item, output_dir / item.name)
 
+        copytree(
+            repo_root / "likelihood",
+            output_dir / "likelihood",
+            dirs_exist_ok=True,
+        )
+
         try:
             client.execute(cwd=output_dir)
 
@@ -93,5 +122,9 @@ def test_notebook_execution(notebook_path: Path):
                 print("-" * 80)
                 print(cell.get("source", ""))
                 print("-" * 80)
+
+                print("\nOutputs:")
+                for output in cell.get("outputs", []):
+                    print(output)
 
             raise

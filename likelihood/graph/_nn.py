@@ -4,12 +4,16 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
-from multiprocessing import Pool, cpu_count
+import os
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
-import pandas as pd
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 from IPython.display import clear_output
 from sklearn.metrics import f1_score
 
@@ -17,7 +21,7 @@ tf.get_logger().setLevel("ERROR")
 
 from likelihood.tools import LoRALayer
 
-from .nn import Data, cal_adjacency_matrix, compare_pair, compare_similarity_np
+from .nn import Data
 
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="VanillaGNNLayer")

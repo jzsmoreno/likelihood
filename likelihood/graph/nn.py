@@ -4,12 +4,18 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
+import os
 from multiprocessing import Pool, cpu_count
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 from IPython.display import clear_output
 from sklearn.metrics import f1_score
 

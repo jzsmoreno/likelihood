@@ -1,10 +1,14 @@
 import json
 import os
-import pickle
 from typing import Any, Dict, List, Optional, Tuple, Type
 
 import numpy as np
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 from packaging import version
 from sklearn.base import BaseEstimator, ClassifierMixin
 
