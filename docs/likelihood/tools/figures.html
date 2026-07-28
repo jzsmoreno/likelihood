@@ -384,7 +384,7 @@ def loss_curve(
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.tools.figures.act_pred"><code class="name flex">
-<span>def <span class="ident">act_pred</span></span>(<span>y_act: numpy.ndarray, y_pred: numpy.ndarray, name: str = 'example', x_hist: bool = True, y_hist: bool = True, reg_line: bool = True, save_dir: str | None = None) ‑> None</span>
+<span>def <span class="ident">act_pred</span></span>(<span>y_act: numpy.ndarray, y_pred: numpy.ndarray, name: str = 'example', x_hist: bool = True, y_hist: bool = True, reg_line: bool = True, save_dir: Optional[str] = None) ‑> None</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Creates a scatter plot of actual vs predicted values along with histograms and a regression line.</p>
@@ -516,7 +516,7 @@ def loss_curve(
 </details>
 </dd>
 <dt id="likelihood.tools.figures.loss_curve"><code class="name flex">
-<span>def <span class="ident">loss_curve</span></span>(<span>x_data: numpy.ndarray, train_err: numpy.ndarray, val_err: numpy.ndarray, name: str = 'example', save_dir: str | None = None) ‑> None</span>
+<span>def <span class="ident">loss_curve</span></span>(<span>x_data: numpy.ndarray, train_err: numpy.ndarray, val_err: numpy.ndarray, name: str = 'example', save_dir: Optional[str] = None) ‑> None</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Plots the loss curve for both training and validation errors over epochs,
@@ -737,7 +737,7 @@ is zero (i.e., perfect predictions).</li>
 </details>
 </dd>
 <dt id="likelihood.tools.figures.residual_hist"><code class="name flex">
-<span>def <span class="ident">residual_hist</span></span>(<span>y_act: numpy.ndarray, y_pred: numpy.ndarray, name: str = 'example', save_dir: str | None = None) ‑> None</span>
+<span>def <span class="ident">residual_hist</span></span>(<span>y_act: numpy.ndarray, y_pred: numpy.ndarray, name: str = 'example', save_dir: Optional[str] = None) ‑> None</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Generates a residual error histogram with kernel density estimate (KDE) for the given true and predicted values.

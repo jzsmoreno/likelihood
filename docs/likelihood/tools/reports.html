@@ -31,7 +31,7 @@ import json
 import math
 import re
 from html import escape
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 from IPython.display import HTML, display
 
@@ -40,7 +40,7 @@ def generate_html_pipeline(
     data_dict: Any,
     save_to_file: bool = False,
     file_name: str = &#34;data_processing_report.html&#34;,
-) -&gt; str:
+):
     &#34;&#34;&#34;
     Generates an HTML report for a data processing pipeline with:
       - Tabbed interface (Initial / Steps / Final / Visualizations)
@@ -786,7 +786,7 @@ def generate_html_pipeline(
     &#34;&#34;&#34;
 
     # ── Python helpers ──
-    def render_value(val: Any) -&gt; str:
+    def render_value(val):
         if isinstance(val, dict):
             return dict_to_table(val, nested=True)
         if isinstance(val, list):
@@ -799,7 +799,7 @@ def generate_html_pipeline(
             )
         return escape(str(val))
 
-    def dict_to_table(d: Dict[Any, Any], nested: bool = False) -&gt; str:
+    def dict_to_table(d, nested=False):
         if not isinstance(d, dict):
             d = {&#34;Error&#34;: &#34;Data not available or incorrect format&#34;}
         cls = &#34;nested-table&#34; if nested else &#34;&#34;
@@ -816,7 +816,7 @@ def generate_html_pipeline(
     final = data_dict.get(&#34;final_dataset&#34;, {})
     steps = data_dict.get(&#34;processing_steps&#34;, [])
 
-    def extract_shape(ds: Dict[str, Any]) -&gt; Tuple[Optional[int], Optional[int]]:
+    def extract_shape(ds):
         shape = ds.get(&#34;shape&#34;) or ds.get(&#34;Shape&#34;)
         if isinstance(shape, (list, tuple)) and len(shape) == 2:
             return shape
@@ -1065,7 +1065,7 @@ def generate_html_pipeline(
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.tools.reports.generate_html_pipeline"><code class="name flex">
-<span>def <span class="ident">generate_html_pipeline</span></span>(<span>data_dict: Any, save_to_file: bool = False, file_name: str = 'data_processing_report.html') ‑> str</span>
+<span>def <span class="ident">generate_html_pipeline</span></span>(<span>data_dict: Any, save_to_file: bool = False, file_name: str = 'data_processing_report.html')</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Generates an HTML report for a data processing pipeline with:
@@ -1093,7 +1093,7 @@ or list-of-dicts [{col: val, &hellip;}, &hellip;]</p></div>
     data_dict: Any,
     save_to_file: bool = False,
     file_name: str = &#34;data_processing_report.html&#34;,
-) -&gt; str:
+):
     &#34;&#34;&#34;
     Generates an HTML report for a data processing pipeline with:
       - Tabbed interface (Initial / Steps / Final / Visualizations)
@@ -1839,7 +1839,7 @@ or list-of-dicts [{col: val, &hellip;}, &hellip;]</p></div>
     &#34;&#34;&#34;
 
     # ── Python helpers ──
-    def render_value(val: Any) -&gt; str:
+    def render_value(val):
         if isinstance(val, dict):
             return dict_to_table(val, nested=True)
         if isinstance(val, list):
@@ -1852,7 +1852,7 @@ or list-of-dicts [{col: val, &hellip;}, &hellip;]</p></div>
             )
         return escape(str(val))
 
-    def dict_to_table(d: Dict[Any, Any], nested: bool = False) -&gt; str:
+    def dict_to_table(d, nested=False):
         if not isinstance(d, dict):
             d = {&#34;Error&#34;: &#34;Data not available or incorrect format&#34;}
         cls = &#34;nested-table&#34; if nested else &#34;&#34;
@@ -1869,7 +1869,7 @@ or list-of-dicts [{col: val, &hellip;}, &hellip;]</p></div>
     final = data_dict.get(&#34;final_dataset&#34;, {})
     steps = data_dict.get(&#34;processing_steps&#34;, [])
 
-    def extract_shape(ds: Dict[str, Any]) -&gt; Tuple[Optional[int], Optional[int]]:
+    def extract_shape(ds):
         shape = ds.get(&#34;shape&#34;) or ds.get(&#34;Shape&#34;)
         if isinstance(shape, (list, tuple)) and len(shape) == 2:
             return shape
