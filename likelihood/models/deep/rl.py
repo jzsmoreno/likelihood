@@ -1,12 +1,18 @@
+import os
 import random
 from collections import deque
-from typing import Any
+from typing import Any, List, Optional, Tuple
 
 import numpy as np
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
 
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
-def print_progress_bar(iteration, total, length=30):
+
+def print_progress_bar(iteration: int, total: int, length: int = 30) -> None:
     percent = f"{100 * (iteration / float(total)):.1f}"
     filled_length = int(length * iteration // total)
     bar = "█" * filled_length + "-" * (length - filled_length)
@@ -16,7 +22,7 @@ def print_progress_bar(iteration, total, length=30):
 
 
 class Env:
-    def __init__(self, model: Any, maxlen: int = 100, name: str = "likenasium"):
+    def __init__(self, model: Any, maxlen: int = 100, name: str = "likenasium") -> None:
         """
         Initialize the environment with a model.
 
@@ -31,14 +37,16 @@ class Env:
         """
         self.model = model
         self.maxlen = maxlen
-        self.transitions = deque(
+        self.transitions: deque = deque(
             maxlen=self.maxlen
         )  # Stores (state, action, reward, next_action, done)
-        self.current_state = None
-        self.current_step = 0
-        self.done = False
+        self.current_state: Optional[np.ndarray] = None
+        self.current_step: int = 0
+        self.done: bool = False
 
-    def step(self, state: np.ndarray, action: int, verbose: int = 0):
+    def step(
+        self, state: np.ndarray, action: int, verbose: int = 0
+    ) -> Tuple[Any, int, float, Any, bool]:
         """
         Perform an environment step with the given action.
 
@@ -82,7 +90,7 @@ class Env:
             )
         return self.current_state, action_pred, reward, next_action, self.done
 
-    def reset(self):
+    def reset(self) -> Optional[np.ndarray]:
         """Reset the environment to initial state."""
         self.current_state = None
         self.current_step = 0
@@ -90,7 +98,7 @@ class Env:
         self.transitions = deque(maxlen=self.maxlen)
         return self.current_state
 
-    def get_transitions(self):
+    def get_transitions(self) -> deque:
         """Get all stored transitions."""
         return self.transitions
 
@@ -110,7 +118,7 @@ class AutoQL:
         env: Any,
         model: tf.keras.Model,
         maxlen: int = 2000,
-    ):
+    ) -> None:
         """Initialize AutoQL agent
 
         Parameters
@@ -124,9 +132,11 @@ class AutoQL:
         self.env = env
         self.model = model
         self.maxlen = maxlen
-        self.replay_buffer = deque(maxlen=self.maxlen)
+        self.replay_buffer: deque = deque(maxlen=self.maxlen)
 
-    def epsilon_greedy_policy(self, state: np.ndarray, action: int, epsilon: float = 0.0) -> tuple:
+    def epsilon_greedy_policy(
+        self, state: np.ndarray, action: int, epsilon: float = 0.0
+    ) -> Tuple[Any, int, float, Any, bool]:
         """
         Epsilon-greedy policy for action selection
 
@@ -153,7 +163,9 @@ class AutoQL:
 
         return _state[0], greedy_action[0], _reward[0], _next_action[0], _done[0]
 
-    def play_one_step(self, state: np.ndarray, action: int, epsilon: float):
+    def play_one_step(
+        self, state: np.ndarray, action: int, epsilon: float
+    ) -> Tuple[Any, int, float, Any, int]:
         """
         Perform one step in the environment and add experience to buffer
 
@@ -191,7 +203,7 @@ class AutoQL:
         return current_state, greedy_action, reward, next_action, done
 
     @tf.function
-    def _training_step(self):
+    def _training_step(self) -> float:
         """
         Perform one training step using experience replay
 
@@ -230,17 +242,17 @@ class AutoQL:
 
     def train(
         self,
-        x_data,
-        y_data,
-        optimizer="adam",
-        loss_fn="mse",
-        num_episodes=50,
-        num_steps=100,
-        gamma=0.7,
-        batch_size=32,
-        patience=10,
-        alpha=0.01,
-    ):
+        x_data: Any,
+        y_data: Any,
+        optimizer: str = "adam",
+        loss_fn: str = "mse",
+        num_episodes: int = 50,
+        num_steps: int = 100,
+        gamma: float = 0.7,
+        batch_size: int = 32,
+        patience: int = 10,
+        alpha: float = 0.01,
+    ) -> None:
         """Train the agent for a fixed number of episodes
 
         Parameters
@@ -262,9 +274,9 @@ class AutoQL:
         alpha : `float`
             Trade-off factor between loss and reward.
         """
-        rewards = []
-        self.best_weights = None
-        self.best_loss = float("inf")
+        rewards: List[float] = []
+        self.best_weights: Optional[List[np.ndarray]] = None
+        self.best_loss: float = float("inf")
 
         optimizers = {
             "sgd": tf.keras.optimizers.SGD(),
@@ -275,6 +287,7 @@ class AutoQL:
         }
         self.optimizer = optimizers[optimizer]
         losses = {
+            "huber": tf.keras.losses.Huber(),
             "mse": tf.keras.losses.MeanSquaredError(),
             "mae": tf.keras.losses.MeanAbsoluteError(),
             "mape": tf.keras.losses.MeanAbsolutePercentageError(),
@@ -284,9 +297,9 @@ class AutoQL:
         self.num_steps = num_steps if num_steps >= self.env.maxlen else self.env.maxlen
         self.gamma = gamma
         self.batch_size = batch_size
-        loss = float("inf")
-        no_improve_count = 0
-        best_combined_metric = float("inf")
+        loss: float = float("inf")
+        no_improve_count: int = 0
+        best_combined_metric: float = float("inf")
 
         for episode in range(self.num_episodes):
             print_progress_bar(episode + 1, self.num_episodes)
@@ -335,7 +348,7 @@ class AutoQL:
         # Save best model
         self.model.set_weights(self.best_weights)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (
             f"AutoQL (Env: {self.env.name}, Episodes: {self.num_episodes}, Steps: {self.num_steps})"
         )

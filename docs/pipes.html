@@ -142,10 +142,17 @@ el.replaceWith(d);
             &#34;missing_values&#34;: X.isnull().sum().to_dict(),
         }
 
+        sample_df = X.sample(n=min(500, len(X)), random_state=42)
+        sample_data = {
+            &#34;columns&#34;: list(sample_df.columns),
+            &#34;rows&#34;: sample_df.values.tolist(),
+        }
+
         self.documentation = {
             &#34;initial_dataset&#34;: initial_info,
             &#34;processing_steps&#34;: steps_info,
             &#34;final_dataset&#34;: final_info,
+            &#34;sample_data&#34;: sample_data,
         }
 
         importances = None
@@ -518,10 +525,17 @@ el.replaceWith(d);
         &#34;missing_values&#34;: X.isnull().sum().to_dict(),
     }
 
+    sample_df = X.sample(n=min(500, len(X)), random_state=42)
+    sample_data = {
+        &#34;columns&#34;: list(sample_df.columns),
+        &#34;rows&#34;: sample_df.values.tolist(),
+    }
+
     self.documentation = {
         &#34;initial_dataset&#34;: initial_info,
         &#34;processing_steps&#34;: steps_info,
         &#34;final_dataset&#34;: final_info,
+        &#34;sample_data&#34;: sample_data,
     }
 
     importances = None

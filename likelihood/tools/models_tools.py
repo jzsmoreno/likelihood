@@ -7,15 +7,23 @@ import pandas as pd
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
+import os
 import sys
 import warnings
 from functools import wraps
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import seaborn as sns
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 import torch
+from IPython.display import HTML, display
+from tabulate import tabulate
 from torch.utils.data import DataLoader, TensorDataset
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -33,9 +41,11 @@ class suppress_prints:
         sys.stdout = self.original_stdout
 
 
-def suppress_warnings(func):
+def suppress_warnings(
+    func: Callable[..., Any],
+) -> Callable[..., Any]:
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             return func(*args, **kwargs)
@@ -360,12 +370,17 @@ def train_and_insights(
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="LoRALayer")
 class LoRALayer(tf.keras.layers.Layer):
-    def __init__(self, units, rank=4, **kwargs):
+    def __init__(
+        self,
+        units: int,
+        rank: int = 4,
+        **kwargs: Any,
+    ) -> None:
         super(LoRALayer, self).__init__(**kwargs)
         self.units = units
         self.rank = rank
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape):
         input_dim = input_shape[-1]
         print(f"Input shape: {input_shape}")
 
@@ -387,12 +402,15 @@ class LoRALayer(tf.keras.layers.Layer):
         print(f"Dense weights shape: {input_dim}x{self.units}")
         print(f"LoRA weights shape: A{self.A.shape}, B{self.B.shape}")
 
-    def call(self, inputs):
+    def call(self, inputs: Any) -> Any:
         lora_output = tf.matmul(tf.matmul(inputs, self.A), self.B)
         return lora_output
 
 
-def apply_lora(model, rank=4):
+def apply_lora(
+    model: tf.keras.Model,
+    rank: int = 4,
+) -> tf.keras.Model:
     inputs = tf.keras.Input(shape=model.input_shape[1:])
     x = inputs
 
@@ -465,7 +483,15 @@ def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -
     return metrics_df
 
 
-def print_trajectory_info(state, selected_option, action, reward, next_state, terminate, done):
+def print_trajectory_info(
+    state: Any,
+    selected_option: Any,
+    action: Any,
+    reward: Any,
+    next_state: Any,
+    terminate: bool,
+    done: bool,
+) -> None:
     print("=" * 50)
     print("TRAJECTORY INFO".center(50, "="))
     print("=" * 50)
@@ -636,7 +662,7 @@ def ppo_loss(
     old_action_probs: torch.Tensor,
     action_probs: torch.Tensor,
     epsilon: float = 0.2,
-):
+) -> torch.Tensor:
     """Computes the Proximal Policy Optimization (PPO) loss using the clipped objective.
 
     Parameters
@@ -821,8 +847,8 @@ def train_model_with_episodes(
     env: Any,
     num_episodes: int,
     episode_patience: int = 5,
-    **kwargs,
-):
+    **kwargs: Any,
+) -> Tuple[torch.nn.Module, float]:
     """Trains a model via reinforcement learning episodes.
 
     Parameters
@@ -920,6 +946,468 @@ def train_model_with_episodes(
     plt.show()
 
     return model, best_loss_so_far
+
+
+def plot_two_region_histograms_boxplots(
+    option_outputs: Dict[str, np.ndarray],
+    action_outputs: Dict[str, np.ndarray],
+) -> None:
+    """
+    Creates a figure with:
+      - Top panel: overlaid histograms for option outputs.
+      - Bottom panel: boxplots for action outputs.
+
+    Parameters
+    ----------
+    option_outputs : dict[str, np.ndarray]
+        Mapping from option name to array of output values.
+
+    action_outputs : dict[str, np.ndarray]
+        Mapping from action name to array of output values.
+
+    Returns
+    -------
+    None
+    """
+
+    sns.set_theme(style="whitegrid", context="notebook")
+    show_actions = len(action_outputs) <= 5
+    is_dark = plt.rcParams.get("figure.facecolor") not in ["#ffffff", "white"]
+    palette = sns.color_palette("viridis", max(len(option_outputs), 1))
+
+    if is_dark:
+        bg = "#121212"
+        fg = "#EAEAEA"
+        grid_alpha = 0.12
+        spine_color = "#666666"
+        legend_bg = "#1e1e1e"
+    else:
+        bg = "#ffffff"
+        fg = "#111111"
+        grid_alpha = 0.08
+        spine_color = "#333333"
+        legend_bg = "#ffffff"
+
+    plt.rcParams.update(
+        {
+            "figure.facecolor": bg,
+            "axes.facecolor": bg,
+            "axes.edgecolor": spine_color,
+            "axes.labelcolor": fg,
+            "xtick.color": fg,
+            "ytick.color": fg,
+            "text.color": fg,
+        }
+    )
+
+    if show_actions:
+        fig, (ax_top, ax_bottom) = plt.subplots(
+            2,
+            1,
+            figsize=(9, 4.3),
+            gridspec_kw={"height_ratios": [3.2, 1.3]},
+        )
+        fig.subplots_adjust(hspace=0.18)
+    else:
+        fig, ax_top = plt.subplots(figsize=(9, 3.2))
+
+    fig.patch.set_facecolor(bg)
+    ax_top.set_facecolor(bg)
+    if show_actions:
+        ax_bottom.set_facecolor(bg)
+
+    for color, (opt_name, values) in zip(palette, option_outputs.items()):
+        values = np.asarray(values).ravel()
+
+        sns.histplot(
+            values,
+            bins=35,
+            stat="density",
+            alpha=0.22,
+            color=color,
+            edgecolor=None,
+            ax=ax_top,
+            label=opt_name,
+        )
+
+        sns.kdeplot(
+            values,
+            color=color,
+            linewidth=1.8,
+            ax=ax_top,
+        )
+
+    ax_top.grid(axis="y", alpha=grid_alpha)
+    ax_top.grid(axis="x", visible=False)
+
+    ax_top.spines["top"].set_visible(False)
+    ax_top.spines["right"].set_visible(False)
+    ax_top.spines["left"].set_color(spine_color)
+    ax_top.spines["bottom"].set_color(spine_color)
+
+    ax_top.tick_params(labelsize=9)
+
+    if option_outputs:
+        leg = ax_top.legend(
+            frameon=True,
+            fontsize=8.5,
+            ncol=min(4, len(option_outputs)),
+            loc="upper right",
+        )
+        leg.get_frame().set_facecolor(legend_bg)
+        leg.get_frame().set_edgecolor("none")
+        leg.get_frame().set_alpha(0.6)
+
+    if show_actions:
+        labels, action_data = [], []
+
+        for act_name, values in action_outputs.items():
+            values = np.asarray(values).squeeze().ravel()
+            if values.size == 0:
+                continue
+            labels.append(act_name)
+            action_data.append(values)
+
+        if action_data:
+            bp = ax_bottom.boxplot(
+                action_data,
+                labels=labels,
+                patch_artist=True,
+                widths=0.55,
+                showfliers=False,
+                medianprops={"linewidth": 1.8, "color": fg},
+                whiskerprops={"color": spine_color},
+                capprops={"color": spine_color},
+            )
+
+            box_colors = sns.color_palette("viridis", len(bp["boxes"]))
+
+            for box, color in zip(bp["boxes"], box_colors):
+                box.set_facecolor(color)
+                box.set_alpha(0.85)
+                box.set_edgecolor("none")
+
+            ax_bottom.grid(axis="y", alpha=grid_alpha)
+            ax_bottom.grid(axis="x", visible=False)
+
+            ax_bottom.spines["top"].set_visible(False)
+            ax_bottom.spines["right"].set_visible(False)
+
+            ax_bottom.tick_params(labelsize=9)
+
+            plt.setp(
+                ax_bottom.get_xticklabels(),
+                rotation=20,
+                ha="right",
+                fontsize=8.5,
+                color=fg,
+            )
+        else:
+            ax_bottom.set_visible(False)
+
+    plt.tight_layout(pad=0.5)
+    plt.show()
+
+
+def analyze_network_variations(
+    model: torch.nn.Module,
+    sample_data: np.ndarray,
+    train_option: bool = False,
+    temperature: float = 1.0,
+    plot_graph: bool = False,
+) -> Tuple[pd.DataFrame, pd.DataFrame, int]:
+    """
+    Analyzes the output variations of option_network and action_networks for a given sample.
+
+    Parameters
+    ----------
+    model : `torch.nn.Module`
+        The MultiBanditNet model to analyze.
+    sample_data : `np.ndarray`
+        Input sample data of shape (n_samples, state_dim).
+    train_option : `bool`, optional
+        Whether to use train mode, by default False.
+    temperature : float, default 1.0
+        Temperature used to control the sharpness of the output probability
+        distribution. A value of ``1.0`` preserves the default behavior.
+        Values greater than ``1.0`` produce a softer (more uniform)
+        distribution, while values between ``0`` and ``1.0`` produce a
+        sharper (more peaked) distribution. Must be strictly positive.
+    plot_graph : bool, default False
+        Whether to generate and display plots visualizing the variation
+        statistics of the option and action network outputs.
+
+    Returns
+    -------
+    `pd.DataFrame`
+        Table with statistics for option_network dimensions.
+    `pd.DataFrame`
+        Table with statistics for action_networks dimensions.
+    int
+        Index of the dimension with maximum variation in option_network.
+    int
+        Index of the dimension with maximum variation in action_networks.
+    """
+    if train_option:
+        model.train()
+    else:
+        model.eval()
+
+    state_tensor = torch.tensor(sample_data, dtype=torch.float32)
+    model.to("cpu")
+    state_tensor = state_tensor.to("cpu")
+
+    # Get raw outputs from option_network and apply softmax with temperature
+    option_raw_outputs = model.option_network(state_tensor)
+    option_probs = torch.softmax(option_raw_outputs / temperature, dim=-1)
+
+    option_outputs = {}
+    option_prob_outputs = {}
+
+    for i in range(model.num_options):
+        option_outputs[f"Option {i}"] = option_raw_outputs[..., i].detach().numpy()
+        option_prob_outputs[f"Option {i}"] = option_probs[..., i].detach().numpy()
+
+    # Get raw outputs from action_networks and apply softmax with temperature
+    action_outputs = {}
+    action_prob_outputs = {}
+
+    for opt_idx, net in enumerate(model.action_networks):
+        network_output = net(state_tensor)
+        network_probs = torch.softmax(network_output / temperature, dim=-1)
+
+        num_actions = network_probs.shape[-1]
+        for act_idx in range(num_actions):
+            key = f"Option {opt_idx}, Action {act_idx}"
+
+            action_outputs[key] = network_output[..., act_idx].detach().numpy()
+
+            action_prob_outputs[key] = network_probs[..., act_idx].detach().numpy()
+    if plot_graph:
+        plot_two_region_histograms_boxplots(option_outputs, action_outputs)
+    option_stats = {}
+    for opt_name in option_outputs:
+        logits = option_outputs[opt_name]
+        probs = option_prob_outputs[opt_name]
+
+        option_stats[opt_name] = {
+            "Mean": np.mean(logits),
+            "Std": np.std(logits),
+            "Min": np.min(logits),
+            "Max": np.max(logits),
+            "Range": np.ptp(logits),
+            "Variance": np.var(logits),
+            "Prob Mean": np.mean(probs),
+            "Prob Std": np.std(probs),
+        }
+
+    action_stats = {}
+    for act_name in action_outputs:
+        logits = action_outputs[act_name]
+        probs = action_prob_outputs[act_name]
+
+        action_stats[act_name] = {
+            "Mean": np.mean(logits),
+            "Std": np.std(logits),
+            "Min": np.min(logits),
+            "Max": np.max(logits),
+            "Range": np.ptp(logits),
+            "Variance": np.var(logits),
+            "Prob Mean": np.mean(probs),
+            "Prob Std": np.std(probs),
+        }
+
+    option_df = pd.DataFrame(option_stats).T
+    action_df = pd.DataFrame(action_stats).T
+
+    max_variation_opt_dim = None
+    max_range = -float("inf")
+
+    for opt_name, stats in option_stats.items():
+        if stats["Range"] > max_range:
+            max_range = stats["Range"]
+            max_variation_opt_dim = int(opt_name.split()[-1])
+
+    max_variation_act_dim = None
+    max_action_range = -float("inf")
+
+    for act_name, stats in action_stats.items():
+        if stats["Range"] > max_action_range:
+            max_action_range = stats["Range"]
+            max_variation_act_dim = act_name
+
+    return option_df, action_df, max_variation_opt_dim, max_variation_act_dim
+
+
+def network_analysis_table(
+    model: torch.nn.Module,
+    sample_data: np.ndarray,
+    train_option: bool = False,
+    temperature: float = 1.0,
+) -> str:
+    """
+    Creates a well-formatted table showing statistics for option_network and action_networks.
+
+    Parameters
+    ----------
+    model : `torch.nn.Module`
+        The MultiBanditNet model to analyze.
+    sample_data : `np.ndarray`
+        Input sample data of shape (n_samples, state_dim).
+    train_option : `bool`, optional
+        Whether to use train mode, by default False.
+    temperature : float, default 1.0
+        Temperature used to control the sharpness of the output probability
+        distribution. A value of ``1.0`` preserves the default behavior.
+        Values greater than ``1.0`` produce a softer (more uniform)
+        distribution, while values between ``0`` and ``1.0`` produce a
+        sharper (more peaked) distribution. Must be strictly positive.
+
+    Returns
+    -------
+    str
+        Formatted string with network analysis tables.
+    """
+
+    option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
+        model,
+        sample_data,
+        train_option,
+        temperature,
+    )
+
+    def format_df(df: pd.DataFrame, highlight_idx: Optional[int] = None) -> str:
+        df = df.copy()
+
+        numeric_cols = df.select_dtypes(include=["number"]).columns
+        df[numeric_cols] = df[numeric_cols].round(5)
+
+        index_labels = []
+        for idx in df.index:
+            if highlight_idx is not None and idx == highlight_idx:
+                index_labels.append(f"★ {idx}")
+            else:
+                index_labels.append(str(idx))
+
+        df.index = index_labels
+
+        return tabulate(
+            df,
+            headers="keys",
+            tablefmt="rounded_outline",
+            floatfmt=".5f",
+            showindex=True,
+        )
+
+    report = []
+
+    report.append("═" * 80)
+    report.append("                 NETWORK OUTPUT VARIATION ANALYSIS")
+    report.append("═" * 80)
+    report.append("")
+    report.append("┌──────────────────────────────────────────────────────────────┐")
+    report.append("│ OPTION NETWORK                                               │")
+    report.append("└──────────────────────────────────────────────────────────────┘")
+    report.append("")
+
+    report.append(format_df(option_df, max_opt_dim))
+    report.append("")
+
+    if max_opt_dim is not None:
+        report.append(f"★ Most variable option dimension : {max_opt_dim}")
+
+    report.append("")
+    report.append("┌──────────────────────────────────────────────────────────────┐")
+    report.append("│ ACTION NETWORKS                                              │")
+    report.append("└──────────────────────────────────────────────────────────────┘")
+    report.append("")
+
+    report.append(format_df(action_df, max_act_dim))
+    report.append("")
+
+    if max_act_dim is not None:
+        report.append(f"★ Most variable action dimension : {max_act_dim}")
+
+    report.append("")
+    report.append("─" * 80)
+    report.append("SUMMARY")
+    report.append("─" * 80)
+
+    report.append(f"Option dimensions analyzed : {len(option_df)}")
+    report.append(f"Action dimensions analyzed : {len(action_df)}")
+    report.append(f"Samples analyzed           : {len(sample_data):,}")
+
+    if max_opt_dim is not None:
+        report.append(f"Highest option variation   : {max_opt_dim}")
+
+    if max_act_dim is not None:
+        report.append(f"Highest action variation   : {max_act_dim}")
+
+    report.append("─" * 80)
+
+    return "\n".join(report)
+
+
+def display_network_analysis(
+    model: torch.nn.Module,
+    sample_data: np.ndarray,
+    multiple_option: bool = False,
+    temperature: float = 1.0,
+    plot_graph: bool = True,
+) -> None:
+    option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
+        model, sample_data, multiple_option, temperature, plot_graph
+    )
+
+    def highlight_row(row: pd.Series, target: Any) -> List[str]:
+        if row.name == target:
+            return ["background-color: #ffec99; font-weight: bold"] * len(row)
+        return [""] * len(row)
+
+    option_format = {col: "{:.5f}" for col in option_df.columns}
+    action_format = {col: "{:.5f}" for col in action_df.columns}
+
+    option_style = (
+        option_df.style.format(option_format)
+        .apply(highlight_row, axis=1, target=max_opt_dim)
+        .background_gradient(cmap="Blues")
+        .set_caption("🧠 Option Network Statistics")
+    )
+
+    action_style = (
+        action_df.style.format(action_format)
+        .apply(highlight_row, axis=1, target=max_act_dim)
+        .background_gradient(cmap="Greens")
+        .set_caption("🎯 Action Network Statistics")
+    )
+
+    if "Probability" in option_df.columns:
+        option_style = option_style.background_gradient(
+            cmap="Oranges", subset=["Prob Mean", "Prob Std"]
+        )
+
+    if "Probability" in action_df.columns:
+        action_style = action_style.background_gradient(
+            cmap="Oranges", subset=["Prob Mean", "Prob Std"]
+        )
+
+    display(option_style)
+    display(action_style)
+
+    display(HTML(f"""
+    <div style="
+        margin-top:20px;
+        padding:15px;
+        border-left:5px solid #1976d2;
+        border-radius:4px;
+    ">
+        <b>Summary</b><br>
+        Samples analyzed: {len(sample_data):,}<br>
+        Temperature: {temperature}<br>
+        Most variable option dimension: {max_opt_dim}<br>
+        Most variable action dimension: {max_act_dim}
+    </div>
+    """))
 
 
 if __name__ == "__main__":

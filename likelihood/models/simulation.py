@@ -53,7 +53,7 @@ class SimulationEngine(FeatureSelection):
     for both numerical and categorical outcomes efficiently.
     """
 
-    def __init__(self, use_scaler: bool = False, **kwargs):
+    def __init__(self, use_scaler: bool = False, **kwargs) -> None:
         self.df = pd.DataFrame()
         self.n_importances = None
         self.use_scaler = use_scaler
@@ -194,7 +194,7 @@ class SimulationEngine(FeatureSelection):
             pickle.dump(self, f)
 
     @staticmethod
-    def load(filename: str = "./simulation_model"):
+    def load(filename: str = "./simulation_model") -> "SimulationEngine":
         """
         Load the state of a SimulationEngine from a file.
 

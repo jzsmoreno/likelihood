@@ -1,6 +1,14 @@
+import os
+from typing import Any, Dict, Tuple
+
 import numpy as np
 import pandas as pd
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 from IPython.display import clear_output
 from tensorflow.keras.regularizers import l2
 from tqdm import tqdm
@@ -16,15 +24,15 @@ class GANRegressor(tf.keras.Model):
 
     def __init__(
         self,
-        input_shape_parm,
-        output_shape_parm,
-        num_neurons=128,
-        activation="linear",
-        depth=5,
-        dropout=0.2,
-        l2_reg=0.0,
+        input_shape_parm: int,
+        output_shape_parm: int,
+        num_neurons: int = 128,
+        activation: str = "linear",
+        depth: int = 5,
+        dropout: float = 0.2,
+        l2_reg: float = 0.0,
         **kwargs,
-    ):
+    ) -> None:
         super(GANRegressor, self).__init__()
         self.input_shape_parm = input_shape_parm
         self.output_shape_parm = output_shape_parm
@@ -40,7 +48,7 @@ class GANRegressor(tf.keras.Model):
         dummy_input = tf.convert_to_tensor(tf.random.normal([1, self.input_shape_parm]))
         self.build(dummy_input.shape)
 
-    def build(self, input_shape):
+    def build(self, input_shape: Tuple[int, ...]) -> None:
         self.gan = tf.keras.models.Sequential([self.generator, self.discriminator], name="gan")
 
         self.generator.compile(
@@ -56,7 +64,7 @@ class GANRegressor(tf.keras.Model):
         self.gan.compile(optimizer=self.optimizer, loss="binary_crossentropy")
         super(GANRegressor, self).build(input_shape)
 
-    def _build_generator(self):
+    def _build_generator(self) -> tf.keras.Model:
         generator = tf.keras.Sequential(name="generator")
         generator.add(
             tf.keras.layers.Dense(
@@ -77,7 +85,7 @@ class GANRegressor(tf.keras.Model):
         generator.add(tf.keras.layers.Dense(2 * self.output_shape_parm, activation=self.activation))
         return generator
 
-    def _build_discriminator(self):
+    def _build_discriminator(self) -> tf.keras.Model:
         discriminator = tf.keras.Sequential(name="discriminator")
         for _ in range(self.depth):
             discriminator.add(
@@ -91,13 +99,13 @@ class GANRegressor(tf.keras.Model):
 
     def train_gan(
         self,
-        X,
-        y,
-        batch_size,
-        n_epochs,
-        validation_split=0.2,
-        verbose=1,
-    ):
+        X: np.ndarray,
+        y: np.ndarray,
+        batch_size: int,
+        n_epochs: int,
+        validation_split: float = 0.2,
+        verbose: int = 1,
+    ) -> pd.DataFrame:
         """
         Train the GAN model.
 
@@ -193,13 +201,15 @@ class GANRegressor(tf.keras.Model):
 
         return pd.DataFrame(loss_history, columns=["epoch", "loss"])
 
-    def _get_frame(self, y, y_pred):
+    def _get_frame(self, y: np.ndarray, y_pred: list) -> pd.DataFrame:
         df = pd.DataFrame()
         df["y"] = y
         df["y_pred"] = y_pred
         return df
 
-    def _train_and_val(self, X, y, validation_split):
+    def _train_and_val(
+        self, X: tf.Tensor, y: tf.Tensor, validation_split: float
+    ) -> tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         split = int((1 - validation_split) * len(X))
 
         if len(X) > split and split > 0:
@@ -218,18 +228,18 @@ class GANRegressor(tf.keras.Model):
 
         return X_train, y_train, X_val, y_val
 
-    def _cal_loss(self, generated, y):
-        return tf.math.reduce_mean(100 * abs((y - generated) / y), keepdims=False).numpy()
+    def _cal_loss(self, generated: tf.Tensor, y: tf.Tensor) -> float:
+        return tf.math.reduce_mean(100 * abs((y - generated) / y), keepdims=False).numpy().item()
 
     def train_gen(
         self,
-        X_train,
-        y_train,
-        batch_size,
-        n_epochs,
-        validation_split=0.2,
-        patience=3,
-    ):
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        batch_size: int,
+        n_epochs: int,
+        validation_split: float = 0.2,
+        patience: int = 3,
+    ) -> pd.DataFrame:
         """
         Train the generator model.
 
@@ -276,10 +286,10 @@ class GANRegressor(tf.keras.Model):
 
         return pd.DataFrame(history.history)
 
-    def call(self, inputs):
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return self.generator(inputs)[:, 0]
 
-    def get_config(self):
+    def get_config(self) -> Dict[str, Any]:
         config = {
             "input_shape_parm": self.input_shape_parm,
             "output_shape_parm": self.output_shape_parm,
@@ -297,7 +307,7 @@ class GANRegressor(tf.keras.Model):
         return dict(list(base_config.items()) + list(config.items()))
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config: Dict[str, Any]) -> "GANRegressor":
         return cls(
             input_shape_parm=config["input_shape_parm"],
             output_shape_parm=config["output_shape_parm"],

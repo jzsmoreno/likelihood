@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>likelihood.models.ensemble API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>likelihood.models.ensemble</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="likelihood.models.ensemble.EnsembleClassifier"><code class="flex name class">
+<span>class <span class="ident">EnsembleClassifier</span></span>
+<span>(</span><span>n_models: int = 5,<br>base_model_class=None,<br>param_ranges: Dict | None = None,<br>seed_range: tuple = (0, 100),<br>voting_method: str = 'soft',<br>verbose: int = 0)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class EnsembleClassifier(BaseEstimator, ClassifierMixin):
+    &#34;&#34;&#34;
+    An ensemble of AutoClassifier models with different hyperparameters and random seeds.
+
+    Parameters
+    ----------
+    n_models : `int`
+        Number of models in the ensemble. Default is `5`.
+
+    base_model_class : `class`
+        The classifier model class to use (e.g., `AutoClassifier`). Default is `AutoClassifier`.
+
+    param_ranges : `dict`, `optional`
+        Dictionary specifying ranges for hyperparameter variation:
+        - `units`: list of integers or tuple `(min, max)`
+        - `activation`: list of activation function names
+        - `num_layers`: list of integers or tuple `(min, max)`
+        - `dropout`: list of floats or tuple `(min, max)`
+        - `l2_reg`: list of floats or tuple `(min, max)`
+        If `None`, default values are used.
+
+    seed_range : `tuple`, `optional`
+        Range for random seeds as (start, end). Default is `(0, 100)`.
+
+    voting_method : `str`, `optional`
+        Method to combine predictions: `soft` (average probabilities) or `hard` (majority vote). Default is `soft`.
+
+    verbose : `int`, `optional`
+        Verbosity level. `0` = silent, `1` = progress bar. Default is `0`.
+
+    Attributes
+    ----------
+    models_ : `list`
+        List of trained AutoClassifier instances.
+
+    model_params_ : `list`
+        List of parameter dictionaries used for each model.
+
+    n_models_ : `int`
+        Actual number of models created and trained.
+
+    Methods
+    -------
+    `fit(X, y)`
+        Train all ensemble members on the provided data.
+
+    `predict(X)`
+        Return predicted class labels using the voting method.
+
+    `predict_proba(X)`
+        Return probability estimates for each class (soft voting only).
+
+    `get_model_scores()`
+        Retrieve individual model performance metrics if available.
+
+    Examples
+    --------
+    &gt;&gt;&gt; ensemble = EnsembleClassifier(
+    ...     n_models=5,
+    ...     param_ranges={&#39;units&#39;: (10, 20), &#39;activation&#39;: [&#39;selu&#39;, &#39;relu&#39;]},
+    ...     voting_method=&#39;soft&#39;
+    ... )
+    &gt;&gt;&gt; ensemble.fit(X_train, y_train)
+    &gt;&gt;&gt; predictions = ensemble.predict(X_test)
+    &#34;&#34;&#34;
+
+    def __init__(
+        self,
+        n_models: int = 5,
+        base_model_class=None,
+        param_ranges: Optional[Dict] = None,
+        seed_range: tuple = (0, 100),
+        voting_method: str = &#34;soft&#34;,
+        verbose: int = 0,
+    ):
+        if base_model_class is None:
+            from likelihood.models.deep import AutoClassifier
+
+            base_model_class = AutoClassifier
+
+        self.n_models = n_models
+        self.base_model_class = base_model_class
+        self.param_ranges = param_ranges or {}
+        self.seed_range = seed_range
+        self.voting_method = voting_method
+        self.verbose = verbose
+
+        # Initialize internal attributes
+        self.scores = []
+        self.configs = []
+        self.models_ = []
+        self.model_params_ = []
+        self.all_history = []
+        self.n_models_ = 0
+
+    def _generate_model_configs(self) -&gt; List[Dict]:
+        &#34;&#34;&#34;Generate unique configurations for each model in the ensemble.&#34;&#34;&#34;
+        self.configs = []
+        default_ranges = {
+            &#34;units&#34;: [17],
+            &#34;activation&#34;: [&#34;selu&#34;],
+            &#34;num_layers&#34;: [1],
+            &#34;dropout&#34;: [None],
+            &#34;l2_reg&#34;: [0.0],
+        }
+
+        param_ranges = self.param_ranges or default_ranges
+
+        def sample_param(name, integer=False):
+            values = param_ranges.get(name, default_ranges[name])
+            if isinstance(values, tuple):
+                low, high = values
+                if integer:
+                    return np.random.randint(low, high + 1)
+                else:
+                    return np.random.uniform(low, high)
+            return np.random.choice(values)
+
+        for _ in range(self.n_models):
+            config = {
+                &#34;units&#34;: sample_param(&#34;units&#34;, integer=True),
+                &#34;activation&#34;: sample_param(&#34;activation&#34;),
+                &#34;num_layers&#34;: sample_param(&#34;num_layers&#34;, integer=True),
+                &#34;dropout&#34;: sample_param(&#34;dropout&#34;),
+                &#34;l2_reg&#34;: sample_param(&#34;l2_reg&#34;),
+                &#34;seed&#34;: np.random.randint(*self.seed_range),
+            }
+            self.configs.append(config)
+
+        return self.configs
+
+    def fit(self, X: np.ndarray, y: np.ndarray, **fit_kwargs):
+        &#34;&#34;&#34;Train all models in the ensemble.&#34;&#34;&#34;
+        self.models_ = []
+        self.all_history = []
+        self.model_params_ = []
+        configs = self.configs or self._generate_model_configs()
+
+        for i, config in enumerate(configs):
+            if self.verbose &gt; 0 and (i + 1) % max(1, len(configs) // 5) == 0:
+                print(f&#34;Training model {i+1}/{len(configs)}...&#34;)
+
+            tf.random.set_seed(config[&#34;seed&#34;])
+            np.random.seed(config[&#34;seed&#34;])
+
+            try:
+                model = self.base_model_class(
+                    input_shape_parm=X.shape[1],
+                    num_classes=y.shape[1] if len(y.shape) &gt; 1 else y.max() + 1,
+                    units=config[&#34;units&#34;],
+                    activation=config[&#34;activation&#34;],
+                    l2_reg=config[&#34;l2_reg&#34;],
+                    num_layers=config[&#34;num_layers&#34;],
+                    dropout=config[&#34;dropout&#34;],
+                )
+
+                model.compile(
+                    optimizer=&#34;adam&#34;,
+                    loss=tf.keras.losses.CategoricalCrossentropy(),
+                    metrics=[tf.keras.metrics.F1Score(threshold=0.5, average=&#34;micro&#34;)],
+                )
+
+                history = model.fit(X, y, verbose=0, **fit_kwargs)
+                self.models_.append(model)
+                self.all_history.append(history)
+                self.model_params_.append(config)
+
+            except Exception as e:
+                print(f&#34;Warning: Model {i+1} failed to train. Error: {e}&#34;)
+
+        self.n_models_ = len(self.models_)
+        if self.verbose &gt; 0:
+            print(f&#34;Ensemble trained with {self.n_models_} models.&#34;)
+        return self
+
+    def predict_proba(self, X: np.ndarray) -&gt; np.ndarray:
+        &#34;&#34;&#34;Return probability estimates for each class (soft voting).&#34;&#34;&#34;
+        all_probs = []
+        for model in self.models_:
+            probs = model.predict(X, verbose=0)
+            if len(probs.shape) == 1:
+                probs = tf.nn.softmax(probs).numpy()
+            all_probs.append(probs)
+
+        return np.mean(all_probs, axis=0)
+
+    def predict(self, X: np.ndarray) -&gt; np.ndarray:
+        &#34;&#34;&#34;Return predicted class labels.&#34;&#34;&#34;
+        if self.voting_method == &#34;soft&#34;:
+            probs = self.predict_proba(X)
+            return np.argmax(probs, axis=1)
+        elif self.voting_method == &#34;hard&#34;:
+            all_preds = []
+            for model in self.models_:
+                preds = model.predict(X, verbose=0)
+                if len(preds.shape) &gt; 1:
+                    preds = np.argmax(preds, axis=1)
+                else:
+                    preds = (preds &gt;= 0.5).astype(int)
+                all_preds.append(preds.reshape(-1, 1))
+
+            stacked = np.hstack(all_preds)
+            return np.apply_along_axis(lambda x: np.bincount(x).argmax(), axis=1, arr=stacked)
+        else:
+            raise ValueError(&#34;voting_method must be &#39;soft&#39; or &#39;hard&#39;.&#34;)
+
+    def get_model_scores(self):
+        &#34;&#34;&#34;Return performance metrics for each model (if available).&#34;&#34;&#34;
+        if hasattr(self, &#34;all_history&#34;):
+            self.scores = []
+            for i, model in enumerate(self.models_):
+                if hasattr(model, &#34;history&#34;):
+                    loss = self.all_history[i].history.get(&#34;loss&#34;, [None])[0]
+                    val_loss = self.all_history[i].history.get(&#34;val_loss&#34;, [None])[0]
+                    f1 = self.all_history[i].history.get(&#34;f1_score&#34;, [None])[0]
+                    val_f1 = self.all_history[i].history.get(&#34;val_f1_score&#34;, [None])[0]
+                    self.scores.append(
+                        {
+                            &#34;model_id&#34;: i + 1,
+                            &#34;params&#34;: self.model_params_[i],
+                            &#34;loss&#34;: loss,
+                            &#34;val_loss&#34;: val_loss,
+                            &#34;f1_score&#34;: f1,
+                            &#34;val_f1_score&#34;: val_f1,
+                        }
+                    )
+        return self.scores
+
+    def _save_keras_model(self, model, path: str) -&gt; None:
+        &#34;&#34;&#34;
+        Internal helper to save a Keras model depending on TF version.
+        &#34;&#34;&#34;
+        is_updated = version.parse(tf.__version__) &gt; version.parse(&#34;2.15.0&#34;)
+
+        if is_updated:
+            model.save(f&#34;{path}&#34;)
+        else:
+            model.save(path, save_format=&#34;tf&#34;)
+
+    def save(self, filepath: str) -&gt; None:
+        &#34;&#34;&#34;
+        Save ensemble metadata and models inside a directory
+        named after the last part of filepath.
+        &#34;&#34;&#34;
+
+        filepath = filepath.rstrip(&#34;.pkl&#34;)
+        parent_dir = os.path.dirname(filepath)
+        folder_name = os.path.basename(filepath)
+        save_dir = os.path.join(parent_dir, folder_name)
+        os.makedirs(save_dir, exist_ok=True)
+        self.get_model_scores()
+
+        save_dict = {
+            &#34;n_models&#34;: self.n_models,
+            &#34;param_ranges&#34;: self.param_ranges,
+            &#34;seed_range&#34;: self.seed_range,
+            &#34;voting_method&#34;: self.voting_method,
+            &#34;verbose&#34;: self.verbose,
+            &#34;configs&#34;: self.configs,
+            &#34;model_params_&#34;: self.model_params_,
+            &#34;scores&#34;: self.scores,
+            &#34;n_models_&#34;: self.n_models_,
+        }
+
+        with open(os.path.join(save_dir, &#34;meta.json&#34;), &#34;w&#34;) as f:
+            json.dump(save_dict, f, indent=4)
+
+        for i, model in enumerate(self.models_):
+            self._save_keras_model(model, os.path.join(save_dir, f&#34;model_{i}&#34;))
+
+    @classmethod
+    def load(cls, filepath: str, base_model_class=None):
+
+        filepath = filepath.rstrip(&#34;.pkl&#34;)
+
+        parent_dir = os.path.dirname(filepath)
+        folder_name = os.path.basename(filepath)
+        save_dir = os.path.join(parent_dir, folder_name)
+
+        with open(os.path.join(save_dir, &#34;meta.json&#34;), &#34;r&#34;) as f:
+            save_dict = json.load(f)
+
+        ensemble = cls.__new__(cls)
+
+        for key, value in save_dict.items():
+            setattr(ensemble, key, value)
+
+        ensemble.models_ = []
+        if base_model_class is None:
+            from likelihood.models.deep import AutoClassifier
+
+            base_model_class = AutoClassifier
+
+        def _load_keras_model(path: str) -&gt; None:
+            &#34;&#34;&#34;
+            Internal helper to load a Keras model depending on TF version.
+            &#34;&#34;&#34;
+            is_updated = version.parse(tf.__version__) &gt; version.parse(&#34;2.15.0&#34;)
+
+            if is_updated:
+                return base_model_class.load(path)
+            else:
+                return tf.keras.models.load_model(path)
+
+        for i in range(ensemble.n_models_):
+            model_path = os.path.join(save_dir, f&#34;model_{i}&#34;)
+            model = _load_keras_model(model_path)
+            ensemble.models_.append(model)
+
+        ensemble.base_model_class = base_model_class
+
+        return ensemble
+
+    def __repr__(self):
+        return (
+            f&#34;EnsembleClassifier(n_models={self.n_models}, &#34;
+            f&#34;voting_method=&#39;{self.voting_method}&#39;, &#34;
+            f&#34;trained_models={self.n_models_})&#34;
+        )</code></pre>
+</details>
+<div class="desc"><p>An ensemble of AutoClassifier models with different hyperparameters and random seeds.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>n_models</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of models in the ensemble. Default is <code>5</code>.</dd>
+<dt><strong><code>base_model_class</code></strong> :&ensp;<code>class</code></dt>
+<dd>The classifier model class to use (e.g., <code>AutoClassifier</code>). Default is <code>AutoClassifier</code>.</dd>
+<dt><strong><code>param_ranges</code></strong> :&ensp;<code>dict<code>,</code>optional</code></dt>
+<dd>Dictionary specifying ranges for hyperparameter variation:
+- <code>units</code>: list of integers or tuple <code>(min, max)</code>
+- <code>activation</code>: list of activation function names
+- <code>num_layers</code>: list of integers or tuple <code>(min, max)</code>
+- <code>dropout</code>: list of floats or tuple <code>(min, max)</code>
+- <code>l2_reg</code>: list of floats or tuple <code>(min, max)</code>
+If <code>None</code>, default values are used.</dd>
+<dt><strong><code>seed_range</code></strong> :&ensp;<code>tuple<code>,</code>optional</code></dt>
+<dd>Range for random seeds as (start, end). Default is <code>(0, 100)</code>.</dd>
+<dt><strong><code>voting_method</code></strong> :&ensp;<code>str<code>,</code>optional</code></dt>
+<dd>Method to combine predictions: <code>soft</code> (average probabilities) or <code>hard</code> (majority vote). Default is <code>soft</code>.</dd>
+<dt><strong><code>verbose</code></strong> :&ensp;<code>int<code>,</code>optional</code></dt>
+<dd>Verbosity level. <code>0</code> = silent, <code>1</code> = progress bar. Default is <code>0</code>.</dd>
+</dl>
+<h2 id="attributes">Attributes</h2>
+<dl>
+<dt><strong><code>models_</code></strong> :&ensp;<code>list</code></dt>
+<dd>List of trained AutoClassifier instances.</dd>
+<dt><strong><code>model_params_</code></strong> :&ensp;<code>list</code></dt>
+<dd>List of parameter dictionaries used for each model.</dd>
+<dt><strong><code>n_models_</code></strong> :&ensp;<code>int</code></dt>
+<dd>Actual number of models created and trained.</dd>
+</dl>
+<h2 id="methods">Methods</h2>
+<p><code>fit(X, y)</code>
+Train all ensemble members on the provided data.</p>
+<p><code>predict(X)</code>
+Return predicted class labels using the voting method.</p>
+<p><code>predict_proba(X)</code>
+Return probability estimates for each class (soft voting only).</p>
+<p><code>get_model_scores()</code>
+Retrieve individual model performance metrics if available.</p>
+<h2 id="examples">Examples</h2>
+<pre><code class="language-python-repl">&gt;&gt;&gt; ensemble = EnsembleClassifier(
+...     n_models=5,
+...     param_ranges={'units': (10, 20), 'activation': ['selu', 'relu']},
+...     voting_method='soft'
+... )
+&gt;&gt;&gt; ensemble.fit(X_train, y_train)
+&gt;&gt;&gt; predictions = ensemble.predict(X_test)
+</code></pre></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>sklearn.base.BaseEstimator</li>
+<li>sklearn.utils._repr_html.base.ReprHTMLMixin</li>
+<li>sklearn.utils._repr_html.base._HTMLDocumentationLinkMixin</li>
+<li>sklearn.utils._metadata_requests._MetadataRequester</li>
+<li>sklearn.base.ClassifierMixin</li>
+</ul>
+<h3>Static methods</h3>
+<dl>
+<dt id="likelihood.models.ensemble.EnsembleClassifier.load"><code class="name flex">
+<span>def <span class="ident">load</span></span>(<span>filepath: str, base_model_class=None)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="likelihood.models.ensemble.EnsembleClassifier.fit"><code class="name flex">
+<span>def <span class="ident">fit</span></span>(<span>self, X: numpy.ndarray, y: numpy.ndarray, **fit_kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def fit(self, X: np.ndarray, y: np.ndarray, **fit_kwargs):
+    &#34;&#34;&#34;Train all models in the ensemble.&#34;&#34;&#34;
+    self.models_ = []
+    self.all_history = []
+    self.model_params_ = []
+    configs = self.configs or self._generate_model_configs()
+
+    for i, config in enumerate(configs):
+        if self.verbose &gt; 0 and (i + 1) % max(1, len(configs) // 5) == 0:
+            print(f&#34;Training model {i+1}/{len(configs)}...&#34;)
+
+        tf.random.set_seed(config[&#34;seed&#34;])
+        np.random.seed(config[&#34;seed&#34;])
+
+        try:
+            model = self.base_model_class(
+                input_shape_parm=X.shape[1],
+                num_classes=y.shape[1] if len(y.shape) &gt; 1 else y.max() + 1,
+                units=config[&#34;units&#34;],
+                activation=config[&#34;activation&#34;],
+                l2_reg=config[&#34;l2_reg&#34;],
+                num_layers=config[&#34;num_layers&#34;],
+                dropout=config[&#34;dropout&#34;],
+            )
+
+            model.compile(
+                optimizer=&#34;adam&#34;,
+                loss=tf.keras.losses.CategoricalCrossentropy(),
+                metrics=[tf.keras.metrics.F1Score(threshold=0.5, average=&#34;micro&#34;)],
+            )
+
+            history = model.fit(X, y, verbose=0, **fit_kwargs)
+            self.models_.append(model)
+            self.all_history.append(history)
+            self.model_params_.append(config)
+
+        except Exception as e:
+            print(f&#34;Warning: Model {i+1} failed to train. Error: {e}&#34;)
+
+    self.n_models_ = len(self.models_)
+    if self.verbose &gt; 0:
+        print(f&#34;Ensemble trained with {self.n_models_} models.&#34;)
+    return self</code></pre>
+</details>
+<div class="desc"><p>Train all models in the ensemble.</p></div>
+</dd>
+<dt id="likelihood.models.ensemble.EnsembleClassifier.get_model_scores"><code class="name flex">
+<span>def <span class="ident">get_model_scores</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_model_scores(self):
+    &#34;&#34;&#34;Return performance metrics for each model (if available).&#34;&#34;&#34;
+    if hasattr(self, &#34;all_history&#34;):
+        self.scores = []
+        for i, model in enumerate(self.models_):
+            if hasattr(model, &#34;history&#34;):
+                loss = self.all_history[i].history.get(&#34;loss&#34;, [None])[0]
+                val_loss = self.all_history[i].history.get(&#34;val_loss&#34;, [None])[0]
+                f1 = self.all_history[i].history.get(&#34;f1_score&#34;, [None])[0]
+                val_f1 = self.all_history[i].history.get(&#34;val_f1_score&#34;, [None])[0]
+                self.scores.append(
+                    {
+                        &#34;model_id&#34;: i + 1,
+                        &#34;params&#34;: self.model_params_[i],
+                        &#34;loss&#34;: loss,
+                        &#34;val_loss&#34;: val_loss,
+                        &#34;f1_score&#34;: f1,
+                        &#34;val_f1_score&#34;: val_f1,
+                    }
+                )
+    return self.scores</code></pre>
+</details>
+<div class="desc"><p>Return performance metrics for each model (if available).</p></div>
+</dd>
+<dt id="likelihood.models.ensemble.EnsembleClassifier.predict"><code class="name flex">
+<span>def <span class="ident">predict</span></span>(<span>self, X: numpy.ndarray) ‑> numpy.ndarray</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def predict(self, X: np.ndarray) -&gt; np.ndarray:
+    &#34;&#34;&#34;Return predicted class labels.&#34;&#34;&#34;
+    if self.voting_method == &#34;soft&#34;:
+        probs = self.predict_proba(X)
+        return np.argmax(probs, axis=1)
+    elif self.voting_method == &#34;hard&#34;:
+        all_preds = []
+        for model in self.models_:
+            preds = model.predict(X, verbose=0)
+            if len(preds.shape) &gt; 1:
+                preds = np.argmax(preds, axis=1)
+            else:
+                preds = (preds &gt;= 0.5).astype(int)
+            all_preds.append(preds.reshape(-1, 1))
+
+        stacked = np.hstack(all_preds)
+        return np.apply_along_axis(lambda x: np.bincount(x).argmax(), axis=1, arr=stacked)
+    else:
+        raise ValueError(&#34;voting_method must be &#39;soft&#39; or &#39;hard&#39;.&#34;)</code></pre>
+</details>
+<div class="desc"><p>Return predicted class labels.</p></div>
+</dd>
+<dt id="likelihood.models.ensemble.EnsembleClassifier.predict_proba"><code class="name flex">
+<span>def <span class="ident">predict_proba</span></span>(<span>self, X: numpy.ndarray) ‑> numpy.ndarray</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def predict_proba(self, X: np.ndarray) -&gt; np.ndarray:
+    &#34;&#34;&#34;Return probability estimates for each class (soft voting).&#34;&#34;&#34;
+    all_probs = []
+    for model in self.models_:
+        probs = model.predict(X, verbose=0)
+        if len(probs.shape) == 1:
+            probs = tf.nn.softmax(probs).numpy()
+        all_probs.append(probs)
+
+    return np.mean(all_probs, axis=0)</code></pre>
+</details>
+<div class="desc"><p>Return probability estimates for each class (soft voting).</p></div>
+</dd>
+<dt id="likelihood.models.ensemble.EnsembleClassifier.save"><code class="name flex">
+<span>def <span class="ident">save</span></span>(<span>self, filepath: str) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def save(self, filepath: str) -&gt; None:
+    &#34;&#34;&#34;
+    Save ensemble metadata and models inside a directory
+    named after the last part of filepath.
+    &#34;&#34;&#34;
+
+    filepath = filepath.rstrip(&#34;.pkl&#34;)
+    parent_dir = os.path.dirname(filepath)
+    folder_name = os.path.basename(filepath)
+    save_dir = os.path.join(parent_dir, folder_name)
+    os.makedirs(save_dir, exist_ok=True)
+    self.get_model_scores()
+
+    save_dict = {
+        &#34;n_models&#34;: self.n_models,
+        &#34;param_ranges&#34;: self.param_ranges,
+        &#34;seed_range&#34;: self.seed_range,
+        &#34;voting_method&#34;: self.voting_method,
+        &#34;verbose&#34;: self.verbose,
+        &#34;configs&#34;: self.configs,
+        &#34;model_params_&#34;: self.model_params_,
+        &#34;scores&#34;: self.scores,
+        &#34;n_models_&#34;: self.n_models_,
+    }
+
+    with open(os.path.join(save_dir, &#34;meta.json&#34;), &#34;w&#34;) as f:
+        json.dump(save_dict, f, indent=4)
+
+    for i, model in enumerate(self.models_):
+        self._save_keras_model(model, os.path.join(save_dir, f&#34;model_{i}&#34;))</code></pre>
+</details>
+<div class="desc"><p>Save ensemble metadata and models inside a directory
+named after the last part of filepath.</p></div>
+</dd>
+<dt id="likelihood.models.ensemble.EnsembleClassifier.set_score_request"><code class="name flex">
+<span>def <span class="ident">set_score_request</span></span>(<span>self: <a title="likelihood.models.ensemble.EnsembleClassifier" href="#likelihood.models.ensemble.EnsembleClassifier">EnsembleClassifier</a>,<br>*,<br>sample_weight: bool | str | None = '$UNCHANGED$') ‑> <a title="likelihood.models.ensemble.EnsembleClassifier" href="#likelihood.models.ensemble.EnsembleClassifier">EnsembleClassifier</a></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def func(*args, **kw):
+    &#34;&#34;&#34;Updates the `_metadata_request` attribute of the consumer (`instance`)
+    for the parameters provided as `**kw`.
+
+    This docstring is overwritten below.
+    See REQUESTER_DOC for expected functionality.
+    &#34;&#34;&#34;
+    if not _routing_enabled():
+        raise RuntimeError(
+            &#34;This method is only available when metadata routing is enabled.&#34;
+            &#34; You can enable it using&#34;
+            &#34; sklearn.set_config(enable_metadata_routing=True).&#34;
+        )
+
+    if self.validate_keys and (set(kw) - set(self.keys)):
+        raise TypeError(
+            f&#34;Unexpected args: {set(kw) - set(self.keys)} in {self.name}. &#34;
+            f&#34;Accepted arguments are: {set(self.keys)}&#34;
+        )
+
+    # This makes it possible to use the decorated method as an unbound method,
+    # for instance when monkeypatching.
+    # https://github.com/scikit-learn/scikit-learn/issues/28632
+    if instance is None:
+        _instance = args[0]
+        args = args[1:]
+    else:
+        _instance = instance
+
+    # Replicating python&#39;s behavior when positional args are given other than
+    # `self`, and `self` is only allowed if this method is unbound.
+    if args:
+        raise TypeError(
+            f&#34;set_{self.name}_request() takes 0 positional argument but&#34;
+            f&#34; {len(args)} were given&#34;
+        )
+
+    requests = _instance._get_metadata_request()
+    method_metadata_request = getattr(requests, self.name)
+
+    for prop, alias in kw.items():
+        if alias is not UNCHANGED:
+            method_metadata_request.add_request(param=prop, alias=alias)
+    _instance._metadata_request = requests
+
+    return _instance</code></pre>
+</details>
+<div class="desc"><p>Configure whether metadata should be requested to be passed to the <code>score</code> method.</p>
+<p>Note that this method is only relevant when this estimator is used as a
+sub-estimator within a :term:<code>meta-estimator</code> and metadata routing is enabled
+with <code>enable_metadata_routing=True</code> (see :func:<code>sklearn.set_config</code>).
+Please check the :ref:<code>User Guide &lt;metadata_routing&gt;</code> on how the routing
+mechanism works.</p>
+<p>The options for each parameter are:</p>
+<ul>
+<li>
+<p><code>True</code>: metadata is requested, and passed to <code>score</code> if provided. The request is ignored if metadata is not provided.</p>
+</li>
+<li>
+<p><code>False</code>: metadata is not requested and the meta-estimator will not pass it to <code>score</code>.</p>
+</li>
+<li>
+<p><code>None</code>: metadata is not requested, and the meta-estimator will raise an error if the user provides it.</p>
+</li>
+<li>
+<p><code>str</code>: metadata should be passed to the meta-estimator with this given alias instead of the original name.</p>
+</li>
+</ul>
+<p>The default (<code>sklearn.utils.metadata_routing.UNCHANGED</code>) retains the
+existing request. This allows you to change the request for some
+parameters and not others.</p>
+<div class="admonition versionadded">
+<p class="admonition-title">Added in version:&ensp;1.3</p>
+</div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>sample_weight</code></strong> :&ensp;<code>str, True, False,</code> or <code>None</code>,
+default=<code>sklearn.utils.metadata_routing.UNCHANGED</code></dt>
+<dd>Metadata routing for <code>sample_weight</code> parameter in <code>score</code>.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>self</code></strong> :&ensp;<code>object</code></dt>
+<dd>The updated object.</dd>
+</dl></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="likelihood.models" href="index.html">likelihood.models</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="likelihood.models.ensemble.EnsembleClassifier" href="#likelihood.models.ensemble.EnsembleClassifier">EnsembleClassifier</a></code></h4>
+<ul class="two-column">
+<li><code><a title="likelihood.models.ensemble.EnsembleClassifier.fit" href="#likelihood.models.ensemble.EnsembleClassifier.fit">fit</a></code></li>
+<li><code><a title="likelihood.models.ensemble.EnsembleClassifier.get_model_scores" href="#likelihood.models.ensemble.EnsembleClassifier.get_model_scores">get_model_scores</a></code></li>
+<li><code><a title="likelihood.models.ensemble.EnsembleClassifier.load" href="#likelihood.models.ensemble.EnsembleClassifier.load">load</a></code></li>
+<li><code><a title="likelihood.models.ensemble.EnsembleClassifier.predict" href="#likelihood.models.ensemble.EnsembleClassifier.predict">predict</a></code></li>
+<li><code><a title="likelihood.models.ensemble.EnsembleClassifier.predict_proba" href="#likelihood.models.ensemble.EnsembleClassifier.predict_proba">predict_proba</a></code></li>
+<li><code><a title="likelihood.models.ensemble.EnsembleClassifier.save" href="#likelihood.models.ensemble.EnsembleClassifier.save">save</a></code></li>
+<li><code><a title="likelihood.models.ensemble.EnsembleClassifier.set_score_request" href="#likelihood.models.ensemble.EnsembleClassifier.set_score_request">set_score_request</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>

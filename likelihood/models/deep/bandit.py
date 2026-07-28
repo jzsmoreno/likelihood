@@ -1,4 +1,3 @@
-import warnings
 from typing import List
 
 import torch
@@ -15,7 +14,7 @@ class MultiBanditNet(nn.Module):
         num_layers: int = 1,
         activation: nn.Module = nn.SELU(),
         dropout_rate: float = 0.3,
-    ):
+    ) -> None:
         super(MultiBanditNet, self).__init__()
         self.state_dim = state_dim
         self.num_options = num_options
@@ -71,7 +70,7 @@ class MultiBanditNet(nn.Module):
         self.equal_action_sizes = len(set(self.num_actions)) == 1
         self.max_num_actions = max(self.num_actions)
 
-    def apply_initialization(self, method: str = "xavier_uniform"):
+    def apply_initialization(self, method: str = "xavier_uniform") -> None:
         """
         Applies a specific initialization method to all linear layers in the network.
 
@@ -108,7 +107,9 @@ class MultiBanditNet(nn.Module):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-    def forward(self, state: torch.Tensor, multiple_option: bool = False):
+    def forward(
+        self, state: torch.Tensor, multiple_option: bool = False, temperature: float = 1.0
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Parameters
         ----------
@@ -116,6 +117,12 @@ class MultiBanditNet(nn.Module):
             Tensor of shape (batch_size, state_dim) or (state_dim,)
         multiple_option : bool, default False
             Whether the model should return probabilities for multiple options.
+        temperature : float, default 1.0
+            Temperature used to control the sharpness of the output probability
+            distribution. A value of ``1.0`` preserves the default behavior.
+            Values greater than ``1.0`` produce a softer (more uniform)
+            distribution, while values between ``0`` and ``1.0`` produce a
+            sharper (more peaked) distribution. Must be strictly positive.
 
         Returns
         -------
@@ -137,7 +144,7 @@ class MultiBanditNet(nn.Module):
         batch_size = state.size(0)
 
         option_probs = torch.softmax(
-            self.option_network(state), dim=-1
+            self.option_network(state) / temperature, dim=-1
         )  # (batch_size, num_options)
 
         device = state.device
@@ -148,7 +155,7 @@ class MultiBanditNet(nn.Module):
             selected_actions = torch.zeros(batch_size, num_options, dtype=torch.long, device=device)
 
             for i, net in enumerate(self.action_networks):
-                probs = torch.softmax(net(state), dim=-1)
+                probs = torch.softmax(net(state) / temperature, dim=-1)
                 num_actions_i = probs.size(-1)
                 action_probs[:, i, :num_actions_i] = probs
                 selected_actions[:, i] = torch.argmax(probs, dim=-1)
@@ -164,7 +171,9 @@ class MultiBanditNet(nn.Module):
                 mask = selected_options == opt_idx
                 if mask.any():
                     states_opt = state[mask]
-                    probs = torch.softmax(self.action_networks[opt_idx](states_opt), dim=-1)
+                    probs = torch.softmax(
+                        self.action_networks[opt_idx](states_opt) / temperature, dim=-1
+                    )
                     num_actions_i = probs.size(-1)
                     action_probs[mask, :num_actions_i] = probs
                     selected_actions[mask] = torch.argmax(probs, dim=-1)

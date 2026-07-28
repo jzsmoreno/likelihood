@@ -11,7 +11,7 @@ from likelihood.tools import FeatureSelection
 class DynamicGraph(FeatureSelection):
     """A class to represent a dynamic graph"""
 
-    def __init__(self, df: pd.DataFrame, n_importances: int, **kwargs):
+    def __init__(self, df: pd.DataFrame, n_importances: int, **kwargs) -> None:
         self.G = Network(notebook=True, cdn_resources="remote", directed=True)
         self.df = df
         self.n_importances = n_importances
@@ -40,7 +40,7 @@ class DynamicGraph(FeatureSelection):
             self.labels.append(node)
             self.G.add_node(n_id=i, label=node)
 
-    def draw(self, name="graph.html", **kwargs) -> None:
+    def draw(self, name: str = "graph.html", **kwargs) -> None:
         """Display the network using HTML format"""
         spring_length = kwargs.get("spring_length", 500)
         node_distance = kwargs.get("node_distance", 100)
@@ -51,7 +51,7 @@ class DynamicGraph(FeatureSelection):
         html_file_content = open(name, "r").read()
         display(HTML(html_file_content))
 
-    def pyvis_to_networkx(self):
+    def pyvis_to_networkx(self) -> nx.Graph:
         nx_graph = nx.Graph()
         nodes = [d["id"] for d in self.G.nodes]
         for node_dic in self.G.nodes:

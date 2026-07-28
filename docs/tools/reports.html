@@ -45,7 +45,7 @@ el.replaceWith(d);
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.tools.reports.generate_html_pipeline"><code class="name flex">
-<span>def <span class="ident">generate_html_pipeline</span></span>(<span>data_dict: Any,<br>save_to_file: bool = False,<br>file_name: str = 'data_processing_report_improved.html')</span>
+<span>def <span class="ident">generate_html_pipeline</span></span>(<span>data_dict: Any,<br>save_to_file: bool = False,<br>file_name: str = 'data_processing_report.html')</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -55,374 +55,1040 @@ el.replaceWith(d);
 <pre><code class="python">def generate_html_pipeline(
     data_dict: Any,
     save_to_file: bool = False,
-    file_name: str = &#34;data_processing_report_improved.html&#34;,
+    file_name: str = &#34;data_processing_report.html&#34;,
 ):
     &#34;&#34;&#34;
-    Generates an HTML report for a data processing pipeline with an improved
-    layout using a tabbed interface to reduce vertical scroll.
+    Generates an HTML report for a data processing pipeline with:
+      - Tabbed interface (Initial / Steps / Final / Visualizations)
+      - Stat cards summary bar
+      - Automatic chart generation from sample_data:
+          * Histograms / Box plots / Violin plots for numeric columns
+          * Bar / Donut / Pareto charts for categorical columns
+          * Ordered Range Bar / Cumulative Step / Proportion charts for one-hot range columns
+          * Correlation heatmap (Pearson / Spearman / Kendall)
+      - Interactive chart-type toggle per column
+
+    Expected keys in data_dict:
+        initial_dataset : dict
+        processing_steps: list
+        final_dataset   : dict
+        sample_data     : dict - {&#34;columns&#34;: [...], &#34;rows&#34;: [[...], ...]}
+                                  or list-of-dicts [{col: val, ...}, ...]
     &#34;&#34;&#34;
-    css_js = &#34;&#34;&#34;
+    # ── Normalise sample_data ──
+    raw_sample = data_dict.get(&#34;sample_data&#34;)
+    columns: List[str] = []
+    col_values: Dict[str, list] = {}
+
+    if isinstance(raw_sample, dict) and &#34;columns&#34; in raw_sample and &#34;rows&#34; in raw_sample:
+        columns = raw_sample[&#34;columns&#34;]
+        for ci, col in enumerate(columns):
+            col_values[col] = [row[ci] for row in raw_sample[&#34;rows&#34;] if ci &lt; len(row)]
+    elif isinstance(raw_sample, list) and raw_sample and isinstance(raw_sample[0], dict):
+        columns = list(raw_sample[0].keys())
+        for col in columns:
+            col_values[col] = [row.get(col) for row in raw_sample]
+
+    # ── Classify columns ──
+    # Detect one-hot range columns:
+    #   1. Column name contains a numeric range with &#34;-&#34; (e.g. &#34;18-24&#34;,
+    #      &#34;age_0-50000&#34;, &#34;income 100.5-200.5&#34;, &#34;prefix_18-24&#34;)
+    #   2. Column values are exclusively 0/1 (binary one-hot)
+    # Grouping is done primarily by delta (bin width).
+    range_extract = re.compile(r&#34;(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)&#34;)
+
+    numeric_cols: List[str] = []
+    categorical_cols: List[str] = []
+    # All detected one-hot range columns before grouping
+    _onehot_detected: List[tuple] = []  # (col, prefix, lo, hi, delta)
+
+    for col in columns:
+        m = range_extract.search(col)
+        if m:
+            lo, hi = float(m.group(1)), float(m.group(2))
+            if lo &lt; hi:
+                # Check if values are binary (only 0 and 1)
+                vals = [v for v in col_values[col] if v is not None]
+                unique_vals = set()
+                for v in vals:
+                    if isinstance(v, (int, float)):
+                        unique_vals.add(float(v))
+                    elif isinstance(v, bool):
+                        unique_vals.add(1.0 if v else 0.0)
+
+                is_binary = len(unique_vals) &gt; 0 and unique_vals &lt;= {0.0, 1.0}
+
+                if is_binary:
+                    # Extract prefix: everything before the numeric range
+                    prefix_part = col[: m.start()].rstrip(&#34;_ &#34;)
+                    prefix = prefix_part if prefix_part else &#34;&#34;
+                    delta = round(hi - lo, 6)
+                    _onehot_detected.append((col, prefix, lo, hi, delta))
+                    continue
+
+        # Not a one-hot range column — classify normally
+        nums = [
+            v
+            for v in col_values[col]
+            if isinstance(v, (int, float)) and not (isinstance(v, float) and math.isnan(v))
+        ]
+        if len(nums) &gt;= 3:
+            numeric_cols.append(col)
+        elif col_values[col]:
+            categorical_cols.append(col)
+
+    # Group one-hot columns primarily by delta, then by prefix.
+    # Columns with the same delta AND same prefix belong together.
+    # Columns with the same delta but no prefix (bare ranges) are
+    # grouped together if they form a coherent set.
+    from collections import defaultdict
+
+    onehot_groups: Dict[str, List[tuple]] = {}
+    _by_delta_prefix: Dict[tuple, List[tuple]] = defaultdict(list)
+
+    for col, prefix, lo, hi, delta in _onehot_detected:
+        key = (delta, prefix)
+        _by_delta_prefix[key].append((col, lo, hi))
+
+    for (delta, prefix), members in _by_delta_prefix.items():
+        if len(members) &gt;= 2:
+            members.sort(key=lambda x: x[1])
+            if prefix:
+                group_label = prefix
+            else:
+                # Bare ranges — label by delta
+                delta_fmt = str(int(delta)) if delta == int(delta) else f&#34;{delta}&#34;
+                group_label = f&#34;range (Δ={delta_fmt})&#34;
+            # Deduplicate labels
+            base_label = group_label
+            counter = 2
+            while group_label in onehot_groups:
+                group_label = f&#34;{base_label} #{counter}&#34;
+                counter += 1
+            onehot_groups[group_label] = members
+        else:
+            # Single column with this delta/prefix — not a group,
+            # fall back to numeric (it&#39;s binary but still numeric)
+            for col, lo, hi in members:
+                numeric_cols.append(col)
+
+    # Collect all one-hot column names for correlation analysis
+    # (binary 0/1 columns should participate in correlations)
+    onehot_col_names: List[str] = []
+    for bins in onehot_groups.values():
+        for col, lo, hi in bins:
+            onehot_col_names.append(col)
+
+    # Correlation columns = numeric + one-hot (binary)
+    corr_cols = numeric_cols + onehot_col_names
+
+    col_values_json = json.dumps(
+        {col: [v for v in col_values[col] if v is not None] for col in columns}
+    )
+    numeric_cols_json = json.dumps(numeric_cols)
+    categorical_cols_json = json.dumps(categorical_cols)
+    corr_cols_json = json.dumps(corr_cols)
+    # Build a safe-key mapping for JS: group_label → safe_id and data
+    # We use safe_id as the JS key to avoid issues with special characters
+    onehot_js_map = {}  # safe_id → {label, bins}
+    onehot_safe_ids = {}  # group_label → safe_id
+    for group_label, bins in onehot_groups.items():
+        safe_id = &#34;&#34;.join(c if c.isalnum() else &#34;_&#34; for c in group_label)
+        # Ensure unique
+        base = safe_id
+        counter = 2
+        while safe_id in onehot_js_map:
+            safe_id = f&#34;{base}_{counter}&#34;
+            counter += 1
+        onehot_safe_ids[group_label] = safe_id
+        onehot_js_map[safe_id] = {
+            &#34;label&#34;: group_label,
+            &#34;bins&#34;: [{&#34;col&#34;: c, &#34;lo&#34;: lo, &#34;hi&#34;: hi} for c, lo, hi in bins],
+        }
+    onehot_groups_json = json.dumps(onehot_js_map)
+
+    # ── CSS ──
+    css = &#34;&#34;&#34;
     &lt;style&gt;
-        /* Existing Styles (omitted for brevity, keep the original content) */
+        @import url(&#39;https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap&#39;);
         :root {
-            --primary: #0d9488;
-            --primary-dark: #0f766e;
-            --success: #10b981;
-            --accent: #3b82f6;
-            --card-bg: #ffffff;
-            --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.03);
-            --border-radius-md: 8px;
-            --font-family: &#39;Roboto&#39;, sans-serif;
+            --c-bg:#f1f5f9;--c-surface:#fff;--c-primary:#0d9488;--c-primary-hover:#0f766e;
+            --c-accent:#6366f1;--c-success:#22c55e;--c-text:#0f172a;--c-text-muted:#64748b;
+            --c-border:#e2e8f0;--c-row-alt:#f8fafc;--c-highlight:#f0fdfa;
+            --radius:10px;--shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+            --shadow-lg:0 4px 16px rgba(0,0,0,.08);--transition:.2s ease;
         }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: var(--font-family);
-            background: #f8fafc;
-            color: #1e293b;
-            margin: 0;
-            padding: 1.5rem;
-            font-size: 14px;
-        }
-
-        h2 {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            text-align: center;
-            padding: 1.2rem;
-            border-radius: var(--border-radius-md);
-            font-weight: 700;
-            font-size: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        }
-
-        section {
-            background: var(--card-bg);
-            border-radius: var(--border-radius-md);
-            padding: 1.5rem;
-            box-shadow: var(--shadow-sm);
-            margin-bottom: 2rem;
-        }
-
-        h3 {
-            color: var(--primary-dark);
-            font-weight: 600;
-            font-size: 1.4rem;
-            border-left: 5px solid var(--success);
-            padding-left: 1rem;
-            margin-bottom: 1rem;
-            transition: color 0.3s ease;
-        }
-
-        h3:hover {
-            color: var(--primary);
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-            margin: 1rem 0;
-        }
-
-        th, td {
-            padding: 0.8rem 1rem;
-            text-align: left;
-            border-bottom: 1px solid #e2e8f0;
-            vertical-align: top;
-        }
-
-        thead {
-            background-color: #f0fdf4;
-        }
-
-        tbody tr:nth-child(odd) {
-            background-color: #f9fafb;
-        }
-
-        tbody tr:hover {
-            background-color: #e0f2fe;
-        }
-
-        .nested-table {
-            font-size: 12px;
-            margin-top: 0.8rem;
-        }
-
-        details {
-            margin-bottom: 1rem;
-            padding: 0.8rem;
-            background: #f9f9f9;
-            border-radius: var(--border-radius-md);
-            transition: background 0.3s ease;
-        }
-
-        details[open] {
-            background: #f0fdf4;
-        }
-
-        summary {
-            font-weight: 700;
-            font-size: 1.1rem;
-            color: var(--primary-dark);
-            cursor: pointer;
-            list-style: none; /* Hide default marker */
-            transition: color 0.3s ease;
-        }
-
-        summary::-webkit-details-marker {
-            display: none; /* For Chrome/Safari */
-        }
-
-        summary::before {
-            content: &#34;▶&#34;;
-            margin-right: 6px;
-            color: var(--success);
-            font-size: 1rem;
-            display: inline-block;
-            transition: transform 0.2s;
-        }
-        
-        details[open] summary::before {
-            content: &#34;▼&#34;;
-        }
-
-        summary:hover {
-            color: var(--primary);
-        }
-        
-        .tabbed-interface {
-            display: flex;
-            flex-direction: column;
-            background: var(--card-bg);
-            border-radius: var(--border-radius-md);
-            box-shadow: var(--shadow-sm);
-            padding: 0;
-            margin-bottom: 2rem;
-        }
-
-        .tab-buttons {
-            display: flex;
-            border-bottom: 2px solid #e2e8f0;
-            flex-wrap: wrap; /* Allows wrapping on smaller screens */
-        }
-
-        .tab-button {
-            padding: 1rem 1.5rem;
-            cursor: pointer;
-            border: none;
-            background: transparent;
-            font-weight: 600;
-            color: #475569;
-            font-size: 1rem;
-            transition: color 0.3s, border-bottom 0.3s;
-            flex-grow: 1; /* Makes buttons take up equal space */
-            text-align: center;
-        }
-
-        .tab-button.active, .tab-button:hover {
-            color: var(--primary);
-            border-bottom: 3px solid var(--primary);
-        }
-
-        .tab-content {
-            padding: 1.5rem;
-        }
-
-        .tab-pane {
-            display: none;
-        }
-
-        .tab-pane.active {
-            display: block;
-        }
-
-        /* --- END NEW TABBED LAYOUT STYLES --- */
-
-        @media (max-width: 768px) {
-            body {
-                font-size: 13px;
-            }
-
-            h2 {
-                font-size: 1.6rem;
-                padding: 1rem;
-            }
-
-            h3 {
-                font-size: 1.3rem;
-            }
-
-            table, .nested-table {
-                font-size: 12px;
-            }
-
-            section {
-                padding: 1rem;
-            }
-            
-            .tab-button {
-                padding: 0.8rem 1rem;
-                font-size: 0.9rem;
-            }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:&#39;Inter&#39;,system-ui,sans-serif;background:var(--c-bg);color:var(--c-text);padding:2rem;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+        .report-header{background:linear-gradient(135deg,#0d9488,#6366f1);color:#fff;padding:2rem 2.5rem;border-radius:var(--radius);margin-bottom:2rem;box-shadow:var(--shadow-lg);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem}
+        .report-header h1{font-size:1.75rem;font-weight:700;letter-spacing:-.02em}
+        .report-header .subtitle{opacity:.85;font-size:.85rem}
+        .stats-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:1rem;margin-bottom:2rem}
+        .stat-card{background:var(--c-surface);border-radius:var(--radius);padding:1.2rem 1.4rem;box-shadow:var(--shadow);border-left:4px solid var(--c-primary);transition:transform var(--transition),box-shadow var(--transition)}
+        .stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+        .stat-card .label{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--c-text-muted);margin-bottom:.2rem}
+        .stat-card .value{font-size:1.45rem;font-weight:700;color:var(--c-primary)}
+        .tabs-wrapper{background:var(--c-surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+        .tab-bar{display:flex;border-bottom:2px solid var(--c-border);background:var(--c-row-alt);overflow-x:auto}
+        .tab-bar button{flex:1;min-width:max-content;padding:1rem 1.25rem;border:none;background:transparent;font:inherit;font-weight:600;font-size:.88rem;color:var(--c-text-muted);cursor:pointer;position:relative;transition:color var(--transition),background var(--transition);white-space:nowrap}
+        .tab-bar button:hover{background:var(--c-highlight);color:var(--c-primary)}
+        .tab-bar button.active{color:var(--c-primary);background:var(--c-surface)}
+        .tab-bar button.active::after{content:&#39;&#39;;position:absolute;bottom:-2px;left:0;right:0;height:3px;background:var(--c-primary);border-radius:3px 3px 0 0}
+        .tab-panel{display:none;padding:2rem;animation:fadeIn .25s ease}
+        .tab-panel.active{display:block}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+        .section-title{font-size:1.15rem;font-weight:700;margin-bottom:1.2rem;display:flex;align-items:center;gap:.5rem}
+        .section-title .icon{font-size:1.25rem}
+        .subsection-label{font-size:.82rem;font-weight:600;color:var(--c-text-muted);text-transform:uppercase;letter-spacing:.04em;margin:1.5rem 0 .75rem;padding-bottom:.4rem;border-bottom:1px dashed var(--c-border)}
+        table{width:100%;border-collapse:collapse;font-size:.875rem}
+        th,td{padding:.7rem 1rem;text-align:left;border-bottom:1px solid var(--c-border);vertical-align:top}
+        th{background:var(--c-row-alt);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--c-text-muted);position:sticky;top:0}
+        tbody tr:hover{background:var(--c-highlight)}
+        .nested-table{font-size:.8rem;margin-top:.5rem;border:1px solid var(--c-border);border-radius:6px;overflow:hidden}
+        .nested-table th{background:#f0fdf4}
+        .step-accordion{margin-bottom:.75rem;border:1px solid var(--c-border);border-radius:var(--radius);overflow:hidden;transition:box-shadow var(--transition)}
+        .step-accordion:hover{box-shadow:var(--shadow)}
+        .step-accordion summary{display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;font-weight:600;font-size:.95rem;color:var(--c-text);cursor:pointer;list-style:none;background:var(--c-row-alt);transition:background var(--transition)}
+        .step-accordion summary::-webkit-details-marker{display:none}
+        .step-accordion summary:hover{background:var(--c-highlight)}
+        .step-accordion[open] summary{background:var(--c-highlight);border-bottom:1px solid var(--c-border)}
+        .step-number{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--c-primary);color:#fff;font-size:.8rem;font-weight:700;flex-shrink:0}
+        .chevron{margin-left:auto;transition:transform .2s;color:var(--c-text-muted);font-size:.8rem}
+        .step-accordion[open] .chevron{transform:rotate(90deg)}
+        .step-body{padding:1.25rem 1.5rem}
+        .step-desc{color:var(--c-text-muted);margin-bottom:1rem;font-size:.875rem}
+        .sub-section-title{font-weight:600;font-size:.85rem;color:var(--c-primary-hover);margin:1rem 0 .5rem;display:flex;align-items:center;gap:.35rem}
+        .badge{display:inline-block;padding:.15rem .55rem;border-radius:999px;font-size:.7rem;font-weight:600;background:#dbeafe;color:#1e40af;margin:1px 2px}
+        .charts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:1.5rem}
+        .chart-card{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius);overflow:hidden;transition:box-shadow var(--transition)}
+        .chart-card:hover{box-shadow:var(--shadow-lg)}
+        .chart-header{display:flex;justify-content:space-between;align-items:center;padding:.85rem 1.1rem;border-bottom:1px solid var(--c-border);background:var(--c-row-alt);flex-wrap:wrap;gap:.5rem}
+        .chart-header h4{font-size:.9rem;font-weight:600;color:var(--c-text)}
+        .chart-header .tag{font-size:.65rem;padding:.15rem .45rem;border-radius:4px;font-weight:600;margin-left:.4rem}
+        .tag-onehot{background:#fef3c7;color:#92400e}
+        .tag-numeric{background:#dbeafe;color:#1e40af}
+        .tag-categorical{background:#ede9fe;color:#5b21b6}
+        .chart-toggle{display:flex;gap:0;border:1px solid var(--c-border);border-radius:6px;overflow:hidden}
+        .chart-toggle button{padding:.3rem .65rem;border:none;background:transparent;font:inherit;font-size:.7rem;font-weight:600;color:var(--c-text-muted);cursor:pointer;transition:all var(--transition)}
+        .chart-toggle button.active{background:var(--c-primary);color:#fff}
+        .chart-toggle button:hover:not(.active){background:var(--c-highlight)}
+        .chart-body{padding:1rem;min-height:220px;display:flex;align-items:center;justify-content:center}
+        .chart-body canvas{max-width:100%;height:200px}
+        .chart-stats{display:flex;gap:1rem;padding:.6rem 1.1rem;border-top:1px solid var(--c-border);background:var(--c-row-alt);flex-wrap:wrap}
+        .chart-stat{font-size:.72rem;color:var(--c-text-muted)}
+        .chart-stat strong{color:var(--c-text);font-weight:600}
+        .heatmap-wrapper{grid-column:1/-1}
+        .heatmap-wrapper .chart-body{padding:1.5rem;overflow-x:auto;justify-content:flex-start}
+        .heatmap-wrapper canvas{height:auto!important;max-height:500px}
+        .heatmap-legend{display:flex;align-items:center;gap:.5rem;padding:.5rem 1.1rem;border-top:1px solid var(--c-border);background:var(--c-row-alt);font-size:.72rem;color:var(--c-text-muted);flex-wrap:wrap}
+        .heatmap-legend .grad{width:120px;height:12px;border-radius:3px;border:1px solid var(--c-border)}
+        .report-footer{text-align:center;color:var(--c-text-muted);font-size:.75rem;margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--c-border)}
+        @media(max-width:640px){
+            body{padding:1rem;font-size:13px}
+            .report-header{padding:1.5rem}.report-header h1{font-size:1.3rem}
+            .tab-bar button{padding:.75rem .5rem;font-size:.78rem}
+            .tab-panel{padding:1.25rem}
+            th,td{padding:.5rem .6rem}
+            .charts-grid{grid-template-columns:1fr}
         }
     &lt;/style&gt;
-    &lt;script&gt;
-        function openTab(evt, tabName) {
-            var i, tabcontent, tablinks;
-            tabcontent = document.getElementsByClassName(&#34;tab-pane&#34;);
-            for (i = 0; i &lt; tabcontent.length; i++) {
-                tabcontent[i].style.display = &#34;none&#34;;
-                tabcontent[i].classList.remove(&#34;active&#34;);
-            }
-            tablinks = document.getElementsByClassName(&#34;tab-button&#34;);
-            for (i = 0; i &lt; tablinks.length; i++) {
-                tablinks[i].classList.remove(&#34;active&#34;);
-            }
-            document.getElementById(tabName).style.display = &#34;block&#34;;
-            document.getElementById(tabName).classList.add(&#34;active&#34;);
-            evt.currentTarget.classList.add(&#34;active&#34;);
-            // Scroll to the top of the tabbed interface container
-            document.querySelector(&#39;.tabbed-interface&#39;).scrollIntoView({ behavior: &#39;smooth&#39;, block: &#39;start&#39; });
-        }
+    &#34;&#34;&#34;
 
-        // Set &#39;Initial Dataset&#39; as the default active tab on load
-        window.onload = function() {
-            document.querySelector(&#39;.tab-button&#39;).click();
-        };
+    # ── JS ──
+    js = f&#34;&#34;&#34;
+    &lt;script&gt;
+    function openTab(evt,id){{
+        document.querySelectorAll(&#39;.tab-panel&#39;).forEach(p=&gt;{{p.style.display=&#39;none&#39;;p.classList.remove(&#39;active&#39;)}});
+        document.querySelectorAll(&#39;.tab-bar button&#39;).forEach(b=&gt;b.classList.remove(&#39;active&#39;));
+        const panel=document.getElementById(id);
+        panel.style.display=&#39;block&#39;;void panel.offsetWidth;panel.classList.add(&#39;active&#39;);
+        evt.currentTarget.classList.add(&#39;active&#39;);
+    }}
+    window.addEventListener(&#39;DOMContentLoaded&#39;,()=&gt;document.querySelector(&#39;.tab-bar button&#39;).click());
+
+    const COL_DATA = {col_values_json};
+    const NUM_COLS = {numeric_cols_json};
+    const CAT_COLS = {categorical_cols_json};
+    const CORR_COLS = {corr_cols_json};
+    const OH_GROUPS = {onehot_groups_json};
+
+    const PAL = {{
+        primary:&#39;#0d9488&#39;,accent:&#39;#6366f1&#39;,success:&#39;#22c55e&#39;,warm:&#39;#f59e0b&#39;,rose:&#39;#f43f5e&#39;,
+        grid:&#39;#e2e8f0&#39;,text:&#39;#475569&#39;,textLight:&#39;#94a3b8&#39;,
+        fills:[&#39;rgba(13,148,136,.2)&#39;,&#39;rgba(99,102,241,.2)&#39;,&#39;rgba(34,197,94,.2)&#39;,&#39;rgba(245,158,11,.2)&#39;,&#39;rgba(244,63,94,.2)&#39;,&#39;rgba(168,85,247,.2)&#39;,&#39;rgba(14,165,233,.2)&#39;,&#39;rgba(251,146,60,.2)&#39;],
+        strokes:[&#39;#0d9488&#39;,&#39;#6366f1&#39;,&#39;#22c55e&#39;,&#39;#f59e0b&#39;,&#39;#f43f5e&#39;,&#39;#a855f7&#39;,&#39;#0ea5e9&#39;,&#39;#fb923c&#39;],
+        gradientFills:[&#39;rgba(13,148,136,.35)&#39;,&#39;rgba(99,102,241,.35)&#39;,&#39;rgba(34,197,94,.35)&#39;],
+        heatmap: n =&gt; {{
+            const t=Math.max(0,Math.min(1,(n+1)/2));
+            if(t&lt;0.5){{const s=t*2;return `rgb(${{Math.round(59+s*(255-59))}},${{Math.round(130+s*(255-130))}},${{Math.round(246+s*(255-246))}})`;}}
+            else{{const s=(t-0.5)*2;return `rgb(255,${{Math.round(255-s*(255-87))}},${{Math.round(255-s*(255-87))}})`;}}
+        }}
+    }};
+
+    function stats(arr){{
+        const s=[...arr].sort((a,b)=&gt;a-b),n=s.length;
+        const sum=s.reduce((a,b)=&gt;a+b,0),mean=sum/n;
+        const q=p=&gt;{{const i=p*(n-1),lo=Math.floor(i);return lo===i?s[lo]:s[lo]+(s[lo+1]-s[lo])*(i-lo);}};
+        const variance=s.reduce((a,v)=&gt;a+(v-mean)**2,0)/n;
+        return {{min:s[0],max:s[n-1],mean,median:q(.5),q1:q(.25),q3:q(.75),std:Math.sqrt(variance),n}};
+    }}
+
+    function setupCanvas(canvas,w,h){{
+        const dpr=window.devicePixelRatio||1;
+        canvas.width=w*dpr;canvas.height=h*dpr;
+        canvas.style.width=w+&#39;px&#39;;canvas.style.height=h+&#39;px&#39;;
+        const ctx=canvas.getContext(&#39;2d&#39;);ctx.scale(dpr,dpr);return ctx;
+    }}
+
+    function fmtTick(v,range){{
+        if(Math.abs(v)&gt;=1e6) return (v/1e6).toFixed(1)+&#39;M&#39;;
+        if(Math.abs(v)&gt;=1e3) return (v/1e3).toFixed(1)+&#39;K&#39;;
+        if(range&lt;1) return v.toFixed(3);
+        if(range&lt;10) return v.toFixed(2);
+        if(range&lt;100) return v.toFixed(1);
+        return Math.round(v).toString();
+    }}
+    function fmtRange(v){{
+        if(Math.abs(v)&gt;=1e6) return (v/1e6).toFixed(1)+&#39;M&#39;;
+        if(Math.abs(v)&gt;=1e3) return (v/1e3).toFixed(1)+&#39;K&#39;;
+        return Number.isInteger(v)?v.toString():v.toFixed(1);
+    }}
+
+    function niceScale(dMin,dMax,maxTicks){{
+        const range=dMax-dMin||1;const rough=range/maxTicks;
+        const mag=Math.pow(10,Math.floor(Math.log10(rough)));const residual=rough/mag;
+        let nice;
+        if(residual&lt;=1.5)nice=mag;else if(residual&lt;=3)nice=2*mag;else if(residual&lt;=7)nice=5*mag;else nice=10*mag;
+        const lo=Math.floor(dMin/nice)*nice,hi=Math.ceil(dMax/nice)*nice;
+        const ticks=[];for(let v=lo;v&lt;=hi+nice*0.001;v+=nice)ticks.push(parseFloat(v.toFixed(10)));
+        return {{lo,hi,ticks}};
+    }}
+
+    function drawAxes(ctx,m,w,h,yMin,yMax){{
+        const range=yMax-yMin;const ns=niceScale(yMin,yMax,5);
+        ctx.strokeStyle=PAL.grid;ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(m.l,m.t);ctx.lineTo(m.l,h-m.b);ctx.lineTo(w-m.r,h-m.b);ctx.stroke();
+        ctx.fillStyle=PAL.textLight;ctx.font=&#39;10px Inter,sans-serif&#39;;ctx.textAlign=&#39;right&#39;;
+        ns.ticks.forEach(v=&gt;{{
+            const y=m.t+(h-m.t-m.b)*(1-(v-ns.lo)/(ns.hi-ns.lo||1));
+            if(y&lt;m.t-2||y&gt;h-m.b+2)return;
+            ctx.fillText(fmtTick(v,range),m.l-6,y+3);
+            ctx.strokeStyle=&#39;#f1f5f9&#39;;ctx.beginPath();ctx.moveTo(m.l+1,y);ctx.lineTo(w-m.r,y);ctx.stroke();ctx.strokeStyle=PAL.grid;
+        }});
+        return ns;
+    }}
+
+    function drawXLabels(ctx,m,w,h,xMin,xMax,numTicks){{
+        const range=xMax-xMin;const ns=niceScale(xMin,xMax,numTicks||6);
+        ctx.fillStyle=PAL.textLight;ctx.font=&#39;9px Inter,sans-serif&#39;;ctx.textAlign=&#39;center&#39;;
+        ns.ticks.forEach(v=&gt;{{
+            const x=m.l+(w-m.l-m.r)*((v-ns.lo)/(ns.hi-ns.lo||1));
+            if(x&lt;m.l-2||x&gt;w-m.r+2)return;
+            ctx.fillText(fmtTick(v,range),x,h-m.b+14);
+        }});
+        return ns;
+    }}
+
+    // ── Histogram ──
+    function drawHistogram(canvas,data,colName){{
+        const W=canvas.parentElement.clientWidth-32||380,H=200;
+        const ctx=setupCanvas(canvas,W,H);
+        const s=stats(data),m={{t:15,r:15,b:30,l:48}};
+        const numBins=Math.min(Math.ceil(Math.sqrt(data.length)),30);
+        const binW=(s.max-s.min)/numBins||1;
+        const bins=Array(numBins).fill(0);
+        data.forEach(v=&gt;{{let i=Math.floor((v-s.min)/binW);if(i&gt;=numBins)i=numBins-1;bins[i]++;}});
+        const maxBin=Math.max(...bins);
+        const ns=drawAxes(ctx,m,W,H,0,maxBin);
+        const xNs=drawXLabels(ctx,m,W,H,s.min,s.max,6);
+        const plotW=W-m.l-m.r;
+        const xScale=v=&gt;(v-xNs.lo)/(xNs.hi-xNs.lo||1)*plotW;
+        const cIdx=NUM_COLS.indexOf(colName)%PAL.fills.length;
+        ctx.fillStyle=PAL.fills[cIdx];ctx.strokeStyle=PAL.strokes[cIdx];ctx.lineWidth=1.5;
+        bins.forEach((c,i)=&gt;{{
+            const x1=m.l+xScale(s.min+i*binW),x2=m.l+xScale(s.min+(i+1)*binW);
+            const bh=ns.hi?c/ns.hi*(H-m.t-m.b):0,y=H-m.b-bh;
+            ctx.beginPath();ctx.rect(x1+.5,y,x2-x1-1,bh);ctx.fill();ctx.stroke();
+        }});
+        const mx=m.l+xScale(s.mean);
+        ctx.strokeStyle=PAL.rose;ctx.lineWidth=1.5;ctx.setLineDash([5,3]);
+        ctx.beginPath();ctx.moveTo(mx,m.t);ctx.lineTo(mx,H-m.b);ctx.stroke();ctx.setLineDash([]);
+        ctx.fillStyle=PAL.rose;ctx.font=&#39;9px Inter,sans-serif&#39;;ctx.textAlign=&#39;left&#39;;ctx.fillText(&#39;μ&#39;,mx+3,m.t+10);
+    }}
+
+    // ── Box Plot ──
+    function drawBoxPlot(canvas,data,colName){{
+        const W=canvas.parentElement.clientWidth-32||380,H=200;
+        const ctx=setupCanvas(canvas,W,H);
+        const s=stats(data),m={{t:20,r:20,b:25,l:48}};
+        const plotW=W-m.l-m.r,plotH=H-m.t-m.b;
+        const cIdx=NUM_COLS.indexOf(colName)%PAL.fills.length;
+        const iqr=s.q3-s.q1;const wLo=Math.max(s.min,s.q1-1.5*iqr),wHi=Math.min(s.max,s.q3+1.5*iqr);
+        const outliers=data.filter(v=&gt;v&lt;wLo||v&gt;wHi);
+        const dMin=Math.min(wLo,...outliers),dMax=Math.max(wHi,...outliers);
+        drawAxes(ctx,m,W,H,dMin,dMax);
+        const mapY=v=&gt;m.t+plotH*(1-(v-dMin)/(dMax-dMin||1));
+        const cx=m.l+plotW/2,bw=Math.min(plotW*.4,70);
+        ctx.strokeStyle=PAL.strokes[cIdx];ctx.lineWidth=1.5;
+        ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(cx,mapY(wLo));ctx.lineTo(cx,mapY(s.q1));ctx.moveTo(cx,mapY(s.q3));ctx.lineTo(cx,mapY(wHi));ctx.stroke();ctx.setLineDash([]);
+        ctx.beginPath();ctx.moveTo(cx-bw*.3,mapY(wLo));ctx.lineTo(cx+bw*.3,mapY(wLo));ctx.moveTo(cx-bw*.3,mapY(wHi));ctx.lineTo(cx+bw*.3,mapY(wHi));ctx.stroke();
+        const bTop=mapY(s.q3),bBot=mapY(s.q1);
+        ctx.fillStyle=PAL.fills[cIdx];ctx.beginPath();ctx.rect(cx-bw/2,bTop,bw,bBot-bTop);ctx.fill();ctx.stroke();
+        ctx.strokeStyle=PAL.primary;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(cx-bw/2,mapY(s.median));ctx.lineTo(cx+bw/2,mapY(s.median));ctx.stroke();
+        const my=mapY(s.mean);ctx.fillStyle=PAL.accent;ctx.beginPath();ctx.moveTo(cx,my-5);ctx.lineTo(cx+5,my);ctx.lineTo(cx,my+5);ctx.lineTo(cx-5,my);ctx.closePath();ctx.fill();
+        ctx.fillStyle=&#39;rgba(244,63,94,.5)&#39;;ctx.strokeStyle=PAL.rose;ctx.lineWidth=1;
+        outliers.forEach(v=&gt;{{const y=mapY(v);ctx.beginPath();ctx.arc(cx+(Math.random()-.5)*bw*.4,y,3,0,Math.PI*2);ctx.fill();ctx.stroke();}});
+    }}
+
+    // ── Violin Plot ──
+    function drawViolin(canvas,data,colName){{
+        const W=canvas.parentElement.clientWidth-32||380,H=200;
+        const ctx=setupCanvas(canvas,W,H);
+        const s=stats(data),m={{t:20,r:20,b:25,l:48}};
+        const plotH=H-m.t-m.b,cx=(W-m.l-m.r)/2+m.l;
+        const cIdx=NUM_COLS.indexOf(colName)%PAL.fills.length;
+        drawAxes(ctx,m,W,H,s.min,s.max);
+        const mapY=v=&gt;m.t+plotH*(1-(v-s.min)/(s.max-s.min||1));
+        const bw=(s.q3-s.q1)*0.6/(data.length**0.2)||1;
+        const steps=60,kde=[];let maxD=0;
+        for(let i=0;i&lt;=steps;i++){{
+            const v=s.min+(s.max-s.min)*i/steps;let d=0;
+            data.forEach(x=&gt;{{const z=(v-x)/bw;d+=Math.exp(-.5*z*z);}});
+            d/=data.length*bw*Math.sqrt(2*Math.PI);kde.push({{v,d}});if(d&gt;maxD)maxD=d;
+        }}
+        const maxW=Math.min((W-m.l-m.r)*.35,80);
+        ctx.fillStyle=PAL.fills[cIdx];ctx.strokeStyle=PAL.strokes[cIdx];ctx.lineWidth=1.5;
+        ctx.beginPath();
+        kde.forEach((p,i)=&gt;{{const y=mapY(p.v),w=maxD?p.d/maxD*maxW:0;if(i===0)ctx.moveTo(cx-w,y);else ctx.lineTo(cx-w,y);}});
+        for(let i=kde.length-1;i&gt;=0;i--){{const p=kde[i],y=mapY(p.v),w=maxD?p.d/maxD*maxW:0;ctx.lineTo(cx+w,y);}}
+        ctx.closePath();ctx.fill();ctx.stroke();
+        ctx.strokeStyle=PAL.primary;ctx.lineWidth=2;
+        [s.q1,s.median,s.q3].forEach((v,i)=&gt;{{
+            const y=mapY(v),idx=Math.round((v-s.min)/(s.max-s.min||1)*steps);
+            const d=kde[Math.min(idx,kde.length-1)]?.d||0,w=maxD?d/maxD*maxW:0;
+            ctx.setLineDash(i===1?[]:[4,3]);ctx.beginPath();ctx.moveTo(cx-w,y);ctx.lineTo(cx+w,y);ctx.stroke();
+        }});ctx.setLineDash([]);
+        ctx.fillStyle=&#39;rgba(99,102,241,.25)&#39;;
+        data.forEach(v=&gt;{{
+            const y=mapY(v),idx=Math.round((v-s.min)/(s.max-s.min||1)*steps);
+            const d=kde[Math.min(idx,kde.length-1)]?.d||0,w=maxD?d/maxD*maxW*.7:0;
+            ctx.beginPath();ctx.arc(cx+(Math.random()-.5)*2*w,y,1.5,0,Math.PI*2);ctx.fill();
+        }});
+    }}
+
+    // ── Bar Chart (Categorical) ──
+    function drawBarChart(canvas,data,colName){{
+        const W=canvas.parentElement.clientWidth-32||380,H=200;
+        const ctx=setupCanvas(canvas,W,H);
+        const counts={{}};data.forEach(v=&gt;{{const k=String(v);counts[k]=(counts[k]||0)+1;}});
+        const entries=Object.entries(counts).sort((a,b)=&gt;b[1]-a[1]).slice(0,12);
+        const maxC=Math.max(...entries.map(e=&gt;e[1]));
+        const m={{t:15,r:15,b:50,l:48}};const plotW=W-m.l-m.r,plotH=H-m.t-m.b;
+        const bw=plotW/entries.length;const ns=drawAxes(ctx,m,W,H,0,maxC);
+        const cIdx=CAT_COLS.indexOf(colName);
+        entries.forEach(([label,count],i)=&gt;{{
+            const bh=ns.hi?count/ns.hi*plotH:0;const x=m.l+i*bw,y=H-m.b-bh;
+            ctx.fillStyle=PAL.fills[(cIdx+i)%PAL.fills.length];ctx.strokeStyle=PAL.strokes[(cIdx+i)%PAL.strokes.length];ctx.lineWidth=1.5;
+            ctx.beginPath();ctx.rect(x+2,y,bw-4,bh);ctx.fill();ctx.stroke();
+            if(bh&gt;18){{ctx.fillStyle=PAL.text;ctx.font=&#39;bold 10px Inter,sans-serif&#39;;ctx.textAlign=&#39;center&#39;;ctx.fillText(count,x+bw/2,y+14);}}
+            ctx.fillStyle=PAL.textLight;ctx.font=&#39;9px Inter,sans-serif&#39;;ctx.textAlign=&#39;right&#39;;
+            ctx.save();ctx.translate(x+bw/2,H-m.b+6);ctx.rotate(-Math.PI/4);
+            ctx.fillText(label.length&gt;12?label.slice(0,11)+&#39;…&#39;:label,0,0);ctx.restore();
+        }});
+    }}
+
+    // ── Donut ──
+    function drawDonut(canvas,data,colName){{
+        const W=canvas.parentElement.clientWidth-32||380,H=220;
+        const ctx=setupCanvas(canvas,W,H);
+        const counts={{}};data.forEach(v=&gt;{{const k=String(v);counts[k]=(counts[k]||0)+1;}});
+        const entries=Object.entries(counts).sort((a,b)=&gt;b[1]-a[1]);
+        const total=data.length;const topN=8;
+        let shown=entries.slice(0,topN);const otherC=entries.slice(topN).reduce((s,e)=&gt;s+e[1],0);
+        if(otherC&gt;0)shown.push([&#39;Other&#39;,otherC]);
+        const cx=W/2-60,cy=H/2,r=Math.min(cx-10,cy-10,80),inner=r*0.55;
+        let angle=-Math.PI/2;const cIdx=CAT_COLS.indexOf(colName);const legendX=cx+r+25;
+        shown.forEach(([label,count],i)=&gt;{{
+            const sweep=count/total*Math.PI*2;
+            ctx.fillStyle=PAL.strokes[(cIdx+i)%PAL.strokes.length];
+            ctx.beginPath();ctx.moveTo(cx+Math.cos(angle)*inner,cy+Math.sin(angle)*inner);
+            ctx.arc(cx,cy,r,angle,angle+sweep);ctx.arc(cx,cy,inner,angle+sweep,angle,true);ctx.closePath();ctx.fill();
+            const ly=20+i*18;ctx.fillRect(legendX,ly,10,10);
+            ctx.fillStyle=PAL.text;ctx.font=&#39;10px Inter,sans-serif&#39;;ctx.textAlign=&#39;left&#39;;
+            ctx.fillText(`${{(label.length&gt;14?label.slice(0,13)+&#39;…&#39;:label)}} (${{(count/total*100).toFixed(1)}}%)`,legendX+14,ly+9);
+            ctx.fillStyle=PAL.strokes[(cIdx+i)%PAL.strokes.length];
+            angle+=sweep;
+        }});
+        ctx.fillStyle=PAL.text;ctx.font=&#39;bold 16px Inter,sans-serif&#39;;ctx.textAlign=&#39;center&#39;;ctx.fillText(total.toString(),cx,cy+2);
+        ctx.fillStyle=PAL.textLight;ctx.font=&#39;9px Inter,sans-serif&#39;;ctx.fillText(&#39;total&#39;,cx,cy+14);
+    }}
+
+    // ── Pareto ──
+    function drawPareto(canvas,data,colName){{
+        const W=canvas.parentElement.clientWidth-32||380,H=200;
+        const ctx=setupCanvas(canvas,W,H);
+        const counts={{}};data.forEach(v=&gt;{{const k=String(v);counts[k]=(counts[k]||0)+1;}});
+        const entries=Object.entries(counts).sort((a,b)=&gt;b[1]-a[1]).slice(0,12);
+        const maxC=entries[0][1];const total=entries.reduce((s,e)=&gt;s+e[1],0);
+        const m={{t:15,r:48,b:50,l:48}};const plotW=W-m.l-m.r,plotH=H-m.t-m.b;
+        const bw=plotW/entries.length;const ns=drawAxes(ctx,m,W,H,0,maxC);
+        ctx.strokeStyle=PAL.grid;ctx.beginPath();ctx.moveTo(W-m.r,m.t);ctx.lineTo(W-m.r,H-m.b);ctx.stroke();
+        ctx.fillStyle=PAL.rose;ctx.font=&#39;10px Inter,sans-serif&#39;;ctx.textAlign=&#39;left&#39;;
+        [0,25,50,75,100].forEach(p=&gt;{{ctx.fillText(p+&#39;%&#39;,W-m.r+5,m.t+plotH*(1-p/100)+3);}});
+        const cIdx=CAT_COLS.indexOf(colName);let cumul=0;const cumulPts=[];
+        entries.forEach(([label,count],i)=&gt;{{
+            const bh=ns.hi?count/ns.hi*plotH:0;const x=m.l+i*bw,y=H-m.b-bh;
+            ctx.fillStyle=PAL.fills[(cIdx+i)%PAL.fills.length];ctx.strokeStyle=PAL.strokes[(cIdx+i)%PAL.strokes.length];ctx.lineWidth=1.5;
+            ctx.beginPath();ctx.rect(x+2,y,bw-4,bh);ctx.fill();ctx.stroke();
+            cumul+=count;cumulPts.push({{x:x+bw/2,y:m.t+plotH*(1-cumul/total)}});
+            ctx.fillStyle=PAL.textLight;ctx.font=&#39;9px Inter,sans-serif&#39;;ctx.textAlign=&#39;right&#39;;
+            ctx.save();ctx.translate(x+bw/2,H-m.b+6);ctx.rotate(-Math.PI/4);
+            ctx.fillText(label.length&gt;12?label.slice(0,11)+&#39;…&#39;:label,0,0);ctx.restore();
+        }});
+        ctx.strokeStyle=PAL.rose;ctx.lineWidth=2;ctx.beginPath();
+        cumulPts.forEach((p,i)=&gt;{{if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);}});ctx.stroke();
+        cumulPts.forEach(p=&gt;{{ctx.fillStyle=&#39;#fff&#39;;ctx.strokeStyle=PAL.rose;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(p.x,p.y,3.5,0,Math.PI*2);ctx.fill();ctx.stroke();}});
+    }}
+
+    // ══════════════════════════════════════════════════════════════
+    // ONE-HOT RANGE CHARTS
+    // ══════════════════════════════════════════════════════════════
+
+    function getOHData(safeId){{
+        const group=OH_GROUPS[safeId];
+        if(!group||!group.bins)return[];
+        return group.bins.map(b=&gt;{{
+            const vals=COL_DATA[b.col]||[];
+            const count=vals.filter(v=&gt;v===1||v===1.0||v===true||v===&#39;1&#39;).length;
+            return {{col:b.col, lo:b.lo, hi:b.hi, count, label:fmtRange(b.lo)+&#39;-&#39;+fmtRange(b.hi)}};
+        }});
+    }}
+
+    // ── Range Bar (ordered) ──
+    function drawRangeBar(canvas,safeId){{
+        const bins=getOHData(safeId);if(!bins.length)return;
+        const W=canvas.parentElement.clientWidth-32||380,H=200;
+        const ctx=setupCanvas(canvas,W,H);
+        const maxC=Math.max(...bins.map(b=&gt;b.count));
+        const m={{t:15,r:15,b:52,l:48}};const plotW=W-m.l-m.r,plotH=H-m.t-m.b;
+        const bw=plotW/bins.length;
+        const ns=drawAxes(ctx,m,W,H,0,maxC);
+        const total=bins.reduce((s,b)=&gt;s+b.count,0);
+        bins.forEach((b,i)=&gt;{{
+            const bh=ns.hi?b.count/ns.hi*plotH:0;const x=m.l+i*bw,y=H-m.b-bh;
+            // gradient fill
+            const grad=ctx.createLinearGradient(x,y,x,H-m.b);
+            grad.addColorStop(0,PAL.strokes[i%PAL.strokes.length]);
+            grad.addColorStop(1,PAL.fills[i%PAL.fills.length]);
+            ctx.fillStyle=grad;ctx.strokeStyle=PAL.strokes[i%PAL.strokes.length];ctx.lineWidth=1.5;
+            ctx.beginPath();ctx.rect(x+2,y,bw-4,bh);ctx.fill();ctx.stroke();
+            // pct label on bar
+            if(bh&gt;22){{
+                const pct=total?(b.count/total*100).toFixed(1)+&#39;%&#39;:&#39;&#39;;
+                ctx.fillStyle=&#39;#fff&#39;;ctx.font=&#39;bold 10px Inter,sans-serif&#39;;ctx.textAlign=&#39;center&#39;;ctx.fillText(pct,x+bw/2,y+14);
+            }}
+            // count below bar
+            ctx.fillStyle=PAL.text;ctx.font=&#39;9px Inter,sans-serif&#39;;ctx.textAlign=&#39;center&#39;;ctx.fillText(b.count,x+bw/2,y-4);
+            // range label
+            ctx.fillStyle=PAL.textLight;ctx.font=&#39;9px Inter,sans-serif&#39;;ctx.textAlign=&#39;right&#39;;
+            ctx.save();ctx.translate(x+bw/2,H-m.b+6);ctx.rotate(-Math.PI/4);
+            ctx.fillText(b.label,0,0);ctx.restore();
+        }});
+    }}
+
+    // ── Cumulative Step ──
+    function drawCumulStep(canvas,safeId){{
+        const bins=getOHData(safeId);if(!bins.length)return;
+        const W=canvas.parentElement.clientWidth-32||380,H=200;
+        const ctx=setupCanvas(canvas,W,H);
+        const total=bins.reduce((s,b)=&gt;s+b.count,0);
+        const m={{t:20,r:48,b:30,l:48}};const plotW=W-m.l-m.r,plotH=H-m.t-m.b;
+        // y axis: count
+        const ns=drawAxes(ctx,m,W,H,0,total);
+        // right axis: percentage
+        ctx.strokeStyle=PAL.grid;ctx.beginPath();ctx.moveTo(W-m.r,m.t);ctx.lineTo(W-m.r,H-m.b);ctx.stroke();
+        ctx.fillStyle=PAL.accent;ctx.font=&#39;10px Inter,sans-serif&#39;;ctx.textAlign=&#39;left&#39;;
+        [0,25,50,75,100].forEach(p=&gt;{{ctx.fillText(p+&#39;%&#39;,W-m.r+5,m.t+plotH*(1-p/100)+3);}});
+        // x labels
+        const xStep=plotW/(bins.length);
+        ctx.fillStyle=PAL.textLight;ctx.font=&#39;9px Inter,sans-serif&#39;;ctx.textAlign=&#39;center&#39;;
+        bins.forEach((b,i)=&gt;ctx.fillText(b.label,m.l+i*xStep+xStep/2,H-m.b+14));
+
+        let cumul=0;const pts=[];
+        bins.forEach((b,i)=&gt;{{
+            cumul+=b.count;
+            pts.push({{x:m.l+i*xStep+xStep/2, y:m.t+plotH*(1-cumul/(ns.hi||1))}});
+        }});
+        // area fill
+        ctx.beginPath();ctx.moveTo(pts[0].x,H-m.b);
+        pts.forEach((p,i)=&gt;{{
+            if(i&gt;0)ctx.lineTo(p.x,pts[i-1].y); // horizontal step
+            ctx.lineTo(p.x,p.y);
+        }});
+        ctx.lineTo(pts[pts.length-1].x,H-m.b);ctx.closePath();
+        const grad=ctx.createLinearGradient(0,m.t,0,H-m.b);
+        grad.addColorStop(0,&#39;rgba(13,148,136,.3)&#39;);grad.addColorStop(1,&#39;rgba(13,148,136,.02)&#39;);
+        ctx.fillStyle=grad;ctx.fill();
+        // step line
+        ctx.strokeStyle=PAL.primary;ctx.lineWidth=2.5;ctx.beginPath();
+        pts.forEach((p,i)=&gt;{{
+            if(i===0)ctx.moveTo(p.x,p.y);
+            else{{ctx.lineTo(p.x,pts[i-1].y);ctx.lineTo(p.x,p.y);}}
+        }});ctx.stroke();
+        // dots
+        pts.forEach((p,i)=&gt;{{
+            ctx.fillStyle=&#39;#fff&#39;;ctx.strokeStyle=PAL.primary;ctx.lineWidth=2;
+            ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fill();ctx.stroke();
+            const pct=(bins.slice(0,i+1).reduce((s,b)=&gt;s+b.count,0)/total*100).toFixed(0);
+            ctx.fillStyle=PAL.text;ctx.font=&#39;bold 9px Inter,sans-serif&#39;;ctx.textAlign=&#39;center&#39;;
+            ctx.fillText(pct+&#39;%&#39;,p.x,p.y-8);
+        }});
+    }}
+
+    // ── Proportion / Stacked Percentage Bar ──
+    function drawProportion(canvas,safeId){{
+        const bins=getOHData(safeId);if(!bins.length)return;
+        const W=canvas.parentElement.clientWidth-32||380,H=200;
+        const ctx=setupCanvas(canvas,W,H);
+        const total=bins.reduce((s,b)=&gt;s+b.count,0);
+        const m={{t:25,r:15,b:70,l:15}};const barH=50;const barY=(H-m.b-m.t)/2-barH/2+m.t;
+        // stacked horizontal bar
+        let x=m.l;
+        const barW=W-m.l-m.r;
+        bins.forEach((b,i)=&gt;{{
+            const w=total?b.count/total*barW:0;
+            ctx.fillStyle=PAL.strokes[i%PAL.strokes.length];
+            ctx.beginPath();
+            if(i===0&amp;&amp;bins.length&gt;1){{
+                ctx.moveTo(x+6,barY);ctx.lineTo(x+w,barY);ctx.lineTo(x+w,barY+barH);ctx.lineTo(x+6,barY+barH);
+                ctx.quadraticCurveTo(x,barY+barH,x,barY+barH-6);ctx.lineTo(x,barY+6);ctx.quadraticCurveTo(x,barY,x+6,barY);
+            }} else if(i===bins.length-1){{
+                ctx.moveTo(x,barY);ctx.lineTo(x+w-6,barY);ctx.quadraticCurveTo(x+w,barY,x+w,barY+6);
+                ctx.lineTo(x+w,barY+barH-6);ctx.quadraticCurveTo(x+w,barY+barH,x+w-6,barY+barH);ctx.lineTo(x,barY+barH);
+            }} else {{
+                ctx.rect(x,barY,w,barH);
+            }}
+            ctx.fill();
+            // pct label inside
+            const pct=(b.count/total*100);
+            if(w&gt;30){{
+                ctx.fillStyle=&#39;#fff&#39;;ctx.font=&#39;bold 11px Inter,sans-serif&#39;;ctx.textAlign=&#39;center&#39;;ctx.textBaseline=&#39;middle&#39;;
+                ctx.fillText(pct.toFixed(1)+&#39;%&#39;,x+w/2,barY+barH/2);
+            }}
+            // label below
+            ctx.fillStyle=PAL.strokes[i%PAL.strokes.length];ctx.font=&#39;bold 9px Inter,sans-serif&#39;;ctx.textAlign=&#39;center&#39;;
+            const lblX=x+w/2;
+            // connector line
+            ctx.strokeStyle=PAL.strokes[i%PAL.strokes.length];ctx.lineWidth=1;ctx.setLineDash([2,2]);
+            ctx.beginPath();ctx.moveTo(lblX,barY+barH);ctx.lineTo(lblX,barY+barH+14);ctx.stroke();ctx.setLineDash([]);
+            ctx.save();ctx.translate(lblX,barY+barH+18);ctx.rotate(-Math.PI/5);
+            ctx.fillStyle=PAL.text;ctx.font=&#39;9px Inter,sans-serif&#39;;ctx.textAlign=&#39;right&#39;;
+            ctx.fillText(b.label,0,0);ctx.restore();
+            // count
+            ctx.fillStyle=PAL.textLight;ctx.font=&#39;8px Inter,sans-serif&#39;;ctx.textAlign=&#39;center&#39;;
+            ctx.fillText(&#39;n=&#39;+b.count,lblX,barY-6);
+            x+=w;
+        }});
+        // title
+        ctx.fillStyle=PAL.text;ctx.font=&#39;bold 10px Inter,sans-serif&#39;;ctx.textAlign=&#39;left&#39;;
+        ctx.fillText(&#39;Distribution across bins (n=&#39;+total+&#39;)&#39;,m.l,m.t-8);
+    }}
+
+    // ══════════════════════════════════════════════════════════════
+    // CORRELATION
+    // ══════════════════════════════════════════════════════════════
+
+    function rankArray(arr){{
+        const indexed=arr.map((v,i)=&gt;({{v,i}})).sort((a,b)=&gt;a.v-b.v);
+        const ranks=new Array(arr.length);let i=0;
+        while(i&lt;indexed.length){{
+            let j=i;while(j&lt;indexed.length&amp;&amp;indexed[j].v===indexed[i].v)j++;
+            const avg=(i+j-1)/2+1;for(let k=i;k&lt;j;k++)ranks[indexed[k].i]=avg;i=j;
+        }}
+        return ranks;
+    }}
+    function pearsonCorr(a,b){{
+        const paired=[];for(let i=0;i&lt;Math.min(a.length,b.length);i++)if(typeof a[i]===&#39;number&#39;&amp;&amp;typeof b[i]===&#39;number&#39;)paired.push([a[i],b[i]]);
+        if(paired.length&lt;3)return 0;
+        const ma=paired.reduce((s,p)=&gt;s+p[0],0)/paired.length,mb=paired.reduce((s,p)=&gt;s+p[1],0)/paired.length;
+        let num=0,da=0,db=0;paired.forEach(([x,y])=&gt;{{num+=(x-ma)*(y-mb);da+=(x-ma)**2;db+=(y-mb)**2;}});
+        return da&amp;&amp;db?num/Math.sqrt(da*db):0;
+    }}
+    function spearmanCorr(a,b){{
+        const paired=[];for(let i=0;i&lt;Math.min(a.length,b.length);i++)if(typeof a[i]===&#39;number&#39;&amp;&amp;typeof b[i]===&#39;number&#39;)paired.push([a[i],b[i]]);
+        if(paired.length&lt;3)return 0;return pearsonCorr(rankArray(paired.map(p=&gt;p[0])),rankArray(paired.map(p=&gt;p[1])));
+    }}
+    function kendallCorr(a,b){{
+        const paired=[];for(let i=0;i&lt;Math.min(a.length,b.length);i++)if(typeof a[i]===&#39;number&#39;&amp;&amp;typeof b[i]===&#39;number&#39;)paired.push([a[i],b[i]]);
+        const n=paired.length;if(n&lt;3)return 0;let conc=0,disc=0;
+        for(let i=0;i&lt;n;i++)for(let j=i+1;j&lt;n;j++){{const dx=paired[i][0]-paired[j][0],dy=paired[i][1]-paired[j][1];if(dx*dy&gt;0)conc++;else if(dx*dy&lt;0)disc++;}}
+        const denom=n*(n-1)/2;return denom?(conc-disc)/denom:0;
+    }}
+
+    let currentCorrMethod=&#39;pearson&#39;;
+    function drawHeatmap(canvas,method){{
+        if(CORR_COLS.length&lt;2)return;
+        method=method||currentCorrMethod;currentCorrMethod=method;
+        const corrFn=method===&#39;spearman&#39;?spearmanCorr:method===&#39;kendall&#39;?kendallCorr:pearsonCorr;
+        const n=CORR_COLS.length;
+        const tmpCtx=canvas.getContext(&#39;2d&#39;);tmpCtx.font=&#39;10px Inter,sans-serif&#39;;
+        let maxLabelW=0;CORR_COLS.forEach(c=&gt;{{const w=tmpCtx.measureText(c).width;if(w&gt;maxLabelW)maxLabelW=w;}});
+        const labelPad=Math.min(maxLabelW+14,150);
+        const cellSize=Math.max(28,Math.min(50,Math.floor(480/n)));
+        const gridW=n*cellSize,gridH=n*cellSize;
+        const W=labelPad+gridW+20,H=labelPad+gridH+20;
+        const ctx=setupCanvas(canvas,W,H);const ox=labelPad,oy=labelPad;
+        ctx.fillStyle=PAL.text;ctx.font=&#39;10px Inter,sans-serif&#39;;ctx.textAlign=&#39;right&#39;;ctx.textBaseline=&#39;middle&#39;;
+        CORR_COLS.forEach((c,i)=&gt;{{ctx.fillText(c.length&gt;18?c.slice(0,17)+&#39;…&#39;:c,ox-6,oy+i*cellSize+cellSize/2);}});
+        ctx.textAlign=&#39;left&#39;;ctx.textBaseline=&#39;middle&#39;;
+        CORR_COLS.forEach((c,i)=&gt;{{
+            ctx.save();ctx.translate(ox+i*cellSize+cellSize/2,oy-6);ctx.rotate(-Math.PI/3);
+            ctx.fillText(c.length&gt;18?c.slice(0,17)+&#39;…&#39;:c,0,0);ctx.restore();
+        }});
+        CORR_COLS.forEach((ca,i)=&gt;{{CORR_COLS.forEach((cb,j)=&gt;{{
+            const r=corrFn(COL_DATA[ca],COL_DATA[cb]);const x=ox+j*cellSize,y=oy+i*cellSize;
+            ctx.fillStyle=PAL.heatmap(r);ctx.beginPath();
+            if(ctx.roundRect)ctx.roundRect(x+.5,y+.5,cellSize-1,cellSize-1,3);else ctx.rect(x+.5,y+.5,cellSize-1,cellSize-1);
+            ctx.fill();
+            if(cellSize&gt;=30){{ctx.fillStyle=Math.abs(r)&gt;.55?&#39;#fff&#39;:&#39;#333&#39;;ctx.font=&#39;bold 10px Inter,sans-serif&#39;;ctx.textAlign=&#39;center&#39;;ctx.textBaseline=&#39;middle&#39;;ctx.fillText(r.toFixed(2),x+cellSize/2,y+cellSize/2);}}
+        }});}});
+        const card=canvas.closest(&#39;.chart-card&#39;);
+        card.querySelectorAll(&#39;.chart-toggle button&#39;).forEach(b=&gt;b.classList.toggle(&#39;active&#39;,b.dataset.type===method));
+    }}
+
+    // ── Chart Manager ──
+    const chartInstances={{}};
+    function renderChart(colName,type){{
+        const canvasId=&#39;chart-&#39;+colName.replace(/[^a-zA-Z0-9]/g,&#39;_&#39;);
+        const canvas=document.getElementById(canvasId);if(!canvas)return;
+        const ctx=canvas.getContext(&#39;2d&#39;);const dpr=window.devicePixelRatio||1;
+        ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);
+        const data=COL_DATA[colName];const nums=data.filter(v=&gt;typeof v===&#39;number&#39;);
+        if(type===&#39;histogram&#39;)drawHistogram(canvas,nums,colName);
+        else if(type===&#39;boxplot&#39;)drawBoxPlot(canvas,nums,colName);
+        else if(type===&#39;violin&#39;)drawViolin(canvas,nums,colName);
+        else if(type===&#39;bar&#39;)drawBarChart(canvas,data,colName);
+        else if(type===&#39;donut&#39;)drawDonut(canvas,data,colName);
+        else if(type===&#39;pareto&#39;)drawPareto(canvas,data,colName);
+        chartInstances[colName]=type;
+        const card=canvas.closest(&#39;.chart-card&#39;);
+        card.querySelectorAll(&#39;.chart-toggle button&#39;).forEach(b=&gt;b.classList.toggle(&#39;active&#39;,b.dataset.type===type));
+    }}
+    function renderOH(safeId,type){{
+        const canvas=document.getElementById(&#39;oh-&#39;+safeId);if(!canvas)return;
+        const ctx=canvas.getContext(&#39;2d&#39;);const dpr=window.devicePixelRatio||1;
+        ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);
+        if(type===&#39;rangebar&#39;)drawRangeBar(canvas,safeId);
+        else if(type===&#39;cumulative&#39;)drawCumulStep(canvas,safeId);
+        else if(type===&#39;proportion&#39;)drawProportion(canvas,safeId);
+        chartInstances[&#39;oh_&#39;+safeId]=type;
+        const card=canvas.closest(&#39;.chart-card&#39;);
+        card.querySelectorAll(&#39;.chart-toggle button&#39;).forEach(b=&gt;b.classList.toggle(&#39;active&#39;,b.dataset.type===type));
+    }}
+
+    window.addEventListener(&#39;DOMContentLoaded&#39;,()=&gt;{{
+        NUM_COLS.forEach(c=&gt;renderChart(c,&#39;histogram&#39;));
+        CAT_COLS.forEach(c=&gt;renderChart(c,&#39;bar&#39;));
+        Object.keys(OH_GROUPS).forEach(sid=&gt;renderOH(sid,&#39;rangebar&#39;));
+        if(CORR_COLS.length&gt;=2)drawHeatmap(document.getElementById(&#39;heatmap-canvas&#39;),&#39;pearson&#39;);
+    }});
+    window.addEventListener(&#39;resize&#39;,()=&gt;{{
+        NUM_COLS.forEach(c=&gt;renderChart(c,chartInstances[c]||&#39;histogram&#39;));
+        CAT_COLS.forEach(c=&gt;renderChart(c,chartInstances[c]||&#39;bar&#39;));
+        Object.keys(OH_GROUPS).forEach(sid=&gt;renderOH(sid,chartInstances[&#39;oh_&#39;+sid]||&#39;rangebar&#39;));
+        if(CORR_COLS.length&gt;=2)drawHeatmap(document.getElementById(&#39;heatmap-canvas&#39;));
+    }});
     &lt;/script&gt;
     &#34;&#34;&#34;
 
+    # ── Python helpers ──
     def render_value(val):
         if isinstance(val, dict):
             return dict_to_table(val, nested=True)
-        elif isinstance(val, list):
+        if isinstance(val, list):
             if all(isinstance(item, (str, int, float)) for item in val):
-                return &#34;, &#34;.join(escape(str(x)) for x in val)
-            else:
-                return &#34;&lt;ul&gt;&#34; + &#34;&#34;.join(f&#34;&lt;li&gt;{render_value(v)}&lt;/li&gt;&#34; for v in val) + &#34;&lt;/ul&gt;&#34;
-        else:
-            return escape(str(val))
+                return &#34;, &#34;.join(f&#34;&lt;span class=&#39;badge&#39;&gt;{escape(str(x))}&lt;/span&gt;&#34; for x in val)
+            return (
+                &#34;&lt;ul style=&#39;margin:.25rem 0;padding-left:1.2rem&#39;&gt;&#34;
+                + &#34;&#34;.join(f&#34;&lt;li&gt;{render_value(v)}&lt;/li&gt;&#34; for v in val)
+                + &#34;&lt;/ul&gt;&#34;
+            )
+        return escape(str(val))
 
-    def dict_to_table(d, title=None, nested=False):
-        html = &#34;&#34;
-        table_class = &#34;nested-table&#34; if nested else &#34;main-table&#34;
-        html += f&#34;&lt;table class=&#39;{table_class}&#39;&gt;&#34;
-        html += &#34;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Key&lt;/th&gt;&lt;th&gt;Value&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&#34;
+    def dict_to_table(d, nested=False):
         if not isinstance(d, dict):
             d = {&#34;Error&#34;: &#34;Data not available or incorrect format&#34;}
-
+        cls = &#34;nested-table&#34; if nested else &#34;&#34;
+        rows = &#34;&#34;
         for key, val in d.items():
             if val is None or (isinstance(val, (str, list, dict)) and not val):
                 continue
-            key_html = escape(str(key))
-            val_html = render_value(val)
-            html += f&#34;&lt;tr&gt;&lt;td&gt;{key_html}&lt;/td&gt;&lt;td&gt;{val_html}&lt;/td&gt;&lt;/tr&gt;&#34;
-        html += &#34;&lt;/tbody&gt;&lt;/table&gt;&#34;
-        return html
+            rows += (
+                f&#34;&lt;tr&gt;&lt;td&gt;&lt;strong&gt;{escape(str(key))}&lt;/strong&gt;&lt;/td&gt;&lt;td&gt;{render_value(val)}&lt;/td&gt;&lt;/tr&gt;&#34;
+            )
+        return f&#34;&lt;table class=&#39;{cls}&#39;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Key&lt;/th&gt;&lt;th&gt;Value&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;{rows}&lt;/tbody&gt;&lt;/table&gt;&#34;
 
-    html_content = f&#34;&#34;&#34;
-    &lt;!DOCTYPE html&gt;
-    &lt;html lang=&#34;en&#34;&gt;
-    &lt;head&gt;
-        &lt;meta charset=&#34;UTF-8&#34;&gt;
-        &lt;meta name=&#34;viewport&#34; content=&#34;width=device-width, initial-scale=1.0&#34;&gt;
-        &lt;title&gt;Data Processing Report&lt;/title&gt;
-        {css_js}
-    &lt;/head&gt;
-    &lt;body&gt;
-        &lt;h2&gt;📈 Data Processing Report&lt;/h2&gt;
-    &#34;&#34;&#34;
-    html_content += &#34;&#34;&#34;
-        &lt;div class=&#34;tabbed-interface&#34;&gt;
-            &lt;div class=&#34;tab-buttons&#34;&gt;
-                &lt;button class=&#34;tab-button&#34; onclick=&#34;openTab(event, &#39;initial_dataset_tab&#39;)&#34;&gt;📁 Initial Dataset&lt;/button&gt;
-                &lt;button class=&#34;tab-button&#34; onclick=&#34;openTab(event, &#39;processing_steps_tab&#39;)&#34;&gt;🔧 Processing Steps&lt;/button&gt;
-                &lt;button class=&#34;tab-button&#34; onclick=&#34;openTab(event, &#39;final_dataset_tab&#39;)&#34;&gt;✅ Final Dataset&lt;/button&gt;
-            &lt;/div&gt;
-            &lt;div class=&#34;tab-content&#34;&gt;
-    &#34;&#34;&#34;
-    html_content += &#34;&#34;&#34;
-                &lt;div id=&#34;initial_dataset_tab&#34; class=&#34;tab-pane&#34;&gt;
-                    &lt;h3&gt;📁 Initial Dataset Overview&lt;/h3&gt;
-    &#34;&#34;&#34;
-    html_content += dict_to_table(data_dict.get(&#34;initial_dataset&#34;, {}))
-    html_content += &#34;&#34;&#34;
-                &lt;/div&gt;
-    &#34;&#34;&#34;
-    html_content += &#34;&#34;&#34;
-                &lt;div id=&#34;processing_steps_tab&#34; class=&#34;tab-pane&#34;&gt;
-                    &lt;h3&gt;🔧 Pipeline Steps Breakdown&lt;/h3&gt;
-    &#34;&#34;&#34;
-    for i, step in enumerate(data_dict.get(&#34;processing_steps&#34;, [])):
-        html_content += f&#34;&lt;details&gt;&#34;
-        html_content += (
-            f&#34;&lt;summary&gt;Step {i + 1}: {escape(step.get(&#39;step_name&#39;, &#39;Unnamed Step&#39;))}&lt;/summary&gt;&#34;
-        )
-        html_content += f&#34;&lt;p&gt;&lt;strong&gt;Description:&lt;/strong&gt; {escape(step.get(&#39;description&#39;, &#39;No description provided&#39;))}&lt;/p&gt;&#34;
+    initial = data_dict.get(&#34;initial_dataset&#34;, {})
+    final = data_dict.get(&#34;final_dataset&#34;, {})
+    steps = data_dict.get(&#34;processing_steps&#34;, [])
 
-        html_content += (
-            f&#34;&lt;div style=&#39;margin-left: 1rem; border-left: 3px solid #e0f2fe; padding-left: 1rem;&#39;&gt;&#34;
-        )
+    def extract_shape(ds):
+        shape = ds.get(&#34;shape&#34;) or ds.get(&#34;Shape&#34;)
+        if isinstance(shape, (list, tuple)) and len(shape) == 2:
+            return shape
+        return None, None
 
+    init_rows, init_cols = extract_shape(initial)
+    final_rows, final_cols = extract_shape(final)
+
+    stats_html = &#39;&lt;div class=&#34;stats-bar&#34;&gt;&#39;
+    for label, value in [
+        (&#34;Pipeline Steps&#34;, str(len(steps))),
+        (&#34;Initial Rows&#34;, str(init_rows) if init_rows is not None else &#34;—&#34;),
+        (&#34;Final Rows&#34;, str(final_rows) if final_rows is not None else &#34;—&#34;),
+        (&#34;Numeric Cols&#34;, str(len(numeric_cols))),
+        (&#34;Categorical&#34;, str(len(categorical_cols))),
+        (&#34;One-Hot Groups&#34;, str(len(onehot_groups))),
+    ]:
+        stats_html += f&#39;&lt;div class=&#34;stat-card&#34;&gt;&lt;div class=&#34;label&#34;&gt;{label}&lt;/div&gt;&lt;div class=&#34;value&#34;&gt;{value}&lt;/div&gt;&lt;/div&gt;&#39;
+    stats_html += &#34;&lt;/div&gt;&#34;
+
+    steps_html = &#34;&#34;
+    for i, step in enumerate(steps):
+        name = escape(step.get(&#34;step_name&#34;, &#34;Unnamed Step&#34;))
+        desc = escape(step.get(&#34;description&#34;, &#34;No description provided&#34;))
         params_data = step.get(&#34;parameters&#34;, {})
-        if params_data:
-            html_content += &#34;&lt;h4&gt;⚙️ Parameters&lt;/h4&gt;&#34;
-            html_content += dict_to_table(params_data, nested=True)
-        else:
-            html_content += &#34;&lt;p&gt;&lt;em&gt;No parameters recorded.&lt;/em&gt;&lt;/p&gt;&#34;
-
+        params_block = (
+            f&#39;&lt;div class=&#34;sub-section-title&#34;&gt;⚙️ Parameters&lt;/div&gt;{dict_to_table(params_data, nested=True)}&#39;
+            if params_data
+            else &#34;&#34;
+        )
         output_info = {
-            &#34;Output Shape&#34;: step.get(&#34;output_shape&#34;, &#34;N/A&#34;),
-            &#34;Input Columns&#34;: step.get(&#34;input_columns&#34;, &#34;N/A&#34;),
-            &#34;Output Columns&#34;: step.get(&#34;output_columns&#34;, &#34;N/A&#34;),
-            &#34;Output Dtypes&#34;: step.get(&#34;output_dtypes&#34;, &#34;N/A&#34;),
-            &#34;Category Columns&#34;: step.get(&#34;unique_categories&#34;, &#34;N/A&#34;),
+            k: v
+            for k, v in {
+                &#34;Output Shape&#34;: step.get(&#34;output_shape&#34;, &#34;N/A&#34;),
+                &#34;Input Columns&#34;: step.get(&#34;input_columns&#34;, &#34;N/A&#34;),
+                &#34;Output Columns&#34;: step.get(&#34;output_columns&#34;, &#34;N/A&#34;),
+                &#34;Output Dtypes&#34;: step.get(&#34;output_dtypes&#34;, &#34;N/A&#34;),
+                &#34;Category Columns&#34;: step.get(&#34;unique_categories&#34;, &#34;N/A&#34;),
+            }.items()
+            if v != &#34;N/A&#34;
         }
-        html_content += &#34;&lt;h4&gt;📊 Output Information&lt;/h4&gt;&#34;
-        html_content += dict_to_table(output_info, nested=True)
+        output_block = (
+            f&#39;&lt;div class=&#34;sub-section-title&#34;&gt;📊 Output Info&lt;/div&gt;{dict_to_table(output_info, nested=True)}&#39;
+            if output_info
+            else &#34;&#34;
+        )
+        steps_html += f&#34;&#34;&#34;&lt;details class=&#34;step-accordion&#34;&gt;&lt;summary&gt;&lt;span class=&#34;step-number&#34;&gt;{i+1}&lt;/span&gt;{name}&lt;span class=&#34;chevron&#34;&gt;▶&lt;/span&gt;&lt;/summary&gt;&lt;div class=&#34;step-body&#34;&gt;&lt;p class=&#34;step-desc&#34;&gt;{desc}&lt;/p&gt;{params_block}{output_block}&lt;/div&gt;&lt;/details&gt;&#34;&#34;&#34;
 
-        html_content += &#34;&lt;/div&gt;&#34;
-        html_content += &#34;&lt;/details&gt;&#34;
-    html_content += &#34;&#34;&#34;
+    # ── Chart Cards ──
+    charts_html = &#39;&lt;div class=&#34;charts-grid&#34;&gt;&#39;
+
+    # ── One-hot range groups ──
+    if onehot_groups:
+        charts_html += &#39;&lt;div style=&#34;grid-column:1/-1&#34; class=&#34;subsection-label&#34;&gt;🔢 One-Hot Encoded Range Distributions&lt;/div&gt;&#39;
+    for group_label, bins in onehot_groups.items():
+        safe_id = onehot_safe_ids[group_label]
+        total_count = 0
+        for col_name, lo, hi in bins:
+            vals = col_values.get(col_name, [])
+            total_count += sum(1 for v in vals if v == 1 or v == 1.0 or v is True)
+        n_bins = len(bins)
+        range_lo = bins[0][1]
+        range_hi = bins[-1][2]
+        range_str = f&#34;{range_lo}–{range_hi}&#34;
+        charts_html += f&#34;&#34;&#34;
+        &lt;div class=&#34;chart-card&#34;&gt;
+            &lt;div class=&#34;chart-header&#34;&gt;
+                &lt;h4&gt;{escape(group_label)} &lt;span class=&#34;tag tag-onehot&#34;&gt;one-hot · {n_bins} bins&lt;/span&gt;&lt;/h4&gt;
+                &lt;div class=&#34;chart-toggle&#34;&gt;
+                    &lt;button data-type=&#34;rangebar&#34; onclick=&#34;renderOH(&#39;{safe_id}&#39;,&#39;rangebar&#39;)&#34;&gt;Range Bar&lt;/button&gt;
+                    &lt;button data-type=&#34;cumulative&#34; onclick=&#34;renderOH(&#39;{safe_id}&#39;,&#39;cumulative&#39;)&#34;&gt;Cumulative&lt;/button&gt;
+                    &lt;button data-type=&#34;proportion&#34; onclick=&#34;renderOH(&#39;{safe_id}&#39;,&#39;proportion&#39;)&#34;&gt;Proportion&lt;/button&gt;
                 &lt;/div&gt;
+            &lt;/div&gt;
+            &lt;div class=&#34;chart-body&#34;&gt;&lt;canvas id=&#34;oh-{safe_id}&#34;&gt;&lt;/canvas&gt;&lt;/div&gt;
+            &lt;div class=&#34;chart-stats&#34;&gt;
+                &lt;span class=&#34;chart-stat&#34;&gt;bins=&lt;strong&gt;{n_bins}&lt;/strong&gt;&lt;/span&gt;
+                &lt;span class=&#34;chart-stat&#34;&gt;range=&lt;strong&gt;{range_str}&lt;/strong&gt;&lt;/span&gt;
+                &lt;span class=&#34;chart-stat&#34;&gt;active=&lt;strong&gt;{total_count}&lt;/strong&gt;&lt;/span&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;&#34;&#34;&#34;
+
+    # ── Numeric columns ──
+    if numeric_cols:
+        charts_html += &#39;&lt;div style=&#34;grid-column:1/-1&#34; class=&#34;subsection-label&#34;&gt;📐 Numeric Column Distributions&lt;/div&gt;&#39;
+    for col in numeric_cols:
+        safe_id = &#34;&#34;.join(c if c.isalnum() else &#34;_&#34; for c in col)
+        esc_col = escape(col).replace(&#34;&#39;&#34;, &#34;\\&#39;&#34;)
+        nums = [v for v in col_values[col] if isinstance(v, (int, float))]
+        stat_footer = &#34;&#34;
+        if nums:
+            s_sorted = sorted(nums)
+            n = len(s_sorted)
+            mean_v = sum(s_sorted) / n
+            med_v = s_sorted[n // 2] if n % 2 else (s_sorted[n // 2 - 1] + s_sorted[n // 2]) / 2
+            std_v = (sum((x - mean_v) ** 2 for x in s_sorted) / n) ** 0.5
+            stat_footer = (
+                f&#39;&lt;div class=&#34;chart-stats&#34;&gt;&#39;
+                f&#39;&lt;span class=&#34;chart-stat&#34;&gt;n=&lt;strong&gt;{n}&lt;/strong&gt;&lt;/span&gt;&#39;
+                f&#39;&lt;span class=&#34;chart-stat&#34;&gt;μ=&lt;strong&gt;{mean_v:.2f}&lt;/strong&gt;&lt;/span&gt;&#39;
+                f&#39;&lt;span class=&#34;chart-stat&#34;&gt;med=&lt;strong&gt;{med_v:.2f}&lt;/strong&gt;&lt;/span&gt;&#39;
+                f&#39;&lt;span class=&#34;chart-stat&#34;&gt;σ=&lt;strong&gt;{std_v:.2f}&lt;/strong&gt;&lt;/span&gt;&#39;
+                f&#39;&lt;span class=&#34;chart-stat&#34;&gt;min=&lt;strong&gt;{s_sorted[0]:.2f}&lt;/strong&gt;&lt;/span&gt;&#39;
+                f&#39;&lt;span class=&#34;chart-stat&#34;&gt;max=&lt;strong&gt;{s_sorted[-1]:.2f}&lt;/strong&gt;&lt;/span&gt;&#39;
+                f&#34;&lt;/div&gt;&#34;
+            )
+        charts_html += f&#34;&#34;&#34;
+        &lt;div class=&#34;chart-card&#34;&gt;
+            &lt;div class=&#34;chart-header&#34;&gt;
+                &lt;h4&gt;{escape(col)} &lt;span class=&#34;tag tag-numeric&#34;&gt;numeric&lt;/span&gt;&lt;/h4&gt;
+                &lt;div class=&#34;chart-toggle&#34;&gt;
+                    &lt;button data-type=&#34;histogram&#34; onclick=&#34;renderChart(&#39;{esc_col}&#39;,&#39;histogram&#39;)&#34;&gt;Histogram&lt;/button&gt;
+                    &lt;button data-type=&#34;boxplot&#34; onclick=&#34;renderChart(&#39;{esc_col}&#39;,&#39;boxplot&#39;)&#34;&gt;Box Plot&lt;/button&gt;
+                    &lt;button data-type=&#34;violin&#34; onclick=&#34;renderChart(&#39;{esc_col}&#39;,&#39;violin&#39;)&#34;&gt;Violin&lt;/button&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
+            &lt;div class=&#34;chart-body&#34;&gt;&lt;canvas id=&#34;chart-{safe_id}&#34;&gt;&lt;/canvas&gt;&lt;/div&gt;
+            {stat_footer}
+        &lt;/div&gt;&#34;&#34;&#34;
+
+    # ── Categorical columns ──
+    if categorical_cols:
+        charts_html += &#39;&lt;div style=&#34;grid-column:1/-1&#34; class=&#34;subsection-label&#34;&gt;🏷️ Categorical Column Distributions&lt;/div&gt;&#39;
+    for col in categorical_cols:
+        safe_id = &#34;&#34;.join(c if c.isalnum() else &#34;_&#34; for c in col)
+        esc_col = escape(col).replace(&#34;&#39;&#34;, &#34;\\&#39;&#34;)
+        n_unique = len(set(str(v) for v in col_values[col] if v is not None))
+        charts_html += f&#34;&#34;&#34;
+        &lt;div class=&#34;chart-card&#34;&gt;
+            &lt;div class=&#34;chart-header&#34;&gt;
+                &lt;h4&gt;{escape(col)} &lt;span class=&#34;tag tag-categorical&#34;&gt;categorical&lt;/span&gt;&lt;/h4&gt;
+                &lt;div class=&#34;chart-toggle&#34;&gt;
+                    &lt;button data-type=&#34;bar&#34; onclick=&#34;renderChart(&#39;{esc_col}&#39;,&#39;bar&#39;)&#34;&gt;Bar&lt;/button&gt;
+                    &lt;button data-type=&#34;donut&#34; onclick=&#34;renderChart(&#39;{esc_col}&#39;,&#39;donut&#39;)&#34;&gt;Donut&lt;/button&gt;
+                    &lt;button data-type=&#34;pareto&#34; onclick=&#34;renderChart(&#39;{esc_col}&#39;,&#39;pareto&#39;)&#34;&gt;Pareto&lt;/button&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
+            &lt;div class=&#34;chart-body&#34;&gt;&lt;canvas id=&#34;chart-{safe_id}&#34;&gt;&lt;/canvas&gt;&lt;/div&gt;
+            &lt;div class=&#34;chart-stats&#34;&gt;&lt;span class=&#34;chart-stat&#34;&gt;unique=&lt;strong&gt;{n_unique}&lt;/strong&gt;&lt;/span&gt;&lt;span class=&#34;chart-stat&#34;&gt;total=&lt;strong&gt;{len(col_values[col])}&lt;/strong&gt;&lt;/span&gt;&lt;/div&gt;
+        &lt;/div&gt;&#34;&#34;&#34;
+
+    # ── Heatmap ──
+    if len(corr_cols) &gt;= 2:
+        charts_html += (
+            &#39;&lt;div style=&#34;grid-column:1/-1&#34; class=&#34;subsection-label&#34;&gt;🔗 Correlation Analysis&lt;/div&gt;&#39;
+        )
+        charts_html += &#34;&#34;&#34;
+        &lt;div class=&#34;chart-card heatmap-wrapper&#34;&gt;
+            &lt;div class=&#34;chart-header&#34;&gt;
+                &lt;h4&gt;Correlation Matrix&lt;/h4&gt;
+                &lt;div class=&#34;chart-toggle&#34;&gt;
+                    &lt;button data-type=&#34;pearson&#34; onclick=&#34;drawHeatmap(document.getElementById(&#39;heatmap-canvas&#39;),&#39;pearson&#39;)&#34;&gt;Pearson&lt;/button&gt;
+                    &lt;button data-type=&#34;spearman&#34; onclick=&#34;drawHeatmap(document.getElementById(&#39;heatmap-canvas&#39;),&#39;spearman&#39;)&#34;&gt;Spearman&lt;/button&gt;
+                    &lt;button data-type=&#34;kendall&#34; onclick=&#34;drawHeatmap(document.getElementById(&#39;heatmap-canvas&#39;),&#39;kendall&#39;)&#34;&gt;Kendall&lt;/button&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
+            &lt;div class=&#34;chart-body&#34;&gt;&lt;canvas id=&#34;heatmap-canvas&#34;&gt;&lt;/canvas&gt;&lt;/div&gt;
+            &lt;div class=&#34;heatmap-legend&#34;&gt;
+                &lt;span&gt;-1&lt;/span&gt;&lt;canvas id=&#34;heatmap-legend-grad&#34; width=&#34;120&#34; height=&#34;12&#34; class=&#34;grad&#34;&gt;&lt;/canvas&gt;&lt;span&gt;+1&lt;/span&gt;
+                &lt;span style=&#34;margin-left:auto&#34;&gt;● Strong &amp;gt; 0.7 &amp;nbsp; ◐ Moderate 0.4–0.7 &amp;nbsp; ○ Weak &amp;lt; 0.4&lt;/span&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;&#34;&#34;&#34;
+    charts_html += &#34;&lt;/div&gt;&#34;
+
+    has_viz = bool(numeric_cols or categorical_cols or onehot_groups)
+    current_time = datetime.datetime.now().strftime(&#34;%Y-%m-%d %H:%M:%S&#34;)
+
+    viz_tab_btn = (
+        &#39;&lt;button role=&#34;tab&#34; onclick=&#34;openTab(event,\&#39;tab-viz\&#39;)&#34;&gt;📊 Visualizations&lt;/button&gt;&#39;
+        if has_viz
+        else &#34;&#34;
+    )
+    viz_tab_panel = (
+        f&#34;&#34;&#34;
+    &lt;div id=&#34;tab-viz&#34; class=&#34;tab-panel&#34; role=&#34;tabpanel&#34;&gt;
+        &lt;div class=&#34;section-title&#34;&gt;&lt;span class=&#34;icon&#34;&gt;📊&lt;/span&gt; Column Distributions &amp;amp; Correlations&lt;/div&gt;
+        {charts_html}
+    &lt;/div&gt;&#34;&#34;&#34;
+        if has_viz
+        else &#34;&#34;
+    )
+
+    legend_js = &#34;&#34;&#34;
+    &lt;script&gt;
+    window.addEventListener(&#39;DOMContentLoaded&#39;,()=&gt;{
+        const c=document.getElementById(&#39;heatmap-legend-grad&#39;);
+        if(!c)return;const ctx=c.getContext(&#39;2d&#39;);
+        for(let x=0;x&lt;c.width;x++){ctx.fillStyle=PAL.heatmap(x/c.width*2-1);ctx.fillRect(x,0,1,c.height);}
+    });
+    &lt;/script&gt;
     &#34;&#34;&#34;
 
-    html_content += &#34;&#34;&#34;
-                &lt;div id=&#34;final_dataset_tab&#34; class=&#34;tab-pane&#34;&gt;
-                    &lt;h3&gt;✅ Final Dataset Overview&lt;/h3&gt;
-    &#34;&#34;&#34;
-    html_content += dict_to_table(data_dict.get(&#34;final_dataset&#34;, {}))
-    html_content += &#34;&#34;&#34;
-                &lt;/div&gt;
-            &lt;/div&gt; &lt;/div&gt; &#34;&#34;&#34;
-    current_time_str = datetime.datetime.now().strftime(&#34;%Y-%m-%d %H:%M:%S&#34;)
-    html_content += f&#34;&#34;&#34;
-        &lt;p style=&#34;text-align: center; color: #94a3b8; font-size: 0.8rem; margin-top: 3rem;&#34;&gt;
-            Report Generated by Pipeline at {current_time_str}
-        &lt;/p&gt;
-    &lt;/body&gt;
-    &lt;/html&gt;
-    &#34;&#34;&#34;
+    html = f&#34;&#34;&#34;&lt;!DOCTYPE html&gt;
+&lt;html lang=&#34;en&#34;&gt;
+&lt;head&gt;
+&lt;meta charset=&#34;UTF-8&#34;&gt;&lt;meta name=&#34;viewport&#34; content=&#34;width=device-width,initial-scale=1.0&#34;&gt;
+&lt;title&gt;Data Processing Report&lt;/title&gt;
+{css}{js}{legend_js}
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div class=&#34;report-header&#34;&gt;&lt;div&gt;&lt;h1&gt;📈 Data Processing Report&lt;/h1&gt;&lt;div class=&#34;subtitle&#34;&gt;Generated {current_time}&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+{stats_html}
+&lt;div class=&#34;tabs-wrapper&#34;&gt;
+    &lt;div class=&#34;tab-bar&#34; role=&#34;tablist&#34;&gt;
+        &lt;button role=&#34;tab&#34; onclick=&#34;openTab(event,&#39;tab-initial&#39;)&#34;&gt;📁 Initial Dataset&lt;/button&gt;
+        &lt;button role=&#34;tab&#34; onclick=&#34;openTab(event,&#39;tab-steps&#39;)&#34;&gt;🔧 Processing Steps&lt;/button&gt;
+        &lt;button role=&#34;tab&#34; onclick=&#34;openTab(event,&#39;tab-final&#39;)&#34;&gt;✅ Final Dataset&lt;/button&gt;
+        {viz_tab_btn}
+    &lt;/div&gt;
+    &lt;div id=&#34;tab-initial&#34; class=&#34;tab-panel&#34; role=&#34;tabpanel&#34;&gt;
+        &lt;div class=&#34;section-title&#34;&gt;&lt;span class=&#34;icon&#34;&gt;📁&lt;/span&gt; Initial Dataset Overview&lt;/div&gt;
+        {dict_to_table(initial)}
+    &lt;/div&gt;
+    &lt;div id=&#34;tab-steps&#34; class=&#34;tab-panel&#34; role=&#34;tabpanel&#34;&gt;
+        &lt;div class=&#34;section-title&#34;&gt;&lt;span class=&#34;icon&#34;&gt;🔧&lt;/span&gt; Pipeline Steps ({len(steps)})&lt;/div&gt;
+        {steps_html if steps_html else &#39;&lt;p style=&#34;color:var(--c-text-muted)&#34;&gt;No processing steps recorded.&lt;/p&gt;&#39;}
+    &lt;/div&gt;
+    &lt;div id=&#34;tab-final&#34; class=&#34;tab-panel&#34; role=&#34;tabpanel&#34;&gt;
+        &lt;div class=&#34;section-title&#34;&gt;&lt;span class=&#34;icon&#34;&gt;✅&lt;/span&gt; Final Dataset Overview&lt;/div&gt;
+        {dict_to_table(final)}
+    &lt;/div&gt;
+    {viz_tab_panel}
+&lt;/div&gt;
+&lt;div class=&#34;report-footer&#34;&gt;Pipeline Report &amp;middot; {current_time}&lt;/div&gt;
+&lt;/body&gt;&lt;/html&gt;&#34;&#34;&#34;
+
     if save_to_file:
         try:
             with open(file_name, &#34;w&#34;, encoding=&#34;utf-8&#34;) as f:
-                f.write(html_content)
+                f.write(html)
             print(f&#34;✅ Report saved to &#39;{file_name}&#39;&#34;)
         except NameError:
             return f&#34;Report content saved to &#39;{file_name}&#39;&#34;
     else:
         try:
-            display(HTML(html_content))
+            display(HTML(html))
         except (ImportError, NameError):
-            return html_content</code></pre>
+            return html</code></pre>
 </details>
-<div class="desc"><p>Generates an HTML report for a data processing pipeline with an improved
-layout using a tabbed interface to reduce vertical scroll.</p></div>
+<div class="desc"><p>Generates an HTML report for a data processing pipeline with:
+- Tabbed interface (Initial / Steps / Final / Visualizations)
+- Stat cards summary bar
+- Automatic chart generation from sample_data:
+* Histograms / Box plots / Violin plots for numeric columns
+* Bar / Donut / Pareto charts for categorical columns
+* Ordered Range Bar / Cumulative Step / Proportion charts for one-hot range columns
+* Correlation heatmap (Pearson / Spearman / Kendall)
+- Interactive chart-type toggle per column</p>
+<p>Expected keys in data_dict:
+initial_dataset : dict
+processing_steps: list
+final_dataset
+: dict
+sample_data
+: dict - {"columns": [&hellip;], "rows": [[&hellip;], &hellip;]}
+or list-of-dicts [{col: val, &hellip;}, &hellip;]</p></div>
 </dd>
 </dl>
 </section>

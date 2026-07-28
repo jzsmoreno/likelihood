@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Tuple
+
 from .autoencoders import (
     EarlyStopping,
     LoRALayer,
@@ -18,18 +22,18 @@ from .autoencoders import (
 
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="stabilize_log_var")
-def stabilize_log_var(x):
+def stabilize_log_var(x: tf.Tensor) -> tf.Tensor:
     return x + 1e-7
 
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="sampling_wrapper")
-def sampling_wrapper(args):
+def sampling_wrapper(args: Tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
     mean, log_var = args
     return sampling(mean, log_var)
 
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="sampling_output_shape")
-def sampling_output_shape(input_shapes):
+def sampling_output_shape(input_shapes: List[int]) -> int:
     return input_shapes[0]
 
 
@@ -70,7 +74,14 @@ class AutoClassifier:
         The rank of the LoRA layer. Default is 4.
     """
 
-    def __init__(self, input_shape_parm, num_classes, units, activation, **kwargs):
+    def __init__(
+        self,
+        input_shape_parm: int | None,
+        num_classes: int | None,
+        units: int,
+        activation: str,
+        **kwargs: Any,
+    ) -> None:
         self.input_shape_parm = input_shape_parm
         self.num_classes = num_classes
         self.units = units
@@ -95,10 +106,10 @@ class AutoClassifier:
         # Build all models
         self._build_models()
 
-    def _build_encoder(self):
+    def _build_encoder(self) -> None:
         """Build the encoder model."""
+        inputs = tf.keras.Input(shape=(self.input_shape_parm,), name="encoder_input")
         if self.vae_mode:
-            inputs = tf.keras.Input(shape=(self.input_shape_parm,), name="encoder_input")
             x = tf.keras.layers.Dense(
                 units=self.units,
                 kernel_regularizer=l2(self.l2_reg),
@@ -138,7 +149,7 @@ class AutoClassifier:
 
             self._encoder = tf.keras.Model(inputs, outputs, name="encoder")
 
-    def _build_decoder(self):
+    def _build_decoder(self) -> tf.keras.Model | None:
         """Build the decoder model."""
         if self.vae_mode:
             inputs = tf.keras.Input(shape=(self.vae_units,), name="decoder_input")
@@ -171,7 +182,7 @@ class AutoClassifier:
 
         self._decoder = tf.keras.Model(inputs, outputs, name="decoder")
 
-    def _build_classifier(self):
+    def _build_classifier(self) -> tf.keras.Model | None:
         """Build the classifier model."""
         # Input shape is decoded + encoded features
         if self.vae_mode:
@@ -211,7 +222,7 @@ class AutoClassifier:
 
         self._classifier = tf.keras.Model(inputs, outputs, name="classifier")
 
-    def _build_main_model(self):
+    def _build_main_model(self) -> None:
         """Build the main model that combines encoder, decoder, and classifier."""
         inputs = tf.keras.Input(shape=(self.input_shape_parm,), name="main_input")
 
@@ -238,7 +249,7 @@ class AutoClassifier:
             inputs=inputs, outputs=outputs, name="auto_classifier_main"
         )
 
-    def _build_models(self):
+    def _build_models(self) -> None:
         """Build all component models."""
         self._build_encoder()
         self._build_decoder()
@@ -246,44 +257,50 @@ class AutoClassifier:
         self._build_main_model()
 
     @property
-    def encoder(self):
+    def encoder(self) -> tf.keras.Model | None:
         """Get the encoder model."""
         return self._encoder
 
     @encoder.setter
-    def encoder(self, value):
+    def encoder(self, value: tf.keras.Model | None) -> None:
         """Set the encoder model and rebuild main model."""
         self._encoder = value
         if self._decoder and self._classifier:
             self._build_main_model()
 
     @property
-    def decoder(self):
+    def decoder(self) -> tf.keras.Model | None:
         """Get the decoder model."""
         return self._decoder
 
     @decoder.setter
-    def decoder(self, value):
+    def decoder(self, value: tf.keras.Model | None) -> None:
         """Set the decoder model and rebuild main model."""
         self._decoder = value
         if self._encoder and self._classifier:
             self._build_main_model()
 
     @property
-    def classifier(self):
+    def classifier(self) -> tf.keras.Model | None:
         """Get the classifier model."""
         return self._classifier
 
     @classifier.setter
-    def classifier(self, value):
+    def classifier(self, value: tf.keras.Model | None) -> None:
         """Set the classifier model and rebuild main model."""
         self._classifier = value
         if self._encoder and self._decoder:
             self._build_main_model()
 
     def train_encoder_decoder(
-        self, data, epochs, batch_size, validation_split=0.2, patience=10, **kwargs
-    ):
+        self,
+        data: tf.data.Dataset | np.ndarray,
+        epochs: int,
+        batch_size: int,
+        validation_split: float = 0.2,
+        patience: int = 10,
+        **kwargs: Any,
+    ) -> None:
         """
         Trains the encoder and decoder on the input data.
 
@@ -344,7 +361,7 @@ class AutoClassifier:
 
         self.freeze_encoder_decoder()
 
-    def freeze_encoder_decoder(self):
+    def freeze_encoder_decoder(self) -> None:
         """Freezes the encoder and decoder layers to prevent them from being updated during training."""
         if self._encoder:
             for layer in self._encoder.layers:
@@ -356,7 +373,7 @@ class AutoClassifier:
         # Rebuild main model to reflect trainability changes
         self._build_main_model()
 
-    def unfreeze_encoder_decoder(self):
+    def unfreeze_encoder_decoder(self) -> None:
         """Unfreezes the encoder and decoder layers allowing them to be updated during training."""
         if self._encoder:
             for layer in self._encoder.layers:
@@ -368,7 +385,7 @@ class AutoClassifier:
         # Rebuild main model to reflect trainability changes
         self._build_main_model()
 
-    def set_encoder_decoder(self, source_model):
+    def set_encoder_decoder(self, source_model: "AutoClassifier") -> None:
         """
         Sets the encoder and decoder layers from another AutoClassifier instance,
         ensuring compatibility in dimensions.
@@ -377,7 +394,6 @@ class AutoClassifier:
         ----------
         source_model : AutoClassifier
             The source model to copy the encoder and decoder layers from.
-
         Raises
         ------
         ValueError
@@ -408,35 +424,34 @@ class AutoClassifier:
         self._build_main_model()
 
     # Main model interface methods
-    def __call__(self, x, training=None):
+    def __call__(self, x: tf.Tensor | np.ndarray, training: bool | None = None) -> Any:
         """Forward pass through the model."""
         return self._main_model(x, training=training)
 
-    def compile(self, *args, **kwargs):
+    def compile(self, *args: Any, **kwargs: Any) -> tf.keras.Model:
         """Compile the main model."""
         return self._main_model.compile(*args, **kwargs)
 
-    def fit(self, *args, **kwargs):
+    def fit(self, *args: Any, **kwargs: Any) -> tf.keras.callbacks.History | None:
         """Fit the main model."""
         return self._main_model.fit(*args, **kwargs)
 
-    def evaluate(self, *args, **kwargs):
+    def evaluate(self, *args: Any, **kwargs: Any) -> np.ndarray:
         """Evaluate the main model."""
         return self._main_model.evaluate(*args, **kwargs)
 
-    def predict(self, *args, **kwargs):
+    def predict(self, *args: Any, **kwargs: Any) -> np.ndarray:
         """Predict using the main model."""
         return self._main_model.predict(*args, **kwargs)
 
-    def save(self, filepath, **kwargs):
+    def save(self, filepath: str, **kwargs: Any) -> None:
         """
         Save the complete model including all components.
 
         Parameters
         ----------
         filepath : str
-            Path where to save the model.
-        """
+            Path where to save the model."""
         import os
 
         # Create directory if it doesn't exist
@@ -470,7 +485,7 @@ class AutoClassifier:
             json.dump(config, f, indent=2)
 
     @classmethod
-    def load(cls, filepath):
+    def load(cls: type["AutoClassifier"], filepath: str) -> "AutoClassifier":
         """
         Load a complete model from saved components.
 
@@ -508,29 +523,29 @@ class AutoClassifier:
 
     # Additional properties and methods for compatibility
     @property
-    def weights(self):
+    def weights(self) -> tf.keras.ModelWeights:
         """Get all model weights."""
         return self._main_model.weights
 
-    def get_weights(self):
+    def get_weights(self) -> List[np.ndarray]:
         """Get all model weights."""
         return self._main_model.get_weights()
 
-    def set_weights(self, weights):
+    def set_weights(self, weights: List[np.ndarray]) -> None:
         """Set all model weights."""
         return self._main_model.set_weights(weights)
 
     @property
-    def trainable_variables(self):
+    def trainable_variables(self) -> List[tf.Variable]:
         """Get trainable variables."""
         return self._main_model.trainable_variables
 
     @property
-    def non_trainable_variables(self):
+    def non_trainable_variables(self) -> List[tf.Variable]:
         """Get non-trainable variables."""
         return self._main_model.non_trainable_variables
 
-    def summary(self, *args, **kwargs):
+    def summary(self, *args: Any, **kwargs: Any) -> None:
         """Print model summary."""
         print("=== AutoClassifier Summary ===")
         print("\n--- Encoder ---")
@@ -542,7 +557,7 @@ class AutoClassifier:
         print("\n--- Main Model ---")
         self._main_model.summary(*args, **kwargs)
 
-    def get_config(self):
+    def get_config(self) -> Dict[str, Any]:
         """Get model configuration."""
         return {
             "input_shape_parm": self.input_shape_parm,
@@ -565,10 +580,10 @@ def call_existing_code(
     activation: str,
     threshold: float,
     optimizer: str,
-    input_shape_parm: None | int = None,
-    num_classes: None | int = None,
+    input_shape_parm: Optional[int] = None,
+    num_classes: Optional[int] = None,
     num_layers: int = 1,
-    **kwargs,
+    **kwargs: Any,
 ) -> AutoClassifier:
     """
     Calls an existing AutoClassifier instance.
@@ -626,7 +641,10 @@ def call_existing_code(
 
 
 def build_model(
-    hp, input_shape_parm: None | int, num_classes: None | int, **kwargs
+    hp: "keras_tuner.HyperParameters",
+    input_shape_parm: Optional[int],
+    num_classes: Optional[int],
+    **kwargs: Any,
 ) -> AutoClassifier:
     """Builds a neural network model using Keras Tuner's search algorithm.
 
@@ -763,7 +781,7 @@ def setup_model(
     target: str,
     epochs: int,
     train_size: float = 0.7,
-    seed=None,
+    seed: Optional[int] = None,
     train_mode: bool = True,
     filepath: str = "./my_dir/best_model",
     method: str = "Hyperband",
@@ -841,7 +859,7 @@ def setup_model(
         y_encoder = OneHotEncoder()
         y = y_encoder.encode(y.to_list())
         X = X.to_numpy()
-        input_sample.to_numpy()
+        input_sample = input_sample.to_numpy()
         X = np.asarray(X).astype(np.float32)
         input_sample = np.asarray(input_sample).astype(np.float32)
         y = np.asarray(y).astype(np.float32)

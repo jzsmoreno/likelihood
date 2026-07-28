@@ -422,19 +422,35 @@ to <code>1e-3</code>.</dd>
     if figname:
         plt.show()
 
-    if len(theta) == 2 and figname:
-        corner.hist2d(
-            nwalk[:, 0],
-            nwalk[:, 1],
-            range=None,
-            bins=18,
-            smooth=True,
-            plot_datapoints=True,
-            plot_density=True,
-        )
-        plt.ylabel(&#34;$\\theta_{1}$&#34;)
-        plt.xlabel(&#34;$\\theta_{0}$&#34;)
-        plt.savefig(f&#34;theta_{figname}&#34;, dpi=300, transparent=True)
+    if figname:
+        n_params = len(theta)
+
+        if n_params == 2:
+            corner.hist2d(
+                nwalk[:, 0],
+                nwalk[:, 1],
+                range=None,
+                bins=18,
+                smooth=True,
+                plot_datapoints=True,
+                plot_density=True,
+            )
+            plt.ylabel(&#34;$\\theta_{1}$&#34;)
+            plt.xlabel(&#34;$\\theta_{0}$&#34;)
+            plt.savefig(f&#34;theta_{figname}&#34;, dpi=300, transparent=True)
+        elif n_params &gt; 2:
+            param_names = [f&#34;$\\theta _{i}$&#34; for i in range(n_params)]
+            corner.corner(
+                nwalk,
+                labels=param_names,
+                bins=18,
+                smooth=True,
+                plot_datapoints=True,
+                plot_density=True,
+                max_n_ticks=3,
+                hist2d_kwargs={&#34;smooth&#34;: True},
+            )
+            plt.savefig(f&#34;theta_{figname}&#34;, dpi=300, transparent=True)
 
     return par, error</code></pre>
 </details>
