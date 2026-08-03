@@ -45,7 +45,7 @@ el.replaceWith(d);
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.models.deep.autoencoders.build_model"><code class="name flex">
-<span>def <span class="ident">build_model</span></span>(<span>hp, input_shape_parm: None | int, num_classes: None | int, **kwargs) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
+<span>def <span class="ident">build_model</span></span>(<span>hp: keras_tuner.src.engine.hyperparameters.hyperparameters.HyperParameters,<br>input_shape_parm: None | int,<br>num_classes: None | int,<br>**kwargs) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
 </code></dt>
 <dd>
 <details class="source">
@@ -53,7 +53,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def build_model(
-    hp, input_shape_parm: None | int, num_classes: None | int, **kwargs
+    hp: keras_tuner.HyperParameters, input_shape_parm: None | int, num_classes: None | int, **kwargs
 ) -&gt; AutoClassifier:
     &#34;&#34;&#34;Builds a neural network model using Keras Tuner&#39;s search algorithm.
 
@@ -202,16 +202,21 @@ The hyperparameters to set.</p>
 The neural network model.</p></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.cal_loss_step"><code class="name flex">
-<span>def <span class="ident">cal_loss_step</span></span>(<span>batch, encoder, decoder, vae_mode=False, training=True)</span>
+<span>def <span class="ident">cal_loss_step</span></span>(<span>batch: tensorflow.python.framework.tensor.Tensor,<br>encoder: keras.src.models.model.Model,<br>decoder: keras.src.models.model.Model,<br>vae_mode: bool = False,<br>training: bool = True) ‑> tensorflow.python.framework.tensor.Tensor</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def cal_loss_step(batch, encoder, decoder, vae_mode=False, training=True):
-    &#34;&#34;&#34;
-    Calculates the loss value on a batch of data.
+<pre><code class="python">def cal_loss_step(
+    batch: tf.Tensor,
+    encoder: tf.keras.Model,
+    decoder: tf.keras.Model,
+    vae_mode: bool = False,
+    training: bool = True,
+) -&gt; tf.Tensor:
+    &#34;&#34;&#34;Calculates the loss value on a batch of data.
 
     Parameters
     ----------
@@ -365,14 +370,14 @@ The number of units in the variational autoencoder. Default is 2.</p>
 The AutoClassifier instance.</p></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.check_for_nans"><code class="name flex">
-<span>def <span class="ident">check_for_nans</span></span>(<span>tensors, name='Tensor')</span>
+<span>def <span class="ident">check_for_nans</span></span>(<span>tensors: List[tensorflow.python.framework.tensor.Tensor],<br>name: str = 'Tensor') ‑> bool</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def check_for_nans(tensors, name=&#34;Tensor&#34;):
+<pre><code class="python">def check_for_nans(tensors: List[tf.Tensor], name: str = &#34;Tensor&#34;) -&gt; bool:
     for t in tensors:
         if tf.reduce_any(tf.math.is_nan(t)) or tf.reduce_any(tf.math.is_inf(t)):
             print(f&#34;Warning: {name} contains NaNs or Infs&#34;)
@@ -382,14 +387,14 @@ The AutoClassifier instance.</p></div>
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.kl_loss"><code class="name flex">
-<span>def <span class="ident">kl_loss</span></span>(<span>mean, log_var)</span>
+<span>def <span class="ident">kl_loss</span></span>(<span>mean: tensorflow.python.framework.tensor.Tensor,<br>log_var: tensorflow.python.framework.tensor.Tensor) ‑> tensorflow.python.framework.tensor.Tensor</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def kl_loss(mean, log_var):
+<pre><code class="python">def kl_loss(mean: tf.Tensor, log_var: tf.Tensor) -&gt; tf.Tensor:
     &#34;&#34;&#34;
     Kullback-Leibler divergence loss function.
 
@@ -418,14 +423,14 @@ The AutoClassifier instance.</p></div>
 <p><code>tf.Tensor</code></p></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.mse_loss"><code class="name flex">
-<span>def <span class="ident">mse_loss</span></span>(<span>y_true, y_pred)</span>
+<span>def <span class="ident">mse_loss</span></span>(<span>y_true: tensorflow.python.framework.tensor.Tensor,<br>y_pred: tensorflow.python.framework.tensor.Tensor) ‑> tensorflow.python.framework.tensor.Tensor</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def mse_loss(y_true, y_pred):
+<pre><code class="python">def mse_loss(y_true: tf.Tensor, y_pred: tf.Tensor) -&gt; tf.Tensor:
     &#34;&#34;&#34;
     Mean squared error loss function.
 
@@ -454,14 +459,14 @@ The AutoClassifier instance.</p></div>
 <p><code>tf.Tensor</code></p></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.sampling"><code class="name flex">
-<span>def <span class="ident">sampling</span></span>(<span>mean, log_var, epsilon_value=1e-08)</span>
+<span>def <span class="ident">sampling</span></span>(<span>mean: tensorflow.python.framework.tensor.Tensor,<br>log_var: tensorflow.python.framework.tensor.Tensor,<br>epsilon_value: float = 1e-08) ‑> tensorflow.python.framework.tensor.Tensor</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def sampling(mean, log_var, epsilon_value=1e-8):
+<pre><code class="python">def sampling(mean: tf.Tensor, log_var: tf.Tensor, epsilon_value: float = 1e-8) -&gt; tf.Tensor:
     &#34;&#34;&#34;
     Samples from the distribution.
 
@@ -497,7 +502,7 @@ The AutoClassifier instance.</p></div>
 <p><code>tf.Tensor</code></p></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.setup_model"><code class="name flex">
-<span>def <span class="ident">setup_model</span></span>(<span>data: pandas.core.frame.DataFrame,<br>target: str,<br>epochs: int,<br>train_size: float = 0.7,<br>seed=None,<br>train_mode: bool = True,<br>filepath: str = './my_dir/best_model',<br>method: str = 'Hyperband',<br>**kwargs) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
+<span>def <span class="ident">setup_model</span></span>(<span>data: pandas.core.frame.DataFrame,<br>target: str,<br>epochs: int,<br>train_size: float = 0.7,<br>seed: None | int = None,<br>train_mode: bool = True,<br>filepath: str = './my_dir/best_model',<br>method: str = 'Hyperband',<br>**kwargs) ‑> Tuple[<a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a>, pandas.core.frame.DataFrame]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -510,12 +515,12 @@ def setup_model(
     target: str,
     epochs: int,
     train_size: float = 0.7,
-    seed=None,
+    seed: None | int = None,
     train_mode: bool = True,
     filepath: str = &#34;./my_dir/best_model&#34;,
     method: str = &#34;Hyperband&#34;,
     **kwargs,
-) -&gt; AutoClassifier:
+) -&gt; Tuple[AutoClassifier, pd.DataFrame]:
     &#34;&#34;&#34;Setup model for training and tuning.
 
     Parameters
@@ -556,8 +561,8 @@ def setup_model(
 
     Returns
     -------
-    model : `AutoClassifier`
-        The trained model.
+    model, hps : (`AutoClassifier`, `pd.DataFrame`)
+        The trained model and best hyperparameter results.
     &#34;&#34;&#34;
     max_trials = kwargs.get(&#34;max_trials&#34;, 10)
     directory = kwargs.get(&#34;directory&#34;, &#34;./my_dir&#34;)
@@ -588,7 +593,7 @@ def setup_model(
         y_encoder = OneHotEncoder()
         y = y_encoder.encode(y.to_list())
         X = X.to_numpy()
-        input_sample.to_numpy()
+        input_sample = input_sample.to_numpy()
         X = np.asarray(X).astype(np.float32)
         input_sample = np.asarray(input_sample).astype(np.float32)
         y = np.asarray(y).astype(np.float32)
@@ -676,12 +681,12 @@ hyperparameters : <code>dict</code>
 The hyperparameters to set.</p>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><strong><code>model</code></strong> :&ensp;<code><a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></code></dt>
-<dd>The trained model.</dd>
+<dt><strong><code>model</code></strong>, <strong><code>hps</code></strong> :&ensp;<code>(</code>AutoClassifier<code>, </code>pd.DataFrame<code>)</code></dt>
+<dd>The trained model and best hyperparameter results.</dd>
 </dl></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.train_step"><code class="name flex">
-<span>def <span class="ident">train_step</span></span>(<span>batch, encoder, decoder, optimizer, vae_mode=False)</span>
+<span>def <span class="ident">train_step</span></span>(<span>batch: tensorflow.python.framework.tensor.Tensor,<br>encoder: keras.src.models.model.Model,<br>decoder: keras.src.models.model.Model,<br>optimizer: keras.src.optimizers.optimizer.Optimizer,<br>vae_mode: bool = False) ‑> tensorflow.python.framework.tensor.Tensor</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -689,9 +694,14 @@ The hyperparameters to set.</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@tf.function
-def train_step(batch, encoder, decoder, optimizer, vae_mode=False):
-    &#34;&#34;&#34;
-    Trains the model on a batch of data.
+def train_step(
+    batch: tf.Tensor,
+    encoder: tf.keras.Model,
+    decoder: tf.keras.Model,
+    optimizer: tf.keras.optimizers.Optimizer,
+    vae_mode: bool = False,
+) -&gt; tf.Tensor:
+    &#34;&#34;&#34;Trains the model on a batch of data.
 
     Parameters
     ----------
@@ -751,14 +761,16 @@ def train_step(batch, encoder, decoder, optimizer, vae_mode=False):
 The loss value.</p></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.vae_loss"><code class="name flex">
-<span>def <span class="ident">vae_loss</span></span>(<span>y_true, y_pred, mean, log_var)</span>
+<span>def <span class="ident">vae_loss</span></span>(<span>y_true: tensorflow.python.framework.tensor.Tensor,<br>y_pred: tensorflow.python.framework.tensor.Tensor,<br>mean: tensorflow.python.framework.tensor.Tensor,<br>log_var: tensorflow.python.framework.tensor.Tensor) ‑> tensorflow.python.framework.tensor.Tensor</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def vae_loss(y_true, y_pred, mean, log_var):
+<pre><code class="python">def vae_loss(
+    y_true: tf.Tensor, y_pred: tf.Tensor, mean: tf.Tensor, log_var: tf.Tensor
+) -&gt; tf.Tensor:
     &#34;&#34;&#34;
     Variational autoencoder loss function.
 
@@ -801,7 +813,7 @@ The loss value.</p></div>
 <dl>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier"><code class="flex name class">
 <span>class <span class="ident">AutoClassifier</span></span>
-<span>(</span><span>input_shape_parm, num_classes, units, activation, **kwargs)</span>
+<span>(</span><span>input_shape_parm: int, num_classes: int, units: int, activation: str, **kwargs)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -846,7 +858,14 @@ class AutoClassifier(tf.keras.Model):
         The rank of the LoRA layer. Default is 4.
     &#34;&#34;&#34;
 
-    def __init__(self, input_shape_parm, num_classes, units, activation, **kwargs):
+    def __init__(
+        self,
+        input_shape_parm: int,
+        num_classes: int,
+        units: int,
+        activation: str,
+        **kwargs,
+    ) -&gt; None:
         super(AutoClassifier, self).__init__()
         self.input_shape_parm = input_shape_parm
         self.num_classes = num_classes
@@ -856,16 +875,16 @@ class AutoClassifier(tf.keras.Model):
         self.encoder = None
         self.decoder = None
         self.classifier = None
-        self.classifier_activation = kwargs.get(&#34;classifier_activation&#34;, &#34;softmax&#34;)
-        self.num_layers = kwargs.get(&#34;num_layers&#34;, 1)
-        self.dropout = kwargs.get(&#34;dropout&#34;, None)
-        self.l2_reg = kwargs.get(&#34;l2_reg&#34;, 0.0)
-        self.vae_mode = kwargs.get(&#34;vae_mode&#34;, False)
-        self.vae_units = kwargs.get(&#34;vae_units&#34;, 2)
-        self.lora_mode = kwargs.get(&#34;lora_mode&#34;, False)
-        self.lora_rank = kwargs.get(&#34;lora_rank&#34;, 4)
+        self.classifier_activation: str = kwargs.get(&#34;classifier_activation&#34;, &#34;softmax&#34;)
+        self.num_layers: int = kwargs.get(&#34;num_layers&#34;, 1)
+        self.dropout: Optional[float] = kwargs.get(&#34;dropout&#34;, None)
+        self.l2_reg: float = kwargs.get(&#34;l2_reg&#34;, 0.0)
+        self.vae_mode: bool = kwargs.get(&#34;vae_mode&#34;, False)
+        self.vae_units: int = kwargs.get(&#34;vae_units&#34;, 2)
+        self.lora_mode: bool = kwargs.get(&#34;lora_mode&#34;, False)
+        self.lora_rank: int = kwargs.get(&#34;lora_rank&#34;, 4)
 
-    def build_encoder_decoder(self, input_shape):
+    def build_encoder_decoder(self, input_shape: tuple) -&gt; None:
         self.encoder = (
             tf.keras.Sequential(
                 [
@@ -906,7 +925,7 @@ class AutoClassifier(tf.keras.Model):
             else self.decoder
         )
 
-    def build(self, input_shape):
+    def build(self, input_shape: tuple) -&gt; None:
         if self.vae_mode:
             inputs = tf.keras.Input(shape=self.input_shape_parm, name=&#34;encoder_input&#34;)
             x = tf.keras.layers.Dense(
@@ -990,10 +1009,15 @@ class AutoClassifier(tf.keras.Model):
         )
 
     def train_encoder_decoder(
-        self, data, epochs, batch_size, validation_split=0.2, patience=10, **kwargs
-    ):
-        &#34;&#34;&#34;
-        Trains the encoder and decoder on the input data.
+        self,
+        data: Union[tf.data.Dataset, np.ndarray],
+        epochs: int,
+        batch_size: int,
+        validation_split: float = 0.2,
+        patience: int = 10,
+        **kwargs,
+    ) -&gt; None:
+        &#34;&#34;&#34;Trains the encoder and decoder on the input data.
 
         Parameters
         ----------
@@ -1052,7 +1076,7 @@ class AutoClassifier(tf.keras.Model):
                 )
         self.freeze_encoder_decoder()
 
-    def call(self, x):
+    def call(self, x: tf.Tensor) -&gt; tf.Tensor:
         if self.vae_mode:
             mean, log_var = self.encoder(x)
             encoded = sampling(mean, log_var)
@@ -1063,27 +1087,22 @@ class AutoClassifier(tf.keras.Model):
         classification = self.classifier(combined)
         return classification
 
-    def freeze_encoder_decoder(self):
-        &#34;&#34;&#34;
-        Freezes the encoder and decoder layers to prevent them from being updated during training.
-        &#34;&#34;&#34;
+    def freeze_encoder_decoder(self) -&gt; None:
+        &#34;&#34;&#34;Freezes the encoder and decoder layers to prevent them from being updated during training.&#34;&#34;&#34;
         for layer in self.encoder.layers:
             layer.trainable = False
         for layer in self.decoder.layers:
             layer.trainable = False
 
-    def unfreeze_encoder_decoder(self):
-        &#34;&#34;&#34;
-        Unfreezes the encoder and decoder layers allowing them to be updated during training.
-        &#34;&#34;&#34;
+    def unfreeze_encoder_decoder(self) -&gt; None:
+        &#34;&#34;&#34;Unfreezes the encoder and decoder layers allowing them to be updated during training.&#34;&#34;&#34;
         for layer in self.encoder.layers:
             layer.trainable = True
         for layer in self.decoder.layers:
             layer.trainable = True
 
-    def set_encoder_decoder(self, source_model):
-        &#34;&#34;&#34;
-        Sets the encoder and decoder layers from another AutoClassifier instance,
+    def set_encoder_decoder(self, source_model: &#34;AutoClassifier&#34;) -&gt; None:
+        &#34;&#34;&#34;Sets the encoder and decoder layers from another AutoClassifier instance,
         ensuring compatibility in dimensions. Only works if vae_mode is False.
 
         Parameters
@@ -1136,7 +1155,7 @@ class AutoClassifier(tf.keras.Model):
             elif not isinstance(layer, InputLayer):
                 raise ValueError(f&#34;Layer type {type(layer)} not supported for copying.&#34;)
 
-    def get_config(self):
+    def get_config(self) -&gt; Dict[str, Any]:
         config = {
             &#34;input_shape_parm&#34;: self.input_shape_parm,
             &#34;num_classes&#34;: self.num_classes,
@@ -1155,7 +1174,7 @@ class AutoClassifier(tf.keras.Model):
         return dict(list(base_config.items()) + list(config.items()))
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config: Dict[str, Any]) -&gt; &#34;AutoClassifier&#34;:
         return cls(
             input_shape_parm=config[&#34;input_shape_parm&#34;],
             num_classes=config[&#34;num_classes&#34;],
@@ -1217,7 +1236,7 @@ The rank of the LoRA layer. Default is 4.</p></div>
 <h3>Static methods</h3>
 <dl>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier.from_config"><code class="name flex">
-<span>def <span class="ident">from_config</span></span>(<span>config)</span>
+<span>def <span class="ident">from_config</span></span>(<span>config: Dict[str, Any]) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
 </code></dt>
 <dd>
 <div class="desc"><p>Creates an operation from its config.</p>
@@ -1228,26 +1247,28 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 <pre><code class="language-python">if &quot;dtype&quot; in config and isinstance(config[&quot;dtype&quot;], dict):
     policy = dtype_policies.deserialize(config[&quot;dtype&quot;])
 </code></pre>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>config</code></strong></dt>
 <dd>A Python dictionary, typically the output of <code>get_config</code>.</dd>
 </dl>
-<h2 id="returns">Returns</h2>
-<p>An operation instance.</p></div>
+<p>Returns
+-----=
+An operation instance.</p></div>
 </dd>
 </dl>
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier.build"><code class="name flex">
-<span>def <span class="ident">build</span></span>(<span>self, input_shape)</span>
+<span>def <span class="ident">build</span></span>(<span>self, input_shape: tuple) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def build(self, input_shape):
+<pre><code class="python">def build(self, input_shape: tuple) -&gt; None:
     if self.vae_mode:
         inputs = tf.keras.Input(shape=self.input_shape_parm, name=&#34;encoder_input&#34;)
         x = tf.keras.layers.Dense(
@@ -1333,14 +1354,14 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier.build_encoder_decoder"><code class="name flex">
-<span>def <span class="ident">build_encoder_decoder</span></span>(<span>self, input_shape)</span>
+<span>def <span class="ident">build_encoder_decoder</span></span>(<span>self, input_shape: tuple) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def build_encoder_decoder(self, input_shape):
+<pre><code class="python">def build_encoder_decoder(self, input_shape: tuple) -&gt; None:
     self.encoder = (
         tf.keras.Sequential(
             [
@@ -1384,14 +1405,14 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier.call"><code class="name flex">
-<span>def <span class="ident">call</span></span>(<span>self, x)</span>
+<span>def <span class="ident">call</span></span>(<span>self, x: tensorflow.python.framework.tensor.Tensor) ‑> tensorflow.python.framework.tensor.Tensor</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def call(self, x):
+<pre><code class="python">def call(self, x: tf.Tensor) -&gt; tf.Tensor:
     if self.vae_mode:
         mean, log_var = self.encoder(x)
         encoded = sampling(mean, log_var)
@@ -1405,17 +1426,15 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier.freeze_encoder_decoder"><code class="name flex">
-<span>def <span class="ident">freeze_encoder_decoder</span></span>(<span>self)</span>
+<span>def <span class="ident">freeze_encoder_decoder</span></span>(<span>self) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def freeze_encoder_decoder(self):
-    &#34;&#34;&#34;
-    Freezes the encoder and decoder layers to prevent them from being updated during training.
-    &#34;&#34;&#34;
+<pre><code class="python">def freeze_encoder_decoder(self) -&gt; None:
+    &#34;&#34;&#34;Freezes the encoder and decoder layers to prevent them from being updated during training.&#34;&#34;&#34;
     for layer in self.encoder.layers:
         layer.trainable = False
     for layer in self.decoder.layers:
@@ -1424,14 +1443,14 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 <div class="desc"><p>Freezes the encoder and decoder layers to prevent them from being updated during training.</p></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier.get_config"><code class="name flex">
-<span>def <span class="ident">get_config</span></span>(<span>self)</span>
+<span>def <span class="ident">get_config</span></span>(<span>self) ‑> Dict[str, Any]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_config(self):
+<pre><code class="python">def get_config(self) -&gt; Dict[str, Any]:
     config = {
         &#34;input_shape_parm&#34;: self.input_shape_parm,
         &#34;num_classes&#34;: self.num_classes,
@@ -1454,16 +1473,15 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 containing the information needed to re-instantiate it.</p></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier.set_encoder_decoder"><code class="name flex">
-<span>def <span class="ident">set_encoder_decoder</span></span>(<span>self, source_model)</span>
+<span>def <span class="ident">set_encoder_decoder</span></span>(<span>self,<br>source_model: <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a>) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def set_encoder_decoder(self, source_model):
-    &#34;&#34;&#34;
-    Sets the encoder and decoder layers from another AutoClassifier instance,
+<pre><code class="python">def set_encoder_decoder(self, source_model: &#34;AutoClassifier&#34;) -&gt; None:
+    &#34;&#34;&#34;Sets the encoder and decoder layers from another AutoClassifier instance,
     ensuring compatibility in dimensions. Only works if vae_mode is False.
 
     Parameters
@@ -1530,7 +1548,7 @@ ensuring compatibility in dimensions. Only works if vae_mode is False.</p>
 </dl></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier.train_encoder_decoder"><code class="name flex">
-<span>def <span class="ident">train_encoder_decoder</span></span>(<span>self, data, epochs, batch_size, validation_split=0.2, patience=10, **kwargs)</span>
+<span>def <span class="ident">train_encoder_decoder</span></span>(<span>self,<br>data: tensorflow.python.data.ops.dataset_ops.DatasetV2 | numpy.ndarray,<br>epochs: int,<br>batch_size: int,<br>validation_split: float = 0.2,<br>patience: int = 10,<br>**kwargs) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1538,10 +1556,15 @@ ensuring compatibility in dimensions. Only works if vae_mode is False.</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def train_encoder_decoder(
-    self, data, epochs, batch_size, validation_split=0.2, patience=10, **kwargs
-):
-    &#34;&#34;&#34;
-    Trains the encoder and decoder on the input data.
+    self,
+    data: Union[tf.data.Dataset, np.ndarray],
+    epochs: int,
+    batch_size: int,
+    validation_split: float = 0.2,
+    patience: int = 10,
+    **kwargs,
+) -&gt; None:
+    &#34;&#34;&#34;Trains the encoder and decoder on the input data.
 
     Parameters
     ----------
@@ -1618,17 +1641,15 @@ ensuring compatibility in dimensions. Only works if vae_mode is False.</p>
 <p>Additional keyword arguments to pass to the model.</p></div>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.AutoClassifier.unfreeze_encoder_decoder"><code class="name flex">
-<span>def <span class="ident">unfreeze_encoder_decoder</span></span>(<span>self)</span>
+<span>def <span class="ident">unfreeze_encoder_decoder</span></span>(<span>self) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def unfreeze_encoder_decoder(self):
-    &#34;&#34;&#34;
-    Unfreezes the encoder and decoder layers allowing them to be updated during training.
-    &#34;&#34;&#34;
+<pre><code class="python">def unfreeze_encoder_decoder(self) -&gt; None:
+    &#34;&#34;&#34;Unfreezes the encoder and decoder layers allowing them to be updated during training.&#34;&#34;&#34;
     for layer in self.encoder.layers:
         layer.trainable = True
     for layer in self.decoder.layers:
@@ -1640,7 +1661,7 @@ ensuring compatibility in dimensions. Only works if vae_mode is False.</p>
 </dd>
 <dt id="likelihood.models.deep.autoencoders.EarlyStopping"><code class="flex name class">
 <span>class <span class="ident">EarlyStopping</span></span>
-<span>(</span><span>patience=10, min_delta=0.001)</span>
+<span>(</span><span>patience: int = 10, min_delta: float = 0.001)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1648,14 +1669,14 @@ ensuring compatibility in dimensions. Only works if vae_mode is False.</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class EarlyStopping:
-    def __init__(self, patience=10, min_delta=0.001):
+    def __init__(self, patience: int = 10, min_delta: float = 0.001) -&gt; None:
         self.patience = patience
         self.min_delta = min_delta
-        self.best_loss = np.inf
-        self.counter = 0
-        self.stop_training = False
+        self.best_loss: float = np.inf
+        self.counter: int = 0
+        self.stop_training: bool = False
 
-    def __call__(self, current_loss):
+    def __call__(self, current_loss: float) -&gt; None:
         if self.best_loss - current_loss &gt; self.min_delta:
             self.best_loss = current_loss
             self.counter = 0

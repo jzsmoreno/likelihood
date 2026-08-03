@@ -45,7 +45,7 @@ el.replaceWith(d);
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.tools.reports.generate_html_pipeline"><code class="name flex">
-<span>def <span class="ident">generate_html_pipeline</span></span>(<span>data_dict: Any,<br>save_to_file: bool = False,<br>file_name: str = 'data_processing_report.html')</span>
+<span>def <span class="ident">generate_html_pipeline</span></span>(<span>data_dict: Any,<br>save_to_file: bool = False,<br>file_name: str = 'data_processing_report.html') ‑> str</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -56,7 +56,7 @@ el.replaceWith(d);
     data_dict: Any,
     save_to_file: bool = False,
     file_name: str = &#34;data_processing_report.html&#34;,
-):
+) -&gt; str:
     &#34;&#34;&#34;
     Generates an HTML report for a data processing pipeline with:
       - Tabbed interface (Initial / Steps / Final / Visualizations)
@@ -802,7 +802,7 @@ el.replaceWith(d);
     &#34;&#34;&#34;
 
     # ── Python helpers ──
-    def render_value(val):
+    def render_value(val: Any) -&gt; str:
         if isinstance(val, dict):
             return dict_to_table(val, nested=True)
         if isinstance(val, list):
@@ -815,7 +815,7 @@ el.replaceWith(d);
             )
         return escape(str(val))
 
-    def dict_to_table(d, nested=False):
+    def dict_to_table(d: Dict[Any, Any], nested: bool = False) -&gt; str:
         if not isinstance(d, dict):
             d = {&#34;Error&#34;: &#34;Data not available or incorrect format&#34;}
         cls = &#34;nested-table&#34; if nested else &#34;&#34;
@@ -832,7 +832,7 @@ el.replaceWith(d);
     final = data_dict.get(&#34;final_dataset&#34;, {})
     steps = data_dict.get(&#34;processing_steps&#34;, [])
 
-    def extract_shape(ds):
+    def extract_shape(ds: Dict[str, Any]) -&gt; Tuple[Optional[int], Optional[int]]:
         shape = ds.get(&#34;shape&#34;) or ds.get(&#34;Shape&#34;)
         if isinstance(shape, (list, tuple)) and len(shape) == 2:
             return shape

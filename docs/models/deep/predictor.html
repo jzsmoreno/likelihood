@@ -457,12 +457,12 @@ el.replaceWith(d);
 
     def predictor_analyzer(
         self,
-        frac: float = None,
+        frac: float | None = None,
         cmap: str = &#34;viridis&#34;,
         aspect: str = &#34;auto&#34;,
         highlight: bool = True,
         **kwargs,
-    ) -&gt; None:
+    ) -&gt; pd.DataFrame:
         &#34;&#34;&#34;
         Analyze the model&#39;s predictions and visualize data.
 
@@ -810,7 +810,7 @@ of the weights, t-SNE representation, and feature statistics.</p>
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.deep.predictor.GetInsights.predictor_analyzer"><code class="name flex">
-<span>def <span class="ident">predictor_analyzer</span></span>(<span>self,<br>frac: float = None,<br>cmap: str = 'viridis',<br>aspect: str = 'auto',<br>highlight: bool = True,<br>**kwargs) ‑> None</span>
+<span>def <span class="ident">predictor_analyzer</span></span>(<span>self,<br>frac: float | None = None,<br>cmap: str = 'viridis',<br>aspect: str = 'auto',<br>highlight: bool = True,<br>**kwargs) ‑> pandas.core.frame.DataFrame</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -819,12 +819,12 @@ of the weights, t-SNE representation, and feature statistics.</p>
 </summary>
 <pre><code class="python">def predictor_analyzer(
     self,
-    frac: float = None,
+    frac: float | None = None,
     cmap: str = &#34;viridis&#34;,
     aspect: str = &#34;auto&#34;,
     highlight: bool = True,
     **kwargs,
-) -&gt; None:
+) -&gt; pd.DataFrame:
     &#34;&#34;&#34;
     Analyze the model&#39;s predictions and visualize data.
 

@@ -45,14 +45,14 @@ el.replaceWith(d);
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.models.deep.rl.print_progress_bar"><code class="name flex">
-<span>def <span class="ident">print_progress_bar</span></span>(<span>iteration, total, length=30)</span>
+<span>def <span class="ident">print_progress_bar</span></span>(<span>iteration: int, total: int, length: int = 30) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def print_progress_bar(iteration, total, length=30):
+<pre><code class="python">def print_progress_bar(iteration: int, total: int, length: int = 30) -&gt; None:
     percent = f&#34;{100 * (iteration / float(total)):.1f}&#34;
     filled_length = int(length * iteration // total)
     bar = &#34;█&#34; * filled_length + &#34;-&#34; * (length - filled_length)
@@ -91,7 +91,7 @@ el.replaceWith(d);
         env: Any,
         model: tf.keras.Model,
         maxlen: int = 2000,
-    ):
+    ) -&gt; None:
         &#34;&#34;&#34;Initialize AutoQL agent
 
         Parameters
@@ -105,9 +105,11 @@ el.replaceWith(d);
         self.env = env
         self.model = model
         self.maxlen = maxlen
-        self.replay_buffer = deque(maxlen=self.maxlen)
+        self.replay_buffer: deque = deque(maxlen=self.maxlen)
 
-    def epsilon_greedy_policy(self, state: np.ndarray, action: int, epsilon: float = 0.0) -&gt; tuple:
+    def epsilon_greedy_policy(
+        self, state: np.ndarray, action: int, epsilon: float = 0.0
+    ) -&gt; Tuple[Any, int, float, Any, bool]:
         &#34;&#34;&#34;
         Epsilon-greedy policy for action selection
 
@@ -134,7 +136,9 @@ el.replaceWith(d);
 
         return _state[0], greedy_action[0], _reward[0], _next_action[0], _done[0]
 
-    def play_one_step(self, state: np.ndarray, action: int, epsilon: float):
+    def play_one_step(
+        self, state: np.ndarray, action: int, epsilon: float
+    ) -&gt; Tuple[Any, int, float, Any, int]:
         &#34;&#34;&#34;
         Perform one step in the environment and add experience to buffer
 
@@ -172,7 +176,7 @@ el.replaceWith(d);
         return current_state, greedy_action, reward, next_action, done
 
     @tf.function
-    def _training_step(self):
+    def _training_step(self) -&gt; float:
         &#34;&#34;&#34;
         Perform one training step using experience replay
 
@@ -211,17 +215,17 @@ el.replaceWith(d);
 
     def train(
         self,
-        x_data,
-        y_data,
-        optimizer=&#34;adam&#34;,
-        loss_fn=&#34;mse&#34;,
-        num_episodes=50,
-        num_steps=100,
-        gamma=0.7,
-        batch_size=32,
-        patience=10,
-        alpha=0.01,
-    ):
+        x_data: Any,
+        y_data: Any,
+        optimizer: str = &#34;adam&#34;,
+        loss_fn: str = &#34;mse&#34;,
+        num_episodes: int = 50,
+        num_steps: int = 100,
+        gamma: float = 0.7,
+        batch_size: int = 32,
+        patience: int = 10,
+        alpha: float = 0.01,
+    ) -&gt; None:
         &#34;&#34;&#34;Train the agent for a fixed number of episodes
 
         Parameters
@@ -243,9 +247,9 @@ el.replaceWith(d);
         alpha : `float`
             Trade-off factor between loss and reward.
         &#34;&#34;&#34;
-        rewards = []
-        self.best_weights = None
-        self.best_loss = float(&#34;inf&#34;)
+        rewards: List[float] = []
+        self.best_weights: Optional[List[np.ndarray]] = None
+        self.best_loss: float = float(&#34;inf&#34;)
 
         optimizers = {
             &#34;sgd&#34;: tf.keras.optimizers.SGD(),
@@ -256,6 +260,7 @@ el.replaceWith(d);
         }
         self.optimizer = optimizers[optimizer]
         losses = {
+            &#34;huber&#34;: tf.keras.losses.Huber(),
             &#34;mse&#34;: tf.keras.losses.MeanSquaredError(),
             &#34;mae&#34;: tf.keras.losses.MeanAbsoluteError(),
             &#34;mape&#34;: tf.keras.losses.MeanAbsolutePercentageError(),
@@ -265,9 +270,9 @@ el.replaceWith(d);
         self.num_steps = num_steps if num_steps &gt;= self.env.maxlen else self.env.maxlen
         self.gamma = gamma
         self.batch_size = batch_size
-        loss = float(&#34;inf&#34;)
-        no_improve_count = 0
-        best_combined_metric = float(&#34;inf&#34;)
+        loss: float = float(&#34;inf&#34;)
+        no_improve_count: int = 0
+        best_combined_metric: float = float(&#34;inf&#34;)
 
         for episode in range(self.num_episodes):
             print_progress_bar(episode + 1, self.num_episodes)
@@ -316,7 +321,7 @@ el.replaceWith(d);
         # Save best model
         self.model.set_weights(self.best_weights)
 
-    def __str__(self):
+    def __str__(self) -&gt; str:
         return (
             f&#34;AutoQL (Env: {self.env.name}, Episodes: {self.num_episodes}, Steps: {self.num_steps})&#34;
         )</code></pre>
@@ -337,14 +342,16 @@ el.replaceWith(d);
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.deep.rl.AutoQL.epsilon_greedy_policy"><code class="name flex">
-<span>def <span class="ident">epsilon_greedy_policy</span></span>(<span>self, state: numpy.ndarray, action: int, epsilon: float = 0.0) ‑> tuple</span>
+<span>def <span class="ident">epsilon_greedy_policy</span></span>(<span>self, state: numpy.ndarray, action: int, epsilon: float = 0.0) ‑> Tuple[Any, int, float, Any, bool]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def epsilon_greedy_policy(self, state: np.ndarray, action: int, epsilon: float = 0.0) -&gt; tuple:
+<pre><code class="python">def epsilon_greedy_policy(
+    self, state: np.ndarray, action: int, epsilon: float = 0.0
+) -&gt; Tuple[Any, int, float, Any, bool]:
     &#34;&#34;&#34;
     Epsilon-greedy policy for action selection
 
@@ -388,14 +395,16 @@ el.replaceWith(d);
 </dl></div>
 </dd>
 <dt id="likelihood.models.deep.rl.AutoQL.play_one_step"><code class="name flex">
-<span>def <span class="ident">play_one_step</span></span>(<span>self, state: numpy.ndarray, action: int, epsilon: float)</span>
+<span>def <span class="ident">play_one_step</span></span>(<span>self, state: numpy.ndarray, action: int, epsilon: float) ‑> Tuple[Any, int, float, Any, int]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def play_one_step(self, state: np.ndarray, action: int, epsilon: float):
+<pre><code class="python">def play_one_step(
+    self, state: np.ndarray, action: int, epsilon: float
+) -&gt; Tuple[Any, int, float, Any, int]:
     &#34;&#34;&#34;
     Perform one step in the environment and add experience to buffer
 
@@ -449,7 +458,7 @@ el.replaceWith(d);
 </dl></div>
 </dd>
 <dt id="likelihood.models.deep.rl.AutoQL.train"><code class="name flex">
-<span>def <span class="ident">train</span></span>(<span>self,<br>x_data,<br>y_data,<br>optimizer='adam',<br>loss_fn='mse',<br>num_episodes=50,<br>num_steps=100,<br>gamma=0.7,<br>batch_size=32,<br>patience=10,<br>alpha=0.01)</span>
+<span>def <span class="ident">train</span></span>(<span>self,<br>x_data: Any,<br>y_data: Any,<br>optimizer: str = 'adam',<br>loss_fn: str = 'mse',<br>num_episodes: int = 50,<br>num_steps: int = 100,<br>gamma: float = 0.7,<br>batch_size: int = 32,<br>patience: int = 10,<br>alpha: float = 0.01) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -458,17 +467,17 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def train(
     self,
-    x_data,
-    y_data,
-    optimizer=&#34;adam&#34;,
-    loss_fn=&#34;mse&#34;,
-    num_episodes=50,
-    num_steps=100,
-    gamma=0.7,
-    batch_size=32,
-    patience=10,
-    alpha=0.01,
-):
+    x_data: Any,
+    y_data: Any,
+    optimizer: str = &#34;adam&#34;,
+    loss_fn: str = &#34;mse&#34;,
+    num_episodes: int = 50,
+    num_steps: int = 100,
+    gamma: float = 0.7,
+    batch_size: int = 32,
+    patience: int = 10,
+    alpha: float = 0.01,
+) -&gt; None:
     &#34;&#34;&#34;Train the agent for a fixed number of episodes
 
     Parameters
@@ -490,9 +499,9 @@ el.replaceWith(d);
     alpha : `float`
         Trade-off factor between loss and reward.
     &#34;&#34;&#34;
-    rewards = []
-    self.best_weights = None
-    self.best_loss = float(&#34;inf&#34;)
+    rewards: List[float] = []
+    self.best_weights: Optional[List[np.ndarray]] = None
+    self.best_loss: float = float(&#34;inf&#34;)
 
     optimizers = {
         &#34;sgd&#34;: tf.keras.optimizers.SGD(),
@@ -503,6 +512,7 @@ el.replaceWith(d);
     }
     self.optimizer = optimizers[optimizer]
     losses = {
+        &#34;huber&#34;: tf.keras.losses.Huber(),
         &#34;mse&#34;: tf.keras.losses.MeanSquaredError(),
         &#34;mae&#34;: tf.keras.losses.MeanAbsoluteError(),
         &#34;mape&#34;: tf.keras.losses.MeanAbsolutePercentageError(),
@@ -512,9 +522,9 @@ el.replaceWith(d);
     self.num_steps = num_steps if num_steps &gt;= self.env.maxlen else self.env.maxlen
     self.gamma = gamma
     self.batch_size = batch_size
-    loss = float(&#34;inf&#34;)
-    no_improve_count = 0
-    best_combined_metric = float(&#34;inf&#34;)
+    loss: float = float(&#34;inf&#34;)
+    no_improve_count: int = 0
+    best_combined_metric: float = float(&#34;inf&#34;)
 
     for episode in range(self.num_episodes):
         print_progress_bar(episode + 1, self.num_episodes)
@@ -596,7 +606,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Env:
-    def __init__(self, model: Any, maxlen: int = 100, name: str = &#34;likenasium&#34;):
+    def __init__(self, model: Any, maxlen: int = 100, name: str = &#34;likenasium&#34;) -&gt; None:
         &#34;&#34;&#34;
         Initialize the environment with a model.
 
@@ -611,14 +621,16 @@ el.replaceWith(d);
         &#34;&#34;&#34;
         self.model = model
         self.maxlen = maxlen
-        self.transitions = deque(
+        self.transitions: deque = deque(
             maxlen=self.maxlen
         )  # Stores (state, action, reward, next_action, done)
-        self.current_state = None
-        self.current_step = 0
-        self.done = False
+        self.current_state: Optional[np.ndarray] = None
+        self.current_step: int = 0
+        self.done: bool = False
 
-    def step(self, state: np.ndarray, action: int, verbose: int = 0):
+    def step(
+        self, state: np.ndarray, action: int, verbose: int = 0
+    ) -&gt; Tuple[Any, int, float, Any, bool]:
         &#34;&#34;&#34;
         Perform an environment step with the given action.
 
@@ -662,7 +674,7 @@ el.replaceWith(d);
             )
         return self.current_state, action_pred, reward, next_action, self.done
 
-    def reset(self):
+    def reset(self) -&gt; Optional[np.ndarray]:
         &#34;&#34;&#34;Reset the environment to initial state.&#34;&#34;&#34;
         self.current_state = None
         self.current_step = 0
@@ -670,7 +682,7 @@ el.replaceWith(d);
         self.transitions = deque(maxlen=self.maxlen)
         return self.current_state
 
-    def get_transitions(self):
+    def get_transitions(self) -&gt; deque:
         &#34;&#34;&#34;Get all stored transitions.&#34;&#34;&#34;
         return self.transitions</code></pre>
 </details>
@@ -687,28 +699,28 @@ el.replaceWith(d);
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.deep.rl.Env.get_transitions"><code class="name flex">
-<span>def <span class="ident">get_transitions</span></span>(<span>self)</span>
+<span>def <span class="ident">get_transitions</span></span>(<span>self) ‑> collections.deque</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_transitions(self):
+<pre><code class="python">def get_transitions(self) -&gt; deque:
     &#34;&#34;&#34;Get all stored transitions.&#34;&#34;&#34;
     return self.transitions</code></pre>
 </details>
 <div class="desc"><p>Get all stored transitions.</p></div>
 </dd>
 <dt id="likelihood.models.deep.rl.Env.reset"><code class="name flex">
-<span>def <span class="ident">reset</span></span>(<span>self)</span>
+<span>def <span class="ident">reset</span></span>(<span>self) ‑> numpy.ndarray | None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def reset(self):
+<pre><code class="python">def reset(self) -&gt; Optional[np.ndarray]:
     &#34;&#34;&#34;Reset the environment to initial state.&#34;&#34;&#34;
     self.current_state = None
     self.current_step = 0
@@ -719,14 +731,16 @@ el.replaceWith(d);
 <div class="desc"><p>Reset the environment to initial state.</p></div>
 </dd>
 <dt id="likelihood.models.deep.rl.Env.step"><code class="name flex">
-<span>def <span class="ident">step</span></span>(<span>self, state: numpy.ndarray, action: int, verbose: int = 0)</span>
+<span>def <span class="ident">step</span></span>(<span>self, state: numpy.ndarray, action: int, verbose: int = 0) ‑> Tuple[Any, int, float, Any, bool]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def step(self, state: np.ndarray, action: int, verbose: int = 0):
+<pre><code class="python">def step(
+    self, state: np.ndarray, action: int, verbose: int = 0
+) -&gt; Tuple[Any, int, float, Any, bool]:
     &#34;&#34;&#34;
     Perform an environment step with the given action.
 

@@ -100,7 +100,7 @@ el.replaceWith(d);
 
     adj_dict = {i: data[i].tolist() for i in range(n)}
 
-    def pair_generator():
+    def pair_generator() -&gt; None:
         for i in range(n):
             for j in range(i, n):
                 yield (i, j)
@@ -154,14 +154,16 @@ threshold : <code>float</code>
 The threshold value used in the <code>compare_similarity</code> function. Default is 0.0</p></div>
 </dd>
 <dt id="likelihood.graph.nn.compare_pair"><code class="name flex">
-<span>def <span class="ident">compare_pair</span></span>(<span>pair, data, similarity, threshold)</span>
+<span>def <span class="ident">compare_pair</span></span>(<span>pair: Tuple[int, int], data: numpy.ndarray, similarity: int, threshold: float) ‑> Tuple[int, int, int]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def compare_pair(pair, data, similarity, threshold):
+<pre><code class="python">def compare_pair(
+    pair: Tuple[int, int], data: np.ndarray, similarity: int, threshold: float
+) -&gt; Tuple[int, int, int]:
     i, j = pair
     sim = compare_similarity_np(data[i], data[j], threshold=threshold)
     return (i, j, 1 if sim &gt;= similarity else 0)</code></pre>
@@ -228,7 +230,7 @@ The threshold value used in the <code>compare_similarity</code> function. Defaul
         target: str | None = None,
         exclude_subset: List[str] = [],
         **kwargs,
-    ):
+    ) -&gt; None:
         sparse = kwargs.get(&#34;sparse&#34;, True)
         threshold = kwargs.get(&#34;threshold&#34;, 0.05)
         _, adjacency = cal_adjacency_matrix(
@@ -249,7 +251,7 @@ The threshold value used in the <code>compare_similarity</code> function. Defaul
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNN"><code class="flex name class">
 <span>class <span class="ident">VanillaGNN</span></span>
-<span>(</span><span>dim_in, dim_h, dim_out, rank=2, **kwargs)</span>
+<span>(</span><span>dim_in: int, dim_h: int, dim_out: int, rank: int = 2, **kwargs)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -258,7 +260,7 @@ The threshold value used in the <code>compare_similarity</code> function. Defaul
 </summary>
 <pre><code class="python">@tf.keras.utils.register_keras_serializable(package=&#34;Custom&#34;, name=&#34;VanillaGNN&#34;)
 class VanillaGNN(tf.keras.Model):
-    def __init__(self, dim_in, dim_h, dim_out, rank=2, **kwargs):
+    def __init__(self, dim_in: int, dim_h: int, dim_out: int, rank: int = 2, **kwargs) -&gt; None:
         super(VanillaGNN, self).__init__(**kwargs)
         self.dim_in = dim_in
         self.dim_h = dim_h
@@ -269,22 +271,24 @@ class VanillaGNN(tf.keras.Model):
         self.gnn2 = VanillaGNNLayer(self.dim_h, self.dim_h, self.rank)
         self.gnn3 = VanillaGNNLayer(self.dim_h, self.dim_out, None)
 
-    def call(self, x, adjacency):
+    def call(self, x: np.ndarray, adjacency: tf.SparseTensor) -&gt; np.ndarray:
         h = self.gnn1(x, adjacency)
         h = tf.nn.tanh(h)
         h = self.gnn2(h, adjacency)
         h = self.gnn3(h, adjacency)
         return tf.nn.softmax(h, axis=1)
 
-    def f1_macro(self, y_true, y_pred):
+    def f1_macro(self, y_true: np.ndarray, y_pred: np.ndarray) -&gt; float:
         return f1_score(y_true, y_pred, average=&#34;macro&#34;)
 
-    def compute_f1_score(self, logits, labels):
+    def compute_f1_score(self, logits: tf.Tensor, labels: tf.Tensor) -&gt; float:
         predictions = tf.argmax(logits, axis=1, output_type=tf.int32)
         true_labels = tf.cast(labels, tf.int32)
         return self.f1_macro(true_labels.numpy(), predictions.numpy())
 
-    def evaluate(self, x, adjacency, y):
+    def evaluate(
+        self, x: np.ndarray, adjacency: tf.SparseTensor, y: np.ndarray
+    ) -&gt; Tuple[float, float]:
         y = tf.cast(y, tf.int32)
         out = self(x, adjacency)
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=out)
@@ -292,16 +296,16 @@ class VanillaGNN(tf.keras.Model):
         f1 = round(self.compute_f1_score(out, y), 4)
         return loss.numpy(), f1
 
-    def test(self, data):
+    def test(self, data: Data) -&gt; float:
         out = self(data.x, data.adjacency)
         test_f1 = self.compute_f1_score(out, data.y)
         return round(test_f1, 4)
 
-    def predict(self, data):
+    def predict(self, data: Data) -&gt; np.ndarray:
         out = self(data.x, data.adjacency)
         return tf.argmax(out, axis=1, output_type=tf.int32).numpy()
 
-    def get_config(self):
+    def get_config(self) -&gt; Dict[str, Any]:
         config = {
             &#34;dim_in&#34;: self.dim_in,
             &#34;dim_h&#34;: self.dim_h,
@@ -312,7 +316,7 @@ class VanillaGNN(tf.keras.Model):
         return dict(list(base_config.items()) + list(config.items()))
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config: Dict[str, Any]) -&gt; &#34;VanillaGNN&#34;:
         return cls(
             dim_in=config[&#34;dim_in&#34;],
             dim_h=config[&#34;dim_h&#34;],
@@ -321,7 +325,13 @@ class VanillaGNN(tf.keras.Model):
         )
 
     @tf.function
-    def train_step(self, batch_x, batch_adjacency, batch_y, optimizer):
+    def train_step(
+        self,
+        batch_x: np.ndarray,
+        batch_adjacency: tf.SparseTensor,
+        batch_y: np.ndarray,
+        optimizer: tf.keras.optimizers.Optimizer,
+    ) -&gt; tf.Tensor:
         with tf.GradientTape() as tape:
             out = self(batch_x, batch_adjacency)
             loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=batch_y, logits=out)
@@ -330,7 +340,14 @@ class VanillaGNN(tf.keras.Model):
         optimizer.apply_gradients(zip(gradients, self.trainable_variables))
         return loss
 
-    def fit(self, data, epochs, batch_size, test_size=0.2, optimizer=&#34;adam&#34;):
+    def fit(
+        self,
+        data: Data,
+        epochs: int,
+        batch_size: int,
+        test_size: float = 0.2,
+        optimizer: str = &#34;adam&#34;,
+    ) -&gt; Tuple[List[float], List[float], List[float], List[float]]:
         optimizers = {
             &#34;sgd&#34;: tf.keras.optimizers.SGD(),
             &#34;adam&#34;: tf.keras.optimizers.Adam(),
@@ -479,7 +496,7 @@ the model is purely a stack of single-input, single-output layers.</p>
 <h3>Static methods</h3>
 <dl>
 <dt id="likelihood.graph.nn.VanillaGNN.from_config"><code class="name flex">
-<span>def <span class="ident">from_config</span></span>(<span>config)</span>
+<span>def <span class="ident">from_config</span></span>(<span>config: Dict[str, Any]) ‑> <a title="likelihood.graph.nn.VanillaGNN" href="#likelihood.graph.nn.VanillaGNN">VanillaGNN</a></span>
 </code></dt>
 <dd>
 <div class="desc"><p>Creates an operation from its config.</p>
@@ -490,26 +507,28 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 <pre><code class="language-python">if &quot;dtype&quot; in config and isinstance(config[&quot;dtype&quot;], dict):
     policy = dtype_policies.deserialize(config[&quot;dtype&quot;])
 </code></pre>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>config</code></strong></dt>
 <dd>A Python dictionary, typically the output of <code>get_config</code>.</dd>
 </dl>
-<h2 id="returns">Returns</h2>
-<p>An operation instance.</p></div>
+<p>Returns
+-----=
+An operation instance.</p></div>
 </dd>
 </dl>
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.graph.nn.VanillaGNN.call"><code class="name flex">
-<span>def <span class="ident">call</span></span>(<span>self, x, adjacency)</span>
+<span>def <span class="ident">call</span></span>(<span>self,<br>x: numpy.ndarray,<br>adjacency: tensorflow.python.framework.sparse_tensor.SparseTensor) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def call(self, x, adjacency):
+<pre><code class="python">def call(self, x: np.ndarray, adjacency: tf.SparseTensor) -&gt; np.ndarray:
     h = self.gnn1(x, adjacency)
     h = tf.nn.tanh(h)
     h = self.gnn2(h, adjacency)
@@ -519,14 +538,14 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNN.compute_f1_score"><code class="name flex">
-<span>def <span class="ident">compute_f1_score</span></span>(<span>self, logits, labels)</span>
+<span>def <span class="ident">compute_f1_score</span></span>(<span>self,<br>logits: tensorflow.python.framework.tensor.Tensor,<br>labels: tensorflow.python.framework.tensor.Tensor) ‑> float</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def compute_f1_score(self, logits, labels):
+<pre><code class="python">def compute_f1_score(self, logits: tf.Tensor, labels: tf.Tensor) -&gt; float:
     predictions = tf.argmax(logits, axis=1, output_type=tf.int32)
     true_labels = tf.cast(labels, tf.int32)
     return self.f1_macro(true_labels.numpy(), predictions.numpy())</code></pre>
@@ -534,14 +553,16 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNN.evaluate"><code class="name flex">
-<span>def <span class="ident">evaluate</span></span>(<span>self, x, adjacency, y)</span>
+<span>def <span class="ident">evaluate</span></span>(<span>self,<br>x: numpy.ndarray,<br>adjacency: tensorflow.python.framework.sparse_tensor.SparseTensor,<br>y: numpy.ndarray) ‑> Tuple[float, float]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def evaluate(self, x, adjacency, y):
+<pre><code class="python">def evaluate(
+    self, x: np.ndarray, adjacency: tf.SparseTensor, y: np.ndarray
+) -&gt; Tuple[float, float]:
     y = tf.cast(y, tf.int32)
     out = self(x, adjacency)
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=out)
@@ -551,8 +572,9 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 </details>
 <div class="desc"><p>Returns the loss value &amp; metrics values for the model in test mode.</p>
 <p>Computation is done in batches (see the <code>batch_size</code> arg.)</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>x</code></strong></dt>
 <dd>Input data. It can be:
 - A NumPy array (or array-like), or a list of arrays
@@ -623,8 +645,9 @@ List of callbacks to apply during evaluation.</dd>
 dict, with each key being the name of the metric.
 If <code>False</code>, they are returned as a list.</dd>
 </dl>
-<h2 id="returns">Returns</h2>
-<p>Scalar test loss (if the model has a single output and no metrics)
+<p>Returns
+-----=
+Scalar test loss (if the model has a single output and no metrics)
 or list of scalars (if the model has multiple outputs
 and/or metrics).
 Note: When using compiled metrics, <code>evaluate()</code> may return multiple
@@ -637,27 +660,34 @@ metric. <code>model.metrics_names</code> itself will still return only the
 top-level names.</p></div>
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNN.f1_macro"><code class="name flex">
-<span>def <span class="ident">f1_macro</span></span>(<span>self, y_true, y_pred)</span>
+<span>def <span class="ident">f1_macro</span></span>(<span>self, y_true: numpy.ndarray, y_pred: numpy.ndarray) ‑> float</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def f1_macro(self, y_true, y_pred):
+<pre><code class="python">def f1_macro(self, y_true: np.ndarray, y_pred: np.ndarray) -&gt; float:
     return f1_score(y_true, y_pred, average=&#34;macro&#34;)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNN.fit"><code class="name flex">
-<span>def <span class="ident">fit</span></span>(<span>self, data, epochs, batch_size, test_size=0.2, optimizer='adam')</span>
+<span>def <span class="ident">fit</span></span>(<span>self,<br>data: <a title="likelihood.graph.nn.Data" href="#likelihood.graph.nn.Data">Data</a>,<br>epochs: int,<br>batch_size: int,<br>test_size: float = 0.2,<br>optimizer: str = 'adam') ‑> Tuple[List[float], List[float], List[float], List[float]]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def fit(self, data, epochs, batch_size, test_size=0.2, optimizer=&#34;adam&#34;):
+<pre><code class="python">def fit(
+    self,
+    data: Data,
+    epochs: int,
+    batch_size: int,
+    test_size: float = 0.2,
+    optimizer: str = &#34;adam&#34;,
+) -&gt; Tuple[List[float], List[float], List[float], List[float]]:
     optimizers = {
         &#34;sgd&#34;: tf.keras.optimizers.SGD(),
         &#34;adam&#34;: tf.keras.optimizers.Adam(),
@@ -712,8 +742,9 @@ top-level names.</p></div>
     return train_losses, train_f1_scores, val_losses, val_f1_scores</code></pre>
 </details>
 <div class="desc"><p>Trains the model for a fixed number of epochs (dataset iterations).</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>x</code></strong></dt>
 <dd>Input data. It can be:
 - A NumPy array (or array-like), or a list of arrays
@@ -901,21 +932,22 @@ interpreting the value. Even worse is a tuple of the form:
 where it is unclear if the tuple was intended to be unpacked
 into <code>x</code>, <code>y</code>, and <code>sample_weight</code> or passed through
 as a single element to <code>x</code>.</p>
-<h2 id="returns">Returns</h2>
-<p>A <code>History</code> object. Its <code>History.history</code> attribute is
+<p>Returns
+-----=
+A <code>History</code> object. Its <code>History.history</code> attribute is
 a record of training loss values and metrics values
 at successive epochs, as well as validation loss values
 and validation metrics values (if applicable).</p></div>
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNN.get_config"><code class="name flex">
-<span>def <span class="ident">get_config</span></span>(<span>self)</span>
+<span>def <span class="ident">get_config</span></span>(<span>self) ‑> Dict[str, Any]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_config(self):
+<pre><code class="python">def get_config(self) -&gt; Dict[str, Any]:
     config = {
         &#34;dim_in&#34;: self.dim_in,
         &#34;dim_h&#34;: self.dim_h,
@@ -930,14 +962,14 @@ and validation metrics values (if applicable).</p></div>
 containing the information needed to re-instantiate it.</p></div>
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNN.predict"><code class="name flex">
-<span>def <span class="ident">predict</span></span>(<span>self, data)</span>
+<span>def <span class="ident">predict</span></span>(<span>self,<br>data: <a title="likelihood.graph.nn.Data" href="#likelihood.graph.nn.Data">Data</a>) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def predict(self, data):
+<pre><code class="python">def predict(self, data: Data) -&gt; np.ndarray:
     out = self(data.x, data.adjacency)
     return tf.argmax(out, axis=1, output_type=tf.int32).numpy()</code></pre>
 </details>
@@ -954,8 +986,9 @@ inference.</p>
 <p>Note: See <a href="https://keras.io/getting_started/faq/#whats-the-difference-between-model-methods-predict-and-call">this FAQ entry</a>
 for more details about the difference between <code>Model</code> methods
 <code>predict()</code> and <code>__call__()</code>.</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>x</code></strong></dt>
 <dd>Input data. It can be:
 - A NumPy array (or array-like), or a list of arrays
@@ -992,18 +1025,19 @@ repeating dataset, it will run indefinitely.</dd>
 <dd>List of <code>keras.callbacks.Callback</code> instances.
 List of callbacks to apply during prediction.</dd>
 </dl>
-<h2 id="returns">Returns</h2>
-<p>NumPy array(s) of predictions.</p></div>
+<p>Returns
+-----=
+NumPy array(s) of predictions.</p></div>
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNN.test"><code class="name flex">
-<span>def <span class="ident">test</span></span>(<span>self, data)</span>
+<span>def <span class="ident">test</span></span>(<span>self,<br>data: <a title="likelihood.graph.nn.Data" href="#likelihood.graph.nn.Data">Data</a>) ‑> float</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def test(self, data):
+<pre><code class="python">def test(self, data: Data) -&gt; float:
     out = self(data.x, data.adjacency)
     test_f1 = self.compute_f1_score(out, data.y)
     return round(test_f1, 4)</code></pre>
@@ -1011,7 +1045,7 @@ List of callbacks to apply during prediction.</dd>
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNN.train_step"><code class="name flex">
-<span>def <span class="ident">train_step</span></span>(<span>self, batch_x, batch_adjacency, batch_y, optimizer)</span>
+<span>def <span class="ident">train_step</span></span>(<span>self,<br>batch_x: numpy.ndarray,<br>batch_adjacency: tensorflow.python.framework.sparse_tensor.SparseTensor,<br>batch_y: numpy.ndarray,<br>optimizer: keras.src.optimizers.optimizer.Optimizer) ‑> tensorflow.python.framework.tensor.Tensor</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1019,7 +1053,13 @@ List of callbacks to apply during prediction.</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@tf.function
-def train_step(self, batch_x, batch_adjacency, batch_y, optimizer):
+def train_step(
+    self,
+    batch_x: np.ndarray,
+    batch_adjacency: tf.SparseTensor,
+    batch_y: np.ndarray,
+    optimizer: tf.keras.optimizers.Optimizer,
+) -&gt; tf.Tensor:
     with tf.GradientTape() as tape:
         out = self(batch_x, batch_adjacency)
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=batch_y, logits=out)
@@ -1034,7 +1074,7 @@ def train_step(self, batch_x, batch_adjacency, batch_y, optimizer):
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNNLayer"><code class="flex name class">
 <span>class <span class="ident">VanillaGNNLayer</span></span>
-<span>(</span><span>dim_in, dim_out, rank=None, kernel_initializer='glorot_uniform', **kwargs)</span>
+<span>(</span><span>dim_in: int,<br>dim_out: int,<br>rank: int = None,<br>kernel_initializer: str = 'glorot_uniform',<br>**kwargs)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1043,14 +1083,21 @@ def train_step(self, batch_x, batch_adjacency, batch_y, optimizer):
 </summary>
 <pre><code class="python">@tf.keras.utils.register_keras_serializable(package=&#34;Custom&#34;, name=&#34;VanillaGNNLayer&#34;)
 class VanillaGNNLayer(tf.keras.layers.Layer):
-    def __init__(self, dim_in, dim_out, rank=None, kernel_initializer=&#34;glorot_uniform&#34;, **kwargs):
+    def __init__(
+        self,
+        dim_in: int,
+        dim_out: int,
+        rank: int = None,
+        kernel_initializer: str = &#34;glorot_uniform&#34;,
+        **kwargs,
+    ) -&gt; None:
         super(VanillaGNNLayer, self).__init__(**kwargs)
         self.dim_out = dim_out
         self.rank = rank
         self.kernel_initializer = kernel_initializer
         self.linear = None
 
-    def build(self, input_shape):
+    def build(self, input_shape: Tuple[int, ...]) -&gt; None:
         if self.rank:
             self.linear = LoRALayer(self.dim_out, rank=self.rank)
         else:
@@ -1059,12 +1106,12 @@ class VanillaGNNLayer(tf.keras.layers.Layer):
             )
         super(VanillaGNNLayer, self).build(input_shape)
 
-    def call(self, x, adjacency):
+    def call(self, x: np.ndarray, adjacency: tf.SparseTensor) -&gt; np.ndarray:
         x = self.linear(x)
         x = tf.sparse.sparse_dense_matmul(adjacency, x)
         return x
 
-    def get_config(self):
+    def get_config(self) -&gt; Dict[str, Any]:
         config = super(VanillaGNNLayer, self).get_config()
         config.update(
             {
@@ -1095,8 +1142,9 @@ attribute of another Layer, the outer layer will start tracking the weights
 created by the inner layer. Nested layers should be instantiated in the
 <code>__init__()</code> method or <code>build()</code> method.</p>
 <p>Users will just instantiate a layer and then treat it as a callable.</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>trainable</code></strong></dt>
 <dd>Boolean, whether the layer's variables should be trainable.</dd>
 <dt><strong><code>name</code></strong></dt>
@@ -1107,9 +1155,8 @@ created by the inner layer. Nested layers should be instantiated in the
 to differ. Defaults to <code>None</code>. <code>None</code> means to use
 <code>keras.config.dtype_policy()</code>, which is a <code>float32</code> policy unless
 set to different value (via <code>keras.config.set_dtype_policy()</code>).</dd>
-</dl>
-<h2 id="attributes">Attributes</h2>
-<dl>
+<dt>Attributes</dt>
+<dt>-----=</dt>
 <dt><strong><code>name</code></strong></dt>
 <dd>The name of the layer (string).</dd>
 <dt><strong><code>dtype</code></strong></dt>
@@ -1245,14 +1292,14 @@ assert my_sum.trainable_weights == []
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.graph.nn.VanillaGNNLayer.build"><code class="name flex">
-<span>def <span class="ident">build</span></span>(<span>self, input_shape)</span>
+<span>def <span class="ident">build</span></span>(<span>self, input_shape: Tuple[int, ...]) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def build(self, input_shape):
+<pre><code class="python">def build(self, input_shape: Tuple[int, ...]) -&gt; None:
     if self.rank:
         self.linear = LoRALayer(self.dim_out, rank=self.rank)
     else:
@@ -1264,14 +1311,14 @@ assert my_sum.trainable_weights == []
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNNLayer.call"><code class="name flex">
-<span>def <span class="ident">call</span></span>(<span>self, x, adjacency)</span>
+<span>def <span class="ident">call</span></span>(<span>self,<br>x: numpy.ndarray,<br>adjacency: tensorflow.python.framework.sparse_tensor.SparseTensor) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def call(self, x, adjacency):
+<pre><code class="python">def call(self, x: np.ndarray, adjacency: tf.SparseTensor) -&gt; np.ndarray:
     x = self.linear(x)
     x = tf.sparse.sparse_dense_matmul(adjacency, x)
     return x</code></pre>
@@ -1279,14 +1326,14 @@ assert my_sum.trainable_weights == []
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.graph.nn.VanillaGNNLayer.get_config"><code class="name flex">
-<span>def <span class="ident">get_config</span></span>(<span>self)</span>
+<span>def <span class="ident">get_config</span></span>(<span>self) ‑> Dict[str, Any]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_config(self):
+<pre><code class="python">def get_config(self) -&gt; Dict[str, Any]:
     config = super(VanillaGNNLayer, self).get_config()
     config.update(
         {

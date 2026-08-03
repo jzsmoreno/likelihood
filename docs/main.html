@@ -214,7 +214,7 @@ $n$ parameters.</dd>
 </dl></div>
 </dd>
 <dt id="likelihood.main.walk"><code class="name flex">
-<span>def <span class="ident">walk</span></span>(<span>x: numpy.ndarray,<br>y: numpy.ndarray,<br>model: Callable,<br>theta: numpy.ndarray,<br>conditions: List[Tuple[float, float]] = None,<br>var2: float = 0.01,<br>mov: int = 100,<br>d: float = 1.0,<br>tol: float = 0.0001,<br>mode: bool = True)</span>
+<span>def <span class="ident">walk</span></span>(<span>x: numpy.ndarray,<br>y: numpy.ndarray,<br>model: Callable,<br>theta: numpy.ndarray,<br>conditions: List[Tuple[float, float]] | None = None,<br>var2: float = 0.01,<br>mov: int = 100,<br>d: float = 1.0,<br>tol: float = 0.0001,<br>mode: bool = True) ‑> Tuple[numpy.ndarray, List[numpy.ndarray], float]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -226,13 +226,13 @@ $n$ parameters.</dd>
     y: np.ndarray,
     model: Callable,
     theta: np.ndarray,
-    conditions: List[Tuple[float, float]] = None,
+    conditions: Optional[List[Tuple[float, float]]] = None,
     var2: float = 0.01,
     mov: int = 100,
     d: float = 1.0,
     tol: float = 1e-4,
     mode: bool = True,
-):
+) -&gt; Tuple[np.ndarray, List[np.ndarray], float]:
     &#34;&#34;&#34;Executes the walker implementation.
 
     Parameters
@@ -339,7 +339,7 @@ to <code>1e-3</code>.</dd>
 </dl></div>
 </dd>
 <dt id="likelihood.main.walkers"><code class="name flex">
-<span>def <span class="ident">walkers</span></span>(<span>nwalkers: int,<br>x: numpy.ndarray,<br>y: numpy.ndarray,<br>model: Callable,<br>theta: numpy.ndarray,<br>conditions: List[Tuple[float, float]] = None,<br>var2: float = 0.01,<br>mov: int = 100,<br>d: float = 1.0,<br>tol: float = 0.0001,<br>mode: bool = False,<br>figname: str = 'fig_out.png')</span>
+<span>def <span class="ident">walkers</span></span>(<span>nwalkers: int,<br>x: numpy.ndarray,<br>y: numpy.ndarray,<br>model: Callable,<br>theta: numpy.ndarray,<br>conditions: List[Tuple[float, float]] | None = None,<br>var2: float = 0.01,<br>mov: int = 100,<br>d: float = 1.0,<br>tol: float = 0.0001,<br>mode: bool = False,<br>figname: str = 'fig_out.png') ‑> Tuple[List[numpy.ndarray], List[float]]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -352,14 +352,14 @@ to <code>1e-3</code>.</dd>
     y: np.ndarray,
     model: Callable,
     theta: np.ndarray,
-    conditions: List[Tuple[float, float]] = None,
+    conditions: Optional[List[Tuple[float, float]]] = None,
     var2: float = 0.01,
     mov: int = 100,
     d: float = 1.0,
     tol: float = 1e-4,
     mode: bool = False,
     figname: str = &#34;fig_out.png&#34;,
-):
+) -&gt; Tuple[List[np.ndarray], List[float]]:
     &#34;&#34;&#34;Executes multiple walkers.
 
     Parameters

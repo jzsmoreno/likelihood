@@ -56,7 +56,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class HMM:
-    def __init__(self, n_states: int, n_observations: int):
+    def __init__(self, n_states: int, n_observations: int) -&gt; None:
         self.n_states = n_states
         self.n_observations = n_observations
 
@@ -175,12 +175,15 @@ el.replaceWith(d);
 
             # Logging parameters every 10 iterations
             if iteration % 10 == 0 and verbose:
-                os.system(&#34;cls&#34; if os.name == &#34;nt&#34; else &#34;clear&#34;)
+                subprocess.run(&#34;cls&#34; if os.name == &#34;nt&#34; else &#34;clear&#34;, shell=True, check=False)
                 clear_output(wait=True)
-                logging.info(f&#34;Iteration {iteration}:&#34;)
-                logging.info(&#34;Pi: %s&#34;, self.pi)
-                logging.info(&#34;A:\n%s&#34;, self.A)
-                logging.info(&#34;B:\n%s&#34;, self.B)
+                print(f&#34;Iteration {iteration}:&#34;)
+                print(&#34;Pi:&#34;)
+                print(self.pi)
+                print(&#34;\nA:&#34;)
+                print(self.A)
+                print(&#34;\nB:&#34;)
+                print(self.B)
 
     def decoding_accuracy(self, sequences: List[List[int]], true_states: List[List[int]]) -&gt; float:
         correct_predictions = 0
@@ -306,12 +309,15 @@ def load_model(filename: str = &#34;./hmm&#34;) -&gt; &#34;HMM&#34;:
 
         # Logging parameters every 10 iterations
         if iteration % 10 == 0 and verbose:
-            os.system(&#34;cls&#34; if os.name == &#34;nt&#34; else &#34;clear&#34;)
+            subprocess.run(&#34;cls&#34; if os.name == &#34;nt&#34; else &#34;clear&#34;, shell=True, check=False)
             clear_output(wait=True)
-            logging.info(f&#34;Iteration {iteration}:&#34;)
-            logging.info(&#34;Pi: %s&#34;, self.pi)
-            logging.info(&#34;A:\n%s&#34;, self.A)
-            logging.info(&#34;B:\n%s&#34;, self.B)</code></pre>
+            print(f&#34;Iteration {iteration}:&#34;)
+            print(&#34;Pi:&#34;)
+            print(self.pi)
+            print(&#34;\nA:&#34;)
+            print(self.A)
+            print(&#34;\nB:&#34;)
+            print(self.B)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>

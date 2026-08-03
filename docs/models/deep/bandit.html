@@ -65,7 +65,7 @@ el.replaceWith(d);
         num_layers: int = 1,
         activation: nn.Module = nn.SELU(),
         dropout_rate: float = 0.3,
-    ):
+    ) -&gt; None:
         super(MultiBanditNet, self).__init__()
         self.state_dim = state_dim
         self.num_options = num_options
@@ -121,7 +121,7 @@ el.replaceWith(d);
         self.equal_action_sizes = len(set(self.num_actions)) == 1
         self.max_num_actions = max(self.num_actions)
 
-    def apply_initialization(self, method: str = &#34;xavier_uniform&#34;):
+    def apply_initialization(self, method: str = &#34;xavier_uniform&#34;) -&gt; None:
         &#34;&#34;&#34;
         Applies a specific initialization method to all linear layers in the network.
 
@@ -158,7 +158,9 @@ el.replaceWith(d);
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-    def forward(self, state: torch.Tensor, multiple_option: bool = False, temperature: float = 1.0):
+    def forward(
+        self, state: torch.Tensor, multiple_option: bool = False, temperature: float = 1.0
+    ) -&gt; tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         &#34;&#34;&#34;
         Parameters
         ----------
@@ -267,14 +269,14 @@ evaluation mode.
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.deep.bandit.MultiBanditNet.apply_initialization"><code class="name flex">
-<span>def <span class="ident">apply_initialization</span></span>(<span>self, method: str = 'xavier_uniform')</span>
+<span>def <span class="ident">apply_initialization</span></span>(<span>self, method: str = 'xavier_uniform') ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def apply_initialization(self, method: str = &#34;xavier_uniform&#34;):
+<pre><code class="python">def apply_initialization(self, method: str = &#34;xavier_uniform&#34;) -&gt; None:
     &#34;&#34;&#34;
     Applies a specific initialization method to all linear layers in the network.
 
@@ -321,14 +323,16 @@ evaluation mode.
 </dl></div>
 </dd>
 <dt id="likelihood.models.deep.bandit.MultiBanditNet.forward"><code class="name flex">
-<span>def <span class="ident">forward</span></span>(<span>self,<br>state: torch.Tensor,<br>multiple_option: bool = False,<br>temperature: float = 1.0) ‑> Callable[..., typing.Any]</span>
+<span>def <span class="ident">forward</span></span>(<span>self,<br>state: torch.Tensor,<br>multiple_option: bool = False,<br>temperature: float = 1.0) ‑> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def forward(self, state: torch.Tensor, multiple_option: bool = False, temperature: float = 1.0):
+<pre><code class="python">def forward(
+    self, state: torch.Tensor, multiple_option: bool = False, temperature: float = 1.0
+) -&gt; tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     &#34;&#34;&#34;
     Parameters
     ----------

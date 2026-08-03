@@ -58,7 +58,11 @@ el.replaceWith(d);
 <pre><code class="python">class SimpleImputer:
     &#34;&#34;&#34;Multiple imputation using simulation engine.&#34;&#34;&#34;
 
-    def __init__(self, n_features: int | None = None, use_scaler: bool = False):
+    def __init__(
+        self,
+        n_features: int | None = None,
+        use_scaler: bool = False,
+    ) -&gt; None:
         &#34;&#34;&#34;
         Initialize the imputer.
 
@@ -169,7 +173,11 @@ el.replaceWith(d);
         self.fit(X_train)
         return self.transform(X, boundary, inplace)
 
-    def _set_zero(self, X: pd.Series, column_exception) -&gt; pd.DataFrame:
+    def _set_zero(
+        self,
+        X: pd.Series,
+        column_exception: str,
+    ) -&gt; pd.DataFrame:
         &#34;&#34;&#34;
         Set missing values to zero, except for `column_exception`.
 
@@ -306,7 +314,7 @@ el.replaceWith(d);
             pickle.dump(self, f)
 
     @staticmethod
-    def load(filename: str = &#34;./imputer&#34;):
+    def load(filename: str = &#34;./imputer&#34;) -&gt; &#34;SimpleImputer&#34;:
         &#34;&#34;&#34;
         Load the state of a SimpleImputer from a file.
 
@@ -331,7 +339,7 @@ el.replaceWith(d);
 <h3>Static methods</h3>
 <dl>
 <dt id="likelihood.tools.impute.SimpleImputer.load"><code class="name flex">
-<span>def <span class="ident">load</span></span>(<span>filename: str = './imputer')</span>
+<span>def <span class="ident">load</span></span>(<span>filename: str = './imputer') ‑> <a title="likelihood.tools.impute.SimpleImputer" href="#likelihood.tools.impute.SimpleImputer">SimpleImputer</a></span>
 </code></dt>
 <dd>
 <details class="source">
@@ -339,7 +347,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@staticmethod
-def load(filename: str = &#34;./imputer&#34;):
+def load(filename: str = &#34;./imputer&#34;) -&gt; &#34;SimpleImputer&#34;:
     &#34;&#34;&#34;
     Load the state of a SimpleImputer from a file.
 

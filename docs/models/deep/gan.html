@@ -48,7 +48,7 @@ el.replaceWith(d);
 <dl>
 <dt id="likelihood.models.deep.gan.GANRegressor"><code class="flex name class">
 <span>class <span class="ident">GANRegressor</span></span>
-<span>(</span><span>input_shape_parm,<br>output_shape_parm,<br>num_neurons=128,<br>activation='linear',<br>depth=5,<br>dropout=0.2,<br>l2_reg=0.0,<br>**kwargs)</span>
+<span>(</span><span>input_shape_parm: int,<br>output_shape_parm: int,<br>num_neurons: int = 128,<br>activation: str = 'linear',<br>depth: int = 5,<br>dropout: float = 0.2,<br>l2_reg: float = 0.0,<br>**kwargs)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -63,15 +63,15 @@ class GANRegressor(tf.keras.Model):
 
     def __init__(
         self,
-        input_shape_parm,
-        output_shape_parm,
-        num_neurons=128,
-        activation=&#34;linear&#34;,
-        depth=5,
-        dropout=0.2,
-        l2_reg=0.0,
+        input_shape_parm: int,
+        output_shape_parm: int,
+        num_neurons: int = 128,
+        activation: str = &#34;linear&#34;,
+        depth: int = 5,
+        dropout: float = 0.2,
+        l2_reg: float = 0.0,
         **kwargs,
-    ):
+    ) -&gt; None:
         super(GANRegressor, self).__init__()
         self.input_shape_parm = input_shape_parm
         self.output_shape_parm = output_shape_parm
@@ -87,7 +87,7 @@ class GANRegressor(tf.keras.Model):
         dummy_input = tf.convert_to_tensor(tf.random.normal([1, self.input_shape_parm]))
         self.build(dummy_input.shape)
 
-    def build(self, input_shape):
+    def build(self, input_shape: Tuple[int, ...]) -&gt; None:
         self.gan = tf.keras.models.Sequential([self.generator, self.discriminator], name=&#34;gan&#34;)
 
         self.generator.compile(
@@ -103,7 +103,7 @@ class GANRegressor(tf.keras.Model):
         self.gan.compile(optimizer=self.optimizer, loss=&#34;binary_crossentropy&#34;)
         super(GANRegressor, self).build(input_shape)
 
-    def _build_generator(self):
+    def _build_generator(self) -&gt; tf.keras.Model:
         generator = tf.keras.Sequential(name=&#34;generator&#34;)
         generator.add(
             tf.keras.layers.Dense(
@@ -124,7 +124,7 @@ class GANRegressor(tf.keras.Model):
         generator.add(tf.keras.layers.Dense(2 * self.output_shape_parm, activation=self.activation))
         return generator
 
-    def _build_discriminator(self):
+    def _build_discriminator(self) -&gt; tf.keras.Model:
         discriminator = tf.keras.Sequential(name=&#34;discriminator&#34;)
         for _ in range(self.depth):
             discriminator.add(
@@ -138,13 +138,13 @@ class GANRegressor(tf.keras.Model):
 
     def train_gan(
         self,
-        X,
-        y,
-        batch_size,
-        n_epochs,
-        validation_split=0.2,
-        verbose=1,
-    ):
+        X: np.ndarray,
+        y: np.ndarray,
+        batch_size: int,
+        n_epochs: int,
+        validation_split: float = 0.2,
+        verbose: int = 1,
+    ) -&gt; pd.DataFrame:
         &#34;&#34;&#34;
         Train the GAN model.
 
@@ -240,13 +240,15 @@ class GANRegressor(tf.keras.Model):
 
         return pd.DataFrame(loss_history, columns=[&#34;epoch&#34;, &#34;loss&#34;])
 
-    def _get_frame(self, y, y_pred):
+    def _get_frame(self, y: np.ndarray, y_pred: list) -&gt; pd.DataFrame:
         df = pd.DataFrame()
         df[&#34;y&#34;] = y
         df[&#34;y_pred&#34;] = y_pred
         return df
 
-    def _train_and_val(self, X, y, validation_split):
+    def _train_and_val(
+        self, X: tf.Tensor, y: tf.Tensor, validation_split: float
+    ) -&gt; tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         split = int((1 - validation_split) * len(X))
 
         if len(X) &gt; split and split &gt; 0:
@@ -265,18 +267,18 @@ class GANRegressor(tf.keras.Model):
 
         return X_train, y_train, X_val, y_val
 
-    def _cal_loss(self, generated, y):
-        return tf.math.reduce_mean(100 * abs((y - generated) / y), keepdims=False).numpy()
+    def _cal_loss(self, generated: tf.Tensor, y: tf.Tensor) -&gt; float:
+        return tf.math.reduce_mean(100 * abs((y - generated) / y), keepdims=False).numpy().item()
 
     def train_gen(
         self,
-        X_train,
-        y_train,
-        batch_size,
-        n_epochs,
-        validation_split=0.2,
-        patience=3,
-    ):
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        batch_size: int,
+        n_epochs: int,
+        validation_split: float = 0.2,
+        patience: int = 3,
+    ) -&gt; pd.DataFrame:
         &#34;&#34;&#34;
         Train the generator model.
 
@@ -323,10 +325,10 @@ class GANRegressor(tf.keras.Model):
 
         return pd.DataFrame(history.history)
 
-    def call(self, inputs):
+    def call(self, inputs: tf.Tensor) -&gt; tf.Tensor:
         return self.generator(inputs)[:, 0]
 
-    def get_config(self):
+    def get_config(self) -&gt; Dict[str, Any]:
         config = {
             &#34;input_shape_parm&#34;: self.input_shape_parm,
             &#34;output_shape_parm&#34;: self.output_shape_parm,
@@ -344,7 +346,7 @@ class GANRegressor(tf.keras.Model):
         return dict(list(base_config.items()) + list(config.items()))
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config: Dict[str, Any]) -&gt; &#34;GANRegressor&#34;:
         return cls(
             input_shape_parm=config[&#34;input_shape_parm&#34;],
             output_shape_parm=config[&#34;output_shape_parm&#34;],
@@ -376,7 +378,7 @@ class GANRegressor(tf.keras.Model):
 <h3>Static methods</h3>
 <dl>
 <dt id="likelihood.models.deep.gan.GANRegressor.from_config"><code class="name flex">
-<span>def <span class="ident">from_config</span></span>(<span>config)</span>
+<span>def <span class="ident">from_config</span></span>(<span>config: Dict[str, Any]) ‑> <a title="likelihood.models.deep.gan.GANRegressor" href="#likelihood.models.deep.gan.GANRegressor">GANRegressor</a></span>
 </code></dt>
 <dd>
 <div class="desc"><p>Creates an operation from its config.</p>
@@ -387,26 +389,28 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 <pre><code class="language-python">if &quot;dtype&quot; in config and isinstance(config[&quot;dtype&quot;], dict):
     policy = dtype_policies.deserialize(config[&quot;dtype&quot;])
 </code></pre>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>config</code></strong></dt>
 <dd>A Python dictionary, typically the output of <code>get_config</code>.</dd>
 </dl>
-<h2 id="returns">Returns</h2>
-<p>An operation instance.</p></div>
+<p>Returns
+-----=
+An operation instance.</p></div>
 </dd>
 </dl>
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.deep.gan.GANRegressor.build"><code class="name flex">
-<span>def <span class="ident">build</span></span>(<span>self, input_shape)</span>
+<span>def <span class="ident">build</span></span>(<span>self, input_shape: Tuple[int, ...]) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def build(self, input_shape):
+<pre><code class="python">def build(self, input_shape: Tuple[int, ...]) -&gt; None:
     self.gan = tf.keras.models.Sequential([self.generator, self.discriminator], name=&#34;gan&#34;)
 
     self.generator.compile(
@@ -425,27 +429,27 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.models.deep.gan.GANRegressor.call"><code class="name flex">
-<span>def <span class="ident">call</span></span>(<span>self, inputs)</span>
+<span>def <span class="ident">call</span></span>(<span>self, inputs: tensorflow.python.framework.tensor.Tensor) ‑> tensorflow.python.framework.tensor.Tensor</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def call(self, inputs):
+<pre><code class="python">def call(self, inputs: tf.Tensor) -&gt; tf.Tensor:
     return self.generator(inputs)[:, 0]</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.models.deep.gan.GANRegressor.get_config"><code class="name flex">
-<span>def <span class="ident">get_config</span></span>(<span>self)</span>
+<span>def <span class="ident">get_config</span></span>(<span>self) ‑> Dict[str, Any]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_config(self):
+<pre><code class="python">def get_config(self) -&gt; Dict[str, Any]:
     config = {
         &#34;input_shape_parm&#34;: self.input_shape_parm,
         &#34;output_shape_parm&#34;: self.output_shape_parm,
@@ -467,7 +471,7 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
 containing the information needed to re-instantiate it.</p></div>
 </dd>
 <dt id="likelihood.models.deep.gan.GANRegressor.train_gan"><code class="name flex">
-<span>def <span class="ident">train_gan</span></span>(<span>self, X, y, batch_size, n_epochs, validation_split=0.2, verbose=1)</span>
+<span>def <span class="ident">train_gan</span></span>(<span>self,<br>X: numpy.ndarray,<br>y: numpy.ndarray,<br>batch_size: int,<br>n_epochs: int,<br>validation_split: float = 0.2,<br>verbose: int = 1) ‑> pandas.core.frame.DataFrame</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -476,13 +480,13 @@ containing the information needed to re-instantiate it.</p></div>
 </summary>
 <pre><code class="python">def train_gan(
     self,
-    X,
-    y,
-    batch_size,
-    n_epochs,
-    validation_split=0.2,
-    verbose=1,
-):
+    X: np.ndarray,
+    y: np.ndarray,
+    batch_size: int,
+    n_epochs: int,
+    validation_split: float = 0.2,
+    verbose: int = 1,
+) -&gt; pd.DataFrame:
     &#34;&#34;&#34;
     Train the GAN model.
 
@@ -601,7 +605,7 @@ containing the information needed to re-instantiate it.</p></div>
 </dl></div>
 </dd>
 <dt id="likelihood.models.deep.gan.GANRegressor.train_gen"><code class="name flex">
-<span>def <span class="ident">train_gen</span></span>(<span>self, X_train, y_train, batch_size, n_epochs, validation_split=0.2, patience=3)</span>
+<span>def <span class="ident">train_gen</span></span>(<span>self,<br>X_train: numpy.ndarray,<br>y_train: numpy.ndarray,<br>batch_size: int,<br>n_epochs: int,<br>validation_split: float = 0.2,<br>patience: int = 3) ‑> pandas.core.frame.DataFrame</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -610,13 +614,13 @@ containing the information needed to re-instantiate it.</p></div>
 </summary>
 <pre><code class="python">def train_gen(
     self,
-    X_train,
-    y_train,
-    batch_size,
-    n_epochs,
-    validation_split=0.2,
-    patience=3,
-):
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    batch_size: int,
+    n_epochs: int,
+    validation_split: float = 0.2,
+    patience: int = 3,
+) -&gt; pd.DataFrame:
     &#34;&#34;&#34;
     Train the generator model.
 

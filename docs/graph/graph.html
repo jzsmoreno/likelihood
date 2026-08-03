@@ -58,7 +58,7 @@ el.replaceWith(d);
 <pre><code class="python">class DynamicGraph(FeatureSelection):
     &#34;&#34;&#34;A class to represent a dynamic graph&#34;&#34;&#34;
 
-    def __init__(self, df: pd.DataFrame, n_importances: int, **kwargs):
+    def __init__(self, df: pd.DataFrame, n_importances: int, **kwargs) -&gt; None:
         self.G = Network(notebook=True, cdn_resources=&#34;remote&#34;, directed=True)
         self.df = df
         self.n_importances = n_importances
@@ -87,7 +87,7 @@ el.replaceWith(d);
             self.labels.append(node)
             self.G.add_node(n_id=i, label=node)
 
-    def draw(self, name=&#34;graph.html&#34;, **kwargs) -&gt; None:
+    def draw(self, name: str = &#34;graph.html&#34;, **kwargs) -&gt; None:
         &#34;&#34;&#34;Display the network using HTML format&#34;&#34;&#34;
         spring_length = kwargs.get(&#34;spring_length&#34;, 500)
         node_distance = kwargs.get(&#34;node_distance&#34;, 100)
@@ -98,7 +98,7 @@ el.replaceWith(d);
         html_file_content = open(name, &#34;r&#34;).read()
         display(HTML(html_file_content))
 
-    def pyvis_to_networkx(self):
+    def pyvis_to_networkx(self) -&gt; nx.Graph:
         nx_graph = nx.Graph()
         nodes = [d[&#34;id&#34;] for d in self.G.nodes]
         for node_dic in self.G.nodes:
@@ -124,14 +124,14 @@ el.replaceWith(d);
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.graph.graph.DynamicGraph.draw"><code class="name flex">
-<span>def <span class="ident">draw</span></span>(<span>self, name='graph.html', **kwargs) ‑> None</span>
+<span>def <span class="ident">draw</span></span>(<span>self, name: str = 'graph.html', **kwargs) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def draw(self, name=&#34;graph.html&#34;, **kwargs) -&gt; None:
+<pre><code class="python">def draw(self, name: str = &#34;graph.html&#34;, **kwargs) -&gt; None:
     &#34;&#34;&#34;Display the network using HTML format&#34;&#34;&#34;
     spring_length = kwargs.get(&#34;spring_length&#34;, 500)
     node_distance = kwargs.get(&#34;node_distance&#34;, 100)
@@ -161,14 +161,14 @@ el.replaceWith(d);
 <div class="desc"><p>Fit the model according to the given data and parameters.</p></div>
 </dd>
 <dt id="likelihood.graph.graph.DynamicGraph.pyvis_to_networkx"><code class="name flex">
-<span>def <span class="ident">pyvis_to_networkx</span></span>(<span>self)</span>
+<span>def <span class="ident">pyvis_to_networkx</span></span>(<span>self) ‑> networkx.classes.graph.Graph</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def pyvis_to_networkx(self):
+<pre><code class="python">def pyvis_to_networkx(self) -&gt; nx.Graph:
     nx_graph = nx.Graph()
     nodes = [d[&#34;id&#34;] for d in self.G.nodes]
     for node_dic in self.G.nodes:
