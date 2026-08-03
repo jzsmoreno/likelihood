@@ -1,10 +1,17 @@
+from typing import Dict
+
 import numpy as np
 import pandas as pd
 from numpy.linalg import solve
 
 
 # -------------------------------------------------------------------------
-def get_metrics(dataset, actual_column_name, predicted_column_name, verbose=False):
+def get_metrics(
+    dataset: pd.DataFrame,
+    actual_column_name: str,
+    predicted_column_name: str,
+    verbose: bool = False,
+) -> Dict[str, float]:
     # Variables to keep track of the number of correct and total predictions
     true_positives = 0  # Correctly predicted positives
     true_negatives = 0  # Correctly predicted negatives

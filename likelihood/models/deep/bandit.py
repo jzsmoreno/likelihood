@@ -1,4 +1,3 @@
-import warnings
 from typing import List
 
 import torch
@@ -15,7 +14,7 @@ class MultiBanditNet(nn.Module):
         num_layers: int = 1,
         activation: nn.Module = nn.SELU(),
         dropout_rate: float = 0.3,
-    ):
+    ) -> None:
         super(MultiBanditNet, self).__init__()
         self.state_dim = state_dim
         self.num_options = num_options
@@ -71,7 +70,7 @@ class MultiBanditNet(nn.Module):
         self.equal_action_sizes = len(set(self.num_actions)) == 1
         self.max_num_actions = max(self.num_actions)
 
-    def apply_initialization(self, method: str = "xavier_uniform"):
+    def apply_initialization(self, method: str = "xavier_uniform") -> None:
         """
         Applies a specific initialization method to all linear layers in the network.
 
@@ -108,7 +107,9 @@ class MultiBanditNet(nn.Module):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-    def forward(self, state: torch.Tensor, multiple_option: bool = False, temperature: float = 1.0):
+    def forward(
+        self, state: torch.Tensor, multiple_option: bool = False, temperature: float = 1.0
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Parameters
         ----------

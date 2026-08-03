@@ -1,10 +1,14 @@
 import json
 import os
-import pickle
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 import numpy as np
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 from packaging import version
 from sklearn.base import BaseEstimator, ClassifierMixin
 
@@ -78,12 +82,12 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
     def __init__(
         self,
         n_models: int = 5,
-        base_model_class=None,
-        param_ranges: Optional[Dict] = None,
-        seed_range: tuple = (0, 100),
+        base_model_class: Optional[Type] = None,
+        param_ranges: Optional[Dict[str, Any]] = None,
+        seed_range: Tuple[int, int] = (0, 100),
         voting_method: str = "soft",
         verbose: int = 0,
-    ):
+    ) -> None:
         if base_model_class is None:
             from likelihood.models.deep import AutoClassifier
 
@@ -97,12 +101,12 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
         self.verbose = verbose
 
         # Initialize internal attributes
-        self.scores = []
-        self.configs = []
-        self.models_ = []
-        self.model_params_ = []
-        self.all_history = []
-        self.n_models_ = 0
+        self.scores: List[Dict[str, Any]] = []
+        self.configs: List[Dict[str, Any]] = []
+        self.models_: List[Any] = []
+        self.model_params_: List[Dict[str, Any]] = []
+        self.all_history: List[Any] = []
+        self.n_models_: int = 0
 
     def _generate_model_configs(self) -> List[Dict]:
         """Generate unique configurations for each model in the ensemble."""
@@ -117,7 +121,7 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
 
         param_ranges = self.param_ranges or default_ranges
 
-        def sample_param(name, integer=False):
+        def sample_param(name: str, integer: bool = False) -> int:
             values = param_ranges.get(name, default_ranges[name])
             if isinstance(values, tuple):
                 low, high = values
@@ -140,7 +144,7 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
 
         return self.configs
 
-    def fit(self, X: np.ndarray, y: np.ndarray, **fit_kwargs):
+    def fit(self, X: np.ndarray, y: np.ndarray, **fit_kwargs) -> "EnsembleClassifier":
         """Train all models in the ensemble."""
         self.models_ = []
         self.all_history = []
@@ -215,7 +219,7 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
         else:
             raise ValueError("voting_method must be 'soft' or 'hard'.")
 
-    def get_model_scores(self):
+    def get_model_scores(self) -> List[Dict[str, Any]]:
         """Return performance metrics for each model (if available)."""
         if hasattr(self, "all_history"):
             self.scores = []
@@ -237,7 +241,7 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
                     )
         return self.scores
 
-    def _save_keras_model(self, model, path: str) -> None:
+    def _save_keras_model(self, model: Any, path: str) -> None:
         """
         Internal helper to save a Keras model depending on TF version.
         """
@@ -280,8 +284,7 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
             self._save_keras_model(model, os.path.join(save_dir, f"model_{i}"))
 
     @classmethod
-    def load(cls, filepath: str, base_model_class=None):
-
+    def load(cls, filepath: str, base_model_class: Optional[Type] = None) -> "EnsembleClassifier":
         filepath = filepath.rstrip(".pkl")
 
         parent_dir = os.path.dirname(filepath)
@@ -302,7 +305,7 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
 
             base_model_class = AutoClassifier
 
-        def _load_keras_model(path: str) -> None:
+        def _load_keras_model(path: str) -> Any:
             """
             Internal helper to load a Keras model depending on TF version.
             """
@@ -322,7 +325,7 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
 
         return ensemble
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"EnsembleClassifier(n_models={self.n_models}, "
             f"voting_method='{self.voting_method}', "

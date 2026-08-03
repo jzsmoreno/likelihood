@@ -1,6 +1,6 @@
-import logging
 import os
 import pickle
+import subprocess
 from typing import List
 
 import numpy as np
@@ -8,7 +8,7 @@ from IPython.display import clear_output
 
 
 class HMM:
-    def __init__(self, n_states: int, n_observations: int):
+    def __init__(self, n_states: int, n_observations: int) -> None:
         self.n_states = n_states
         self.n_observations = n_observations
 
@@ -127,12 +127,15 @@ class HMM:
 
             # Logging parameters every 10 iterations
             if iteration % 10 == 0 and verbose:
-                os.system("cls" if os.name == "nt" else "clear")
+                subprocess.run("cls" if os.name == "nt" else "clear", shell=True, check=False)
                 clear_output(wait=True)
-                logging.info(f"Iteration {iteration}:")
-                logging.info("Pi: %s", self.pi)
-                logging.info("A:\n%s", self.A)
-                logging.info("B:\n%s", self.B)
+                print(f"Iteration {iteration}:")
+                print("Pi:")
+                print(self.pi)
+                print("\nA:")
+                print(self.A)
+                print("\nB:")
+                print(self.B)
 
     def decoding_accuracy(self, sequences: List[List[int]], true_states: List[List[int]]) -> float:
         correct_predictions = 0

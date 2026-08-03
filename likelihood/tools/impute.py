@@ -16,7 +16,11 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 class SimpleImputer:
     """Multiple imputation using simulation engine."""
 
-    def __init__(self, n_features: int | None = None, use_scaler: bool = False):
+    def __init__(
+        self,
+        n_features: int | None = None,
+        use_scaler: bool = False,
+    ) -> None:
         """
         Initialize the imputer.
 
@@ -127,7 +131,11 @@ class SimpleImputer:
         self.fit(X_train)
         return self.transform(X, boundary, inplace)
 
-    def _set_zero(self, X: pd.Series, column_exception) -> pd.DataFrame:
+    def _set_zero(
+        self,
+        X: pd.Series,
+        column_exception: str,
+    ) -> pd.DataFrame:
         """
         Set missing values to zero, except for `column_exception`.
 
@@ -264,7 +272,7 @@ class SimpleImputer:
             pickle.dump(self, f)
 
     @staticmethod
-    def load(filename: str = "./imputer"):
+    def load(filename: str = "./imputer") -> "SimpleImputer":
         """
         Load the state of a SimpleImputer from a file.
 

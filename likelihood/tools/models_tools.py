@@ -7,14 +7,20 @@ import pandas as pd
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
+import os
 import sys
 import warnings
 from functools import wraps
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import seaborn as sns
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 import torch
 from IPython.display import HTML, display
 from tabulate import tabulate
@@ -35,9 +41,11 @@ class suppress_prints:
         sys.stdout = self.original_stdout
 
 
-def suppress_warnings(func):
+def suppress_warnings(
+    func: Callable[..., Any],
+) -> Callable[..., Any]:
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             return func(*args, **kwargs)
@@ -362,12 +370,17 @@ def train_and_insights(
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="LoRALayer")
 class LoRALayer(tf.keras.layers.Layer):
-    def __init__(self, units, rank=4, **kwargs):
+    def __init__(
+        self,
+        units: int,
+        rank: int = 4,
+        **kwargs: Any,
+    ) -> None:
         super(LoRALayer, self).__init__(**kwargs)
         self.units = units
         self.rank = rank
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape):
         input_dim = input_shape[-1]
         print(f"Input shape: {input_shape}")
 
@@ -389,12 +402,15 @@ class LoRALayer(tf.keras.layers.Layer):
         print(f"Dense weights shape: {input_dim}x{self.units}")
         print(f"LoRA weights shape: A{self.A.shape}, B{self.B.shape}")
 
-    def call(self, inputs):
+    def call(self, inputs: Any) -> Any:
         lora_output = tf.matmul(tf.matmul(inputs, self.A), self.B)
         return lora_output
 
 
-def apply_lora(model, rank=4):
+def apply_lora(
+    model: tf.keras.Model,
+    rank: int = 4,
+) -> tf.keras.Model:
     inputs = tf.keras.Input(shape=model.input_shape[1:])
     x = inputs
 
@@ -467,7 +483,15 @@ def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -
     return metrics_df
 
 
-def print_trajectory_info(state, selected_option, action, reward, next_state, terminate, done):
+def print_trajectory_info(
+    state: Any,
+    selected_option: Any,
+    action: Any,
+    reward: Any,
+    next_state: Any,
+    terminate: bool,
+    done: bool,
+) -> None:
     print("=" * 50)
     print("TRAJECTORY INFO".center(50, "="))
     print("=" * 50)
@@ -638,7 +662,7 @@ def ppo_loss(
     old_action_probs: torch.Tensor,
     action_probs: torch.Tensor,
     epsilon: float = 0.2,
-):
+) -> torch.Tensor:
     """Computes the Proximal Policy Optimization (PPO) loss using the clipped objective.
 
     Parameters
@@ -823,8 +847,8 @@ def train_model_with_episodes(
     env: Any,
     num_episodes: int,
     episode_patience: int = 5,
-    **kwargs,
-):
+    **kwargs: Any,
+) -> Tuple[torch.nn.Module, float]:
     """Trains a model via reinforcement learning episodes.
 
     Parameters
@@ -1252,7 +1276,7 @@ def network_analysis_table(
         temperature,
     )
 
-    def format_df(df, highlight_idx=None):
+    def format_df(df: pd.DataFrame, highlight_idx: Optional[int] = None) -> str:
         df = df.copy()
 
         numeric_cols = df.select_dtypes(include=["number"]).columns
@@ -1325,17 +1349,17 @@ def network_analysis_table(
 
 
 def display_network_analysis(
-    model,
-    sample_data,
-    multiple_option=False,
+    model: torch.nn.Module,
+    sample_data: np.ndarray,
+    multiple_option: bool = False,
     temperature: float = 1.0,
     plot_graph: bool = True,
-):
+) -> None:
     option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
         model, sample_data, multiple_option, temperature, plot_graph
     )
 
-    def highlight_row(row, target):
+    def highlight_row(row: pd.Series, target: Any) -> List[str]:
         if row.name == target:
             return ["background-color: #ffec99; font-weight: bold"] * len(row)
         return [""] * len(row)

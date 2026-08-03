@@ -1,3 +1,4 @@
+import os
 import random
 import warnings
 from typing import List
@@ -8,7 +9,12 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 from IPython.display import HTML, display
 from matplotlib import cm
 from matplotlib.colors import Normalize
@@ -421,12 +427,12 @@ class GetInsights:
 
     def predictor_analyzer(
         self,
-        frac: float = None,
+        frac: float | None = None,
         cmap: str = "viridis",
         aspect: str = "auto",
         highlight: bool = True,
         **kwargs,
-    ) -> None:
+    ) -> pd.DataFrame:
         """
         Analyze the model's predictions and visualize data.
 

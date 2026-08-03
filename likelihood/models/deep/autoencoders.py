@@ -2,6 +2,7 @@ import logging
 import os
 from functools import partial
 from shutil import rmtree
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -9,8 +10,15 @@ import pandas as pd
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
+import os
+
 import keras_tuner
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 from tensorflow.keras.layers import InputLayer
 from tensorflow.keras.regularizers import l2
 
@@ -20,14 +28,14 @@ tf.get_logger().setLevel("ERROR")
 
 
 class EarlyStopping:
-    def __init__(self, patience=10, min_delta=0.001):
+    def __init__(self, patience: int = 10, min_delta: float = 0.001) -> None:
         self.patience = patience
         self.min_delta = min_delta
-        self.best_loss = np.inf
-        self.counter = 0
-        self.stop_training = False
+        self.best_loss: float = np.inf
+        self.counter: int = 0
+        self.stop_training: bool = False
 
-    def __call__(self, current_loss):
+    def __call__(self, current_loss: float) -> None:
         if self.best_loss - current_loss > self.min_delta:
             self.best_loss = current_loss
             self.counter = 0
@@ -38,7 +46,7 @@ class EarlyStopping:
             self.stop_training = True
 
 
-def mse_loss(y_true, y_pred):
+def mse_loss(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
     """
     Mean squared error loss function.
 
@@ -56,7 +64,7 @@ def mse_loss(y_true, y_pred):
     return tf.reduce_mean(tf.square(y_true - y_pred))
 
 
-def kl_loss(mean, log_var):
+def kl_loss(mean: tf.Tensor, log_var: tf.Tensor) -> tf.Tensor:
     """
     Kullback-Leibler divergence loss function.
 
@@ -74,7 +82,9 @@ def kl_loss(mean, log_var):
     return -0.5 * tf.reduce_mean(1 + log_var - tf.square(mean) - tf.exp(log_var))
 
 
-def vae_loss(y_true, y_pred, mean, log_var):
+def vae_loss(
+    y_true: tf.Tensor, y_pred: tf.Tensor, mean: tf.Tensor, log_var: tf.Tensor
+) -> tf.Tensor:
     """
     Variational autoencoder loss function.
 
@@ -96,7 +106,7 @@ def vae_loss(y_true, y_pred, mean, log_var):
     return mse_loss(y_true, y_pred) + kl_loss(mean, log_var)
 
 
-def sampling(mean, log_var, epsilon_value=1e-8):
+def sampling(mean: tf.Tensor, log_var: tf.Tensor, epsilon_value: float = 1e-8) -> tf.Tensor:
     """
     Samples from the distribution.
 
@@ -119,7 +129,7 @@ def sampling(mean, log_var, epsilon_value=1e-8):
     return mean + stddev * epsilon
 
 
-def check_for_nans(tensors, name="Tensor"):
+def check_for_nans(tensors: List[tf.Tensor], name: str = "Tensor") -> bool:
     for t in tensors:
         if tf.reduce_any(tf.math.is_nan(t)) or tf.reduce_any(tf.math.is_inf(t)):
             print(f"Warning: {name} contains NaNs or Infs")
@@ -127,9 +137,14 @@ def check_for_nans(tensors, name="Tensor"):
     return False
 
 
-def cal_loss_step(batch, encoder, decoder, vae_mode=False, training=True):
-    """
-    Calculates the loss value on a batch of data.
+def cal_loss_step(
+    batch: tf.Tensor,
+    encoder: tf.keras.Model,
+    decoder: tf.keras.Model,
+    vae_mode: bool = False,
+    training: bool = True,
+) -> tf.Tensor:
+    """Calculates the loss value on a batch of data.
 
     Parameters
     ----------
@@ -165,9 +180,14 @@ def cal_loss_step(batch, encoder, decoder, vae_mode=False, training=True):
 
 
 @tf.function
-def train_step(batch, encoder, decoder, optimizer, vae_mode=False):
-    """
-    Trains the model on a batch of data.
+def train_step(
+    batch: tf.Tensor,
+    encoder: tf.keras.Model,
+    decoder: tf.keras.Model,
+    optimizer: tf.keras.optimizers.Optimizer,
+    vae_mode: bool = False,
+) -> tf.Tensor:
+    """Trains the model on a batch of data.
 
     Parameters
     ----------
@@ -243,7 +263,14 @@ class AutoClassifier(tf.keras.Model):
         The rank of the LoRA layer. Default is 4.
     """
 
-    def __init__(self, input_shape_parm, num_classes, units, activation, **kwargs):
+    def __init__(
+        self,
+        input_shape_parm: int,
+        num_classes: int,
+        units: int,
+        activation: str,
+        **kwargs,
+    ) -> None:
         super(AutoClassifier, self).__init__()
         self.input_shape_parm = input_shape_parm
         self.num_classes = num_classes
@@ -253,16 +280,16 @@ class AutoClassifier(tf.keras.Model):
         self.encoder = None
         self.decoder = None
         self.classifier = None
-        self.classifier_activation = kwargs.get("classifier_activation", "softmax")
-        self.num_layers = kwargs.get("num_layers", 1)
-        self.dropout = kwargs.get("dropout", None)
-        self.l2_reg = kwargs.get("l2_reg", 0.0)
-        self.vae_mode = kwargs.get("vae_mode", False)
-        self.vae_units = kwargs.get("vae_units", 2)
-        self.lora_mode = kwargs.get("lora_mode", False)
-        self.lora_rank = kwargs.get("lora_rank", 4)
+        self.classifier_activation: str = kwargs.get("classifier_activation", "softmax")
+        self.num_layers: int = kwargs.get("num_layers", 1)
+        self.dropout: Optional[float] = kwargs.get("dropout", None)
+        self.l2_reg: float = kwargs.get("l2_reg", 0.0)
+        self.vae_mode: bool = kwargs.get("vae_mode", False)
+        self.vae_units: int = kwargs.get("vae_units", 2)
+        self.lora_mode: bool = kwargs.get("lora_mode", False)
+        self.lora_rank: int = kwargs.get("lora_rank", 4)
 
-    def build_encoder_decoder(self, input_shape):
+    def build_encoder_decoder(self, input_shape: tuple) -> None:
         self.encoder = (
             tf.keras.Sequential(
                 [
@@ -303,7 +330,7 @@ class AutoClassifier(tf.keras.Model):
             else self.decoder
         )
 
-    def build(self, input_shape):
+    def build(self, input_shape: tuple) -> None:
         if self.vae_mode:
             inputs = tf.keras.Input(shape=self.input_shape_parm, name="encoder_input")
             x = tf.keras.layers.Dense(
@@ -387,10 +414,15 @@ class AutoClassifier(tf.keras.Model):
         )
 
     def train_encoder_decoder(
-        self, data, epochs, batch_size, validation_split=0.2, patience=10, **kwargs
-    ):
-        """
-        Trains the encoder and decoder on the input data.
+        self,
+        data: Union[tf.data.Dataset, np.ndarray],
+        epochs: int,
+        batch_size: int,
+        validation_split: float = 0.2,
+        patience: int = 10,
+        **kwargs,
+    ) -> None:
+        """Trains the encoder and decoder on the input data.
 
         Parameters
         ----------
@@ -449,7 +481,7 @@ class AutoClassifier(tf.keras.Model):
                 )
         self.freeze_encoder_decoder()
 
-    def call(self, x):
+    def call(self, x: tf.Tensor) -> tf.Tensor:
         if self.vae_mode:
             mean, log_var = self.encoder(x)
             encoded = sampling(mean, log_var)
@@ -460,27 +492,22 @@ class AutoClassifier(tf.keras.Model):
         classification = self.classifier(combined)
         return classification
 
-    def freeze_encoder_decoder(self):
-        """
-        Freezes the encoder and decoder layers to prevent them from being updated during training.
-        """
+    def freeze_encoder_decoder(self) -> None:
+        """Freezes the encoder and decoder layers to prevent them from being updated during training."""
         for layer in self.encoder.layers:
             layer.trainable = False
         for layer in self.decoder.layers:
             layer.trainable = False
 
-    def unfreeze_encoder_decoder(self):
-        """
-        Unfreezes the encoder and decoder layers allowing them to be updated during training.
-        """
+    def unfreeze_encoder_decoder(self) -> None:
+        """Unfreezes the encoder and decoder layers allowing them to be updated during training."""
         for layer in self.encoder.layers:
             layer.trainable = True
         for layer in self.decoder.layers:
             layer.trainable = True
 
-    def set_encoder_decoder(self, source_model):
-        """
-        Sets the encoder and decoder layers from another AutoClassifier instance,
+    def set_encoder_decoder(self, source_model: "AutoClassifier") -> None:
+        """Sets the encoder and decoder layers from another AutoClassifier instance,
         ensuring compatibility in dimensions. Only works if vae_mode is False.
 
         Parameters
@@ -533,7 +560,7 @@ class AutoClassifier(tf.keras.Model):
             elif not isinstance(layer, InputLayer):
                 raise ValueError(f"Layer type {type(layer)} not supported for copying.")
 
-    def get_config(self):
+    def get_config(self) -> Dict[str, Any]:
         config = {
             "input_shape_parm": self.input_shape_parm,
             "num_classes": self.num_classes,
@@ -552,7 +579,7 @@ class AutoClassifier(tf.keras.Model):
         return dict(list(base_config.items()) + list(config.items()))
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config: Dict[str, Any]) -> "AutoClassifier":
         return cls(
             input_shape_parm=config["input_shape_parm"],
             num_classes=config["num_classes"],
@@ -635,7 +662,7 @@ def call_existing_code(
 
 
 def build_model(
-    hp, input_shape_parm: None | int, num_classes: None | int, **kwargs
+    hp: keras_tuner.HyperParameters, input_shape_parm: None | int, num_classes: None | int, **kwargs
 ) -> AutoClassifier:
     """Builds a neural network model using Keras Tuner's search algorithm.
 
@@ -772,12 +799,12 @@ def setup_model(
     target: str,
     epochs: int,
     train_size: float = 0.7,
-    seed=None,
+    seed: None | int = None,
     train_mode: bool = True,
     filepath: str = "./my_dir/best_model",
     method: str = "Hyperband",
     **kwargs,
-) -> AutoClassifier:
+) -> Tuple[AutoClassifier, pd.DataFrame]:
     """Setup model for training and tuning.
 
     Parameters
@@ -818,8 +845,8 @@ def setup_model(
 
     Returns
     -------
-    model : `AutoClassifier`
-        The trained model.
+    model, hps : (`AutoClassifier`, `pd.DataFrame`)
+        The trained model and best hyperparameter results.
     """
     max_trials = kwargs.get("max_trials", 10)
     directory = kwargs.get("directory", "./my_dir")
@@ -850,7 +877,7 @@ def setup_model(
         y_encoder = OneHotEncoder()
         y = y_encoder.encode(y.to_list())
         X = X.to_numpy()
-        input_sample.to_numpy()
+        input_sample = input_sample.to_numpy()
         X = np.asarray(X).astype(np.float32)
         input_sample = np.asarray(input_sample).astype(np.float32)
         y = np.asarray(y).astype(np.float32)

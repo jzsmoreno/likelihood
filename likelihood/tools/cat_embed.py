@@ -1,25 +1,33 @@
+from __future__ import annotations
+
 import logging
 import os
-from typing import List
+from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
 
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+import os
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 from sklearn.preprocessing import LabelEncoder
 
 tf.get_logger().setLevel("ERROR")
 
 
 class CategoricalEmbedder:
-    def __init__(self, embedding_dim=32):
+    def __init__(self, embedding_dim: int = 32) -> None:
         self.embedding_dim = embedding_dim
-        self.label_encoders = {}
-        self.embeddings = {}
+        self.label_encoders: Dict[str, Any] = {}
+        self.embeddings: Dict[str, tf.Variable] = {}
 
-    def fit(self, df: pd.DataFrame, categorical_cols: List):
+    def fit(self, df: pd.DataFrame, categorical_cols: List[str]) -> None:
         """
         Fit the embeddings on the given data.
 
@@ -27,7 +35,7 @@ class CategoricalEmbedder:
         ----------
         df : `pd.DataFrame`
             Pandas DataFrame containing the tabular data.
-        categorical_cols : `List`
+        categorical_cols : `List[str]`
             List of column names representing categorical features.
 
         Returns
@@ -53,7 +61,7 @@ class CategoricalEmbedder:
             embedding_matrix = np.random.rand(vocab_size, self.embedding_dim)
             self.embeddings[col] = tf.Variable(embedding_matrix, dtype=tf.float32)
 
-    def transform(self, df: pd.DataFrame, categorical_cols: List[str]):
+    def transform(self, df: pd.DataFrame, categorical_cols: List[str]) -> pd.DataFrame:
         """
         Transform the data using the fitted embeddings.
 
@@ -96,7 +104,7 @@ class CategoricalEmbedder:
 
         return df_processed
 
-    def inverse_transform(self, df: pd.DataFrame, categorical_cols: List[str]):
+    def inverse_transform(self, df: pd.DataFrame, categorical_cols: List[str]) -> pd.DataFrame:
         """
         Inverse transform the data using the fitted embeddings.
 
@@ -135,7 +143,7 @@ class CategoricalEmbedder:
 
         return df_processed
 
-    def save_embeddings(self, path: str):
+    def save_embeddings(self, path: str) -> None:
         """
         Save the embeddings to a directory.
 
@@ -149,7 +157,7 @@ class CategoricalEmbedder:
         for col, embedding in self.embeddings.items():
             np.save(os.path.join(path, f"{col}_embedding.npy"), embedding.numpy())
 
-    def load_embeddings(self, path: str):
+    def load_embeddings(self, path: str) -> None:
         """
         Load the embeddings from a directory.
 

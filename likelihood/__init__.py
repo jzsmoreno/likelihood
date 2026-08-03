@@ -14,7 +14,11 @@ By importing the main modules directly or accessing them through this central en
 To get started with Likelihood, simply import the desired modules and start exploring!
 """
 
+from pathlib import Path
+
 from likelihood.main import *
 from likelihood.models import *
 from likelihood.pipes import Pipeline
 from likelihood.tools import *
+
+__version__ = (Path(__file__).parent / "VERSION").read_text().strip()

@@ -4,12 +4,18 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
+import os
 from multiprocessing import Pool, cpu_count
-from typing import List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 from IPython.display import clear_output
 from sklearn.metrics import f1_score
 
@@ -48,7 +54,9 @@ def compare_similarity_np(arr1: np.ndarray, arr2: np.ndarray, threshold: float =
     return np.count_nonzero(similarity)
 
 
-def compare_pair(pair, data, similarity, threshold):
+def compare_pair(
+    pair: Tuple[int, int], data: np.ndarray, similarity: int, threshold: float
+) -> Tuple[int, int, int]:
     i, j = pair
     sim = compare_similarity_np(data[i], data[j], threshold=threshold)
     return (i, j, 1 if sim >= similarity else 0)
@@ -102,7 +110,7 @@ def cal_adjacency_matrix(
 
     adj_dict = {i: data[i].tolist() for i in range(n)}
 
-    def pair_generator():
+    def pair_generator() -> None:
         for i in range(n):
             for j in range(i, n):
                 yield (i, j)
@@ -138,7 +146,7 @@ class Data:
         target: str | None = None,
         exclude_subset: List[str] = [],
         **kwargs,
-    ):
+    ) -> None:
         sparse = kwargs.get("sparse", True)
         threshold = kwargs.get("threshold", 0.05)
         _, adjacency = cal_adjacency_matrix(
@@ -158,14 +166,21 @@ class Data:
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="VanillaGNNLayer")
 class VanillaGNNLayer(tf.keras.layers.Layer):
-    def __init__(self, dim_in, dim_out, rank=None, kernel_initializer="glorot_uniform", **kwargs):
+    def __init__(
+        self,
+        dim_in: int,
+        dim_out: int,
+        rank: int = None,
+        kernel_initializer: str = "glorot_uniform",
+        **kwargs,
+    ) -> None:
         super(VanillaGNNLayer, self).__init__(**kwargs)
         self.dim_out = dim_out
         self.rank = rank
         self.kernel_initializer = kernel_initializer
         self.linear = None
 
-    def build(self, input_shape):
+    def build(self, input_shape: Tuple[int, ...]) -> None:
         if self.rank:
             self.linear = LoRALayer(self.dim_out, rank=self.rank)
         else:
@@ -174,12 +189,12 @@ class VanillaGNNLayer(tf.keras.layers.Layer):
             )
         super(VanillaGNNLayer, self).build(input_shape)
 
-    def call(self, x, adjacency):
+    def call(self, x: np.ndarray, adjacency: tf.SparseTensor) -> np.ndarray:
         x = self.linear(x)
         x = tf.sparse.sparse_dense_matmul(adjacency, x)
         return x
 
-    def get_config(self):
+    def get_config(self) -> Dict[str, Any]:
         config = super(VanillaGNNLayer, self).get_config()
         config.update(
             {
@@ -197,7 +212,7 @@ class VanillaGNNLayer(tf.keras.layers.Layer):
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="VanillaGNN")
 class VanillaGNN(tf.keras.Model):
-    def __init__(self, dim_in, dim_h, dim_out, rank=2, **kwargs):
+    def __init__(self, dim_in: int, dim_h: int, dim_out: int, rank: int = 2, **kwargs) -> None:
         super(VanillaGNN, self).__init__(**kwargs)
         self.dim_in = dim_in
         self.dim_h = dim_h
@@ -208,22 +223,24 @@ class VanillaGNN(tf.keras.Model):
         self.gnn2 = VanillaGNNLayer(self.dim_h, self.dim_h, self.rank)
         self.gnn3 = VanillaGNNLayer(self.dim_h, self.dim_out, None)
 
-    def call(self, x, adjacency):
+    def call(self, x: np.ndarray, adjacency: tf.SparseTensor) -> np.ndarray:
         h = self.gnn1(x, adjacency)
         h = tf.nn.tanh(h)
         h = self.gnn2(h, adjacency)
         h = self.gnn3(h, adjacency)
         return tf.nn.softmax(h, axis=1)
 
-    def f1_macro(self, y_true, y_pred):
+    def f1_macro(self, y_true: np.ndarray, y_pred: np.ndarray) -> float:
         return f1_score(y_true, y_pred, average="macro")
 
-    def compute_f1_score(self, logits, labels):
+    def compute_f1_score(self, logits: tf.Tensor, labels: tf.Tensor) -> float:
         predictions = tf.argmax(logits, axis=1, output_type=tf.int32)
         true_labels = tf.cast(labels, tf.int32)
         return self.f1_macro(true_labels.numpy(), predictions.numpy())
 
-    def evaluate(self, x, adjacency, y):
+    def evaluate(
+        self, x: np.ndarray, adjacency: tf.SparseTensor, y: np.ndarray
+    ) -> Tuple[float, float]:
         y = tf.cast(y, tf.int32)
         out = self(x, adjacency)
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=out)
@@ -231,16 +248,16 @@ class VanillaGNN(tf.keras.Model):
         f1 = round(self.compute_f1_score(out, y), 4)
         return loss.numpy(), f1
 
-    def test(self, data):
+    def test(self, data: Data) -> float:
         out = self(data.x, data.adjacency)
         test_f1 = self.compute_f1_score(out, data.y)
         return round(test_f1, 4)
 
-    def predict(self, data):
+    def predict(self, data: Data) -> np.ndarray:
         out = self(data.x, data.adjacency)
         return tf.argmax(out, axis=1, output_type=tf.int32).numpy()
 
-    def get_config(self):
+    def get_config(self) -> Dict[str, Any]:
         config = {
             "dim_in": self.dim_in,
             "dim_h": self.dim_h,
@@ -251,7 +268,7 @@ class VanillaGNN(tf.keras.Model):
         return dict(list(base_config.items()) + list(config.items()))
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config: Dict[str, Any]) -> "VanillaGNN":
         return cls(
             dim_in=config["dim_in"],
             dim_h=config["dim_h"],
@@ -260,7 +277,13 @@ class VanillaGNN(tf.keras.Model):
         )
 
     @tf.function
-    def train_step(self, batch_x, batch_adjacency, batch_y, optimizer):
+    def train_step(
+        self,
+        batch_x: np.ndarray,
+        batch_adjacency: tf.SparseTensor,
+        batch_y: np.ndarray,
+        optimizer: tf.keras.optimizers.Optimizer,
+    ) -> tf.Tensor:
         with tf.GradientTape() as tape:
             out = self(batch_x, batch_adjacency)
             loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=batch_y, logits=out)
@@ -269,7 +292,14 @@ class VanillaGNN(tf.keras.Model):
         optimizer.apply_gradients(zip(gradients, self.trainable_variables))
         return loss
 
-    def fit(self, data, epochs, batch_size, test_size=0.2, optimizer="adam"):
+    def fit(
+        self,
+        data: Data,
+        epochs: int,
+        batch_size: int,
+        test_size: float = 0.2,
+        optimizer: str = "adam",
+    ) -> Tuple[List[float], List[float], List[float], List[float]]:
         optimizers = {
             "sgd": tf.keras.optimizers.SGD(),
             "adam": tf.keras.optimizers.Adam(),
