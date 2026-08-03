@@ -29,6 +29,9 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/jzsmoreno/likelihood/",
     packages=setuptools.find_packages(),
+    package_data={
+        "likelihood": ["VERSION"],
+    },
     install_requires=install_requires,
     extras_require={
         "full": ["networkx", "pyvis", "tensorflow>=2.15.0", "keras-tuner", "scikit-learn", "torch"],
