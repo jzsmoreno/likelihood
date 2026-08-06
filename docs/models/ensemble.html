@@ -48,7 +48,7 @@ el.replaceWith(d);
 <dl>
 <dt id="likelihood.models.ensemble.EnsembleClassifier"><code class="flex name class">
 <span>class <span class="ident">EnsembleClassifier</span></span>
-<span>(</span><span>n_models: int = 5,<br>base_model_class=None,<br>param_ranges: Dict | None = None,<br>seed_range: tuple = (0, 100),<br>voting_method: str = 'soft',<br>verbose: int = 0)</span>
+<span>(</span><span>n_models: int = 5,<br>base_model_class: Type | None = None,<br>param_ranges: Dict[str, Any] | None = None,<br>seed_range: Tuple[int, int] = (0, 100),<br>voting_method: str = 'soft',<br>verbose: int = 0)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -124,12 +124,12 @@ el.replaceWith(d);
     def __init__(
         self,
         n_models: int = 5,
-        base_model_class=None,
-        param_ranges: Optional[Dict] = None,
-        seed_range: tuple = (0, 100),
+        base_model_class: Optional[Type] = None,
+        param_ranges: Optional[Dict[str, Any]] = None,
+        seed_range: Tuple[int, int] = (0, 100),
         voting_method: str = &#34;soft&#34;,
         verbose: int = 0,
-    ):
+    ) -&gt; None:
         if base_model_class is None:
             from likelihood.models.deep import AutoClassifier
 
@@ -143,12 +143,12 @@ el.replaceWith(d);
         self.verbose = verbose
 
         # Initialize internal attributes
-        self.scores = []
-        self.configs = []
-        self.models_ = []
-        self.model_params_ = []
-        self.all_history = []
-        self.n_models_ = 0
+        self.scores: List[Dict[str, Any]] = []
+        self.configs: List[Dict[str, Any]] = []
+        self.models_: List[Any] = []
+        self.model_params_: List[Dict[str, Any]] = []
+        self.all_history: List[Any] = []
+        self.n_models_: int = 0
 
     def _generate_model_configs(self) -&gt; List[Dict]:
         &#34;&#34;&#34;Generate unique configurations for each model in the ensemble.&#34;&#34;&#34;
@@ -163,7 +163,7 @@ el.replaceWith(d);
 
         param_ranges = self.param_ranges or default_ranges
 
-        def sample_param(name, integer=False):
+        def sample_param(name: str, integer: bool = False) -&gt; int:
             values = param_ranges.get(name, default_ranges[name])
             if isinstance(values, tuple):
                 low, high = values
@@ -186,7 +186,7 @@ el.replaceWith(d);
 
         return self.configs
 
-    def fit(self, X: np.ndarray, y: np.ndarray, **fit_kwargs):
+    def fit(self, X: np.ndarray, y: np.ndarray, **fit_kwargs) -&gt; &#34;EnsembleClassifier&#34;:
         &#34;&#34;&#34;Train all models in the ensemble.&#34;&#34;&#34;
         self.models_ = []
         self.all_history = []
@@ -261,7 +261,7 @@ el.replaceWith(d);
         else:
             raise ValueError(&#34;voting_method must be &#39;soft&#39; or &#39;hard&#39;.&#34;)
 
-    def get_model_scores(self):
+    def get_model_scores(self) -&gt; List[Dict[str, Any]]:
         &#34;&#34;&#34;Return performance metrics for each model (if available).&#34;&#34;&#34;
         if hasattr(self, &#34;all_history&#34;):
             self.scores = []
@@ -283,7 +283,7 @@ el.replaceWith(d);
                     )
         return self.scores
 
-    def _save_keras_model(self, model, path: str) -&gt; None:
+    def _save_keras_model(self, model: Any, path: str) -&gt; None:
         &#34;&#34;&#34;
         Internal helper to save a Keras model depending on TF version.
         &#34;&#34;&#34;
@@ -326,8 +326,7 @@ el.replaceWith(d);
             self._save_keras_model(model, os.path.join(save_dir, f&#34;model_{i}&#34;))
 
     @classmethod
-    def load(cls, filepath: str, base_model_class=None):
-
+    def load(cls, filepath: str, base_model_class: Optional[Type] = None) -&gt; &#34;EnsembleClassifier&#34;:
         filepath = filepath.rstrip(&#34;.pkl&#34;)
 
         parent_dir = os.path.dirname(filepath)
@@ -348,7 +347,7 @@ el.replaceWith(d);
 
             base_model_class = AutoClassifier
 
-        def _load_keras_model(path: str) -&gt; None:
+        def _load_keras_model(path: str) -&gt; Any:
             &#34;&#34;&#34;
             Internal helper to load a Keras model depending on TF version.
             &#34;&#34;&#34;
@@ -368,7 +367,7 @@ el.replaceWith(d);
 
         return ensemble
 
-    def __repr__(self):
+    def __repr__(self) -&gt; str:
         return (
             f&#34;EnsembleClassifier(n_models={self.n_models}, &#34;
             f&#34;voting_method=&#39;{self.voting_method}&#39;, &#34;
@@ -435,7 +434,7 @@ Retrieve individual model performance metrics if available.</p>
 <h3>Static methods</h3>
 <dl>
 <dt id="likelihood.models.ensemble.EnsembleClassifier.load"><code class="name flex">
-<span>def <span class="ident">load</span></span>(<span>filepath: str, base_model_class=None)</span>
+<span>def <span class="ident">load</span></span>(<span>filepath: str, base_model_class: Type | None = None) ‑> <a title="likelihood.models.ensemble.EnsembleClassifier" href="#likelihood.models.ensemble.EnsembleClassifier">EnsembleClassifier</a></span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -444,14 +443,14 @@ Retrieve individual model performance metrics if available.</p>
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.ensemble.EnsembleClassifier.fit"><code class="name flex">
-<span>def <span class="ident">fit</span></span>(<span>self, X: numpy.ndarray, y: numpy.ndarray, **fit_kwargs)</span>
+<span>def <span class="ident">fit</span></span>(<span>self, X: numpy.ndarray, y: numpy.ndarray, **fit_kwargs) ‑> <a title="likelihood.models.ensemble.EnsembleClassifier" href="#likelihood.models.ensemble.EnsembleClassifier">EnsembleClassifier</a></span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def fit(self, X: np.ndarray, y: np.ndarray, **fit_kwargs):
+<pre><code class="python">def fit(self, X: np.ndarray, y: np.ndarray, **fit_kwargs) -&gt; &#34;EnsembleClassifier&#34;:
     &#34;&#34;&#34;Train all models in the ensemble.&#34;&#34;&#34;
     self.models_ = []
     self.all_history = []
@@ -498,14 +497,14 @@ Retrieve individual model performance metrics if available.</p>
 <div class="desc"><p>Train all models in the ensemble.</p></div>
 </dd>
 <dt id="likelihood.models.ensemble.EnsembleClassifier.get_model_scores"><code class="name flex">
-<span>def <span class="ident">get_model_scores</span></span>(<span>self)</span>
+<span>def <span class="ident">get_model_scores</span></span>(<span>self) ‑> List[Dict[str, Any]]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_model_scores(self):
+<pre><code class="python">def get_model_scores(self) -&gt; List[Dict[str, Any]]:
     &#34;&#34;&#34;Return performance metrics for each model (if available).&#34;&#34;&#34;
     if hasattr(self, &#34;all_history&#34;):
         self.scores = []

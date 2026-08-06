@@ -45,14 +45,14 @@ el.replaceWith(d);
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.models.environments.flatten_chain"><code class="name flex">
-<span>def <span class="ident">flatten_chain</span></span>(<span>matrix)</span>
+<span>def <span class="ident">flatten_chain</span></span>(<span>matrix: List[List[Any]]) ‑> List[Any]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def flatten_chain(matrix):
+<pre><code class="python">def flatten_chain(matrix: List[List[Any]]) -&gt; List[Any]:
     return list(chain.from_iterable(matrix))</code></pre>
 </details>
 <div class="desc"></div>
@@ -64,7 +64,7 @@ el.replaceWith(d);
 <dl>
 <dt id="likelihood.models.environments.ActionSpace"><code class="flex name class">
 <span>class <span class="ident">ActionSpace</span></span>
-<span>(</span><span>num_actions)</span>
+<span>(</span><span>num_actions: int)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -72,24 +72,24 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class ActionSpace:
-    def __init__(self, num_actions):
+    def __init__(self, num_actions: int) -&gt; None:
         self._num_actions = num_actions
 
     @property
-    def n(self):
+    def n(self) -&gt; int:
         return self._num_actions</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Instance variables</h3>
 <dl>
-<dt id="likelihood.models.environments.ActionSpace.n"><code class="name">prop <span class="ident">n</span></code></dt>
+<dt id="likelihood.models.environments.ActionSpace.n"><code class="name">prop <span class="ident">n</span> : int</code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@property
-def n(self):
+def n(self) -&gt; int:
     return self._num_actions</code></pre>
 </details>
 <div class="desc"></div>
@@ -134,7 +134,7 @@ def n(self):
     def __init__(
         self,
         episodes: Dict[int, Dict[str, List]],
-    ):
+    ) -&gt; None:
         &#34;&#34;&#34;
         Initializes the OptionCriticEnv with a dataset of episodes.
 
@@ -239,8 +239,12 @@ def n(self):
         self.trans_list = list(self.state_action_option_to_transition.values())
 
     def _make_transition_key(
-        self, state, option: int | list[int], action: int | list[int], decimals=6
-    ) -&gt; tuple:
+        self,
+        state: List[float],
+        option: Union[int, List[int]],
+        action: Union[int, List[int]],
+        decimals: int = 6,
+    ) -&gt; Tuple:
         &#34;&#34;&#34;
         Builds a canonical transition key:
         ((state_tuple), option(s)..., action(s)...)

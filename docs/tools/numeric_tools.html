@@ -211,14 +211,19 @@ with the equalities.</dd>
 </dl></div>
 </dd>
 <dt id="likelihood.tools.numeric_tools.get_metrics"><code class="name flex">
-<span>def <span class="ident">get_metrics</span></span>(<span>dataset, actual_column_name, predicted_column_name, verbose=False)</span>
+<span>def <span class="ident">get_metrics</span></span>(<span>dataset: pandas.core.frame.DataFrame,<br>actual_column_name: str,<br>predicted_column_name: str,<br>verbose: bool = False) ‑> Dict[str, float]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_metrics(dataset, actual_column_name, predicted_column_name, verbose=False):
+<pre><code class="python">def get_metrics(
+    dataset: pd.DataFrame,
+    actual_column_name: str,
+    predicted_column_name: str,
+    verbose: bool = False,
+) -&gt; Dict[str, float]:
     # Variables to keep track of the number of correct and total predictions
     true_positives = 0  # Correctly predicted positives
     true_negatives = 0  # Correctly predicted negatives

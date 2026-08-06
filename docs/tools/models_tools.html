@@ -45,14 +45,17 @@ el.replaceWith(d);
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.tools.models_tools.apply_lora"><code class="name flex">
-<span>def <span class="ident">apply_lora</span></span>(<span>model, rank=4)</span>
+<span>def <span class="ident">apply_lora</span></span>(<span>model: keras.src.models.model.Model, rank: int = 4) ‑> keras.src.models.model.Model</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def apply_lora(model, rank=4):
+<pre><code class="python">def apply_lora(
+    model: tf.keras.Model,
+    rank: int = 4,
+) -&gt; tf.keras.Model:
     inputs = tf.keras.Input(shape=model.input_shape[1:])
     x = inputs
 
@@ -365,7 +368,7 @@ el.replaceWith(d);
 <p>The returned DataFrame will have one row for each node and one column for each of the computed metrics.</p></div>
 </dd>
 <dt id="likelihood.tools.models_tools.ppo_loss"><code class="name flex">
-<span>def <span class="ident">ppo_loss</span></span>(<span>advantages: torch.Tensor,<br>old_action_probs: torch.Tensor,<br>action_probs: torch.Tensor,<br>epsilon: float = 0.2)</span>
+<span>def <span class="ident">ppo_loss</span></span>(<span>advantages: torch.Tensor,<br>old_action_probs: torch.Tensor,<br>action_probs: torch.Tensor,<br>epsilon: float = 0.2) ‑> torch.Tensor</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -377,7 +380,7 @@ el.replaceWith(d);
     old_action_probs: torch.Tensor,
     action_probs: torch.Tensor,
     epsilon: float = 0.2,
-):
+) -&gt; torch.Tensor:
     &#34;&#34;&#34;Computes the Proximal Policy Optimization (PPO) loss using the clipped objective.
 
     Parameters
@@ -430,14 +433,22 @@ el.replaceWith(d);
 </dl></div>
 </dd>
 <dt id="likelihood.tools.models_tools.print_trajectory_info"><code class="name flex">
-<span>def <span class="ident">print_trajectory_info</span></span>(<span>state, selected_option, action, reward, next_state, terminate, done)</span>
+<span>def <span class="ident">print_trajectory_info</span></span>(<span>state: Any,<br>selected_option: Any,<br>action: Any,<br>reward: Any,<br>next_state: Any,<br>terminate: bool,<br>done: bool) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def print_trajectory_info(state, selected_option, action, reward, next_state, terminate, done):
+<pre><code class="python">def print_trajectory_info(
+    state: Any,
+    selected_option: Any,
+    action: Any,
+    reward: Any,
+    next_state: Any,
+    terminate: bool,
+    done: bool,
+) -&gt; None:
     print(&#34;=&#34; * 50)
     print(&#34;TRAJECTORY INFO&#34;.center(50, &#34;=&#34;))
     print(&#34;=&#34; * 50)
@@ -507,16 +518,18 @@ correlation value greater than the specified threshold to identify which columns
 </dl></div>
 </dd>
 <dt id="likelihood.tools.models_tools.suppress_warnings"><code class="name flex">
-<span>def <span class="ident">suppress_warnings</span></span>(<span>func)</span>
+<span>def <span class="ident">suppress_warnings</span></span>(<span>func: Callable[..., Any]) ‑> Callable[..., Any]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def suppress_warnings(func):
+<pre><code class="python">def suppress_warnings(
+    func: Callable[..., Any],
+) -&gt; Callable[..., Any]:
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any):
         with warnings.catch_warnings():
             warnings.simplefilter(&#34;ignore&#34;)
             return func(*args, **kwargs)
@@ -632,7 +645,7 @@ correlation value greater than the specified threshold to identify which columns
 The trained model after fitting.</p></div>
 </dd>
 <dt id="likelihood.tools.models_tools.train_model_with_episodes"><code class="name flex">
-<span>def <span class="ident">train_model_with_episodes</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_episodes: int,<br>episode_patience: int = 5,<br>**kwargs)</span>
+<span>def <span class="ident">train_model_with_episodes</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_episodes: int,<br>episode_patience: int = 5,<br>**kwargs: Any) ‑> Tuple[torch.nn.modules.module.Module, float]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -645,8 +658,8 @@ The trained model after fitting.</p></div>
     env: Any,
     num_episodes: int,
     episode_patience: int = 5,
-    **kwargs,
-):
+    **kwargs: Any,
+) -&gt; Tuple[torch.nn.Module, float]:
     &#34;&#34;&#34;Trains a model via reinforcement learning episodes.
 
     Parameters
@@ -971,7 +984,7 @@ Early stopping patience in epochs.</p>
 <dl>
 <dt id="likelihood.tools.models_tools.LoRALayer"><code class="flex name class">
 <span>class <span class="ident">LoRALayer</span></span>
-<span>(</span><span>units, rank=4, **kwargs)</span>
+<span>(</span><span>units: int, rank: int = 4, **kwargs: Any)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -980,12 +993,17 @@ Early stopping patience in epochs.</p>
 </summary>
 <pre><code class="python">@tf.keras.utils.register_keras_serializable(package=&#34;Custom&#34;, name=&#34;LoRALayer&#34;)
 class LoRALayer(tf.keras.layers.Layer):
-    def __init__(self, units, rank=4, **kwargs):
+    def __init__(
+        self,
+        units: int,
+        rank: int = 4,
+        **kwargs: Any,
+    ) -&gt; None:
         super(LoRALayer, self).__init__(**kwargs)
         self.units = units
         self.rank = rank
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape):
         input_dim = input_shape[-1]
         print(f&#34;Input shape: {input_shape}&#34;)
 
@@ -1007,7 +1025,7 @@ class LoRALayer(tf.keras.layers.Layer):
         print(f&#34;Dense weights shape: {input_dim}x{self.units}&#34;)
         print(f&#34;LoRA weights shape: A{self.A.shape}, B{self.B.shape}&#34;)
 
-    def call(self, inputs):
+    def call(self, inputs: Any) -&gt; Any:
         lora_output = tf.matmul(tf.matmul(inputs, self.A), self.B)
         return lora_output</code></pre>
 </details>
@@ -1027,8 +1045,9 @@ attribute of another Layer, the outer layer will start tracking the weights
 created by the inner layer. Nested layers should be instantiated in the
 <code>__init__()</code> method or <code>build()</code> method.</p>
 <p>Users will just instantiate a layer and then treat it as a callable.</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>trainable</code></strong></dt>
 <dd>Boolean, whether the layer's variables should be trainable.</dd>
 <dt><strong><code>name</code></strong></dt>
@@ -1039,9 +1058,8 @@ created by the inner layer. Nested layers should be instantiated in the
 to differ. Defaults to <code>None</code>. <code>None</code> means to use
 <code>keras.config.dtype_policy()</code>, which is a <code>float32</code> policy unless
 set to different value (via <code>keras.config.set_dtype_policy()</code>).</dd>
-</dl>
-<h2 id="attributes">Attributes</h2>
-<dl>
+<dt>Attributes</dt>
+<dt>-----=</dt>
 <dt><strong><code>name</code></strong></dt>
 <dd>The name of the layer (string).</dd>
 <dt><strong><code>dtype</code></strong></dt>
@@ -1177,14 +1195,14 @@ assert my_sum.trainable_weights == []
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.tools.models_tools.LoRALayer.build"><code class="name flex">
-<span>def <span class="ident">build</span></span>(<span>self, input_shape)</span>
+<span>def <span class="ident">build</span></span>(<span>self, input_shape: tensorflow.python.framework.tensor_shape.TensorShape)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def build(self, input_shape):
+<pre><code class="python">def build(self, input_shape: tf.TensorShape):
     input_dim = input_shape[-1]
     print(f&#34;Input shape: {input_shape}&#34;)
 
@@ -1209,14 +1227,14 @@ assert my_sum.trainable_weights == []
 <div class="desc"></div>
 </dd>
 <dt id="likelihood.tools.models_tools.LoRALayer.call"><code class="name flex">
-<span>def <span class="ident">call</span></span>(<span>self, inputs)</span>
+<span>def <span class="ident">call</span></span>(<span>self, inputs: Any) ‑> Any</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def call(self, inputs):
+<pre><code class="python">def call(self, inputs: Any) -&gt; Any:
     lora_output = tf.matmul(tf.matmul(inputs, self.A), self.B)
     return lora_output</code></pre>
 </details>
