@@ -1,7 +1,4 @@
-import os
-import pickle
-import subprocess
-from typing import List
+from __future__ import annotations
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,9 +10,46 @@ from tqdm.auto import tqdm
 
 
 class HMM:
+    """Discrete Hidden Markov Model with multinomial emissions.
+
+    The model stores an initial-state distribution ``pi``, a state-transition
+    matrix ``A``, and an observation-emission matrix ``B``. Forward/backward
+    inference is performed in log space with per-time-step scaling for
+    numerical stability.
+
+    Parameters
+    ----------
+    n_states : int
+        Number of hidden states.
+    n_observations : int
+        Number of distinct discrete observation symbols. Valid observation
+        values are integers in ``[0, n_observations)``.
+
+    Attributes
+    ----------
+    n_states : int
+        Number of hidden states.
+    n_observations : int
+        Number of observation symbols.
+    pi : NDArray[np.float64]
+        Initial-state probabilities with shape ``(n_states,)``.
+    A : NDArray[np.float64]
+        Transition-probability matrix with shape
+        ``(n_states, n_states)``. ``A[i, j]`` is the probability of moving
+        from state ``i`` to state ``j``.
+    B : NDArray[np.float64]
+        Emission-probability matrix with shape
+        ``(n_states, n_observations)``. ``B[i, k]`` is the probability of
+        observing symbol ``k`` in state ``i``.
+    """
+
+    _EPSILON = 1e-10
+
     def __init__(self, n_states: int, n_observations: int) -> None:
-        self.n_states = n_states
-        self.n_observations = n_observations
+        if n_states <= 0:
+            raise ValueError("n_states must be greater than zero.")
+        if n_observations <= 0:
+            raise ValueError("n_observations must be greater than zero.")
 
         self.pi = np.random.dirichlet(np.ones(n_states))
         self.A = np.random.dirichlet(np.ones(n_states), size=n_states)
@@ -30,10 +64,10 @@ class HMM:
             pickle.dump(self, f)
 
     @staticmethod
-    def load_model(filename: str = "./hmm") -> "HMM":
-        filename = filename + ".pkl" if not filename.endswith(".pkl") else filename
-        with open(filename, "rb") as f:
-            return pickle.load(f)
+    def _model_path(filename: str | Path) -> Path:
+        """Return ``filename`` with a ``.pkl`` suffix appended if necessary."""
+        path = Path(filename)
+        return path if str(path).endswith(".pkl") else Path(f"{path}.pkl")
 
     def _forward_with_scaling(self, sequence: List[int]) -> tuple[np.ndarray, np.ndarray]:
         """
@@ -248,6 +282,8 @@ class HMM:
 
                 # Initial state probabilities
                 pi_num += gamma[0]
+                gamma_sum = gamma.sum(axis=0)
+                B_den += gamma_sum
 
                 # Transition and emission updates
                 for t in range(T - 1):
