@@ -45,47 +45,126 @@ el.replaceWith(d);
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.models.hmm.aligned_decoding_accuracy"><code class="name flex">
-<span>def <span class="ident">aligned_decoding_accuracy</span></span>(<span>model, sequences, true_states)</span>
+<span>def <span class="ident">aligned_decoding_accuracy</span></span>(<span>model: <a title="likelihood.models.hmm.HMM" href="#likelihood.models.hmm.HMM">HMM</a>,<br>sequences: list[list[int]],<br>true_states: list[list[int]]) ‑> float</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def aligned_decoding_accuracy(model, sequences, true_states):
+<pre><code class="python">def aligned_decoding_accuracy(
+    model: HMM,
+    sequences: list[list[int]],
+    true_states: list[list[int]],
+) -&gt; float:
     &#34;&#34;&#34;
-    Computes Viterbi decoding accuracy after optimally aligning
-    predicted hidden-state labels with the ground-truth labels.
-    &#34;&#34;&#34;
+    Compute Viterbi decoding accuracy after optimal hidden-state label alignment.
 
+    Hidden-state labels learned by an HMM are arbitrary. For example,
+    predicted state 0 may correspond to ground-truth state 2. This function
+    finds the optimal one-to-one mapping between predicted and true state
+    labels using the Hungarian algorithm and computes the resulting decoding
+    accuracy.
+
+    Parameters
+    ----------
+    model : HMM
+        Trained HMM used to decode the observation sequences.
+    sequences : list[list[int]]
+        Collection of observation sequences.
+    true_states : list[list[int]]
+        Ground-truth hidden-state sequences corresponding to ``sequences``.
+
+    Returns
+    -------
+    float
+        Decoding accuracy after optimal state-label alignment, expressed as
+        a percentage between 0 and 100.
+
+    Raises
+    ------
+    ValueError
+        If ``sequences`` and ``true_states`` contain different numbers of
+        sequences, if they are empty, or if the total number of predicted
+        and true states differs.
+    &#34;&#34;&#34;
+    if len(sequences) != len(true_states):
+        raise ValueError(&#34;sequences and true_states must contain the same number &#34; &#34;of sequences.&#34;)
+    if not sequences:
+        raise ValueError(&#34;sequences and true_states must not be empty.&#34;)
     y_pred = np.concatenate([model.viterbi(sequence) for sequence in sequences])
+    y_true = np.concatenate([np.asarray(states, dtype=np.int64) for states in true_states])
+    if y_pred.size != y_true.size:
+        raise ValueError(
+            &#34;The total number of predicted states must equal the total &#34;
+            &#34;number of ground-truth states.&#34;
+        )
 
-    y_true = np.concatenate([np.asarray(states) for states in true_states])
-
-    pred_labels = np.unique(y_pred)
-    true_labels = np.unique(y_true)
-
-    confusion = np.zeros(
-        (len(pred_labels), len(true_labels)),
-        dtype=int,
+    pred_labels, pred_indices = np.unique(
+        y_pred,
+        return_inverse=True,
     )
 
-    for i, pred_label in enumerate(pred_labels):
-        for j, true_label in enumerate(true_labels):
-            confusion[i, j] = np.sum((y_pred == pred_label) &amp; (y_true == true_label))
+    true_labels, true_indices = np.unique(
+        y_true,
+        return_inverse=True,
+    )
 
-    row_ind, col_ind = linear_sum_assignment(-confusion)
+    confusion = np.zeros(
+        (pred_labels.size, true_labels.size),
+        dtype=np.int64,
+    )
 
-    mapping = {pred_labels[row]: true_labels[col] for row, col in zip(row_ind, col_ind)}
+    np.add.at(
+        confusion,
+        (pred_indices, true_indices),
+        1,
+    )
 
-    aligned_predictions = np.array([mapping.get(pred, -1) for pred in y_pred])
+    row_ind, col_ind = linear_sum_assignment(
+        confusion,
+        maximize=True,
+    )
 
-    accuracy = np.mean(aligned_predictions == y_true) * 100
+    aligned_label_lookup = np.full(
+        pred_labels.size,
+        -1,
+        dtype=np.int64,
+    )
 
-    return accuracy</code></pre>
+    aligned_label_lookup[row_ind] = true_labels[col_ind]
+    aligned_predictions = aligned_label_lookup[pred_indices]
+    accuracy = np.mean(aligned_predictions == y_true) * 100.0
+    return float(accuracy)</code></pre>
 </details>
-<div class="desc"><p>Computes Viterbi decoding accuracy after optimally aligning
-predicted hidden-state labels with the ground-truth labels.</p></div>
+<div class="desc"><p>Compute Viterbi decoding accuracy after optimal hidden-state label alignment.</p>
+<p>Hidden-state labels learned by an HMM are arbitrary. For example,
+predicted state 0 may correspond to ground-truth state 2. This function
+finds the optimal one-to-one mapping between predicted and true state
+labels using the Hungarian algorithm and computes the resulting decoding
+accuracy.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>model</code></strong> :&ensp;<code><a title="likelihood.models.hmm.HMM" href="#likelihood.models.hmm.HMM">HMM</a></code></dt>
+<dd>Trained HMM used to decode the observation sequences.</dd>
+<dt><strong><code>sequences</code></strong> :&ensp;<code>list[list[int]]</code></dt>
+<dd>Collection of observation sequences.</dd>
+<dt><strong><code>true_states</code></strong> :&ensp;<code>list[list[int]]</code></dt>
+<dd>Ground-truth hidden-state sequences corresponding to <code>sequences</code>.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>float</code></dt>
+<dd>Decoding accuracy after optimal state-label alignment, expressed as
+a percentage between 0 and 100.</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>ValueError</code></dt>
+<dd>If <code>sequences</code> and <code>true_states</code> contain different numbers of
+sequences, if they are empty, or if the total number of predicted
+and true states differs.</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.hmm.train_best_hmm"><code class="name flex">
 <span>def <span class="ident">train_best_hmm</span></span>(<span>train_sequences,<br>val_sequences,<br>val_states,<br>state_configs,<br>n_observations,<br>max_iterations=200,<br>n_restarts=5,<br>tolerance=0.0001,<br>patience=5,<br>random_state=42,<br>show_results=True)</span>
@@ -295,403 +374,555 @@ predicted hidden-state labels with the ground-truth labels.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class HMM:
+    &#34;&#34;&#34;Discrete Hidden Markov Model with multinomial emissions.
+
+    The model stores an initial-state distribution ``pi``, a state-transition
+    matrix ``A``, and an observation-emission matrix ``B``. Forward/backward
+    inference is performed in log space with per-time-step scaling for
+    numerical stability.
+
+    Parameters
+    ----------
+    n_states : int
+        Number of hidden states.
+    n_observations : int
+        Number of distinct discrete observation symbols. Valid observation
+        values are integers in ``[0, n_observations)``.
+
+    Attributes
+    ----------
+    n_states : int
+        Number of hidden states.
+    n_observations : int
+        Number of observation symbols.
+    pi : NDArray[np.float64]
+        Initial-state probabilities with shape ``(n_states,)``.
+    A : NDArray[np.float64]
+        Transition-probability matrix with shape
+        ``(n_states, n_states)``. ``A[i, j]`` is the probability of moving
+        from state ``i`` to state ``j``.
+    B : NDArray[np.float64]
+        Emission-probability matrix with shape
+        ``(n_states, n_observations)``. ``B[i, k]`` is the probability of
+        observing symbol ``k`` in state ``i``.
+    &#34;&#34;&#34;
+
+    _EPSILON = 1e-10
+
     def __init__(self, n_states: int, n_observations: int) -&gt; None:
-        self.n_states = n_states
-        self.n_observations = n_observations
+        if n_states &lt;= 0:
+            raise ValueError(&#34;n_states must be greater than zero.&#34;)
+        if n_observations &lt;= 0:
+            raise ValueError(&#34;n_observations must be greater than zero.&#34;)
 
-        self.pi = np.random.dirichlet(np.ones(n_states))
-        self.A = np.random.dirichlet(np.ones(n_states), size=n_states)
-        self.B = np.random.dirichlet(
-            np.ones(n_observations),
-            size=n_states,
-        )
-
-    def save_model(self, filename: str = &#34;./hmm&#34;) -&gt; None:
-        filename = filename if filename.endswith(&#34;.pkl&#34;) else filename + &#34;.pkl&#34;
-        with open(filename, &#34;wb&#34;) as f:
-            pickle.dump(self, f)
+        self.n_states: int = n_states
+        self.n_observations: int = n_observations
+        self.pi: FloatArray = np.random.dirichlet(np.ones(n_states))
+        self.A: FloatArray = np.random.dirichlet(np.ones(n_states), size=n_states)
+        self.B: FloatArray = np.random.dirichlet(np.ones(n_observations), size=n_states)
 
     @staticmethod
-    def load_model(filename: str = &#34;./hmm&#34;) -&gt; &#34;HMM&#34;:
-        filename = filename + &#34;.pkl&#34; if not filename.endswith(&#34;.pkl&#34;) else filename
-        with open(filename, &#34;rb&#34;) as f:
-            return pickle.load(f)
+    def _model_path(filename: str | Path) -&gt; Path:
+        &#34;&#34;&#34;Return ``filename`` with a ``.pkl`` suffix appended if necessary.&#34;&#34;&#34;
+        path = Path(filename)
+        return path if str(path).endswith(&#34;.pkl&#34;) else Path(f&#34;{path}.pkl&#34;)
 
-    def _forward_with_scaling(self, sequence: List[int]) -&gt; tuple[np.ndarray, np.ndarray]:
-        &#34;&#34;&#34;
-        Computes the scaled forward probabilities using log-space recursion.
+    def _as_observation_array(self, sequence: ObservationSequence) -&gt; IntArray:
+        &#34;&#34;&#34;Convert and validate an observation sequence.
 
         Parameters
         ----------
-        sequence : List[int]
-            Observation sequence.
+        sequence : Sequence[int] or NDArray[np.int64]
+            One-dimensional sequence of discrete observation symbols.
 
         Returns
         -------
-        alpha_hat : np.ndarray
-            Scaled forward probabilities. Each row sums to one.
+        NDArray[np.int64]
+            Validated one-dimensional observation array.
 
-        log_scale : np.ndarray
-            Logarithm of the scaling factor at each time step.
-            The log-likelihood of the observation sequence is
-
-                log P(O | λ) = sum(log_scale).
+        Raises
+        ------
+        ValueError
+            If the sequence is empty, is not one-dimensional, or contains an
+            observation outside ``[0, n_observations)``.
         &#34;&#34;&#34;
-        T = len(sequence)
-        epsilon = 1e-10
-        log_alpha = np.zeros((T, self.n_states))
-        log_scale = np.zeros(T)
+        observations = np.asarray(sequence, dtype=np.int64)
+        if observations.ndim != 1:
+            raise ValueError(&#34;sequence must be one-dimensional.&#34;)
+        if observations.size == 0:
+            raise ValueError(&#34;sequence must contain at least one observation.&#34;)
+        if observations.min() &lt; 0 or observations.max() &gt;= self.n_observations:
+            raise ValueError(f&#34;observations must be integers in [0, {self.n_observations}).&#34;)
+        return observations
 
-        # Initialization
-        log_alpha[0] = np.log(self.pi + epsilon) + np.log(self.B[:, sequence[0]] + epsilon)
-        log_scale[0] = logsumexp(log_alpha[0])
-        log_alpha[0] -= log_scale[0]
+    def save_model(self, filename: str | Path = &#34;./hmm&#34;) -&gt; None:
+        &#34;&#34;&#34;Serialize the model to disk using pickle.
 
-        # Forward recursion
-        for t in range(1, T):
-            for j in range(self.n_states):
-                log_alpha[t, j] = logsumexp(
-                    log_alpha[t - 1] + np.log(self.A[:, j] + epsilon)
-                ) + np.log(self.B[j, sequence[t]] + epsilon)
+        Parameters
+        ----------
+        filename : str or pathlib.Path, default=&#34;./hmm&#34;
+            Destination path. ``.pkl`` is appended when it is not already
+            present.
+        &#34;&#34;&#34;
+        path = self._model_path(filename)
+        with path.open(&#34;wb&#34;) as file:
+            pickle.dump(self, file)
 
-            log_scale[t] = logsumexp(log_alpha[t])
-            log_alpha[t] -= log_scale[t]
+    @staticmethod
+    def load_model(filename: str | Path = &#34;./hmm&#34;) -&gt; HMM:
+        &#34;&#34;&#34;Load a pickled :class:`HMM` from disk.
 
-        alpha_hat = np.exp(log_alpha)
+        Parameters
+        ----------
+        filename : str or pathlib.Path, default=&#34;./hmm&#34;
+            Model path. ``.pkl`` is appended when it is not already present.
 
-        return alpha_hat, log_scale
+        Returns
+        -------
+        HMM
+            Deserialized model.
+
+        Raises
+        ------
+        TypeError
+            If the pickle does not contain an ``HMM`` instance.
+        &#34;&#34;&#34;
+        path = HMM._model_path(filename)
+        with path.open(&#34;rb&#34;) as file:
+            model = pickle.load(file)
+
+        if not isinstance(model, HMM):
+            raise TypeError(f&#34;Expected a pickled HMM, got {type(model).__name__}.&#34;)
+        return model
+
+    def _forward_with_scaling(self, sequence: ObservationSequence) -&gt; tuple[FloatArray, FloatArray]:
+        &#34;&#34;&#34;Compute scaled forward probabilities using log-space recursion.
+
+        The recursion is sequential over time, but the transition from all
+        source states to all destination states is vectorized at each step.
+
+        Parameters
+        ----------
+        sequence : Sequence[int] or NDArray[np.int64]
+            Observation sequence of length ``T``.
+
+        Returns
+        -------
+        alpha_hat : NDArray[np.float64]
+            Scaled forward probabilities with shape ``(T, n_states)``. Each
+            row sums approximately to one.
+        log_scale : NDArray[np.float64]
+            Log scaling factor for each time step. The sequence log-likelihood
+            is ``log_scale.sum()``.
+        &#34;&#34;&#34;
+        observations = self._as_observation_array(sequence)
+        n_steps = observations.size
+
+        A = self.A + self._EPSILON
+        emissions = self.B[:, observations].T + self._EPSILON
+
+        alpha_hat = np.empty((n_steps, self.n_states), dtype=np.float64)
+        scale = np.empty(n_steps, dtype=np.float64)
+
+        alpha_hat[0] = (self.pi + self._EPSILON) * emissions[0]
+        scale[0] = alpha_hat[0].sum()
+        alpha_hat[0] /= scale[0]
+
+        for t in range(1, n_steps):
+            alpha_hat[t] = (alpha_hat[t - 1] @ A) * emissions[t]
+            scale[t] = alpha_hat[t].sum()
+            alpha_hat[t] /= scale[t]
+
+        return alpha_hat, np.log(scale)
 
     def _backward_with_scaling(
         self,
-        sequence: List[int],
-        log_scale: np.ndarray,
-    ) -&gt; np.ndarray:
-
-        T = len(sequence)
-        epsilon = 1e-10
-
-        log_beta = np.zeros((T, self.n_states))
-
-        # beta_hat[T-1] = 1
-        log_beta[-1] = 0.0
-
-        for t in range(T - 2, -1, -1):
-            for i in range(self.n_states):
-                log_beta[t, i] = (
-                    logsumexp(
-                        np.log(self.A[i] + epsilon)
-                        + np.log(self.B[:, sequence[t + 1]] + epsilon)
-                        + log_beta[t + 1]
-                    )
-                    - log_scale[t + 1]
-                )
-
-        return np.exp(log_beta)
-
-    def forward(self, sequence: List[int]) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Computes the scaled forward probabilities.
+        sequence: ObservationSequence,
+        log_scale: FloatArray,
+    ) -&gt; FloatArray:
+        &#34;&#34;&#34;Compute scaled backward probabilities in log space.
 
         Parameters
         ----------
-        sequence : List[int]
-            Observation sequence.
+        sequence : Sequence[int] or NDArray[np.int64]
+            Observation sequence of length ``T``.
+        log_scale : NDArray[np.float64]
+            Forward-pass log scaling factors with shape ``(T,)``.
 
         Returns
         -------
-        np.ndarray
-            Scaled forward probabilities (alpha_hat).
-            Each row is normalized to sum to one.
+        NDArray[np.float64]
+            Scaled backward probabilities with shape ``(T, n_states)``.
+
+        Raises
+        ------
+        ValueError
+            If ``log_scale`` does not have shape ``(T,)``.
+        &#34;&#34;&#34;
+        observations = self._as_observation_array(sequence)
+        n_steps = observations.size
+        scale = np.asarray(log_scale, dtype=np.float64)
+        if scale.shape != (n_steps,):
+            raise ValueError(f&#34;log_scale must have shape ({n_steps},).&#34;)
+
+        A = self.A + self._EPSILON
+        emissions = self.B[:, observations].T + self._EPSILON
+        beta_hat = np.ones((n_steps, self.n_states), dtype=np.float64)
+        scale = np.exp(scale)
+
+        # beta_hat[T - 1] = 1, so log(beta_hat[T - 1]) = 0.
+        for t in range(n_steps - 2, -1, -1):
+            beta_hat[t] = A @ (emissions[t + 1] * beta_hat[t + 1])
+            beta_hat[t] /= scale[t + 1]
+
+        return beta_hat
+
+    def forward(self, sequence: ObservationSequence) -&gt; FloatArray:
+        &#34;&#34;&#34;Compute scaled forward probabilities for an observation sequence.
+
+        Parameters
+        ----------
+        sequence : Sequence[int] or NDArray[np.int64]
+            Observation sequence of length ``T``.
+
+        Returns
+        -------
+        NDArray[np.float64]
+            Matrix with shape ``(T, n_states)`` containing scaled forward
+            probabilities. Each row is normalized approximately to one.
 
         Notes
         -----
-        These are the scaled forward probabilities used for numerical
-        stability. They are proportional to the true forward probabilities,
-        but they are not equal to P(o1, ..., ot, qt=i).
+        These values are proportional to the unscaled forward probabilities;
+        they are not themselves ``P(o_1, ..., o_t, q_t=i)``.
         &#34;&#34;&#34;
         alpha_hat, _ = self._forward_with_scaling(sequence)
         return alpha_hat
 
-    def backward(self, sequence: List[int]) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Computes the scaled backward probabilities.
+    def backward(self, sequence: ObservationSequence) -&gt; FloatArray:
+        &#34;&#34;&#34;Compute scaled backward probabilities for an observation sequence.
 
         Parameters
         ----------
-        sequence : List[int]
-            Observation sequence.
+        sequence : Sequence[int] or NDArray[np.int64]
+            Observation sequence of length ``T``.
 
         Returns
         -------
-        np.ndarray
-            Scaled backward probabilities (beta_hat).
-
-        Notes
-        -----
-        The backward probabilities are computed using the same scaling
-        factors as the forward pass, ensuring consistency for smoothing
-        and Baum-Welch re-estimation.
+        NDArray[np.float64]
+            Matrix with shape ``(T, n_states)`` containing backward
+            probabilities scaled consistently with the forward pass.
         &#34;&#34;&#34;
         _, log_scale = self._forward_with_scaling(sequence)
         return self._backward_with_scaling(sequence, log_scale)
 
-    def viterbi(self, sequence: List[int]) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Computes the most likely hidden state sequence using the Viterbi
-        algorithm in log-space.
+    def viterbi(self, sequence: ObservationSequence) -&gt; IntArray:
+        &#34;&#34;&#34;Decode the most likely hidden-state path with the Viterbi algorithm.
+
+        The dynamic program remains sequential over time, while the score
+        calculation for all source/destination state pairs is vectorized.
 
         Parameters
         ----------
-        sequence : List[int]
-            Observation sequence.
+        sequence : Sequence[int] or NDArray[np.int64]
+            Observation sequence of length ``T``.
 
         Returns
         -------
-        np.ndarray
-            Most probable sequence of hidden states.
+        NDArray[np.int64]
+            Most probable hidden-state sequence with shape ``(T,)``.
         &#34;&#34;&#34;
-        T = len(sequence)
-        epsilon = 1e-10
-        log_delta = np.zeros((T, self.n_states))
-        psi = np.zeros((T, self.n_states), dtype=int)
+        observations = self._as_observation_array(sequence)
+        n_steps = observations.size
 
-        # Initialization
-        log_delta[0] = np.log(self.pi + epsilon) + np.log(self.B[:, sequence[0]] + epsilon)
+        log_A = np.log(self.A + self._EPSILON)
+        log_emissions = np.log(self.B[:, observations].T + self._EPSILON)
 
-        # Recursion
-        for t in range(1, T):
-            for j in range(self.n_states):
-                previous_scores = log_delta[t - 1] + np.log(self.A[:, j] + epsilon)
-                psi[t, j] = np.argmax(previous_scores)
-                log_delta[t, j] = np.max(previous_scores) + np.log(self.B[j, sequence[t]] + epsilon)
+        psi = np.empty((n_steps, self.n_states), dtype=np.int64)
+        psi[0] = 0
+        state_indices = np.arange(self.n_states)
+        log_delta = np.log(self.pi + self._EPSILON) + log_emissions[0]
 
-        # Backtracking
-        state_sequence = np.zeros(T, dtype=int)
-        state_sequence[-1] = np.argmax(log_delta[-1])
+        for t in range(1, n_steps):
+            transition_scores = log_delta[:, None] + log_A
+            psi[t] = np.argmax(transition_scores, axis=0)
+            log_delta = transition_scores[psi[t], state_indices] + log_emissions[t]
 
-        for t in range(T - 2, -1, -1):
+        state_sequence = np.empty(n_steps, dtype=np.int64)
+        state_sequence[-1] = np.argmax(log_delta)
+
+        for t in range(n_steps - 2, -1, -1):
             state_sequence[t] = psi[t + 1, state_sequence[t + 1]]
 
         return state_sequence
 
     def baum_welch(
         self,
-        sequences: List[List[int]],
+        sequences: Sequence[ObservationSequence],
         n_iterations: int,
         verbose: bool = False,
     ) -&gt; None:
-        &#34;&#34;&#34;
-        Baum-Welch algorithm (Expectation-Maximization) for estimating HMM
-        parameters.
+        &#34;&#34;&#34;Estimate model parameters with the Baum-Welch EM algorithm.
 
-        Uses the scaled forward-backward algorithm with shared scaling
-        factors between alpha and beta.
+        Forward/backward inference is performed per sequence. Within each
+        sequence, posterior transition probabilities (``xi``), state
+        occupancies (``gamma``), and emission sufficient statistics are
+        accumulated with NumPy operations instead of Python loops over time
+        and states.
 
         Parameters
         ----------
-        sequences : List[List[int]]
-            Collection of observation sequences.
-
+        sequences : Sequence[Sequence[int] | NDArray[np.int64]]
+            Collection of non-empty observation sequences.
         n_iterations : int
-            Number of EM iterations.
+            Number of expectation-maximization iterations.
+        verbose : bool, default=False
+            If ``True``, print model parameters every 10 iterations, starting
+            at iteration 0.
 
-        verbose : bool
-            Print parameters every 10 iterations.
+        Raises
+        ------
+        ValueError
+            If ``n_iterations`` is negative or ``sequences`` is empty.
         &#34;&#34;&#34;
-        epsilon = 1e-10
+        if n_iterations &lt; 0:
+            raise ValueError(&#34;n_iterations must be non-negative.&#34;)
+        if len(sequences) == 0:
+            raise ValueError(&#34;sequences must contain at least one sequence.&#34;)
+
+        observations_list = [self._as_observation_array(seq) for seq in sequences]
+        state_offsets = np.arange(self.n_states, dtype=np.int64)
 
         for iteration in range(n_iterations):
-            A_num = np.zeros((self.n_states, self.n_states))
-            A_den = np.zeros(self.n_states)
-            B_num = np.zeros((self.n_states, self.n_observations))
-            B_den = np.zeros(self.n_states)
-            pi_num = np.zeros(self.n_states)
+            A_num = np.zeros((self.n_states, self.n_states), dtype=np.float64)
+            A_den = np.zeros(self.n_states, dtype=np.float64)
+            B_num = np.zeros((self.n_states, self.n_observations), dtype=np.float64)
+            B_den = np.zeros(self.n_states, dtype=np.float64)
+            pi_num = np.zeros(self.n_states, dtype=np.float64)
 
-            for sequence in sequences:
-                T = len(sequence)
-                # Forward-backward with consistent scaling
-                alpha_hat, log_scale = self._forward_with_scaling(sequence)
-                beta_hat = self._backward_with_scaling(
-                    sequence,
-                    log_scale,
-                )
+            A_current = self.A
+            B_current = self.B
+            A_stable = A_current + self._EPSILON
+            B_stable = B_current + self._EPSILON
 
-                # Gamma:
-                # probability of being in state i at time t
+            for observations in observations_list:
+                n_steps = observations.size
+                emissions = B_stable[:, observations].T
+
+                alpha_hat = np.empty((n_steps, self.n_states), dtype=np.float64)
+                scale = np.empty(n_steps, dtype=np.float64)
+                alpha_hat[0] = (self.pi + self._EPSILON) * emissions[0]
+                scale[0] = alpha_hat[0].sum()
+                alpha_hat[0] /= scale[0]
+
+                for t in range(1, n_steps):
+                    alpha_hat[t] = (alpha_hat[t - 1] @ A_stable) * emissions[t]
+                    scale[t] = alpha_hat[t].sum()
+                    alpha_hat[t] /= scale[t]
+
+                beta_hat = np.ones((n_steps, self.n_states), dtype=np.float64)
+                for t in range(n_steps - 2, -1, -1):
+                    beta_hat[t] = A_stable @ (emissions[t + 1] * beta_hat[t + 1])
+                    beta_hat[t] /= scale[t + 1]
+
                 gamma = alpha_hat * beta_hat
-                gamma /= (
-                    np.sum(
-                        gamma,
-                        axis=1,
-                        keepdims=True,
+                gamma /= gamma.sum(axis=1, keepdims=True) + self._EPSILON
+
+                pi_num += gamma[0]
+                gamma_sum = gamma.sum(axis=0)
+                B_den += gamma_sum
+
+                emission_indices = (observations[:, None] * self.n_states + state_offsets).ravel()
+                B_num += (
+                    np.bincount(
+                        emission_indices,
+                        weights=gamma.ravel(),
+                        minlength=self.n_observations * self.n_states,
                     )
-                    + epsilon
+                    .reshape(self.n_observations, self.n_states)
+                    .T
                 )
 
-                # Initial state probabilities
-                pi_num += gamma[0]
+                if n_steps &gt; 1:
+                    next_factor = B_current[:, observations[1:]].T * beta_hat[1:]
+                    xi_den = np.sum((alpha_hat[:-1] @ A_current) * next_factor, axis=1)
+                    xi_den += self._EPSILON
 
-                # Transition and emission updates
-                for t in range(T - 1):
-                    xi = (
-                        alpha_hat[t, :, None]
-                        * self.A
-                        * self.B[:, sequence[t + 1]][None, :]
-                        * beta_hat[t + 1, None, :]
-                    )
-                    xi /= np.sum(xi) + epsilon
-                    A_num += xi
-                    A_den += gamma[t]
-                    B_num[:, sequence[t]] += gamma[t]
+                    A_num += A_current * ((alpha_hat[:-1] / xi_den[:, None]).T @ next_factor)
+                    A_den += gamma_sum - gamma[-1]
 
-                # Last observation emission update
-                B_num[:, sequence[-1]] += gamma[-1]
-                B_den += np.sum(gamma, axis=0)
-
-            # Maximization step
-            self.pi = pi_num / (np.sum(pi_num) + epsilon)
-            self.A = A_num / (A_den[:, None] + epsilon)
-            self.B = B_num / (B_den[:, None] + epsilon)
+            self.pi = pi_num / (pi_num.sum() + self._EPSILON)
+            self.A = A_num / (A_den[:, None] + self._EPSILON)
+            self.B = B_num / (B_den[:, None] + self._EPSILON)
 
             if verbose and iteration % 10 == 0:
                 print(f&#34;Iteration {iteration}&#34;)
                 print(&#34;\nPi:&#34;)
                 print(self.pi)
-
                 print(&#34;\nA:&#34;)
                 print(self.A)
-
                 print(&#34;\nB:&#34;)
                 print(self.B)
 
     def decoding_accuracy(
         self,
-        sequences: List[List[int]],
-        true_states: List[List[int]],
+        sequences: Sequence[ObservationSequence],
+        true_states: Sequence[ObservationSequence],
     ) -&gt; float:
-        &#34;&#34;&#34;
-        Computes Viterbi decoding accuracy after optimally aligning
-        predicted hidden-state labels with the ground-truth labels.
+        &#34;&#34;&#34;Compute label-aligned Viterbi decoding accuracy.
+
+        Hidden-state labels are permutation-invariant. This method builds a
+        confusion matrix between predicted and true labels, uses the Hungarian
+        algorithm to find the optimal label assignment, then reports the
+        percentage of correctly aligned states.
 
         Parameters
         ----------
-        sequences : List[List[int]]
-            Observation sequences.
-        true_states : List[List[int]]
-            Ground-truth hidden-state sequences.
+        sequences : Sequence[Sequence[int] | NDArray[np.int64]]
+            Observation sequences to decode.
+        true_states : Sequence[Sequence[int] | NDArray[np.int64]]
+            Ground-truth state sequences corresponding to ``sequences``.
 
         Returns
         -------
         float
-            Label-aligned decoding accuracy percentage.
+            Label-aligned decoding accuracy as a percentage in ``[0, 100]``.
+
+        Raises
+        ------
+        ValueError
+            If the collections are empty, contain different numbers of
+            sequences, or corresponding sequence lengths differ.
         &#34;&#34;&#34;
-        predicted_states = np.concatenate([self.viterbi(sequence) for sequence in sequences])
-        true_states_flat = np.concatenate([np.asarray(states) for states in true_states])
-        predicted_labels = np.unique(predicted_states)
-        true_labels = np.unique(true_states_flat)
-        confusion = np.zeros(
-            (len(predicted_labels), len(true_labels)),
-            dtype=int,
-        )
-        for i, predicted_label in enumerate(predicted_labels):
-            for j, true_label in enumerate(true_labels):
-                confusion[i, j] = np.sum(
-                    (predicted_states == predicted_label) &amp; (true_states_flat == true_label)
+        if len(sequences) == 0:
+            raise ValueError(&#34;sequences must contain at least one sequence.&#34;)
+        if len(sequences) != len(true_states):
+            raise ValueError(&#34;sequences and true_states must contain the same number of sequences.&#34;)
+
+        predicted_parts: list[IntArray] = []
+        true_parts: list[IntArray] = []
+
+        for sequence, states in zip(sequences, true_states):
+            predicted = self.viterbi(sequence)
+            truth = np.asarray(states, dtype=np.int64)
+            if truth.ndim != 1:
+                raise ValueError(&#34;Each true-state sequence must be one-dimensional.&#34;)
+            if predicted.size != truth.size:
+                raise ValueError(
+                    &#34;Each observation sequence and true-state sequence must have &#34;
+                    &#34;the same length.&#34;
                 )
+            predicted_parts.append(predicted)
+            true_parts.append(truth)
+
+        predicted_states = np.concatenate(predicted_parts)
+        true_states_flat = np.concatenate(true_parts)
+
+        predicted_labels, predicted_inverse = np.unique(predicted_states, return_inverse=True)
+        true_labels, true_inverse = np.unique(true_states_flat, return_inverse=True)
+
+        confusion = np.bincount(
+            predicted_inverse * true_labels.size + true_inverse,
+            minlength=predicted_labels.size * true_labels.size,
+        ).reshape(predicted_labels.size, true_labels.size)
+
         row_ind, col_ind = linear_sum_assignment(-confusion)
-        mapping = {predicted_labels[row]: true_labels[col] for row, col in zip(row_ind, col_ind)}
-        aligned_predictions = np.array([mapping.get(state, -1) for state in predicted_states])
-        accuracy = np.mean(aligned_predictions == true_states_flat) * 100
+        aligned_label_by_index = np.full(predicted_labels.size, -1, dtype=np.int64)
+        aligned_label_by_index[row_ind] = true_labels[col_ind]
+        aligned_predictions = aligned_label_by_index[predicted_inverse]
 
-        return accuracy
+        return float(np.mean(aligned_predictions == true_states_flat) * 100.0)
 
-    def state_probabilities(
-        self,
-        sequence: List[int],
-    ) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Computes smoothed hidden-state probabilities.
+    def state_probabilities(self, sequence: ObservationSequence) -&gt; FloatArray:
+        &#34;&#34;&#34;Compute smoothed posterior hidden-state probabilities.
 
-        Calculates:
-
-            gamma_t(i) = P(q_t=i | O)
-
-        using the scaled forward-backward algorithm.
+        This returns ``gamma[t, i] = P(q_t=i | O)`` using the scaled
+        forward-backward algorithm.
 
         Parameters
         ----------
-        sequence : List[int]
-            Observation sequence.
+        sequence : Sequence[int] or NDArray[np.int64]
+            Observation sequence of length ``T``.
 
         Returns
         -------
-        np.ndarray
-            Matrix of shape (T, n_states), where each row
-            contains the posterior probability of each hidden
-            state at time t.
+        NDArray[np.float64]
+            Posterior state-probability matrix with shape ``(T, n_states)``.
+            Each row sums approximately to one.
         &#34;&#34;&#34;
-        epsilon = 1e-10
-
         alpha_hat, log_scale = self._forward_with_scaling(sequence)
-
-        beta_hat = self._backward_with_scaling(
-            sequence,
-            log_scale,
-        )
+        beta_hat = self._backward_with_scaling(sequence, log_scale)
 
         gamma = alpha_hat * beta_hat
-
-        gamma /= (
-            np.sum(
-                gamma,
-                axis=1,
-                keepdims=True,
-            )
-            + epsilon
-        )
-
+        gamma /= gamma.sum(axis=1, keepdims=True) + self._EPSILON
         return gamma
 
-    def sequence_probability(
-        self,
-        sequence: List[int],
-    ) -&gt; float:
-        &#34;&#34;&#34;
-        Computes the likelihood of an observation sequence.
-
-        Calculates:
-
-            P(O | model)
-
-        using the scaling factors from the forward algorithm.
+    def sequence_probability(self, sequence: ObservationSequence) -&gt; float:
+        &#34;&#34;&#34;Return the likelihood ``P(O | model)`` of an observation sequence.
 
         Parameters
         ----------
-        sequence : List[int]
+        sequence : Sequence[int] or NDArray[np.int64]
             Observation sequence.
 
         Returns
         -------
         float
-            Probability of the observation sequence.
+            Sequence likelihood. For long sequences this value can underflow
+            to zero; use :meth:`sequence_log_probability` when possible.
+        &#34;&#34;&#34;
+        return float(np.exp(self.sequence_log_probability(sequence)))
+
+    def sequence_log_probability(self, sequence: ObservationSequence) -&gt; float:
+        &#34;&#34;&#34;Return the log-likelihood ``log P(O | model)`` of a sequence.
+
+        Parameters
+        ----------
+        sequence : Sequence[int] or NDArray[np.int64]
+            Observation sequence.
+
+        Returns
+        -------
+        float
+            Sequence log-likelihood computed from the forward scaling factors.
         &#34;&#34;&#34;
         _, log_scale = self._forward_with_scaling(sequence)
-        log_likelihood = np.sum(log_scale)
-
-        return float(np.exp(log_likelihood))
-
-    def sequence_log_probability(self, sequence: List[int]) -&gt; float:
-        &#34;&#34;&#34;
-        Computes log P(O | model).
-        &#34;&#34;&#34;
-        _, log_scale = self._forward_with_scaling(sequence)
-        return float(np.sum(log_scale))</code></pre>
+        return float(log_scale.sum())</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Discrete Hidden Markov Model with multinomial emissions.</p>
+<p>The model stores an initial-state distribution <code>pi</code>, a state-transition
+matrix <code>A</code>, and an observation-emission matrix <code>B</code>. Forward/backward
+inference is performed in log space with per-time-step scaling for
+numerical stability.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>n_states</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of hidden states.</dd>
+<dt><strong><code>n_observations</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of distinct discrete observation symbols. Valid observation
+values are integers in <code>[0, n_observations)</code>.</dd>
+</dl>
+<h2 id="attributes">Attributes</h2>
+<dl>
+<dt><strong><code>n_states</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of hidden states.</dd>
+<dt><strong><code>n_observations</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of observation symbols.</dd>
+<dt><strong><code>pi</code></strong> :&ensp;<code>NDArray[np.float64]</code></dt>
+<dd>Initial-state probabilities with shape <code>(n_states,)</code>.</dd>
+<dt><strong><code>A</code></strong> :&ensp;<code>NDArray[np.float64]</code></dt>
+<dd>Transition-probability matrix with shape
+<code>(n_states, n_states)</code>. <code>A[i, j]</code> is the probability of moving
+from state <code>i</code> to state <code>j</code>.</dd>
+<dt><strong><code>B</code></strong> :&ensp;<code>NDArray[np.float64]</code></dt>
+<dd>Emission-probability matrix with shape
+<code>(n_states, n_observations)</code>. <code>B[i, k]</code> is the probability of
+observing symbol <code>k</code> in state <code>i</code>.</dd>
+</dl></div>
 <h3>Static methods</h3>
 <dl>
 <dt id="likelihood.models.hmm.HMM.load_model"><code class="name flex">
-<span>def <span class="ident">load_model</span></span>(<span>filename: str = './hmm') ‑> <a title="likelihood.models.hmm.HMM" href="#likelihood.models.hmm.HMM">HMM</a></span>
+<span>def <span class="ident">load_model</span></span>(<span>filename: str | Path = './hmm') ‑> <a title="likelihood.models.hmm.HMM" href="#likelihood.models.hmm.HMM">HMM</a></span>
 </code></dt>
 <dd>
 <details class="source">
@@ -699,65 +930,92 @@ predicted hidden-state labels with the ground-truth labels.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@staticmethod
-def load_model(filename: str = &#34;./hmm&#34;) -&gt; &#34;HMM&#34;:
-    filename = filename + &#34;.pkl&#34; if not filename.endswith(&#34;.pkl&#34;) else filename
-    with open(filename, &#34;rb&#34;) as f:
-        return pickle.load(f)</code></pre>
+def load_model(filename: str | Path = &#34;./hmm&#34;) -&gt; HMM:
+    &#34;&#34;&#34;Load a pickled :class:`HMM` from disk.
+
+    Parameters
+    ----------
+    filename : str or pathlib.Path, default=&#34;./hmm&#34;
+        Model path. ``.pkl`` is appended when it is not already present.
+
+    Returns
+    -------
+    HMM
+        Deserialized model.
+
+    Raises
+    ------
+    TypeError
+        If the pickle does not contain an ``HMM`` instance.
+    &#34;&#34;&#34;
+    path = HMM._model_path(filename)
+    with path.open(&#34;rb&#34;) as file:
+        model = pickle.load(file)
+
+    if not isinstance(model, HMM):
+        raise TypeError(f&#34;Expected a pickled HMM, got {type(model).__name__}.&#34;)
+    return model</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Load a pickled :class:<code><a title="likelihood.models.hmm.HMM" href="#likelihood.models.hmm.HMM">HMM</a></code> from disk.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>filename</code></strong> :&ensp;<code>str</code> or <code>pathlib.Path</code>, default=<code>"./hmm"</code></dt>
+<dd>Model path. <code>.pkl</code> is appended when it is not already present.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code><a title="likelihood.models.hmm.HMM" href="#likelihood.models.hmm.HMM">HMM</a></code></dt>
+<dd>Deserialized model.</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>TypeError</code></dt>
+<dd>If the pickle does not contain an <code><a title="likelihood.models.hmm.HMM" href="#likelihood.models.hmm.HMM">HMM</a></code> instance.</dd>
+</dl></div>
 </dd>
 </dl>
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.hmm.HMM.backward"><code class="name flex">
-<span>def <span class="ident">backward</span></span>(<span>self, sequence: List[int]) ‑> numpy.ndarray</span>
+<span>def <span class="ident">backward</span></span>(<span>self, sequence: ObservationSequence) ‑> numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def backward(self, sequence: List[int]) -&gt; np.ndarray:
-    &#34;&#34;&#34;
-    Computes the scaled backward probabilities.
+<pre><code class="python">def backward(self, sequence: ObservationSequence) -&gt; FloatArray:
+    &#34;&#34;&#34;Compute scaled backward probabilities for an observation sequence.
 
     Parameters
     ----------
-    sequence : List[int]
-        Observation sequence.
+    sequence : Sequence[int] or NDArray[np.int64]
+        Observation sequence of length ``T``.
 
     Returns
     -------
-    np.ndarray
-        Scaled backward probabilities (beta_hat).
-
-    Notes
-    -----
-    The backward probabilities are computed using the same scaling
-    factors as the forward pass, ensuring consistency for smoothing
-    and Baum-Welch re-estimation.
+    NDArray[np.float64]
+        Matrix with shape ``(T, n_states)`` containing backward
+        probabilities scaled consistently with the forward pass.
     &#34;&#34;&#34;
     _, log_scale = self._forward_with_scaling(sequence)
     return self._backward_with_scaling(sequence, log_scale)</code></pre>
 </details>
-<div class="desc"><p>Computes the scaled backward probabilities.</p>
+<div class="desc"><p>Compute scaled backward probabilities for an observation sequence.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>sequence</code></strong> :&ensp;<code>List[int]</code></dt>
-<dd>Observation sequence.</dd>
+<dt><strong><code>sequence</code></strong> :&ensp;<code>Sequence[int]</code> or <code>NDArray[np.int64]</code></dt>
+<dd>Observation sequence of length <code>T</code>.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><code>np.ndarray</code></dt>
-<dd>Scaled backward probabilities (beta_hat).</dd>
-</dl>
-<h2 id="notes">Notes</h2>
-<p>The backward probabilities are computed using the same scaling
-factors as the forward pass, ensuring consistency for smoothing
-and Baum-Welch re-estimation.</p></div>
+<dt><code>NDArray[np.float64]</code></dt>
+<dd>Matrix with shape <code>(T, n_states)</code> containing backward
+probabilities scaled consistently with the forward pass.</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.hmm.HMM.baum_welch"><code class="name flex">
-<span>def <span class="ident">baum_welch</span></span>(<span>self, sequences: List[List[int]], n_iterations: int, verbose: bool = False) ‑> None</span>
+<span>def <span class="ident">baum_welch</span></span>(<span>self,<br>sequences: Sequence[ObservationSequence],<br>n_iterations: int,<br>verbose: bool = False) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -766,110 +1024,136 @@ and Baum-Welch re-estimation.</p></div>
 </summary>
 <pre><code class="python">def baum_welch(
     self,
-    sequences: List[List[int]],
+    sequences: Sequence[ObservationSequence],
     n_iterations: int,
     verbose: bool = False,
 ) -&gt; None:
-    &#34;&#34;&#34;
-    Baum-Welch algorithm (Expectation-Maximization) for estimating HMM
-    parameters.
+    &#34;&#34;&#34;Estimate model parameters with the Baum-Welch EM algorithm.
 
-    Uses the scaled forward-backward algorithm with shared scaling
-    factors between alpha and beta.
+    Forward/backward inference is performed per sequence. Within each
+    sequence, posterior transition probabilities (``xi``), state
+    occupancies (``gamma``), and emission sufficient statistics are
+    accumulated with NumPy operations instead of Python loops over time
+    and states.
 
     Parameters
     ----------
-    sequences : List[List[int]]
-        Collection of observation sequences.
-
+    sequences : Sequence[Sequence[int] | NDArray[np.int64]]
+        Collection of non-empty observation sequences.
     n_iterations : int
-        Number of EM iterations.
+        Number of expectation-maximization iterations.
+    verbose : bool, default=False
+        If ``True``, print model parameters every 10 iterations, starting
+        at iteration 0.
 
-    verbose : bool
-        Print parameters every 10 iterations.
+    Raises
+    ------
+    ValueError
+        If ``n_iterations`` is negative or ``sequences`` is empty.
     &#34;&#34;&#34;
-    epsilon = 1e-10
+    if n_iterations &lt; 0:
+        raise ValueError(&#34;n_iterations must be non-negative.&#34;)
+    if len(sequences) == 0:
+        raise ValueError(&#34;sequences must contain at least one sequence.&#34;)
+
+    observations_list = [self._as_observation_array(seq) for seq in sequences]
+    state_offsets = np.arange(self.n_states, dtype=np.int64)
 
     for iteration in range(n_iterations):
-        A_num = np.zeros((self.n_states, self.n_states))
-        A_den = np.zeros(self.n_states)
-        B_num = np.zeros((self.n_states, self.n_observations))
-        B_den = np.zeros(self.n_states)
-        pi_num = np.zeros(self.n_states)
+        A_num = np.zeros((self.n_states, self.n_states), dtype=np.float64)
+        A_den = np.zeros(self.n_states, dtype=np.float64)
+        B_num = np.zeros((self.n_states, self.n_observations), dtype=np.float64)
+        B_den = np.zeros(self.n_states, dtype=np.float64)
+        pi_num = np.zeros(self.n_states, dtype=np.float64)
 
-        for sequence in sequences:
-            T = len(sequence)
-            # Forward-backward with consistent scaling
-            alpha_hat, log_scale = self._forward_with_scaling(sequence)
-            beta_hat = self._backward_with_scaling(
-                sequence,
-                log_scale,
-            )
+        A_current = self.A
+        B_current = self.B
+        A_stable = A_current + self._EPSILON
+        B_stable = B_current + self._EPSILON
 
-            # Gamma:
-            # probability of being in state i at time t
+        for observations in observations_list:
+            n_steps = observations.size
+            emissions = B_stable[:, observations].T
+
+            alpha_hat = np.empty((n_steps, self.n_states), dtype=np.float64)
+            scale = np.empty(n_steps, dtype=np.float64)
+            alpha_hat[0] = (self.pi + self._EPSILON) * emissions[0]
+            scale[0] = alpha_hat[0].sum()
+            alpha_hat[0] /= scale[0]
+
+            for t in range(1, n_steps):
+                alpha_hat[t] = (alpha_hat[t - 1] @ A_stable) * emissions[t]
+                scale[t] = alpha_hat[t].sum()
+                alpha_hat[t] /= scale[t]
+
+            beta_hat = np.ones((n_steps, self.n_states), dtype=np.float64)
+            for t in range(n_steps - 2, -1, -1):
+                beta_hat[t] = A_stable @ (emissions[t + 1] * beta_hat[t + 1])
+                beta_hat[t] /= scale[t + 1]
+
             gamma = alpha_hat * beta_hat
-            gamma /= (
-                np.sum(
-                    gamma,
-                    axis=1,
-                    keepdims=True,
+            gamma /= gamma.sum(axis=1, keepdims=True) + self._EPSILON
+
+            pi_num += gamma[0]
+            gamma_sum = gamma.sum(axis=0)
+            B_den += gamma_sum
+
+            emission_indices = (observations[:, None] * self.n_states + state_offsets).ravel()
+            B_num += (
+                np.bincount(
+                    emission_indices,
+                    weights=gamma.ravel(),
+                    minlength=self.n_observations * self.n_states,
                 )
-                + epsilon
+                .reshape(self.n_observations, self.n_states)
+                .T
             )
 
-            # Initial state probabilities
-            pi_num += gamma[0]
+            if n_steps &gt; 1:
+                next_factor = B_current[:, observations[1:]].T * beta_hat[1:]
+                xi_den = np.sum((alpha_hat[:-1] @ A_current) * next_factor, axis=1)
+                xi_den += self._EPSILON
 
-            # Transition and emission updates
-            for t in range(T - 1):
-                xi = (
-                    alpha_hat[t, :, None]
-                    * self.A
-                    * self.B[:, sequence[t + 1]][None, :]
-                    * beta_hat[t + 1, None, :]
-                )
-                xi /= np.sum(xi) + epsilon
-                A_num += xi
-                A_den += gamma[t]
-                B_num[:, sequence[t]] += gamma[t]
+                A_num += A_current * ((alpha_hat[:-1] / xi_den[:, None]).T @ next_factor)
+                A_den += gamma_sum - gamma[-1]
 
-            # Last observation emission update
-            B_num[:, sequence[-1]] += gamma[-1]
-            B_den += np.sum(gamma, axis=0)
-
-        # Maximization step
-        self.pi = pi_num / (np.sum(pi_num) + epsilon)
-        self.A = A_num / (A_den[:, None] + epsilon)
-        self.B = B_num / (B_den[:, None] + epsilon)
+        self.pi = pi_num / (pi_num.sum() + self._EPSILON)
+        self.A = A_num / (A_den[:, None] + self._EPSILON)
+        self.B = B_num / (B_den[:, None] + self._EPSILON)
 
         if verbose and iteration % 10 == 0:
             print(f&#34;Iteration {iteration}&#34;)
             print(&#34;\nPi:&#34;)
             print(self.pi)
-
             print(&#34;\nA:&#34;)
             print(self.A)
-
             print(&#34;\nB:&#34;)
             print(self.B)</code></pre>
 </details>
-<div class="desc"><p>Baum-Welch algorithm (Expectation-Maximization) for estimating HMM
-parameters.</p>
-<p>Uses the scaled forward-backward algorithm with shared scaling
-factors between alpha and beta.</p>
+<div class="desc"><p>Estimate model parameters with the Baum-Welch EM algorithm.</p>
+<p>Forward/backward inference is performed per sequence. Within each
+sequence, posterior transition probabilities (<code>xi</code>), state
+occupancies (<code>gamma</code>), and emission sufficient statistics are
+accumulated with NumPy operations instead of Python loops over time
+and states.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>sequences</code></strong> :&ensp;<code>List[List[int]]</code></dt>
-<dd>Collection of observation sequences.</dd>
+<dt><strong><code>sequences</code></strong> :&ensp;<code>Sequence[Sequence[int] | NDArray[np.int64]]</code></dt>
+<dd>Collection of non-empty observation sequences.</dd>
 <dt><strong><code>n_iterations</code></strong> :&ensp;<code>int</code></dt>
-<dd>Number of EM iterations.</dd>
-<dt><strong><code>verbose</code></strong> :&ensp;<code>bool</code></dt>
-<dd>Print parameters every 10 iterations.</dd>
+<dd>Number of expectation-maximization iterations.</dd>
+<dt><strong><code>verbose</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>If <code>True</code>, print model parameters every 10 iterations, starting
+at iteration 0.</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>ValueError</code></dt>
+<dd>If <code>n_iterations</code> is negative or <code>sequences</code> is empty.</dd>
 </dl></div>
 </dd>
 <dt id="likelihood.models.hmm.HMM.decoding_accuracy"><code class="name flex">
-<span>def <span class="ident">decoding_accuracy</span></span>(<span>self, sequences: List[List[int]], true_states: List[List[int]]) ‑> float</span>
+<span>def <span class="ident">decoding_accuracy</span></span>(<span>self,<br>sequences: Sequence[ObservationSequence],<br>true_states: Sequence[ObservationSequence]) ‑> float</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -878,324 +1162,352 @@ factors between alpha and beta.</p>
 </summary>
 <pre><code class="python">def decoding_accuracy(
     self,
-    sequences: List[List[int]],
-    true_states: List[List[int]],
+    sequences: Sequence[ObservationSequence],
+    true_states: Sequence[ObservationSequence],
 ) -&gt; float:
-    &#34;&#34;&#34;
-    Computes Viterbi decoding accuracy after optimally aligning
-    predicted hidden-state labels with the ground-truth labels.
+    &#34;&#34;&#34;Compute label-aligned Viterbi decoding accuracy.
+
+    Hidden-state labels are permutation-invariant. This method builds a
+    confusion matrix between predicted and true labels, uses the Hungarian
+    algorithm to find the optimal label assignment, then reports the
+    percentage of correctly aligned states.
 
     Parameters
     ----------
-    sequences : List[List[int]]
-        Observation sequences.
-    true_states : List[List[int]]
-        Ground-truth hidden-state sequences.
+    sequences : Sequence[Sequence[int] | NDArray[np.int64]]
+        Observation sequences to decode.
+    true_states : Sequence[Sequence[int] | NDArray[np.int64]]
+        Ground-truth state sequences corresponding to ``sequences``.
 
     Returns
     -------
     float
-        Label-aligned decoding accuracy percentage.
-    &#34;&#34;&#34;
-    predicted_states = np.concatenate([self.viterbi(sequence) for sequence in sequences])
-    true_states_flat = np.concatenate([np.asarray(states) for states in true_states])
-    predicted_labels = np.unique(predicted_states)
-    true_labels = np.unique(true_states_flat)
-    confusion = np.zeros(
-        (len(predicted_labels), len(true_labels)),
-        dtype=int,
-    )
-    for i, predicted_label in enumerate(predicted_labels):
-        for j, true_label in enumerate(true_labels):
-            confusion[i, j] = np.sum(
-                (predicted_states == predicted_label) &amp; (true_states_flat == true_label)
-            )
-    row_ind, col_ind = linear_sum_assignment(-confusion)
-    mapping = {predicted_labels[row]: true_labels[col] for row, col in zip(row_ind, col_ind)}
-    aligned_predictions = np.array([mapping.get(state, -1) for state in predicted_states])
-    accuracy = np.mean(aligned_predictions == true_states_flat) * 100
+        Label-aligned decoding accuracy as a percentage in ``[0, 100]``.
 
-    return accuracy</code></pre>
+    Raises
+    ------
+    ValueError
+        If the collections are empty, contain different numbers of
+        sequences, or corresponding sequence lengths differ.
+    &#34;&#34;&#34;
+    if len(sequences) == 0:
+        raise ValueError(&#34;sequences must contain at least one sequence.&#34;)
+    if len(sequences) != len(true_states):
+        raise ValueError(&#34;sequences and true_states must contain the same number of sequences.&#34;)
+
+    predicted_parts: list[IntArray] = []
+    true_parts: list[IntArray] = []
+
+    for sequence, states in zip(sequences, true_states):
+        predicted = self.viterbi(sequence)
+        truth = np.asarray(states, dtype=np.int64)
+        if truth.ndim != 1:
+            raise ValueError(&#34;Each true-state sequence must be one-dimensional.&#34;)
+        if predicted.size != truth.size:
+            raise ValueError(
+                &#34;Each observation sequence and true-state sequence must have &#34;
+                &#34;the same length.&#34;
+            )
+        predicted_parts.append(predicted)
+        true_parts.append(truth)
+
+    predicted_states = np.concatenate(predicted_parts)
+    true_states_flat = np.concatenate(true_parts)
+
+    predicted_labels, predicted_inverse = np.unique(predicted_states, return_inverse=True)
+    true_labels, true_inverse = np.unique(true_states_flat, return_inverse=True)
+
+    confusion = np.bincount(
+        predicted_inverse * true_labels.size + true_inverse,
+        minlength=predicted_labels.size * true_labels.size,
+    ).reshape(predicted_labels.size, true_labels.size)
+
+    row_ind, col_ind = linear_sum_assignment(-confusion)
+    aligned_label_by_index = np.full(predicted_labels.size, -1, dtype=np.int64)
+    aligned_label_by_index[row_ind] = true_labels[col_ind]
+    aligned_predictions = aligned_label_by_index[predicted_inverse]
+
+    return float(np.mean(aligned_predictions == true_states_flat) * 100.0)</code></pre>
 </details>
-<div class="desc"><p>Computes Viterbi decoding accuracy after optimally aligning
-predicted hidden-state labels with the ground-truth labels.</p>
+<div class="desc"><p>Compute label-aligned Viterbi decoding accuracy.</p>
+<p>Hidden-state labels are permutation-invariant. This method builds a
+confusion matrix between predicted and true labels, uses the Hungarian
+algorithm to find the optimal label assignment, then reports the
+percentage of correctly aligned states.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>sequences</code></strong> :&ensp;<code>List[List[int]]</code></dt>
-<dd>Observation sequences.</dd>
-<dt><strong><code>true_states</code></strong> :&ensp;<code>List[List[int]]</code></dt>
-<dd>Ground-truth hidden-state sequences.</dd>
+<dt><strong><code>sequences</code></strong> :&ensp;<code>Sequence[Sequence[int] | NDArray[np.int64]]</code></dt>
+<dd>Observation sequences to decode.</dd>
+<dt><strong><code>true_states</code></strong> :&ensp;<code>Sequence[Sequence[int] | NDArray[np.int64]]</code></dt>
+<dd>Ground-truth state sequences corresponding to <code>sequences</code>.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><code>float</code></dt>
-<dd>Label-aligned decoding accuracy percentage.</dd>
+<dd>Label-aligned decoding accuracy as a percentage in <code>[0, 100]</code>.</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>ValueError</code></dt>
+<dd>If the collections are empty, contain different numbers of
+sequences, or corresponding sequence lengths differ.</dd>
 </dl></div>
 </dd>
 <dt id="likelihood.models.hmm.HMM.forward"><code class="name flex">
-<span>def <span class="ident">forward</span></span>(<span>self, sequence: List[int]) ‑> numpy.ndarray</span>
+<span>def <span class="ident">forward</span></span>(<span>self, sequence: ObservationSequence) ‑> numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def forward(self, sequence: List[int]) -&gt; np.ndarray:
-    &#34;&#34;&#34;
-    Computes the scaled forward probabilities.
+<pre><code class="python">def forward(self, sequence: ObservationSequence) -&gt; FloatArray:
+    &#34;&#34;&#34;Compute scaled forward probabilities for an observation sequence.
 
     Parameters
     ----------
-    sequence : List[int]
-        Observation sequence.
+    sequence : Sequence[int] or NDArray[np.int64]
+        Observation sequence of length ``T``.
 
     Returns
     -------
-    np.ndarray
-        Scaled forward probabilities (alpha_hat).
-        Each row is normalized to sum to one.
+    NDArray[np.float64]
+        Matrix with shape ``(T, n_states)`` containing scaled forward
+        probabilities. Each row is normalized approximately to one.
 
     Notes
     -----
-    These are the scaled forward probabilities used for numerical
-    stability. They are proportional to the true forward probabilities,
-    but they are not equal to P(o1, ..., ot, qt=i).
+    These values are proportional to the unscaled forward probabilities;
+    they are not themselves ``P(o_1, ..., o_t, q_t=i)``.
     &#34;&#34;&#34;
     alpha_hat, _ = self._forward_with_scaling(sequence)
     return alpha_hat</code></pre>
 </details>
-<div class="desc"><p>Computes the scaled forward probabilities.</p>
+<div class="desc"><p>Compute scaled forward probabilities for an observation sequence.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>sequence</code></strong> :&ensp;<code>List[int]</code></dt>
-<dd>Observation sequence.</dd>
+<dt><strong><code>sequence</code></strong> :&ensp;<code>Sequence[int]</code> or <code>NDArray[np.int64]</code></dt>
+<dd>Observation sequence of length <code>T</code>.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><code>np.ndarray</code></dt>
-<dd>Scaled forward probabilities (alpha_hat).
-Each row is normalized to sum to one.</dd>
+<dt><code>NDArray[np.float64]</code></dt>
+<dd>Matrix with shape <code>(T, n_states)</code> containing scaled forward
+probabilities. Each row is normalized approximately to one.</dd>
 </dl>
 <h2 id="notes">Notes</h2>
-<p>These are the scaled forward probabilities used for numerical
-stability. They are proportional to the true forward probabilities,
-but they are not equal to P(o1, &hellip;, ot, qt=i).</p></div>
+<p>These values are proportional to the unscaled forward probabilities;
+they are not themselves <code>P(o_1, ..., o_t, q_t=i)</code>.</p></div>
 </dd>
 <dt id="likelihood.models.hmm.HMM.save_model"><code class="name flex">
-<span>def <span class="ident">save_model</span></span>(<span>self, filename: str = './hmm') ‑> None</span>
+<span>def <span class="ident">save_model</span></span>(<span>self, filename: str | Path = './hmm') ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def save_model(self, filename: str = &#34;./hmm&#34;) -&gt; None:
-    filename = filename if filename.endswith(&#34;.pkl&#34;) else filename + &#34;.pkl&#34;
-    with open(filename, &#34;wb&#34;) as f:
-        pickle.dump(self, f)</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="likelihood.models.hmm.HMM.sequence_log_probability"><code class="name flex">
-<span>def <span class="ident">sequence_log_probability</span></span>(<span>self, sequence: List[int]) ‑> float</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def sequence_log_probability(self, sequence: List[int]) -&gt; float:
-    &#34;&#34;&#34;
-    Computes log P(O | model).
-    &#34;&#34;&#34;
-    _, log_scale = self._forward_with_scaling(sequence)
-    return float(np.sum(log_scale))</code></pre>
-</details>
-<div class="desc"><p>Computes log P(O | model).</p></div>
-</dd>
-<dt id="likelihood.models.hmm.HMM.sequence_probability"><code class="name flex">
-<span>def <span class="ident">sequence_probability</span></span>(<span>self, sequence: List[int]) ‑> float</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def sequence_probability(
-    self,
-    sequence: List[int],
-) -&gt; float:
-    &#34;&#34;&#34;
-    Computes the likelihood of an observation sequence.
-
-    Calculates:
-
-        P(O | model)
-
-    using the scaling factors from the forward algorithm.
+<pre><code class="python">def save_model(self, filename: str | Path = &#34;./hmm&#34;) -&gt; None:
+    &#34;&#34;&#34;Serialize the model to disk using pickle.
 
     Parameters
     ----------
-    sequence : List[int]
+    filename : str or pathlib.Path, default=&#34;./hmm&#34;
+        Destination path. ``.pkl`` is appended when it is not already
+        present.
+    &#34;&#34;&#34;
+    path = self._model_path(filename)
+    with path.open(&#34;wb&#34;) as file:
+        pickle.dump(self, file)</code></pre>
+</details>
+<div class="desc"><p>Serialize the model to disk using pickle.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>filename</code></strong> :&ensp;<code>str</code> or <code>pathlib.Path</code>, default=<code>"./hmm"</code></dt>
+<dd>Destination path. <code>.pkl</code> is appended when it is not already
+present.</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.models.hmm.HMM.sequence_log_probability"><code class="name flex">
+<span>def <span class="ident">sequence_log_probability</span></span>(<span>self, sequence: ObservationSequence) ‑> float</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def sequence_log_probability(self, sequence: ObservationSequence) -&gt; float:
+    &#34;&#34;&#34;Return the log-likelihood ``log P(O | model)`` of a sequence.
+
+    Parameters
+    ----------
+    sequence : Sequence[int] or NDArray[np.int64]
         Observation sequence.
 
     Returns
     -------
     float
-        Probability of the observation sequence.
+        Sequence log-likelihood computed from the forward scaling factors.
     &#34;&#34;&#34;
     _, log_scale = self._forward_with_scaling(sequence)
-    log_likelihood = np.sum(log_scale)
-
-    return float(np.exp(log_likelihood))</code></pre>
+    return float(log_scale.sum())</code></pre>
 </details>
-<div class="desc"><p>Computes the likelihood of an observation sequence.</p>
-<p>Calculates
------=</p>
-<p>P(O | model)</p>
-<p>using the scaling factors from the forward algorithm.</p>
+<div class="desc"><p>Return the log-likelihood <code>log P(O | model)</code> of a sequence.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>sequence</code></strong> :&ensp;<code>List[int]</code></dt>
+<dt><strong><code>sequence</code></strong> :&ensp;<code>Sequence[int]</code> or <code>NDArray[np.int64]</code></dt>
 <dd>Observation sequence.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><code>float</code></dt>
-<dd>Probability of the observation sequence.</dd>
+<dd>Sequence log-likelihood computed from the forward scaling factors.</dd>
 </dl></div>
 </dd>
-<dt id="likelihood.models.hmm.HMM.state_probabilities"><code class="name flex">
-<span>def <span class="ident">state_probabilities</span></span>(<span>self, sequence: List[int]) ‑> numpy.ndarray</span>
+<dt id="likelihood.models.hmm.HMM.sequence_probability"><code class="name flex">
+<span>def <span class="ident">sequence_probability</span></span>(<span>self, sequence: ObservationSequence) ‑> float</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def state_probabilities(
-    self,
-    sequence: List[int],
-) -&gt; np.ndarray:
-    &#34;&#34;&#34;
-    Computes smoothed hidden-state probabilities.
-
-    Calculates:
-
-        gamma_t(i) = P(q_t=i | O)
-
-    using the scaled forward-backward algorithm.
+<pre><code class="python">def sequence_probability(self, sequence: ObservationSequence) -&gt; float:
+    &#34;&#34;&#34;Return the likelihood ``P(O | model)`` of an observation sequence.
 
     Parameters
     ----------
-    sequence : List[int]
+    sequence : Sequence[int] or NDArray[np.int64]
         Observation sequence.
 
     Returns
     -------
-    np.ndarray
-        Matrix of shape (T, n_states), where each row
-        contains the posterior probability of each hidden
-        state at time t.
+    float
+        Sequence likelihood. For long sequences this value can underflow
+        to zero; use :meth:`sequence_log_probability` when possible.
     &#34;&#34;&#34;
-    epsilon = 1e-10
-
-    alpha_hat, log_scale = self._forward_with_scaling(sequence)
-
-    beta_hat = self._backward_with_scaling(
-        sequence,
-        log_scale,
-    )
-
-    gamma = alpha_hat * beta_hat
-
-    gamma /= (
-        np.sum(
-            gamma,
-            axis=1,
-            keepdims=True,
-        )
-        + epsilon
-    )
-
-    return gamma</code></pre>
+    return float(np.exp(self.sequence_log_probability(sequence)))</code></pre>
 </details>
-<div class="desc"><p>Computes smoothed hidden-state probabilities.</p>
-<p>Calculates
------=</p>
-<p>gamma_t(i) = P(q_t=i | O)</p>
-<p>using the scaled forward-backward algorithm.</p>
+<div class="desc"><p>Return the likelihood <code>P(O | model)</code> of an observation sequence.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>sequence</code></strong> :&ensp;<code>List[int]</code></dt>
+<dt><strong><code>sequence</code></strong> :&ensp;<code>Sequence[int]</code> or <code>NDArray[np.int64]</code></dt>
 <dd>Observation sequence.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><code>np.ndarray</code></dt>
-<dd>Matrix of shape (T, n_states), where each row
-contains the posterior probability of each hidden
-state at time t.</dd>
+<dt><code>float</code></dt>
+<dd>Sequence likelihood. For long sequences this value can underflow
+to zero; use :meth:<code>sequence_log_probability</code> when possible.</dd>
 </dl></div>
 </dd>
-<dt id="likelihood.models.hmm.HMM.viterbi"><code class="name flex">
-<span>def <span class="ident">viterbi</span></span>(<span>self, sequence: List[int]) ‑> numpy.ndarray</span>
+<dt id="likelihood.models.hmm.HMM.state_probabilities"><code class="name flex">
+<span>def <span class="ident">state_probabilities</span></span>(<span>self, sequence: ObservationSequence) ‑> numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def viterbi(self, sequence: List[int]) -&gt; np.ndarray:
-    &#34;&#34;&#34;
-    Computes the most likely hidden state sequence using the Viterbi
-    algorithm in log-space.
+<pre><code class="python">def state_probabilities(self, sequence: ObservationSequence) -&gt; FloatArray:
+    &#34;&#34;&#34;Compute smoothed posterior hidden-state probabilities.
+
+    This returns ``gamma[t, i] = P(q_t=i | O)`` using the scaled
+    forward-backward algorithm.
 
     Parameters
     ----------
-    sequence : List[int]
-        Observation sequence.
+    sequence : Sequence[int] or NDArray[np.int64]
+        Observation sequence of length ``T``.
 
     Returns
     -------
-    np.ndarray
-        Most probable sequence of hidden states.
+    NDArray[np.float64]
+        Posterior state-probability matrix with shape ``(T, n_states)``.
+        Each row sums approximately to one.
     &#34;&#34;&#34;
-    T = len(sequence)
-    epsilon = 1e-10
-    log_delta = np.zeros((T, self.n_states))
-    psi = np.zeros((T, self.n_states), dtype=int)
+    alpha_hat, log_scale = self._forward_with_scaling(sequence)
+    beta_hat = self._backward_with_scaling(sequence, log_scale)
 
-    # Initialization
-    log_delta[0] = np.log(self.pi + epsilon) + np.log(self.B[:, sequence[0]] + epsilon)
+    gamma = alpha_hat * beta_hat
+    gamma /= gamma.sum(axis=1, keepdims=True) + self._EPSILON
+    return gamma</code></pre>
+</details>
+<div class="desc"><p>Compute smoothed posterior hidden-state probabilities.</p>
+<p>This returns <code>gamma[t, i] = P(q_t=i | O)</code> using the scaled
+forward-backward algorithm.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>sequence</code></strong> :&ensp;<code>Sequence[int]</code> or <code>NDArray[np.int64]</code></dt>
+<dd>Observation sequence of length <code>T</code>.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>NDArray[np.float64]</code></dt>
+<dd>Posterior state-probability matrix with shape <code>(T, n_states)</code>.
+Each row sums approximately to one.</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.models.hmm.HMM.viterbi"><code class="name flex">
+<span>def <span class="ident">viterbi</span></span>(<span>self, sequence: ObservationSequence) ‑> numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.int64]]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def viterbi(self, sequence: ObservationSequence) -&gt; IntArray:
+    &#34;&#34;&#34;Decode the most likely hidden-state path with the Viterbi algorithm.
 
-    # Recursion
-    for t in range(1, T):
-        for j in range(self.n_states):
-            previous_scores = log_delta[t - 1] + np.log(self.A[:, j] + epsilon)
-            psi[t, j] = np.argmax(previous_scores)
-            log_delta[t, j] = np.max(previous_scores) + np.log(self.B[j, sequence[t]] + epsilon)
+    The dynamic program remains sequential over time, while the score
+    calculation for all source/destination state pairs is vectorized.
 
-    # Backtracking
-    state_sequence = np.zeros(T, dtype=int)
-    state_sequence[-1] = np.argmax(log_delta[-1])
+    Parameters
+    ----------
+    sequence : Sequence[int] or NDArray[np.int64]
+        Observation sequence of length ``T``.
 
-    for t in range(T - 2, -1, -1):
+    Returns
+    -------
+    NDArray[np.int64]
+        Most probable hidden-state sequence with shape ``(T,)``.
+    &#34;&#34;&#34;
+    observations = self._as_observation_array(sequence)
+    n_steps = observations.size
+
+    log_A = np.log(self.A + self._EPSILON)
+    log_emissions = np.log(self.B[:, observations].T + self._EPSILON)
+
+    psi = np.empty((n_steps, self.n_states), dtype=np.int64)
+    psi[0] = 0
+    state_indices = np.arange(self.n_states)
+    log_delta = np.log(self.pi + self._EPSILON) + log_emissions[0]
+
+    for t in range(1, n_steps):
+        transition_scores = log_delta[:, None] + log_A
+        psi[t] = np.argmax(transition_scores, axis=0)
+        log_delta = transition_scores[psi[t], state_indices] + log_emissions[t]
+
+    state_sequence = np.empty(n_steps, dtype=np.int64)
+    state_sequence[-1] = np.argmax(log_delta)
+
+    for t in range(n_steps - 2, -1, -1):
         state_sequence[t] = psi[t + 1, state_sequence[t + 1]]
 
     return state_sequence</code></pre>
 </details>
-<div class="desc"><p>Computes the most likely hidden state sequence using the Viterbi
-algorithm in log-space.</p>
+<div class="desc"><p>Decode the most likely hidden-state path with the Viterbi algorithm.</p>
+<p>The dynamic program remains sequential over time, while the score
+calculation for all source/destination state pairs is vectorized.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>sequence</code></strong> :&ensp;<code>List[int]</code></dt>
-<dd>Observation sequence.</dd>
+<dt><strong><code>sequence</code></strong> :&ensp;<code>Sequence[int]</code> or <code>NDArray[np.int64]</code></dt>
+<dd>Observation sequence of length <code>T</code>.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><code>np.ndarray</code></dt>
-<dd>Most probable sequence of hidden states.</dd>
+<dt><code>NDArray[np.int64]</code></dt>
+<dd>Most probable hidden-state sequence with shape <code>(T,)</code>.</dd>
 </dl></div>
 </dd>
 </dl>
