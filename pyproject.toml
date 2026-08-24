@@ -40,6 +40,11 @@ full = [
 [tool.setuptools]
 packages = { find = {} }
 
+[tool.pytest.ini_options]
+markers = [
+    "performance: performance and benchmark tests",
+]
+
 [tool.setuptools.dynamic]
 version = { file = ["likelihood/VERSION"] }
 dependencies = { file = ["requirements.txt"] }

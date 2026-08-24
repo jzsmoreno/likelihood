@@ -1394,7 +1394,9 @@ def display_network_analysis(
     display(option_style)
     display(action_style)
 
-    display(HTML(f"""
+    display(
+        HTML(
+            f"""
     <div style="
         margin-top:20px;
         padding:15px;
@@ -1407,7 +1409,9 @@ def display_network_analysis(
         Most variable option dimension: {max_opt_dim}<br>
         Most variable action dimension: {max_act_dim}
     </div>
-    """))
+    """
+        )
+    )
 
 
 if __name__ == "__main__":
