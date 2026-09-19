@@ -612,47 +612,50 @@ def collect_experience(
 
     returns = []
     advantages = []
-    G = 0
     delta = 0
+    gae = 0.0
+    G = 0.0
+
     for t in reversed(range(len(trajectory))):
         state, selected_option, action, reward, next_state, terminate, done = trajectory[t]
 
+        # Current state value: V(s_t)
         state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
-        _, action_probs, _, _, _ = model(state_tensor, multiple_option)
 
-        if t == len(trajectory) - 1:
-            G = reward
-            adv = 0
-            selected_probs = get_selected_probs(action_probs, action)
-            if isinstance(selected_probs, list):
-                adv = sum([G - p for p in selected_probs])
-            else:
-                adv = G - selected_probs
-            advantages.insert(0, adv)
+        with torch.no_grad():
+            value = model.value_network(state_tensor)
+
+        value = value.squeeze().item()
+
+        # Next state value: V(s_{t+1})
+        if done:
+            next_value = 0.0
         else:
             next_state_tensor = (
                 torch.tensor(next_state, dtype=torch.float32).unsqueeze(0).to(device)
             )
-            _, next_action_probs, _, _, _ = model(next_state_tensor, multiple_option)
 
-            selected_probs = get_selected_probs(action_probs, action)
-            next_selected_probs = get_selected_probs(next_action_probs, action)
+            with torch.no_grad():
+                next_value = model.value_network(next_state_tensor)
 
-            if isinstance(selected_probs, list):
-                reward_tensor = torch.tensor([reward] * len(action), dtype=torch.float32).to(device)
-                np_tensor = torch.tensor(next_selected_probs, dtype=torch.float32).to(device)
-                sp_tensor = torch.tensor(selected_probs, dtype=torch.float32).to(device)
-                deltas = reward_tensor + gamma * np_tensor - sp_tensor
-                delta = torch.mean(deltas).item()
-            else:
-                delta = reward + gamma * next_selected_probs - selected_probs
+            next_value = next_value.squeeze().item()
 
-            G = reward + gamma * G
-            advantages.insert(
-                0, delta + gamma * lambda_parameter * advantages[0] if advantages else delta
-            )
-
+        # Discounted return:
+        # G_t = r_t + gamma * G_{t+1}
+        G = reward + gamma * G
         returns.insert(0, G)
+
+        # TD error:
+        # delta_t = r_t + gamma * V(s_{t+1}) - V(s_t)
+        # For terminal states:
+        # delta_t = r_t - V(s_t)
+        delta = reward + gamma * next_value * (1.0 - float(done)) - value
+
+        # Generalized Advantage Estimation:
+        # A_t = delta_t + gamma * lambda * A_{t+1}
+        gae = delta + gamma * lambda_parameter * gae
+
+        advantages.insert(0, gae)
 
     return trajectory, returns, advantages, old_probs
 
@@ -1394,9 +1397,7 @@ def display_network_analysis(
     display(option_style)
     display(action_style)
 
-    display(
-        HTML(
-            f"""
+    display(HTML(f"""
     <div style="
         margin-top:20px;
         padding:15px;
@@ -1409,9 +1410,7 @@ def display_network_analysis(
         Most variable option dimension: {max_opt_dim}<br>
         Most variable action dimension: {max_act_dim}
     </div>
-    """
-        )
-    )
+    """))
 
 
 if __name__ == "__main__":
