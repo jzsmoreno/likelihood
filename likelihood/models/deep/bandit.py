@@ -66,6 +66,12 @@ class MultiBanditNet(nn.Module):
             nn.Linear(self.num_neurons, 1),  # Single output for termination probability (0-1)
             nn.Sigmoid(),
         )
+        self.value_network = nn.Sequential(
+            nn.Linear(state_dim, self.num_neurons),
+            self.activation,
+            nn.Dropout(self.dropout_rate) if self.dropout_rate > 0 else nn.Identity(),
+            nn.Linear(self.num_neurons, 1),
+        )
         self.num_actions = [net[-1].out_features for net in self.action_networks]
         self.equal_action_sizes = len(set(self.num_actions)) == 1
         self.max_num_actions = max(self.num_actions)
