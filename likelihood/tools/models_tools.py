@@ -770,7 +770,7 @@ def train_option_critic(
         advantages_tensor = torch.tensor(advantages, dtype=torch.float32).to(device)
         old_probs_tensor = (
             torch.tensor(old_probs, dtype=torch.float32).view(actions.shape).to(device)
-        )
+        ).detach()
         dataset = TensorDataset(
             states, actions, returns_tensor, advantages_tensor, old_probs_tensor
         )
