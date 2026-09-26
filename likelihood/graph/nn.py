@@ -15,11 +15,10 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import tensorflow as tf
 
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+tf.get_logger().setLevel("ERROR")
 from IPython.display import clear_output
 from sklearn.metrics import f1_score
 
-tf.get_logger().setLevel("ERROR")
 
 from likelihood import rust_py_integration
 from likelihood.tools import LoRALayer
