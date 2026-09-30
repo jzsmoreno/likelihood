@@ -73,24 +73,13 @@ el.replaceWith(d);
         self.num_neurons = num_neurons
         self.num_layers = num_layers
         self.activation = activation
-        self.dropout_rate = dropout_rate
+        self.dropout_rate = max(0.0, dropout_rate)
 
-        self.option_network = nn.Sequential(
-            nn.Linear(state_dim, self.num_neurons),
-            nn.SELU(),
-            nn.Dropout(self.dropout_rate) if self.dropout_rate &gt; 0 else nn.Identity(),  # Dropout
-            nn.Linear(
-                self.num_neurons, num_options
-            ),  # Output a probability distribution over options
-        )
-
-        # Low-level (action) Q-networks for each option with additional linear layers
-        self.action_networks = nn.ModuleList()
-        for i in range(num_options):
-            action_network_layers = [nn.Linear(state_dim, self.num_neurons), self.activation]
-            for _ in range(self.num_layers - 1):
+        def build_action_network(num_actions: int) -&gt; nn.Sequential:
+            layers = [nn.Linear(state_dim, self.num_neurons), self.activation]
+            for _ in range(max(0, self.num_layers - 1)):
                 if self.dropout_rate &gt; 0:
-                    action_network_layers.extend(
+                    layers.extend(
                         [
                             nn.Dropout(self.dropout_rate),
                             nn.Linear(self.num_neurons, self.num_neurons),
@@ -98,29 +87,44 @@ el.replaceWith(d);
                         ]
                     )
                 else:
-                    action_network_layers.extend(
-                        [nn.Linear(self.num_neurons, self.num_neurons), self.activation]
-                    )
-            num_actions = (
-                num_actions_per_option
-                if not isinstance(num_actions_per_option, list)
-                else num_actions_per_option[i]
-            )  # Output Q-values for each action in this option
-            action_network_layers.append(nn.Linear(self.num_neurons, num_actions))
-            self.action_networks.append(nn.Sequential(*action_network_layers))
+                    layers.extend([nn.Linear(self.num_neurons, self.num_neurons), self.activation])
+            layers.append(nn.Linear(self.num_neurons, num_actions))
+            return nn.Sequential(*layers)
+
+        # Low-level (action) Q-networks for each option with additional linear layers
+        self.action_networks = nn.ModuleList(
+            build_action_network(
+                num_actions_per_option[i]
+                if isinstance(num_actions_per_option, list)
+                else num_actions_per_option
+            )
+            for i in range(self.num_options)
+        )
+
+        def _dropout() -&gt; nn.Module:
+            return nn.Dropout(self.dropout_rate) if self.dropout_rate &gt; 0 else nn.Identity()
+
+        self.option_network = nn.Sequential(
+            nn.Linear(state_dim, self.num_neurons),
+            self.activation,
+            _dropout(),
+            nn.Linear(
+                self.num_neurons, num_options
+            ),  # Output a probability distribution over options
+        )
 
         # Option termination network
         self.termination_network = nn.Sequential(
             nn.Linear(state_dim, self.num_neurons),
-            nn.SELU(),
-            nn.Dropout(self.dropout_rate) if self.dropout_rate &gt; 0 else nn.Identity(),  # Dropout
+            self.activation,
+            _dropout(),
             nn.Linear(self.num_neurons, 1),  # Single output for termination probability (0-1)
             nn.Sigmoid(),
         )
         self.value_network = nn.Sequential(
             nn.Linear(state_dim, self.num_neurons),
             self.activation,
-            nn.Dropout(self.dropout_rate) if self.dropout_rate &gt; 0 else nn.Identity(),
+            _dropout(),
             nn.Linear(self.num_neurons, 1),
         )
         self.num_actions = [net[-1].out_features for net in self.action_networks]
@@ -138,29 +142,25 @@ el.replaceWith(d);
             &#39;xavier_uniform&#39;, &#39;xavier_normal&#39;, &#39;kaiming_uniform&#39;, &#39;kaiming_normal&#39;,
             &#39;orthogonal&#39;, &#39;uniform&#39;, &#39;normal&#39;, &#39;zeros&#39;, &#39;ones&#39;
         &#34;&#34;&#34;
+        init_dispatch = {
+            &#34;xavier_uniform&#34;: nn.init.xavier_uniform_,
+            &#34;xavier_normal&#34;: nn.init.xavier_normal_,
+            &#34;kaiming_uniform&#34;: nn.init.kaiming_uniform_,
+            &#34;kaiming_normal&#34;: nn.init.kaiming_normal_,
+            &#34;orthogonal&#34;: nn.init.orthogonal_,
+            &#34;uniform&#34;: nn.init.uniform_,
+            &#34;normal&#34;: nn.init.normal_,
+            &#34;zeros&#34;: nn.init.zeros_,
+            &#34;ones&#34;: nn.init.ones_,
+        }
+
+        if method not in init_dispatch:
+            raise ValueError(f&#34;Unsupported initialization method: {method}&#34;)
+
+        # Iterates over all modules (including submodules) and initializes linear layers
         for m in self.modules():
             if isinstance(m, nn.Linear):
-                if method == &#34;xavier_uniform&#34;:
-                    nn.init.xavier_uniform_(m.weight)
-                elif method == &#34;xavier_normal&#34;:
-                    nn.init.xavier_normal_(m.weight)
-                elif method == &#34;kaiming_uniform&#34;:
-                    nn.init.kaiming_uniform_(m.weight)
-                elif method == &#34;kaiming_normal&#34;:
-                    nn.init.kaiming_normal_(m.weight)
-                elif method == &#34;orthogonal&#34;:
-                    nn.init.orthogonal_(m.weight)
-                elif method == &#34;uniform&#34;:
-                    nn.init.uniform_(m.weight)
-                elif method == &#34;normal&#34;:
-                    nn.init.normal_(m.weight)
-                elif method == &#34;zeros&#34;:
-                    nn.init.zeros_(m.weight)
-                elif method == &#34;ones&#34;:
-                    nn.init.ones_(m.weight)
-                else:
-                    raise ValueError(f&#34;Unsupported initialization method: {method}&#34;)
-
+                init_dispatch[method](m.weight)
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
@@ -213,8 +213,8 @@ el.replaceWith(d);
 
             for i, net in enumerate(self.action_networks):
                 probs = torch.softmax(net(state) / temperature, dim=-1)
-                num_actions_i = probs.size(-1)
-                action_probs[:, i, :num_actions_i] = probs
+                n_act = probs.size(-1)
+                action_probs[:, i, :n_act] = probs
                 selected_actions[:, i] = torch.argmax(probs, dim=-1)
 
             selected_options = torch.argmax(option_probs, dim=-1)
@@ -231,8 +231,8 @@ el.replaceWith(d);
                     probs = torch.softmax(
                         self.action_networks[opt_idx](states_opt) / temperature, dim=-1
                     )
-                    num_actions_i = probs.size(-1)
-                    action_probs[mask, :num_actions_i] = probs
+                    n_act = probs.size(-1)
+                    action_probs[mask, :n_act] = probs
                     selected_actions[mask] = torch.argmax(probs, dim=-1)
 
         termination_prob = self.termination_network(state)
@@ -293,29 +293,25 @@ evaluation mode.
         &#39;xavier_uniform&#39;, &#39;xavier_normal&#39;, &#39;kaiming_uniform&#39;, &#39;kaiming_normal&#39;,
         &#39;orthogonal&#39;, &#39;uniform&#39;, &#39;normal&#39;, &#39;zeros&#39;, &#39;ones&#39;
     &#34;&#34;&#34;
+    init_dispatch = {
+        &#34;xavier_uniform&#34;: nn.init.xavier_uniform_,
+        &#34;xavier_normal&#34;: nn.init.xavier_normal_,
+        &#34;kaiming_uniform&#34;: nn.init.kaiming_uniform_,
+        &#34;kaiming_normal&#34;: nn.init.kaiming_normal_,
+        &#34;orthogonal&#34;: nn.init.orthogonal_,
+        &#34;uniform&#34;: nn.init.uniform_,
+        &#34;normal&#34;: nn.init.normal_,
+        &#34;zeros&#34;: nn.init.zeros_,
+        &#34;ones&#34;: nn.init.ones_,
+    }
+
+    if method not in init_dispatch:
+        raise ValueError(f&#34;Unsupported initialization method: {method}&#34;)
+
+    # Iterates over all modules (including submodules) and initializes linear layers
     for m in self.modules():
         if isinstance(m, nn.Linear):
-            if method == &#34;xavier_uniform&#34;:
-                nn.init.xavier_uniform_(m.weight)
-            elif method == &#34;xavier_normal&#34;:
-                nn.init.xavier_normal_(m.weight)
-            elif method == &#34;kaiming_uniform&#34;:
-                nn.init.kaiming_uniform_(m.weight)
-            elif method == &#34;kaiming_normal&#34;:
-                nn.init.kaiming_normal_(m.weight)
-            elif method == &#34;orthogonal&#34;:
-                nn.init.orthogonal_(m.weight)
-            elif method == &#34;uniform&#34;:
-                nn.init.uniform_(m.weight)
-            elif method == &#34;normal&#34;:
-                nn.init.normal_(m.weight)
-            elif method == &#34;zeros&#34;:
-                nn.init.zeros_(m.weight)
-            elif method == &#34;ones&#34;:
-                nn.init.ones_(m.weight)
-            else:
-                raise ValueError(f&#34;Unsupported initialization method: {method}&#34;)
-
+            init_dispatch[method](m.weight)
             if m.bias is not None:
                 nn.init.zeros_(m.bias)</code></pre>
 </details>
@@ -385,8 +381,8 @@ evaluation mode.
 
         for i, net in enumerate(self.action_networks):
             probs = torch.softmax(net(state) / temperature, dim=-1)
-            num_actions_i = probs.size(-1)
-            action_probs[:, i, :num_actions_i] = probs
+            n_act = probs.size(-1)
+            action_probs[:, i, :n_act] = probs
             selected_actions[:, i] = torch.argmax(probs, dim=-1)
 
         selected_options = torch.argmax(option_probs, dim=-1)
@@ -403,8 +399,8 @@ evaluation mode.
                 probs = torch.softmax(
                     self.action_networks[opt_idx](states_opt) / temperature, dim=-1
                 )
-                num_actions_i = probs.size(-1)
-                action_probs[mask, :num_actions_i] = probs
+                n_act = probs.size(-1)
+                action_probs[mask, :n_act] = probs
                 selected_actions[mask] = torch.argmax(probs, dim=-1)
 
     termination_prob = self.termination_network(state)

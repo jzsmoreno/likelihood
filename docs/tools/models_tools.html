@@ -1210,7 +1210,7 @@ correlation value greater than the specified threshold to identify which columns
 The trained model after fitting.</p></div>
 </dd>
 <dt id="likelihood.tools.models_tools.train_model_with_episodes"><code class="name flex">
-<span>def <span class="ident">train_model_with_episodes</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_episodes: int,<br>episode_patience: int = 5,<br>**kwargs: Any) ‑> Tuple[torch.nn.modules.module.Module, float]</span>
+<span>def <span class="ident">train_model_with_episodes</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_episodes: int,<br>episode_patience: int = 1,<br>**kwargs: Any) ‑> Tuple[torch.nn.modules.module.Module, float]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1222,7 +1222,7 @@ The trained model after fitting.</p></div>
     optimizer: torch.optim.Optimizer,
     env: Any,
     num_episodes: int,
-    episode_patience: int = 5,
+    episode_patience: int = 1,
     **kwargs: Any,
 ) -&gt; Tuple[torch.nn.Module, float]:
     &#34;&#34;&#34;Trains a model via reinforcement learning episodes.
@@ -1254,6 +1254,12 @@ The trained model after fitting.</p></div>
         Critic learning rate hyperparameter.
     patience : `int`
         Early stopping patience in epochs.
+    epsilon_start : `float`, default 1.0
+        Initial exploration probability.
+    epsilon_end : `float`, default 0.05
+        Minimum exploration probability after decay.
+    epsilon_decay : `float`, default 0.99
+        Exponential decay rate for epsilon per episode.
 
     Returns
     -------
@@ -1262,14 +1268,18 @@ The trained model after fitting.</p></div>
     best_loss_so_far : `float`
         The best loss value observed during training.
     &#34;&#34;&#34;
+    epsilon_start = kwargs.pop(&#34;epsilon_start&#34;, 1.0)
+    epsilon_end = kwargs.pop(&#34;epsilon_end&#34;, 0.05)
+    epsilon_decay = kwargs.pop(&#34;epsilon_decay&#34;, 0.99)
+
     previous_weights = model.state_dict()
     best_loss_so_far = float(&#34;inf&#34;)
     loss_window = []
     average_loss = 0.0
     no_improvement_count = 0
 
-    print(f&#34;{&#39;Episode&#39;:&lt;12} {&#39;Loss&#39;:&lt;8} {&#39;Best Loss&#39;:&lt;17} {&#39;Status&#39;:&lt;15} {&#39;Avg Loss&#39;:&lt;4}&#34;)
-    print(&#34;=&#34; * 70)
+    print(f&#34;{&#39;Episode&#39;:&lt;12} {&#39;Loss&#39;:&lt;8} {&#39;Best Loss&#39;:&lt;17} {&#39;Status&#39;:&lt;20} {&#39;Avg Loss&#39;:&lt;10} ε&#34;)
+    print(&#34;=&#34; * 85)
 
     NEW_BEST_COLOR = &#34;\033[92m&#34;
     REVERT_COLOR = &#34;\033[91m&#34;
@@ -1283,19 +1293,31 @@ The trained model after fitting.</p></div>
         loss_window.append(loss)
         average_loss = sum(loss_window) / len(loss_window)
 
-        if loss &lt; best_loss_so_far:
-            best_loss_so_far = loss
-            previous_weights = model.state_dict()
-            no_improvement_count = 0
-            status = f&#34;{NEW_BEST_COLOR}Updated{RESET_COLOR}&#34;
+        epsilon = epsilon_end + (epsilon_start - epsilon_end) * (epsilon_decay**episode)
+
+        # Epsilon-greedy decision logic for weight updates
+        if np.random.random() &lt; epsilon:
+            # Exploration phase: randomly accept or reject the new weights
+            if np.random.random() &lt; 0.5:
+                previous_weights = model.state_dict()
+                status = f&#34;{NEW_BEST_COLOR}Updated{RESET_COLOR}&#34;
+            else:
+                status = f&#34;{REVERT_COLOR}No Improvement{RESET_COLOR}&#34;
         else:
-            model.load_state_dict(previous_weights)
-            no_improvement_count += 1
-            status = f&#34;{REVERT_COLOR}No Improvement{RESET_COLOR}&#34;
+            # Exploitation phase: greedy decision based on loss improvement
+            if loss &lt; best_loss_so_far:
+                best_loss_so_far = loss
+                previous_weights = model.state_dict()
+                no_improvement_count = 0
+                status = f&#34;{NEW_BEST_COLOR}Updated{RESET_COLOR}&#34;
+            else:
+                model.load_state_dict(previous_weights)
+                no_improvement_count += 1
+                status = f&#34;{REVERT_COLOR}No Improvement{RESET_COLOR}&#34;
         print(
-            f&#34;{episode + 1:&lt;8} {loss:&lt;12.4f} {best_loss_so_far:&lt;15.4f} {status:&lt;25} {average_loss:&lt;12.4f}&#34;
+            f&#34;{episode + 1:&lt;8} {loss:&lt;12.4f} {best_loss_so_far:&lt;15.4f} {status:&lt;30} {average_loss:&lt;10.4f} {epsilon:.3f}&#34;
         )
-        print(&#34;=&#34; * 70)
+        print(&#34;=&#34; * 85)
 
         if no_improvement_count &gt;= episode_patience:
             print(f&#34;\nNo improvement for {episode_patience} episodes. Stopping early.&#34;)
@@ -1310,6 +1332,16 @@ The trained model after fitting.</p></div>
         marker=None,
         markersize=6,
         color=sns.color_palette(&#34;deep&#34;)[0],
+        linestyle=&#34;-&#34;,
+        linewidth=2,
+    )
+    smoothed = cal_average(np.array(advantages_per_episode), alpha=0.1)
+    plt.plot(
+        range(len(smoothed)),
+        smoothed,
+        marker=None,
+        markersize=6,
+        color=sns.color_palette(&#34;deep&#34;)[1],
         linestyle=&#34;-&#34;,
         linewidth=2,
     )
@@ -1348,7 +1380,13 @@ Target device (e.g., "cpu" or "cuda").
 beta : <code>float</code>
 Critic learning rate hyperparameter.
 patience : <code>int</code>
-Early stopping patience in epochs.</p>
+Early stopping patience in epochs.
+epsilon_start : <code>float</code>, default 1.0
+Initial exploration probability.
+epsilon_end : <code>float</code>, default 0.05
+Minimum exploration probability after decay.
+epsilon_decay : <code>float</code>, default 0.99
+Exponential decay rate for epsilon per episode.</p>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><strong><code>model</code></strong> :&ensp;<code>torch.nn.Module</code></dt>
@@ -1358,7 +1396,7 @@ Early stopping patience in epochs.</p>
 </dl></div>
 </dd>
 <dt id="likelihood.tools.models_tools.train_option_critic"><code class="name flex">
-<span>def <span class="ident">train_option_critic</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_epochs: int = 1000,<br>batch_size: int = 32,<br>device: str = 'cpu',<br>beta: float = 0.01,<br>epsilon: float = 0.2,<br>patience: int = 15,<br>verbose: bool = False,<br>**kwargs) ‑> tuple[torch.nn.modules.module.Module, float]</span>
+<span>def <span class="ident">train_option_critic</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_epochs: int = 1000,<br>batch_size: int = 32,<br>device: str = 'cpu',<br>beta: float = 0.01,<br>value_coef: float = 0.5,<br>epsilon: float = 0.2,<br>patience: int = 15,<br>verbose: bool = False,<br>**kwargs) ‑> tuple[torch.nn.modules.module.Module, float]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1373,6 +1411,7 @@ Early stopping patience in epochs.</p>
     batch_size: int = 32,
     device: str = &#34;cpu&#34;,
     beta: float = 1e-2,
+    value_coef: float = 0.5,
     epsilon: float = 0.2,
     patience: int = 15,
     verbose: bool = False,
@@ -1396,6 +1435,8 @@ Early stopping patience in epochs.</p>
         Target device (e.g., &#34;cpu&#34; or &#34;cuda&#34;).
     beta : `float`
         Critic learning rate hyperparameter.
+    value_coef : `float`
+        Coefficient weighting the value-function loss.
     epsilon : `float`, optional, default=0.2
         The clipping parameter that limits how much the policy can change between updates.
     patience : `int`
@@ -1458,8 +1499,12 @@ Early stopping patience in epochs.</p>
             ppo_loss_value = ppo_loss(
                 batch_advantages, batch_old_probs, batch_current_probs, epsilon=epsilon
             )
+            batch_values = model.value_network(batch_states).squeeze(-1)
+            batch_returns = batch_advantages + batch_values.detach()
+
+            value_loss = torch.nn.functional.mse_loss(batch_values, batch_returns)
             entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
-            loss = ppo_loss_value + beta * entropy.mean()
+            loss = ppo_loss_value + value_coef * value_loss - beta * entropy.mean()
             avg_advantages = batch_advantages.mean().item()
             loss.backward()
             optimizer.step()
@@ -1522,6 +1567,8 @@ Early stopping patience in epochs.</p>
 <dd>Target device (e.g., "cpu" or "cuda").</dd>
 <dt><strong><code>beta</code></strong> :&ensp;<code>float</code></dt>
 <dd>Critic learning rate hyperparameter.</dd>
+<dt><strong><code>value_coef</code></strong> :&ensp;<code>float</code></dt>
+<dd>Coefficient weighting the value-function loss.</dd>
 <dt><strong><code>epsilon</code></strong> :&ensp;<code>float</code>, optional, default=<code>0.2</code></dt>
 <dd>The clipping parameter that limits how much the policy can change between updates.</dd>
 <dt><strong><code>patience</code></strong> :&ensp;<code>int</code></dt>
