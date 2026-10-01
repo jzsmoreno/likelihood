@@ -29,6 +29,7 @@ from torch.utils.data import DataLoader, TensorDataset
 warnings.filterwarnings("ignore", category=UserWarning)
 
 from .figures import *
+from .tools import cal_average
 
 
 class suppress_prints:
@@ -711,6 +712,7 @@ def train_option_critic(
     batch_size: int = 32,
     device: str = "cpu",
     beta: float = 1e-2,
+    value_coef: float = 0.5,
     epsilon: float = 0.2,
     patience: int = 15,
     verbose: bool = False,
@@ -734,6 +736,8 @@ def train_option_critic(
         Target device (e.g., "cpu" or "cuda").
     beta : `float`
         Critic learning rate hyperparameter.
+    value_coef : `float`
+        Coefficient weighting the value-function loss.
     epsilon : `float`, optional, default=0.2
         The clipping parameter that limits how much the policy can change between updates.
     patience : `int`
@@ -796,8 +800,12 @@ def train_option_critic(
             ppo_loss_value = ppo_loss(
                 batch_advantages, batch_old_probs, batch_current_probs, epsilon=epsilon
             )
+            batch_values = model.value_network(batch_states).squeeze(-1)
+            batch_returns = batch_advantages + batch_values.detach()
+
+            value_loss = torch.nn.functional.mse_loss(batch_values, batch_returns)
             entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
-            loss = ppo_loss_value + beta * entropy.mean()
+            loss = ppo_loss_value + value_coef * value_loss - beta * entropy.mean()
             avg_advantages = batch_advantages.mean().item()
             loss.backward()
             optimizer.step()
@@ -849,7 +857,7 @@ def train_model_with_episodes(
     optimizer: torch.optim.Optimizer,
     env: Any,
     num_episodes: int,
-    episode_patience: int = 5,
+    episode_patience: int = 1,
     **kwargs: Any,
 ) -> Tuple[torch.nn.Module, float]:
     """Trains a model via reinforcement learning episodes.
@@ -881,6 +889,12 @@ def train_model_with_episodes(
         Critic learning rate hyperparameter.
     patience : `int`
         Early stopping patience in epochs.
+    epsilon_start : `float`, default 1.0
+        Initial exploration probability.
+    epsilon_end : `float`, default 0.05
+        Minimum exploration probability after decay.
+    epsilon_decay : `float`, default 0.99
+        Exponential decay rate for epsilon per episode.
 
     Returns
     -------
@@ -889,14 +903,18 @@ def train_model_with_episodes(
     best_loss_so_far : `float`
         The best loss value observed during training.
     """
+    epsilon_start = kwargs.pop("epsilon_start", 1.0)
+    epsilon_end = kwargs.pop("epsilon_end", 0.05)
+    epsilon_decay = kwargs.pop("epsilon_decay", 0.99)
+
     previous_weights = model.state_dict()
     best_loss_so_far = float("inf")
     loss_window = []
     average_loss = 0.0
     no_improvement_count = 0
 
-    print(f"{'Episode':<12} {'Loss':<8} {'Best Loss':<17} {'Status':<15} {'Avg Loss':<4}")
-    print("=" * 70)
+    print(f"{'Episode':<12} {'Loss':<8} {'Best Loss':<17} {'Status':<20} {'Avg Loss':<10} ε")
+    print("=" * 85)
 
     NEW_BEST_COLOR = "\033[92m"
     REVERT_COLOR = "\033[91m"
@@ -910,19 +928,31 @@ def train_model_with_episodes(
         loss_window.append(loss)
         average_loss = sum(loss_window) / len(loss_window)
 
-        if loss < best_loss_so_far:
-            best_loss_so_far = loss
-            previous_weights = model.state_dict()
-            no_improvement_count = 0
-            status = f"{NEW_BEST_COLOR}Updated{RESET_COLOR}"
+        epsilon = epsilon_end + (epsilon_start - epsilon_end) * (epsilon_decay**episode)
+
+        # Epsilon-greedy decision logic for weight updates
+        if np.random.random() < epsilon:
+            # Exploration phase: randomly accept or reject the new weights
+            if np.random.random() < 0.5:
+                previous_weights = model.state_dict()
+                status = f"{NEW_BEST_COLOR}Updated{RESET_COLOR}"
+            else:
+                status = f"{REVERT_COLOR}No Improvement{RESET_COLOR}"
         else:
-            model.load_state_dict(previous_weights)
-            no_improvement_count += 1
-            status = f"{REVERT_COLOR}No Improvement{RESET_COLOR}"
+            # Exploitation phase: greedy decision based on loss improvement
+            if loss < best_loss_so_far:
+                best_loss_so_far = loss
+                previous_weights = model.state_dict()
+                no_improvement_count = 0
+                status = f"{NEW_BEST_COLOR}Updated{RESET_COLOR}"
+            else:
+                model.load_state_dict(previous_weights)
+                no_improvement_count += 1
+                status = f"{REVERT_COLOR}No Improvement{RESET_COLOR}"
         print(
-            f"{episode + 1:<8} {loss:<12.4f} {best_loss_so_far:<15.4f} {status:<25} {average_loss:<12.4f}"
+            f"{episode + 1:<8} {loss:<12.4f} {best_loss_so_far:<15.4f} {status:<30} {average_loss:<10.4f} {epsilon:.3f}"
         )
-        print("=" * 70)
+        print("=" * 85)
 
         if no_improvement_count >= episode_patience:
             print(f"\nNo improvement for {episode_patience} episodes. Stopping early.")
@@ -937,6 +967,16 @@ def train_model_with_episodes(
         marker=None,
         markersize=6,
         color=sns.color_palette("deep")[0],
+        linestyle="-",
+        linewidth=2,
+    )
+    smoothed = cal_average(np.array(advantages_per_episode), alpha=0.1)
+    plt.plot(
+        range(len(smoothed)),
+        smoothed,
+        marker=None,
+        markersize=6,
+        color=sns.color_palette("deep")[1],
         linestyle="-",
         linewidth=2,
     )

@@ -22,24 +22,13 @@ class MultiBanditNet(nn.Module):
         self.num_neurons = num_neurons
         self.num_layers = num_layers
         self.activation = activation
-        self.dropout_rate = dropout_rate
+        self.dropout_rate = max(0.0, dropout_rate)
 
-        self.option_network = nn.Sequential(
-            nn.Linear(state_dim, self.num_neurons),
-            nn.SELU(),
-            nn.Dropout(self.dropout_rate) if self.dropout_rate > 0 else nn.Identity(),  # Dropout
-            nn.Linear(
-                self.num_neurons, num_options
-            ),  # Output a probability distribution over options
-        )
-
-        # Low-level (action) Q-networks for each option with additional linear layers
-        self.action_networks = nn.ModuleList()
-        for i in range(num_options):
-            action_network_layers = [nn.Linear(state_dim, self.num_neurons), self.activation]
-            for _ in range(self.num_layers - 1):
+        def build_action_network(num_actions: int) -> nn.Sequential:
+            layers = [nn.Linear(state_dim, self.num_neurons), self.activation]
+            for _ in range(max(0, self.num_layers - 1)):
                 if self.dropout_rate > 0:
-                    action_network_layers.extend(
+                    layers.extend(
                         [
                             nn.Dropout(self.dropout_rate),
                             nn.Linear(self.num_neurons, self.num_neurons),
@@ -47,22 +36,37 @@ class MultiBanditNet(nn.Module):
                         ]
                     )
                 else:
-                    action_network_layers.extend(
-                        [nn.Linear(self.num_neurons, self.num_neurons), self.activation]
-                    )
-            num_actions = (
-                num_actions_per_option
-                if not isinstance(num_actions_per_option, list)
-                else num_actions_per_option[i]
-            )  # Output Q-values for each action in this option
-            action_network_layers.append(nn.Linear(self.num_neurons, num_actions))
-            self.action_networks.append(nn.Sequential(*action_network_layers))
+                    layers.extend([nn.Linear(self.num_neurons, self.num_neurons), self.activation])
+            layers.append(nn.Linear(self.num_neurons, num_actions))
+            return nn.Sequential(*layers)
+
+        # Low-level (action) Q-networks for each option with additional linear layers
+        self.action_networks = nn.ModuleList(
+            build_action_network(
+                num_actions_per_option[i]
+                if isinstance(num_actions_per_option, list)
+                else num_actions_per_option
+            )
+            for i in range(self.num_options)
+        )
+
+        def _dropout() -> nn.Module:
+            return nn.Dropout(self.dropout_rate) if self.dropout_rate > 0 else nn.Identity()
+
+        self.option_network = nn.Sequential(
+            nn.Linear(state_dim, self.num_neurons),
+            self.activation,
+            _dropout(),
+            nn.Linear(
+                self.num_neurons, num_options
+            ),  # Output a probability distribution over options
+        )
 
         # Option termination network
         self.termination_network = nn.Sequential(
             nn.Linear(state_dim, self.num_neurons),
-            nn.SELU(),
-            nn.Dropout(self.dropout_rate) if self.dropout_rate > 0 else nn.Identity(),  # Dropout
+            self.activation,
+            _dropout(),
             nn.Linear(self.num_neurons, 1),  # Single output for termination probability (0-1)
             nn.Sigmoid(),
         )
@@ -87,29 +91,25 @@ class MultiBanditNet(nn.Module):
             'xavier_uniform', 'xavier_normal', 'kaiming_uniform', 'kaiming_normal',
             'orthogonal', 'uniform', 'normal', 'zeros', 'ones'
         """
+        init_dispatch = {
+            "xavier_uniform": nn.init.xavier_uniform_,
+            "xavier_normal": nn.init.xavier_normal_,
+            "kaiming_uniform": nn.init.kaiming_uniform_,
+            "kaiming_normal": nn.init.kaiming_normal_,
+            "orthogonal": nn.init.orthogonal_,
+            "uniform": nn.init.uniform_,
+            "normal": nn.init.normal_,
+            "zeros": nn.init.zeros_,
+            "ones": nn.init.ones_,
+        }
+
+        if method not in init_dispatch:
+            raise ValueError(f"Unsupported initialization method: {method}")
+
+        # Iterates over all modules (including submodules) and initializes linear layers
         for m in self.modules():
             if isinstance(m, nn.Linear):
-                if method == "xavier_uniform":
-                    nn.init.xavier_uniform_(m.weight)
-                elif method == "xavier_normal":
-                    nn.init.xavier_normal_(m.weight)
-                elif method == "kaiming_uniform":
-                    nn.init.kaiming_uniform_(m.weight)
-                elif method == "kaiming_normal":
-                    nn.init.kaiming_normal_(m.weight)
-                elif method == "orthogonal":
-                    nn.init.orthogonal_(m.weight)
-                elif method == "uniform":
-                    nn.init.uniform_(m.weight)
-                elif method == "normal":
-                    nn.init.normal_(m.weight)
-                elif method == "zeros":
-                    nn.init.zeros_(m.weight)
-                elif method == "ones":
-                    nn.init.ones_(m.weight)
-                else:
-                    raise ValueError(f"Unsupported initialization method: {method}")
-
+                init_dispatch[method](m.weight)
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
@@ -162,8 +162,8 @@ class MultiBanditNet(nn.Module):
 
             for i, net in enumerate(self.action_networks):
                 probs = torch.softmax(net(state) / temperature, dim=-1)
-                num_actions_i = probs.size(-1)
-                action_probs[:, i, :num_actions_i] = probs
+                n_act = probs.size(-1)
+                action_probs[:, i, :n_act] = probs
                 selected_actions[:, i] = torch.argmax(probs, dim=-1)
 
             selected_options = torch.argmax(option_probs, dim=-1)
@@ -180,8 +180,8 @@ class MultiBanditNet(nn.Module):
                     probs = torch.softmax(
                         self.action_networks[opt_idx](states_opt) / temperature, dim=-1
                     )
-                    num_actions_i = probs.size(-1)
-                    action_probs[mask, :num_actions_i] = probs
+                    n_act = probs.size(-1)
+                    action_probs[mask, :n_act] = probs
                     selected_actions[mask] = torch.argmax(probs, dim=-1)
 
         termination_prob = self.termination_network(state)
