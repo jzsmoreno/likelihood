@@ -704,6 +704,73 @@ def ppo_loss(
     return loss.mean()
 
 
+def grpo_loss(
+    advantages: torch.Tensor,
+    old_action_probs: torch.Tensor,
+    action_probs: torch.Tensor,
+    epsilon: float = 0.2,
+    beta_kl: float = 0.04,
+) -> torch.Tensor:
+    """Computes the Group Relative Policy Optimization (GRPO) loss.
+
+    GRPO replaces the value-function-based advantage of PPO with group-relative
+    advantages (normalized within a group of samples) and adds a KL divergence
+    penalty to constrain policy updates, making it a critic‑free algorithm.
+
+    Parameters
+    ----------
+    advantages : `torch.Tensor`
+        Group‑relative advantages, typically computed as
+        ``(returns - mean(returns)) / (std(returns) + 1e-8)`` across a group
+        of trajectories sampled from the same (or similar) states.
+    old_action_probs : `torch.Tensor`
+        The action probabilities from the old policy (before the update).
+    action_probs : `torch.Tensor`
+        The action probabilities from the current policy (after the update).
+    epsilon : `float`, optional, default=0.2
+        The clipping parameter that limits how much the policy can change
+        between updates.
+    beta_kl : `float`, optional, default=0.04
+        Coefficient controlling the strength of the KL‑divergence penalty
+        that keeps the new policy close to the old policy.
+
+    Returns
+    -------
+    loss : `torch.Tensor`
+        The GRPO loss, averaged across the batch.  The loss consists of a
+        clipped surrogate objective (identical to PPO) plus an approximate
+        KL‑divergence regularisation term.
+
+    Notes
+    -----
+    The surrogate objective is identical to the PPO clipped objective,
+    so the policy update logic is the same; the only differences are:
+
+    * advantages are *group‑normalised* instead of GAE‑based, and
+    * a KL‑penalty (approximated via the squared log‑ratio) is added.
+    """
+    if advantages.dim() == 1:
+        advantages = advantages.unsqueeze(-1)
+
+    action_probs = torch.clamp(action_probs, min=1e-8)
+    old_action_probs = torch.clamp(old_action_probs, min=1e-8)
+    log_ratio = torch.log(action_probs) - torch.log(old_action_probs)
+
+    ratio = torch.exp(log_ratio)  # π(a|s) / π_old(a|s)
+    if log_ratio.ndim > 1:
+        ratio = ratio.mean(dim=1)
+    ratio = ratio.view(advantages.shape)
+    clipped_ratio = torch.clamp(ratio, 1 - epsilon, 1 + epsilon)
+
+    # Clipped surrogate objective (same form as PPO)
+    surrogate_loss = -torch.min(ratio * advantages, clipped_ratio * advantages)
+
+    # Approximate KL divergence penalty:  (log π_θ - log π_old)²
+    kl_penalty = beta_kl * (log_ratio**2).mean()
+
+    return surrogate_loss.mean() + kl_penalty
+
+
 def train_option_critic(
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
@@ -716,6 +783,9 @@ def train_option_critic(
     epsilon: float = 0.2,
     patience: int = 15,
     verbose: bool = False,
+    mode: str = "ppo_mode",
+    beta_kl: float = 0.04,
+    group_size: int = 4,
     **kwargs,
 ) -> tuple[torch.nn.Module, float]:
     """Trains an option critic model with the provided environment and hyperparameters.
@@ -735,13 +805,28 @@ def train_option_critic(
     device : `str`
         Target device (e.g., "cpu" or "cuda").
     beta : `float`
-        Critic learning rate hyperparameter.
+        Critic learning rate hyperparameter (entropy coefficient in PPO mode,
+        entropy coefficient in GRPO mode).
     value_coef : `float`
-        Coefficient weighting the value-function loss.
+        Coefficient weighting the value-function loss (used only in
+        ``'ppo_mode'``).
     epsilon : `float`, optional, default=0.2
-        The clipping parameter that limits how much the policy can change between updates.
+        The clipping parameter that limits how much the policy can change
+        between updates.
     patience : `int`
         Early stopping patience in epochs.
+    mode : `str`, optional, default='ppo_mode'
+        Training algorithm to use.  Must be one of:
+
+        - ``'ppo_mode'`` – Proximal Policy Optimisation (value‑function
+          based advantages with GAE).
+        - ``'grpo_mode'`` – Group Relative Policy Optimisation (group‑
+          normalised advantages with KL penalty; critic‑free).
+    beta_kl : `float`, optional, default=0.04
+        KL‑divergence penalty coefficient.  Only used in ``'grpo_mode'``.
+    group_size : `int`, optional, default=4
+        Number of trajectories collected per group in ``'grpo_mode'``.
+        Advantages are normalised within each group.
 
     Returns
     -------
@@ -750,6 +835,9 @@ def train_option_critic(
     avg_epoch_loss : `float`
         Average loss per epoch over training.
     """
+    if mode not in ("ppo_mode", "grpo_mode"):
+        raise ValueError(f"mode must be 'ppo_mode' or 'grpo_mode', got '{mode}'")
+
     losses = []
     best_loss_so_far = float("inf")
     best_advantage_so_far = 0.0
@@ -759,27 +847,89 @@ def train_option_critic(
     model = model.to(device)
     advantages_per_epoch = []
     multiple_option = getattr(env, "multiple_option", False)
-    for epoch in range(num_epochs):
-        trajectory, returns, advantages, old_probs = collect_experience(env, model, **kwargs)
-        avg_advantage = sum(advantages) / len(advantages)
-        advantages_per_epoch.append(avg_advantage)
 
-        states = torch.tensor(np.array([t[0] for t in trajectory]), dtype=torch.float32).to(device)
-        actions = (
-            torch.stack([t[2] for t in trajectory]).to(device)
-            if isinstance(trajectory[0][2], torch.Tensor)
-            else torch.tensor([t[2] for t in trajectory], dtype=torch.long).to(device)
-        )
-        returns_tensor = torch.tensor(returns, dtype=torch.float32).to(device)
-        advantages_tensor = torch.tensor(advantages, dtype=torch.float32).to(device)
+    for epoch in range(num_epochs):
+        if mode == "ppo_mode":
+            # --- PPO: single trajectory per epoch -----------------------
+            trajectory, returns, advantages, old_probs = collect_experience(env, model, **kwargs)
+            trajectories_data = [(trajectory, returns, advantages, old_probs)]
+        else:
+            # --- GRPO: collect a *group* of trajectories ----------------
+            trajectories_data = []
+            all_returns = []
+            for _ in range(group_size):
+                traj, rets, _, old_p = collect_experience(env, model, **kwargs)
+                trajectories_data.append((traj, rets, old_p))
+                all_returns.append(rets)
+
+            # Compute group‑normalised advantages across the group
+            max_len = max(len(r) for r in all_returns)
+            group_advantages_per_traj = [[] for _ in range(group_size)]
+
+            for t in range(max_len):
+                step_returns = []
+                traj_has_t = []
+                for g_idx in range(group_size):
+                    if t < len(all_returns[g_idx]):
+                        step_returns.append(all_returns[g_idx][t])
+                        traj_has_t.append(g_idx)
+
+                step_mean = np.mean(step_returns)
+                step_std = np.std(step_returns) + 1e-8
+
+                for g_idx in traj_has_t:
+                    norm_adv = (all_returns[g_idx][t] - step_mean) / step_std
+                    group_advantages_per_traj[g_idx].append(norm_adv)
+
+            # Rebuild trajectories_data with group‑normalised advantages
+            for g_idx in range(group_size):
+                traj, rets, old_p = trajectories_data[g_idx]
+                trajectories_data[g_idx] = (traj, rets, group_advantages_per_traj[g_idx], old_p)
+
+        # ----------------------------------------------------------------
+        # Accumulate average advantage for logging
+        # ----------------------------------------------------------------
+        for _, _, advantages, _ in trajectories_data:
+            avg_advantage = sum(advantages) / len(advantages)
+            advantages_per_epoch.append(avg_advantage)
+
+        # ----------------------------------------------------------------
+        # Build a single dataset from all trajectories
+        # ----------------------------------------------------------------
+        all_states = []
+        all_actions = []
+        all_returns_list = []
+        all_advantages_list = []
+        all_old_probs_list = []
+
+        for trajectory, returns, advantages, old_probs in trajectories_data:
+            states_arr = np.array([t[0] for t in trajectory])
+            all_states.append(states_arr)
+            acts = trajectory[0][2]
+            if isinstance(acts, torch.Tensor):
+                all_actions.append(torch.stack([t[2] for t in trajectory]))
+            else:
+                all_actions.append(torch.tensor([t[2] for t in trajectory], dtype=torch.long))
+            all_returns_list.append(torch.tensor(returns, dtype=torch.float32))
+            all_advantages_list.append(torch.tensor(advantages, dtype=torch.float32))
+            all_old_probs_list.append(torch.tensor(old_probs, dtype=torch.float32))
+
+        states = torch.tensor(np.concatenate(all_states, axis=0), dtype=torch.float32).to(device)
+        actions = torch.cat([a.to(device) for a in all_actions])
         old_probs_tensor = (
-            torch.tensor(old_probs, dtype=torch.float32).view(actions.shape).to(device)
-        ).detach()
+            torch.cat([op.to(device) for op in all_old_probs_list]).view(actions.shape).detach()
+        )
+        returns_tensor = torch.cat([r.to(device) for r in all_returns_list])
+        advantages_tensor = torch.cat([a.to(device) for a in all_advantages_list])
+
         dataset = TensorDataset(
             states, actions, returns_tensor, advantages_tensor, old_probs_tensor
         )
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
+        # ----------------------------------------------------------------
+        # Training loop over batches
+        # ----------------------------------------------------------------
         epoch_loss = 0
         num_batches = 0
         for (
@@ -797,15 +947,32 @@ def train_option_critic(
             batch_current_probs = action_probs.gather(
                 batch_actions.ndim, batch_actions.unsqueeze(-1)
             ).squeeze(-1)
-            ppo_loss_value = ppo_loss(
-                batch_advantages, batch_old_probs, batch_current_probs, epsilon=epsilon
-            )
-            batch_values = model.value_network(batch_states).squeeze(-1)
-            batch_returns = batch_advantages + batch_values.detach()
 
-            value_loss = torch.nn.functional.mse_loss(batch_values, batch_returns)
-            entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
-            loss = ppo_loss_value + value_coef * value_loss - beta * entropy.mean()
+            if mode == "ppo_mode":
+                # --- PPO loss -------------------------------------------
+                policy_loss = ppo_loss(
+                    batch_advantages,
+                    batch_old_probs,
+                    batch_current_probs,
+                    epsilon=epsilon,
+                )
+                batch_values = model.value_network(batch_states).squeeze(-1)
+                batch_returns_target = batch_advantages + batch_values.detach()
+                value_loss = torch.nn.functional.mse_loss(batch_values, batch_returns_target)
+                entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
+                loss = policy_loss + value_coef * value_loss - beta * entropy.mean()
+            else:
+                # --- GRPO loss ------------------------------------------
+                policy_loss = grpo_loss(
+                    batch_advantages,
+                    batch_old_probs,
+                    batch_current_probs,
+                    epsilon=epsilon,
+                    beta_kl=beta_kl,
+                )
+                entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
+                loss = policy_loss - beta * entropy.mean()
+
             avg_advantages = batch_advantages.mean().item()
             loss.backward()
             optimizer.step()
@@ -821,12 +988,10 @@ def train_option_critic(
             if patience_counter_advantage >= patience:
                 if verbose:
                     print(
-                        f"Early stopping at epoch {epoch} after {patience} epochs without advantage improvement."
+                        f"Early stopping at epoch {epoch} after {patience} "
+                        f"epochs without advantage improvement."
                     )
                 break
-
-            epoch_loss += loss.item()
-            num_batches += 1
 
         if num_batches > 0:
             avg_epoch_loss = epoch_loss / num_batches
@@ -841,13 +1006,18 @@ def train_option_critic(
             if patience_counter >= patience:
                 if verbose:
                     print(
-                        f"Early stopping at epoch {epoch} after {patience} epochs without improvement."
+                        f"Early stopping at epoch {epoch} after {patience} "
+                        f"epochs without improvement."
                     )
                 break
 
             if verbose:
                 if epoch % (num_epochs // 10) == 0:
-                    print(f"Epoch {epoch}/{num_epochs} - Avg Loss: {avg_epoch_loss:.4f}")
+                    print(
+                        f"Epoch {epoch}/{num_epochs} - "
+                        f"Avg Loss: {avg_epoch_loss:.4f}  "
+                        f"[{mode}]"
+                    )
 
     return model, avg_epoch_loss, advantages_per_epoch
 
@@ -858,6 +1028,7 @@ def train_model_with_episodes(
     env: Any,
     num_episodes: int,
     episode_patience: int = 1,
+    mode: str = "ppo_mode",
     **kwargs: Any,
 ) -> Tuple[torch.nn.Module, float]:
     """Trains a model via reinforcement learning episodes.
@@ -872,6 +1043,13 @@ def train_model_with_episodes(
         The environment used for the episodes.
     num_episodes : `int`
         The number of episodes to train.
+    episode_patience : `int`, optional, default=1
+        Number of episodes without improvement before early stopping.
+    mode : `str`, optional, default='ppo_mode'
+        Training algorithm to use.  Must be one of:
+
+        - ``'ppo_mode'`` – Proximal Policy Optimisation.
+        - ``'grpo_mode'`` – Group Relative Policy Optimisation.
 
     Keyword Arguments
     -----------------
@@ -887,6 +1065,10 @@ def train_model_with_episodes(
         Target device (e.g., "cpu" or "cuda").
     beta : `float`
         Critic learning rate hyperparameter.
+    beta_kl : `float`
+        KL-divergence penalty coefficient (GRPO mode only).
+    group_size : `int`
+        Number of trajectories per group (GRPO mode only).
     patience : `int`
         Early stopping patience in epochs.
     epsilon_start : `float`, default 1.0
@@ -922,7 +1104,7 @@ def train_model_with_episodes(
     advantages_per_episode = []
 
     for episode in range(num_episodes):
-        model, loss, advantages = train_option_critic(model, optimizer, env, **kwargs)
+        model, loss, advantages = train_option_critic(model, optimizer, env, mode=mode, **kwargs)
         advantages_per_episode.extend(advantages)
 
         loss_window.append(loss)

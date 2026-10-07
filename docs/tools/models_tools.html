@@ -648,7 +648,7 @@ correlation value greater than the specified threshold to identify which columns
 The trained model after fitting.</p></div>
 </dd>
 <dt id="likelihood.tools.models_tools.train_model_with_episodes"><code class="name flex">
-<span>def <span class="ident">train_model_with_episodes</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_episodes: int,<br>episode_patience: int = 1,<br>**kwargs: Any) ‑> Tuple[torch.nn.modules.module.Module, float]</span>
+<span>def <span class="ident">train_model_with_episodes</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_episodes: int,<br>episode_patience: int = 1,<br>mode: str = 'ppo_mode',<br>**kwargs: Any) ‑> Tuple[torch.nn.modules.module.Module, float]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -661,6 +661,7 @@ The trained model after fitting.</p></div>
     env: Any,
     num_episodes: int,
     episode_patience: int = 1,
+    mode: str = &#34;ppo_mode&#34;,
     **kwargs: Any,
 ) -&gt; Tuple[torch.nn.Module, float]:
     &#34;&#34;&#34;Trains a model via reinforcement learning episodes.
@@ -675,6 +676,13 @@ The trained model after fitting.</p></div>
         The environment used for the episodes.
     num_episodes : `int`
         The number of episodes to train.
+    episode_patience : `int`, optional, default=1
+        Number of episodes without improvement before early stopping.
+    mode : `str`, optional, default=&#39;ppo_mode&#39;
+        Training algorithm to use.  Must be one of:
+
+        - ``&#39;ppo_mode&#39;`` – Proximal Policy Optimisation.
+        - ``&#39;grpo_mode&#39;`` – Group Relative Policy Optimisation.
 
     Keyword Arguments
     -----------------
@@ -690,6 +698,10 @@ The trained model after fitting.</p></div>
         Target device (e.g., &#34;cpu&#34; or &#34;cuda&#34;).
     beta : `float`
         Critic learning rate hyperparameter.
+    beta_kl : `float`
+        KL-divergence penalty coefficient (GRPO mode only).
+    group_size : `int`
+        Number of trajectories per group (GRPO mode only).
     patience : `int`
         Early stopping patience in epochs.
     epsilon_start : `float`, default 1.0
@@ -725,7 +737,7 @@ The trained model after fitting.</p></div>
     advantages_per_episode = []
 
     for episode in range(num_episodes):
-        model, loss, advantages = train_option_critic(model, optimizer, env, **kwargs)
+        model, loss, advantages = train_option_critic(model, optimizer, env, mode=mode, **kwargs)
         advantages_per_episode.extend(advantages)
 
         loss_window.append(loss)
@@ -804,6 +816,17 @@ The trained model after fitting.</p></div>
 <dd>The environment used for the episodes.</dd>
 <dt><strong><code>num_episodes</code></strong> :&ensp;<code>int</code></dt>
 <dd>The number of episodes to train.</dd>
+<dt><strong><code>episode_patience</code></strong> :&ensp;<code>int</code>, optional, default=<code>1</code></dt>
+<dd>Number of episodes without improvement before early stopping.</dd>
+<dt><strong><code>mode</code></strong> :&ensp;<code>str</code>, optional, default=<code>'ppo_mode'</code></dt>
+<dd>
+<p>Training algorithm to use.
+Must be one of:</p>
+<ul>
+<li><code>'ppo_mode'</code> – Proximal Policy Optimisation.</li>
+<li><code>'grpo_mode'</code> – Group Relative Policy Optimisation.</li>
+</ul>
+</dd>
 </dl>
 <h2 id="keyword-arguments">Keyword Arguments</h2>
 <p>Additional keyword arguments passed to the <code><a title="likelihood.tools.models_tools.train_option_critic" href="#likelihood.tools.models_tools.train_option_critic">train_option_critic()</a></code> function.</p>
@@ -817,6 +840,10 @@ device : <code>str</code>
 Target device (e.g., "cpu" or "cuda").
 beta : <code>float</code>
 Critic learning rate hyperparameter.
+beta_kl : <code>float</code>
+KL-divergence penalty coefficient (GRPO mode only).
+group_size : <code>int</code>
+Number of trajectories per group (GRPO mode only).
 patience : <code>int</code>
 Early stopping patience in epochs.
 epsilon_start : <code>float</code>, default 1.0
@@ -834,7 +861,7 @@ Exponential decay rate for epsilon per episode.</p>
 </dl></div>
 </dd>
 <dt id="likelihood.tools.models_tools.train_option_critic"><code class="name flex">
-<span>def <span class="ident">train_option_critic</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_epochs: int = 1000,<br>batch_size: int = 32,<br>device: str = 'cpu',<br>beta: float = 0.01,<br>value_coef: float = 0.5,<br>epsilon: float = 0.2,<br>patience: int = 15,<br>verbose: bool = False,<br>**kwargs) ‑> tuple[torch.nn.modules.module.Module, float]</span>
+<span>def <span class="ident">train_option_critic</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_epochs: int = 1000,<br>batch_size: int = 32,<br>device: str = 'cpu',<br>beta: float = 0.01,<br>value_coef: float = 0.5,<br>epsilon: float = 0.2,<br>patience: int = 15,<br>verbose: bool = False,<br>mode: str = 'ppo_mode',<br>beta_kl: float = 0.04,<br>group_size: int = 4,<br>**kwargs) ‑> tuple[torch.nn.modules.module.Module, float]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -853,6 +880,9 @@ Exponential decay rate for epsilon per episode.</p>
     epsilon: float = 0.2,
     patience: int = 15,
     verbose: bool = False,
+    mode: str = &#34;ppo_mode&#34;,
+    beta_kl: float = 0.04,
+    group_size: int = 4,
     **kwargs,
 ) -&gt; tuple[torch.nn.Module, float]:
     &#34;&#34;&#34;Trains an option critic model with the provided environment and hyperparameters.
@@ -872,13 +902,28 @@ Exponential decay rate for epsilon per episode.</p>
     device : `str`
         Target device (e.g., &#34;cpu&#34; or &#34;cuda&#34;).
     beta : `float`
-        Critic learning rate hyperparameter.
+        Critic learning rate hyperparameter (entropy coefficient in PPO mode,
+        entropy coefficient in GRPO mode).
     value_coef : `float`
-        Coefficient weighting the value-function loss.
+        Coefficient weighting the value-function loss (used only in
+        ``&#39;ppo_mode&#39;``).
     epsilon : `float`, optional, default=0.2
-        The clipping parameter that limits how much the policy can change between updates.
+        The clipping parameter that limits how much the policy can change
+        between updates.
     patience : `int`
         Early stopping patience in epochs.
+    mode : `str`, optional, default=&#39;ppo_mode&#39;
+        Training algorithm to use.  Must be one of:
+
+        - ``&#39;ppo_mode&#39;`` – Proximal Policy Optimisation (value‑function
+          based advantages with GAE).
+        - ``&#39;grpo_mode&#39;`` – Group Relative Policy Optimisation (group‑
+          normalised advantages with KL penalty; critic‑free).
+    beta_kl : `float`, optional, default=0.04
+        KL‑divergence penalty coefficient.  Only used in ``&#39;grpo_mode&#39;``.
+    group_size : `int`, optional, default=4
+        Number of trajectories collected per group in ``&#39;grpo_mode&#39;``.
+        Advantages are normalised within each group.
 
     Returns
     -------
@@ -887,6 +932,9 @@ Exponential decay rate for epsilon per episode.</p>
     avg_epoch_loss : `float`
         Average loss per epoch over training.
     &#34;&#34;&#34;
+    if mode not in (&#34;ppo_mode&#34;, &#34;grpo_mode&#34;):
+        raise ValueError(f&#34;mode must be &#39;ppo_mode&#39; or &#39;grpo_mode&#39;, got &#39;{mode}&#39;&#34;)
+
     losses = []
     best_loss_so_far = float(&#34;inf&#34;)
     best_advantage_so_far = 0.0
@@ -901,14 +949,74 @@ Exponential decay rate for epsilon per episode.</p>
         avg_advantage = sum(advantages) / len(advantages)
         advantages_per_epoch.append(avg_advantage)
 
-        states = torch.tensor(np.array([t[0] for t in trajectory]), dtype=torch.float32).to(device)
-        actions = (
-            torch.stack([t[2] for t in trajectory]).to(device)
-            if isinstance(trajectory[0][2], torch.Tensor)
-            else torch.tensor([t[2] for t in trajectory], dtype=torch.long).to(device)
-        )
-        returns_tensor = torch.tensor(returns, dtype=torch.float32).to(device)
-        advantages_tensor = torch.tensor(advantages, dtype=torch.float32).to(device)
+    for epoch in range(num_epochs):
+        if mode == &#34;ppo_mode&#34;:
+            # --- PPO: single trajectory per epoch -----------------------
+            trajectory, returns, advantages, old_probs = collect_experience(env, model, **kwargs)
+            trajectories_data = [(trajectory, returns, advantages, old_probs)]
+        else:
+            # --- GRPO: collect a *group* of trajectories ----------------
+            trajectories_data = []
+            all_returns = []
+            for _ in range(group_size):
+                traj, rets, _, old_p = collect_experience(env, model, **kwargs)
+                trajectories_data.append((traj, rets, old_p))
+                all_returns.append(rets)
+
+            # Compute group‑normalised advantages across the group
+            max_len = max(len(r) for r in all_returns)
+            group_advantages_per_traj = [[] for _ in range(group_size)]
+
+            for t in range(max_len):
+                step_returns = []
+                traj_has_t = []
+                for g_idx in range(group_size):
+                    if t &lt; len(all_returns[g_idx]):
+                        step_returns.append(all_returns[g_idx][t])
+                        traj_has_t.append(g_idx)
+
+                step_mean = np.mean(step_returns)
+                step_std = np.std(step_returns) + 1e-8
+
+                for g_idx in traj_has_t:
+                    norm_adv = (all_returns[g_idx][t] - step_mean) / step_std
+                    group_advantages_per_traj[g_idx].append(norm_adv)
+
+            # Rebuild trajectories_data with group‑normalised advantages
+            for g_idx in range(group_size):
+                traj, rets, old_p = trajectories_data[g_idx]
+                trajectories_data[g_idx] = (traj, rets, group_advantages_per_traj[g_idx], old_p)
+
+        # ----------------------------------------------------------------
+        # Accumulate average advantage for logging
+        # ----------------------------------------------------------------
+        for _, _, advantages, _ in trajectories_data:
+            avg_advantage = sum(advantages) / len(advantages)
+            advantages_per_epoch.append(avg_advantage)
+
+        # ----------------------------------------------------------------
+        # Build a single dataset from all trajectories
+        # ----------------------------------------------------------------
+        all_states = []
+        all_actions = []
+        all_returns_list = []
+        all_advantages_list = []
+        all_old_probs_list = []
+
+        for trajectory, returns, advantages, old_probs in trajectories_data:
+            states_arr = np.array([t[0] for t in trajectory])
+            all_states.append(states_arr)
+            acts = trajectory[0][2]
+            if isinstance(acts, torch.Tensor):
+                all_actions.append(torch.stack([t[2] for t in trajectory]))
+            else:
+                all_actions.append(torch.tensor([t[2] for t in trajectory], dtype=torch.long))
+            all_returns_list.append(torch.tensor(returns, dtype=torch.float32))
+            all_advantages_list.append(torch.tensor(advantages, dtype=torch.float32))
+            all_old_probs_list.append(torch.tensor(old_probs, dtype=torch.float32))
+
+        states = torch.tensor(np.concatenate(all_states, axis=0), dtype=torch.float32).to(device)
+        actions = torch.cat([a.to(device) for a in all_actions])
         old_probs_tensor = (
             torch.tensor(old_probs, dtype=torch.float32).view(actions.shape).to(device)
         )
@@ -918,6 +1026,9 @@ Exponential decay rate for epsilon per episode.</p>
         )
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
+        # ----------------------------------------------------------------
+        # Training loop over batches
+        # ----------------------------------------------------------------
         epoch_loss = 0
         num_batches = 0
 
@@ -961,12 +1072,10 @@ Exponential decay rate for epsilon per episode.</p>
             if patience_counter_advantage &gt;= patience:
                 if verbose:
                     print(
-                        f&#34;Early stopping at epoch {epoch} after {patience} epochs without advantage improvement.&#34;
+                        f&#34;Early stopping at epoch {epoch} after {patience} &#34;
+                        f&#34;epochs without advantage improvement.&#34;
                     )
                 break
-
-            epoch_loss += loss.item()
-            num_batches += 1
 
         if num_batches &gt; 0:
             avg_epoch_loss = epoch_loss / num_batches
@@ -981,13 +1090,18 @@ Exponential decay rate for epsilon per episode.</p>
             if patience_counter &gt;= patience:
                 if verbose:
                     print(
-                        f&#34;Early stopping at epoch {epoch} after {patience} epochs without improvement.&#34;
+                        f&#34;Early stopping at epoch {epoch} after {patience} &#34;
+                        f&#34;epochs without improvement.&#34;
                     )
                 break
 
             if verbose:
                 if epoch % (num_epochs // 10) == 0:
-                    print(f&#34;Epoch {epoch}/{num_epochs} - Avg Loss: {avg_epoch_loss:.4f}&#34;)
+                    print(
+                        f&#34;Epoch {epoch}/{num_epochs} - &#34;
+                        f&#34;Avg Loss: {avg_epoch_loss:.4f}  &#34;
+                        f&#34;[{mode}]&#34;
+                    )
 
     return model, avg_epoch_loss, advantages_per_epoch</code></pre>
 </details>
@@ -1007,13 +1121,33 @@ Exponential decay rate for epsilon per episode.</p>
 <dt><strong><code>device</code></strong> :&ensp;<code>str</code></dt>
 <dd>Target device (e.g., "cpu" or "cuda").</dd>
 <dt><strong><code>beta</code></strong> :&ensp;<code>float</code></dt>
-<dd>Critic learning rate hyperparameter.</dd>
+<dd>Critic learning rate hyperparameter (entropy coefficient in PPO mode,
+entropy coefficient in GRPO mode).</dd>
 <dt><strong><code>value_coef</code></strong> :&ensp;<code>float</code></dt>
-<dd>Coefficient weighting the value-function loss.</dd>
+<dd>Coefficient weighting the value-function loss (used only in
+<code>'ppo_mode'</code>).</dd>
 <dt><strong><code>epsilon</code></strong> :&ensp;<code>float</code>, optional, default=<code>0.2</code></dt>
-<dd>The clipping parameter that limits how much the policy can change between updates.</dd>
+<dd>The clipping parameter that limits how much the policy can change
+between updates.</dd>
 <dt><strong><code>patience</code></strong> :&ensp;<code>int</code></dt>
 <dd>Early stopping patience in epochs.</dd>
+<dt><strong><code>mode</code></strong> :&ensp;<code>str</code>, optional, default=<code>'ppo_mode'</code></dt>
+<dd>
+<p>Training algorithm to use.
+Must be one of:</p>
+<ul>
+<li><code>'ppo_mode'</code> – Proximal Policy Optimisation (value‑function
+based advantages with GAE).</li>
+<li><code>'grpo_mode'</code> – Group Relative Policy Optimisation (group‑
+normalised advantages with KL penalty; critic‑free).</li>
+</ul>
+</dd>
+<dt><strong><code>beta_kl</code></strong> :&ensp;<code>float</code>, optional, default=<code>0.04</code></dt>
+<dd>KL‑divergence penalty coefficient.
+Only used in <code>'grpo_mode'</code>.</dd>
+<dt><strong><code>group_size</code></strong> :&ensp;<code>int</code>, optional, default=<code>4</code></dt>
+<dd>Number of trajectories collected per group in <code>'grpo_mode'</code>.
+Advantages are normalised within each group.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
