@@ -62,11 +62,6 @@ _ACRONYM_BOUNDARY = re.compile(r"([a-z0-9])([A-Z])")
 _DOTTED = re.compile(r"\s*\.\s*")
 
 
-# ---------------------------------------------------------------------------
-# Small text helpers
-# ---------------------------------------------------------------------------
-
-
 def split_identifier(name: str) -> str:
     """Turn a CamelCase identifier into a human readable title.
 
@@ -90,11 +85,6 @@ def dedent_lines(text: str) -> List[str]:
         return []
     common = min(indents)
     return [line[common:] if len(line) >= common else line for line in lines]
-
-
-# ---------------------------------------------------------------------------
-# AST helpers
-# ---------------------------------------------------------------------------
 
 
 def _unparse(node: Optional[ast.AST]) -> Optional[str]:
@@ -157,11 +147,6 @@ def guess_widget(type_hint: str) -> str:
     if base == "path" or base.endswith("path"):
         return "text"
     return "raw"
-
-
-# ---------------------------------------------------------------------------
-# Callable introspection
-# ---------------------------------------------------------------------------
 
 
 def _argument_nodes(args: ast.arguments) -> List[Tuple[ast.arg, str, Optional[ast.AST]]]:
@@ -333,11 +318,6 @@ def parse_labelled_entries(lines: Sequence[str]) -> List[Dict[str, str]]:
         {"name": entry["name"], "description": _join_description(entry["desc"])}
         for entry in entries
     ]
-
-
-# ---------------------------------------------------------------------------
-# Model extraction
-# ---------------------------------------------------------------------------
 
 
 _SAMPLE_LITERALS = {

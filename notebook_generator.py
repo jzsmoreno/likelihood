@@ -50,11 +50,6 @@ KERNEL_DISPLAY_NAME = "Python 3 (likelihood library)"
 _INDENT = 2
 
 
-# ---------------------------------------------------------------------------
-# Notebook scaffolding
-# ---------------------------------------------------------------------------
-
-
 def _notebook_metadata(model: Dict[str, Any]) -> Dict[str, Any]:
     """Notebook level metadata (a single ``metadata`` key, as nbformat requires)."""
     major, _, rest = sys.version.partition(".")
@@ -112,11 +107,6 @@ def _code(source: str, tags: Optional[Sequence[str]] = None) -> Dict[str, Any]:
 def _escape(value: str) -> str:
     """Escape the characters that are special inside a markdown table."""
     return str(value).replace("|", "\\|")
-
-
-# ---------------------------------------------------------------------------
-# Markdown rendering
-# ---------------------------------------------------------------------------
 
 
 def _parameter_table(parameters: Sequence[Dict[str, Any]]) -> str:
@@ -222,11 +212,6 @@ def _source_cell(model: Dict[str, Any]) -> Dict[str, Any]:
     source += f"<details>\n<summary><code>{model['path']}</code></summary>\n\n"
     source += "```python\n" + model["source"].rstrip() + "\n```\n\n</details>\n"
     return _markdown(source, tags=["source"])
-
-
-# ---------------------------------------------------------------------------
-# Interactive example
-# ---------------------------------------------------------------------------
 
 
 def _is_safe_literal(text: Optional[str]) -> bool:
@@ -395,11 +380,6 @@ def _widget_classes(kinds: Sequence[str]) -> List[str]:
     return [mapping[kind] for kind in kinds if kind in mapping]
 
 
-# ---------------------------------------------------------------------------
-# Assembly and persistence
-# ---------------------------------------------------------------------------
-
-
 def build_notebook(model: Dict[str, Any]) -> Dict[str, Any]:
     """Build the complete notebook document for ``model``.
 
@@ -471,11 +451,6 @@ def generate_category(category: str, output_dir: Path = DEFAULT_OUTPUT_DIR) -> L
 def generate_all_notebooks(output_dir: Path = DEFAULT_OUTPUT_DIR) -> List[Path]:
     """Generate the notebook of every model in the catalog."""
     return [write_notebook(model, output_dir) for model in build_catalog()]
-
-
-# ---------------------------------------------------------------------------
-# Command line interface
-# ---------------------------------------------------------------------------
 
 
 def _print_catalog(catalog: Sequence[Dict[str, Any]]) -> None:
