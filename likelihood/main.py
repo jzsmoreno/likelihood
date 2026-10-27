@@ -97,7 +97,7 @@ def update_theta(theta: np.ndarray, d: float) -> np.ndarray:
     theta_new : `np.array`
         An ndarray with the updated theta values.
     """
-    return np.random.normal(theta, d / 2.0)
+    return theta + np.random.normal(0.0, d / 2.0)
 
 
 def walk(
@@ -161,7 +161,9 @@ def walk(
         if y0 <= tol or y1 <= tol:
             if mode:
                 print("Goal reached!")
-            return (theta_new, nwalk, y1) if y1 <= tol else (theta, nwalk, y0)
+            if y1 <= tol:
+                return (theta_new, nwalk, y1)
+            return (theta, nwalk, y0)
 
         if y1 >= y0:
             ratio = y0 / y1

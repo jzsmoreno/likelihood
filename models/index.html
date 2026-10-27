@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#4f5bd5">
+<meta name="description" content="Catálogo interactivo de los modelos de la librería Likelihood: búsqueda, filtros por categoría, firmas, parámetros, métodos y ejemplos listos para copiar.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%AC%3C/text%3E%3C/svg%3E">
+<title>Catálogo de Modelos · Likelihood</title>
+<!--
+  Interfaz del catálogo. Todos los datos provienen de la API del servidor
+  (server.py), que los obtiene por introspección del paquete likelihood.
+  No hay listas de modelos escritas a mano en este archivo.
+
+  Endpoints utilizados:
+    GET /api/models             -> { total, categories, models:[modelBrief] }
+    GET /api/models/<model_id>  -> { success, model }
+    GET /preview/<model_id>     -> vista previa renderizada por el servidor
+    GET /api/notebook/<id>      -> descarga del notebook
+
+  El estado de la vista (categoría, búsqueda, orden y modelo abierto) se
+  refleja en la URL para que los enlaces se puedan compartir.
+-->
+<style>
+  :root {
+    --ink: #1f2430;
+    --muted: #6b7280;
+    --accent: #4f5bd5;
+    --accent-2: #764ba2;
+    --accent-soft: #eef0fd;
+    --line: #e6e8f0;
+    --ok: #2f855a;
+    --danger: #c53030;
+    --radius: 18px;
+    --shadow-sm: 0 8px 24px rgba(15, 23, 42, .14);
+    --shadow-lg: 0 16px 36px rgba(15, 23, 42, .22);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    padding: 24px 16px 48px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-attachment: fixed;
+    color: var(--ink);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  body.no-scroll { overflow: hidden; }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px;
+    padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+  a:focus-visible, button:focus-visible, select:focus-visible,
+  input:focus-visible, [tabindex]:focus-visible {
+    outline: 3px solid var(--accent); outline-offset: 2px;
+  }
+  .modal header :focus-visible { outline-color: #fff; }
+
+  /* ---------- Cabecera ---------- */
+  header.hero {
+    background: #fff; border-radius: var(--radius); padding: 22px 26px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, .18); margin-bottom: 16px;
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between;
+  }
+  header.hero h1 { margin: 0 0 4px; font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
+  header.hero h1 .logo { font-size: 1.5rem; line-height: 1; }
+  header.hero p { margin: 0; color: var(--muted); font-size: .92rem; }
+  header.hero code {
+    background: var(--accent-soft); color: var(--accent);
+    border-radius: 6px; padding: 2px 6px; font-size: .85em;
+  }
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stat {
+    background: var(--accent-soft); border-radius: 12px; padding: 8px 14px;
+    text-align: center; min-width: 84px;
+  }
+  .stat b { display: block; font-size: 1.2rem; color: var(--accent); }
+  .stat span { font-size: .65rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+
+  /* ---------- Controles ---------- */
+  .controls {
+    background: #fff; border-radius: var(--radius); padding: 18px 20px; margin-bottom: 18px;
+    box-shadow: var(--shadow-sm);
+  }
+  .search-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .search-field { position: relative; flex: 1 1 320px; display: flex; align-items: center; }
+  input[type=search] {
+    width: 100%; padding: 11px 46px 11px 16px; font-size: .95rem; color: inherit;
+    border: 2px solid var(--line); border-radius: 999px; outline: none; background: #fbfbfe;
+  }
+  input[type=search]:focus { border-color: var(--accent); background: #fff; }
+  #clear-search {
+    position: absolute; right: 8px; width: 30px; height: 30px; border-radius: 50%;
+    border: 0; background: #eceef6; color: #4b5162; font-size: 1rem; line-height: 1; cursor: pointer;
+  }
+  #clear-search:hover { background: var(--accent); color: #fff; }
+  .select-wrap { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--muted); }
+  select {
+    font: inherit; font-size: .82rem; padding: 9px 12px;
+    border: 2px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink);
+  }
+  select:focus { border-color: var(--accent); outline: none; }
+  .hint { margin: 10px 0 0; font-size: .74rem; color: var(--muted); }
+  kbd {
+    background: #f0f1f6; border: 1px solid var(--line); border-bottom-width: 2px;
+    border-radius: 5px; padding: 1px 5px; font-family: ui-monospace, Consolas, monospace; font-size: .72rem;
+  }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 2px solid var(--line); background: #fff; color: var(--ink);
+    border-radius: 999px; padding: 7px 15px; font-size: .8rem; font-weight: 600;
+    cursor: pointer; transition: transform .18s ease, border-color .18s ease, background .18s ease;
+  }
+  .chip:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .chip.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border-color: transparent; }
+  .chip-count {
+    background: rgba(79, 91, 213, .12); color: var(--accent);
+    border-radius: 999px; padding: 1px 7px; font-size: .68rem;
+  }
+  .chip.active .chip-count { background: rgba(255, 255, 255, .28); color: #fff; }
+  .result-bar {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);
+    font-size: .78rem; color: var(--muted);
+  }
+
+  /* ---------- Rejilla y tarjetas ---------- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
+  .card {
+    background: #fff; border-radius: 16px; padding: 22px; cursor: pointer;
+    box-shadow: var(--shadow-sm); border: 2px solid transparent;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .card:hover, .card:focus-visible {
+    transform: translateY(-4px); box-shadow: var(--shadow-lg);
+    border-color: var(--accent); outline: none;
+  }
+  .badge {
+    align-self: flex-start; padding: 4px 12px; border-radius: 999px;
+    font-size: .66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .category-regression { background: linear-gradient(135deg,#84fab0,#8fd3f4); color:#0a5c49; }
+  .category-deep { background: linear-gradient(135deg,#a18cd1,#fbc2eb); color:#6a4a8c; }
+  .category-simulation { background: linear-gradient(135deg,#ffecd2,#fcb69f); color:#9a5c38; }
+  .category-hmm { background: linear-gradient(135deg,#ff6b6b,#ff8787); color:#8b0000; }
+  .category-ensemble { background: linear-gradient(135deg,#ffd900,#ffea00); color:#856400; }
+  .category-environments { background: linear-gradient(135deg,#a8edea,#fed6e3); color:#0f6f73; }
+  .card h2 { margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 9px; }
+  .card h2 .icon { font-size: 1.35rem; line-height: 1; }
+  .card p.desc { margin: 0; color: var(--muted); font-size: .87rem; line-height: 1.6; flex: 1; }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag { background: #f0f1f6; color: #5b6274; border-radius: 999px; padding: 3px 9px; font-size: .64rem; font-weight: 600; }
+  .card footer {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    border-top: 1px solid var(--line); padding-top: 10px; font-size: .72rem; color: var(--muted);
+  }
+  .card footer .module {
+    font-family: ui-monospace, Consolas, monospace; font-size: .68rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%;
+  }
+
+  /* ---------- Estados ---------- */
+  .notice {
+    grid-column: 1 / -1; background: #fff; border-radius: var(--radius); padding: 24px;
+    box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+  }
+  .notice b { font-size: 1rem; }
+  .notice span { color: var(--muted); font-size: .86rem; }
+  .notice.error { border-left: 6px solid var(--danger); }
+  .loader { padding: 26px; text-align: center; color: var(--muted); font-size: .86rem; }
+  .empty { color: var(--muted); font-style: italic; font-size: .85rem; margin: 0; }
+  .skeleton { height: 150px; border-radius: 16px; background: rgba(255,255,255,.55); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
+  footer.credits { text-align: center; color: rgba(255,255,255,.85); font-size: .82rem; padding-top: 22px; }
+  footer.credits a { color: #fff; }
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(15, 23, 42, .62);
+    display: none; align-items: center; justify-content: center; padding: 20px; z-index: 40;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: #fff; border-radius: var(--radius); width: min(1080px, 100%); max-height: 92vh;
+    overflow: auto; box-shadow: 0 24px 60px rgba(0, 0, 0, .35);
+  }
+  .modal header {
+    position: sticky; top: 0; z-index: 2; background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff; padding: 18px 24px; display: flex; gap: 14px; justify-content: space-between; align-items: flex-start;
+  }
+  .modal header h2 { margin: 0 0 4px; font-size: 1.3rem; display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+  .modal header h2 .badge { align-self: center; }
+  .modal header h2 .icon { line-height: 1; }
+  .modal header p { margin: 0; color: rgba(255, 255, 255, .88); font-size: .85rem; }
+  .modal .close {
+    background: rgba(255,255,255,.22); border: 2px solid rgba(255,255,255,.5); color: #fff;
+    border-radius: 999px; width: 36px; height: 36px; font-size: 1rem; cursor: pointer; flex: 0 0 auto;
+  }
+  .modal .close:hover { background: #fff; color: var(--accent); }
+  .modal .body { padding: 24px; }
+  .modal h3 {
+    font-size: 1rem; color: var(--accent); margin: 24px 0 10px;
+    padding-bottom: 7px; border-bottom: 2px solid var(--line);
+  }
+  .modal h3:first-child { margin-top: 0; }
+  .prose {
+    background: #f7f8fc; border-left: 4px solid var(--accent); border-radius: 10px;
+    padding: 14px 16px; line-height: 1.7; font-size: .88rem; color: #3d4453; white-space: pre-wrap;
+  }
+  .sig {
+    background: #f2f4fb; border-radius: 10px; padding: 12px 14px; overflow-x: auto;
+    font-family: ui-monospace, Consolas, monospace; font-size: .8rem;
+  }
+  .grid-small { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .param-card { background: #f6f8fd; border-left: 3px solid var(--accent); border-radius: 10px; padding: 11px 13px; }
+  .param-name { font-family: ui-monospace, Consolas, monospace; font-weight: 700; font-size: .82rem; }
+  .param-type { font-size: .7rem; color: #8b90a0; font-style: italic; margin: 3px 0 5px; }
+  .param-desc { font-size: .78rem; color: #4b5162; line-height: 1.45; }
+  .methods { list-style: none; margin: 0; padding: 0; }
+  .methods li { background: #f6f9ff; border-left: 3px solid #48bb78; border-radius: 9px; padding: 9px 12px; margin-bottom: 6px; }
+  .method-name { font-family: ui-monospace, Consolas, monospace; font-weight: 700; font-size: .8rem; }
+  .method-origin { margin-left: 8px; font-size: .63rem; text-transform: uppercase; letter-spacing: .06em; color: #8b90a0; }
+  .method-desc { display: block; margin-top: 4px; font-size: .78rem; color: #4b5162; }
+  pre {
+    background: #1b1f2a; color: #d7dae0; border-radius: 12px; padding: 16px; overflow-x: auto;
+    font-size: .8rem; line-height: 1.6; margin: 0; font-family: ui-monospace, Consolas, monospace;
+  }
+  .meta-line { font-size: .78rem; color: var(--muted); margin: 10px 0 0; line-height: 1.7; }
+  .meta-line code { background: #f0f1f6; border-radius: 6px; padding: 2px 6px; }
+  .modal-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; padding-top: 18px; border-top: 2px solid var(--line); }
+  .btn {
+    border: 2px solid transparent; border-radius: 999px; padding: 9px 18px; font-weight: 600;
+    font-size: .8rem; cursor: pointer; text-decoration: none; display: inline-flex; gap: 8px; align-items: center;
+    background: #fff; color: var(--ink);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,23,42,.2); }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+  .btn-secondary { background: #fff; color: var(--accent); border-color: var(--accent); }
+  .btn-success { background: linear-gradient(135deg, #48bb78, var(--ok)); color: #fff; }
+  .btn-small { padding: 6px 13px; font-size: .74rem; }
+
+  /* ---------- Aviso flotante ---------- */
+  .toast {
+    position: fixed; top: 18px; right: 18px; z-index: 60; background: var(--ink); color: #fff;
+    border-radius: 10px; padding: 11px 18px; font-size: .82rem;
+    opacity: 0; transform: translateX(20px); transition: opacity .25s ease, transform .25s ease;
+    pointer-events: none; max-width: min(360px, 80vw);
+  }
+  .toast.show { opacity: 1; transform: translateX(0); }
+
+  /* ---------- Adaptación a pantallas pequeñas ---------- */
+  @media (max-width: 720px) {
+    body { padding: 14px 8px 36px; }
+    header.hero { flex-direction: column; align-items: flex-start; }
+    .stats { width: 100%; }
+    .stat { flex: 1 1 70px; min-width: 70px; }
+    .select-wrap { width: 100%; justify-content: space-between; }
+    select { flex: 1 1 auto; }
+    .grid { grid-template-columns: 1fr; }
+    .modal-backdrop { padding: 0; }
+    .modal { border-radius: 0; max-height: 100vh; min-height: 100vh; }
+    .modal header { flex-direction: row; align-items: flex-start; }
+    .modal .body { padding: 18px; }
+    .modal-actions .btn { flex: 1 1 100%; justify-content: center; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .card:hover, .chip:hover, .btn:hover { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div>
+      <h1><span class="logo" aria-hidden="true">🔬</span> Catálogo de Modelos · Likelihood</h1>
+      <p>Todos los modelos disponibles, descubiertos por introspección del paquete <code>likelihood</code>.</p>
+    </div>
+    <div class="stats" id="stats" aria-live="polite">
+      <div class="stat"><b>—</b><span>modelos</span></div>
+      <div class="stat"><b>—</b><span>categorías</span></div>
+    </div>
+  </header>
+
+  <section class="controls" aria-label="Búsqueda y filtros">
+    <div class="search-row">
+      <div class="search-field">
+        <label class="sr-only" for="search">Buscar modelos</label>
+        <input type="search" id="search" placeholder="🔍 Buscar modelo, método, parámetro…"
+               autocomplete="off" spellcheck="false" aria-describedby="search-hint">
+        <button type="button" id="clear-search" hidden aria-label="Borrar la búsqueda">&times;</button>
+      </div>
+      <div class="select-wrap">
+        <label for="sort">Ordenar por</label>
+        <select id="sort">
+          <option value="catalog">Orden del catálogo</option>
+          <option value="title">Nombre (A→Z)</option>
+          <option value="parameters">Más parámetros</option>
+          <option value="methods">Más métodos</option>
+        </select>
+      </div>
+    </div>
+    <p class="hint" id="search-hint">
+      Pulsa <kbd>/</kbd> para buscar · <kbd>Esc</kbd> para cerrar la ficha de un modelo.
+    </p>
+    <div class="filters" id="filters" role="group" aria-label="Filtrar por categoría">
+      <button class="chip active" type="button" data-category="" aria-pressed="true">
+        Todos<span class="chip-count">—</span>
+      </button>
+    </div>
+    <div class="result-bar" id="result-bar" hidden>
+      <span id="result-count" role="status" aria-live="polite"></span>
+      <button class="btn btn-secondary btn-small" type="button" id="reset-filters" hidden>↺ Restablecer filtros</button>
+    </div>
+  </section>
+
+  <div class="grid" id="grid" aria-busy="true">
+    <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+    <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+  </div>
+
+  <noscript>
+    <div class="notice">
+      <b>Este catálogo necesita JavaScript.</b>
+      <span>Puedes abrir la lista completa de modelos en
+        <a href="/api/models">/api/models</a> o visitar
+        <a href="/preview/Arima">/preview/&lt;modelo&gt;</a> directamente.</span>
+    </div>
+  </noscript>
+
+  <footer class="credits">
+    <p>📊 Librería Likelihood · catálogo generado por introspección · <span id="year"></span></p>
+  </footer>
+</div>
+
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-sub">
+    <header>
+      <div>
+        <h2 id="modal-title"></h2>
+        <p id="modal-sub"></p>
+      </div>
+      <button class="close" id="modal-close" type="button" aria-label="Cerrar la ficha del modelo">&times;</button>
+    </header>
+    <div class="body" id="modal-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  'use strict';
+
+  (function () {
+    var API = '/api';
+    var SEARCH_DELAY = 140;
+
+    var state = {
+      models: [],        // catálogo resumido (model_brief)
+      categories: [],    // índice de categorías
+      total: 0,          // modelos totales del catálogo
+      category: '',      // filtro de categoría activo
+      query: '',         // búsqueda activa
+      sort: 'catalog',   // criterio de orden
+      current: null,     // modelo abierto en el modal
+      requestId: 0,      // descarta respuestas de peticiones antiguas
+      trigger: null      // elemento que abrió el modal (para devolver el foco)
+    };
+
+    var dom = {};
+    var searchTimer = 0;
+    var backdropPressed = false;
+
+    /* ------------------------------------------------------------------ */
+    /* Utilidades                                                          */
+    /* ------------------------------------------------------------------ */
+
+    function byId(id) {
+      return document.getElementById(id);
+    }
+
+    function each(list, callback) {
+      Array.prototype.forEach.call(list || [], callback);
+    }
+
+    function closest(element, selector) {
+      while (element && element.nodeType === 1) {
+        if (element.matches && element.matches(selector)) return element;
+        element = element.parentNode;
+      }
+      return null;
+    }
+
+    function isTyping(element) {
+      if (!element || element === document.body) return false;
+      var tag = element.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || element.isContentEditable === true;
+    }
+
+    function esc(value) {
+      var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;' };
+      return String(value === null || value === undefined ? '' : value)
+        .replace(/[&<>"']/g, function (ch) { return map[ch]; });
+    }
+
+    function toast(message) {
+      dom.toast.textContent = message;
+      dom.toast.classList.add('show');
+      window.clearTimeout(toast.timer);
+      toast.timer = window.setTimeout(function () {
+        dom.toast.classList.remove('show');
+      }, 2400);
+    }
+    toast.timer = 0;
+
+    function legacyCopy(value, onDone, onFail) {
+      var area = document.createElement('textarea');
+      area.value = value;
+      area.setAttribute('readonly', 'readonly');
+      area.setAttribute('aria-hidden', 'true');
+      area.style.position = 'fixed';
+      area.style.top = '-1000px';
+      document.body.appendChild(area);
+      var copied = false;
+      try {
+        area.select();
+        copied = document.execCommand('copy');
+      } catch (error) {
+        copied = false;
+      }
+      document.body.removeChild(area);
+      if (copied) { onDone(); } else { onFail(); }
+    }
+
+    function copyText(value, okMessage, failMessage) {
+      var text = String(value === null || value === undefined ? '' : value);
+      if (!text.trim()) {
+        toast(failMessage || 'No hay nada que copiar');
+        return;
+      }
+      var done = function () { toast(okMessage || 'Copiado'); };
+      var failed = function () { toast(failMessage || 'No se pudo copiar'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () {
+          legacyCopy(text, done, failed);
+        });
+        return;
+      }
+      legacyCopy(text, done, failed);
+    }
+
+    function bindCopyButtons(root) {
+      each(root.querySelectorAll('[data-copy]'), function (button) {
+        button.addEventListener('click', function () {
+          var target = document.querySelector(button.getAttribute('data-copy'));
+          if (!target) {
+            toast('No se encontró el contenido a copiar');
+            return;
+          }
+          copyText(target.textContent, button.getAttribute('data-toast') || 'Copiado');
+        });
+      });
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Catálogo                                                            */
+    /* ------------------------------------------------------------------ */
+
+    function loadCatalog() {
+      dom.grid.setAttribute('aria-busy', 'true');
+      window.fetch(API + '/models')
+        .then(function (response) {
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          return response.json();
+        })
+        .then(function (data) {
+          if (!data || !data.models) throw new Error('Respuesta inesperada de la API');
+          state.models = data.models;
+          state.categories = data.categories || [];
+          state.total = typeof data.total === 'number' ? data.total : state.models.length;
+          renderStats();
+          renderFilters();
+          restoreFromUrl();
+        })
+        .catch(function (error) {
+          renderError(error);
+        })
+        .then(function () {
+          dom.grid.removeAttribute('aria-busy');
+        });
+    }
+
+    function renderError(error) {
+      var detail = error && error.message ? error.message : 'Error desconocido';
+      dom.grid.innerHTML =
+        '<div class="notice error"><b>No se pudo cargar el catálogo.</b>' +
+        '<span>' + esc(detail) + '</span>' +
+        '<button class="btn btn-secondary btn-small" type="button" id="retry">↻ Reintentar</button></div>';
+      dom.resultBar.hidden = true;
+      var retry = byId('retry');
+      if (retry) retry.addEventListener('click', loadCatalog);
+    }
+
+    function stat(value, label) {
+      return '<div class="stat"><b>' + esc(value) + '</b><span>' + esc(label) + '</span></div>';
+    }
+
+    function renderStats() {
+      var parameters = 0;
+      var methods = 0;
+      each(state.models, function (model) {
+        parameters += model.parameterCount || 0;
+        methods += model.methodCount || 0;
+      });
+      dom.stats.innerHTML =
+        stat(state.total, 'modelos') +
+        stat(state.categories.length, 'categorías') +
+        stat(parameters, 'parámetros') +
+        stat(methods, 'métodos');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Filtros                                                             */
+    /* ------------------------------------------------------------------ */
+
+    function chipHtml(id, label, count) {
+      var active = state.category === id;
+      return '<button class="chip' + (active ? ' active' : '') + '" type="button" data-category="' +
+        esc(id) + '" aria-pressed="' + (active ? 'true' : 'false') + '">' +
+        esc(label) + '<span class="chip-count">' + esc(count) + '</span></button>';
+    }
+
+    function renderFilters() {
+      var html = chipHtml('', 'Todos', state.models.length);
+      each(state.categories, function (category) {
+        html += chipHtml(category.id, (category.icon ? category.icon + ' ' : '') + category.label, category.count);
+      });
+      dom.filters.innerHTML = html;
+    }
+
+    function syncChips() {
+      each(dom.filters.querySelectorAll('[data-category]'), function (chip) {
+        var active = chip.getAttribute('data-category') === state.category;
+        if (active) {
+          chip.classList.add('active');
+        } else {
+          chip.classList.remove('active');
+        }
+        chip.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+    }
+
+    function matches(model, terms) {
+      if (state.category && model.category !== state.category) return false;
+      if (!terms.length) return true;
+      var haystack = [
+        model.id, model.title, model.category, model.categoryLabel, model.module,
+        model.signature, model.shortDescription || '', (model.tags || []).join(' ')
+      ].join(' ').toLowerCase();
+      for (var i = 0; i < terms.length; i += 1) {
+        if (haystack.indexOf(terms[i]) === -1) return false;
+      }
+      return true;
+    }
+
+    function sortModels(list) {
+      var sorted = list.slice();
+      if (state.sort === 'title') {
+        sorted.sort(function (a, b) { return a.title.localeCompare(b.title, 'es'); });
+      } else if (state.sort === 'parameters') {
+        sorted.sort(function (a, b) { return (b.parameterCount || 0) - (a.parameterCount || 0); });
+      } else if (state.sort === 'methods') {
+        sorted.sort(function (a, b) { return (b.methodCount || 0) - (a.methodCount || 0); });
+      }
+      return sorted;
+    }
+
+    function visibleModels() {
+      var terms = state.query ? state.query.split(/\s+/) : [];
+      return sortModels(state.models.filter(function (model) {
+        return matches(model, terms);
+      }));
+    }
+
+    function applyFilters() {
+      var list = visibleModels();
+      renderCards(list);
+      renderResultBar(list.length);
+      syncUrl(false);
+    }
+
+    function renderResultBar(count) {
+      var noun = count === 1 ? 'modelo' : 'modelos';
+      var text = count === state.total
+        ? 'Mostrando los ' + count + ' ' + noun + ' del catálogo'
+        : 'Mostrando ' + count + ' de ' + state.total + ' ' + noun;
+      dom.resultCount.textContent = text;
+      dom.resultBar.hidden = false;
+      dom.reset.hidden = !(state.category || state.query);
+    }
+
+    function resetFilters() {
+      state.category = '';
+      state.query = '';
+      dom.search.value = '';
+      dom.clear.hidden = true;
+      syncChips();
+      applyFilters();
+      dom.search.focus();
+      toast('Filtros restablecidos');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Tarjetas                                                            */
+    /* ------------------------------------------------------------------ */
+
+    function cardHtml(model) {
+      var description = String(model.shortDescription || '');
+      if (description.length > 170) description = description.slice(0, 170) + '…';
+      var tags = (model.tags || []).slice(0, 6).map(function (tag) {
+        return '<span class="tag">' + esc(tag) + '</span>';
+      }).join('');
+      var label = model.title + ' (' + model.id + '), ' + model.categoryLabel + '. Abrir la ficha';
+      return '<div class="card" role="button" tabindex="0" data-id="' + esc(model.id) + '"' +
+        ' aria-label="' + esc(label) + '">' +
+        '<span class="badge category-' + esc(model.category) + '">' + esc(model.categoryLabel) + '</span>' +
+        '<h2><span class="icon" aria-hidden="true">' + esc(model.icon) + '</span>' + esc(model.title) + '</h2>' +
+        '<p class="desc">' + esc(description) + '</p>' +
+        '<div class="tags">' + tags + '</div>' +
+        '<footer>' +
+          '<span>' + esc(model.parameterCount || 0) + ' parámetros · ' +
+            esc(model.methodCount || 0) + ' métodos</span>' +
+          '<span class="module" title="' + esc(model.module) + '">' + esc(model.module) + '</span>' +
+        '</footer>' +
+      '</div>';
+    }
+
+    function renderCards(list) {
+      if (!list.length) {
+        dom.grid.innerHTML =
+          '<div class="notice"><b>Ningún modelo coincide con los filtros.</b>' +
+          '<span>Prueba con otro término de búsqueda o restablece los filtros.</span>' +
+          '<button class="btn btn-secondary btn-small" type="button" data-action="reset">↺ Restablecer filtros</button></div>';
+        return;
+      }
+      var html = '';
+      each(list, function (model) { html += cardHtml(model); });
+      dom.grid.innerHTML = html;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Ficha del modelo (modal)                                            */
+    /* ------------------------------------------------------------------ */
+
+    function findModel(id) {
+      for (var i = 0; i < state.models.length; i += 1) {
+        if (state.models[i].id === id) return state.models[i];
+      }
+      return null;
+    }
+
+    function modalHeading(model) {
+      dom.modalTitle.innerHTML =
+        '<span class="badge category-' + esc(model.category || '') + '">' +
+          esc(model.categoryLabel || '') + '</span>' +
+        '<span class="icon" aria-hidden="true">' + esc(model.icon || '') + '</span>' +
+        esc(model.title || model.id || '');
+      dom.modalSub.textContent = model.shortDescription || '';
+    }
+
+    function openModalShell(model) {
+      modalHeading(model);
+      dom.modalBody.innerHTML = '<div class="loader">Cargando la ficha del modelo…</div>';
+      dom.backdrop.classList.add('open');
+      document.body.classList.add('no-scroll');
+      dom.modalClose.focus();
+    }
+
+    function openModel(id, options) {
+      var settings = options || {};
+      var summary = findModel(id);
+      if (!summary) {
+        toast('Modelo no encontrado: ' + id);
+        return;
+      }
+      state.current = summary;
+      state.trigger = settings.trigger || null;
+      openModalShell(summary);
+      if (settings.push !== false) syncUrl(true);
+
+      var requestId = (state.requestId += 1);
+      window.fetch(API + '/models/' + encodeURIComponent(id))
+        .then(function (response) {
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          return response.json();
+        })
+        .then(function (data) {
+          if (requestId !== state.requestId) return;
+          if (!data || !data.success || !data.model) throw new Error('Modelo no disponible');
+          renderModal(data.model);
+        })
+        .catch(function (error) {
+          if (requestId !== state.requestId) return;
+          dom.modalBody.innerHTML =
+            '<div class="notice error"><b>No se pudo cargar la ficha.</b>' +
+            '<span>' + esc(error && error.message ? error.message : 'Error desconocido') + '</span></div>';
+        });
+    }
+
+    function parametersHtml(model) {
+      var parameters = model.parameters || [];
+      if (!parameters.length) return '<p class="empty">Este modelo no declara parámetros de entrada.</p>';
+      return '<div class="grid-small">' + parameters.map(function (parameter) {
+        var fallback = (parameter.default === null || parameter.default === undefined)
+          ? 'requerido' : parameter.default;
+        return '<div class="param-card">' +
+          '<div class="param-name">' + esc(parameter.name) + '</div>' +
+          '<div class="param-type">' + esc(parameter.type) + ' · ' + esc(fallback) + '</div>' +
+          '<div class="param-desc">' + esc(parameter.description || '—') + '</div>' +
+        '</div>';
+      }).join('') + '</div>';
+    }
+
+    function attributesHtml(model) {
+      var attributes = model.attributes || [];
+      if (!attributes.length) return '';
+      return '<h3>Atributos</h3><div class="grid-small">' + attributes.map(function (attribute) {
+        return '<div class="param-card">' +
+          '<div class="param-name">' + esc(attribute.name) + '</div>' +
+          '<div class="param-type">' + esc(attribute.type || '—') + '</div>' +
+          '<div class="param-desc">' + esc(attribute.description || '—') + '</div>' +
+        '</div>';
+      }).join('') + '</div>';
+    }
+
+    function methodsHtml(model) {
+      var methods = model.methods || [];
+      if (!methods.length) return '<li class="empty">Este modelo no expone métodos públicos.</li>';
+      return methods.map(function (method) {
+        var signature = method.signature || method.name || '';
+        return '<li>' +
+          '<span class="method-name" title="' + esc(signature) + '">' +
+            esc(signature.split(' -> ')[0]) + '</span>' +
+          '<span class="method-origin">' + (method.inherited ? 'heredado' : 'propio') + '</span>' +
+          '<span class="method-desc">' + esc(method.description || '—') + '</span>' +
+        '</li>';
+      }).join('');
+    }
+
+    function renderModal(model) {
+      state.current = model;
+      modalHeading(model);
+      var id = encodeURIComponent(model.id);
+      var html = '<h3>Descripción</h3><div class="prose">' +
+        esc(model.fullDescription || model.shortDescription || '') + '</div>';
+      html += '<h3>Firma</h3><div class="sig" id="modal-signature">' + esc(model.signature || '') + '</div>';
+      html += '<p class="meta-line">Importación: <code>' + esc(model.importStatement || '') + '</code><br>' +
+        'Módulo: <code>' + esc(model.module || '') + '</code> · Fuente: <code>' +
+        esc((model.path || '') + ':' + (model.lineno || '')) + '</code> · ' +
+        esc(model.lineCount || 0) + ' líneas</p>';
+      html += '<h3>Parámetros</h3>' + parametersHtml(model);
+      html += attributesHtml(model);
+      html += '<h3>Métodos</h3><ul class="methods">' + methodsHtml(model) + '</ul>';
+      html += '<h3>Ejemplo</h3><pre id="modal-example">' + esc(model.example || '# —') + '</pre>';
+      html += '<div class="modal-actions">' +
+        '<a class="btn btn-primary" href="/preview/' + esc(id) + '" target="_blank" rel="noopener">🌐 Vista previa</a>' +
+        '<a class="btn btn-secondary" href="/api/notebook/' + esc(id) + '" download>⬇️ Notebook</a>' +
+        '<a class="btn btn-secondary" href="/api/models/' + esc(id) + '" target="_blank" rel="noopener">🔌 JSON de la API</a>' +
+        '<button class="btn btn-success" type="button" data-copy="#modal-example" data-toast="Ejemplo copiado">📋 Copiar ejemplo</button>' +
+        '<button class="btn btn-secondary" type="button" data-copy="#modal-signature" data-toast="Firma copiada">📋 Copiar firma</button>' +
+      '</div>';
+      dom.modalBody.innerHTML = html;
+      bindCopyButtons(dom.modalBody);
+    }
+
+    function closeModal(options) {
+      var settings = options || {};
+      if (!dom.backdrop.classList.contains('open')) return;
+      state.requestId += 1;          // ignora respuestas pendientes
+      dom.backdrop.classList.remove('open');
+      document.body.classList.remove('no-scroll');
+      state.current = null;
+      if (settings.push !== false) syncUrl(true);
+      if (state.trigger && document.contains(state.trigger)) state.trigger.focus();
+      state.trigger = null;
+    }
+
+    function onModalKeydown(event) {
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        event.preventDefault();
+        closeModal();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      var focusable = dom.modal.querySelectorAll(
+        'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable.length) return;
+      var first = focusable[0];
+      var last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Estado en la URL                                                    */
+    /* ------------------------------------------------------------------ */
+
+    function readQuery() {
+      var result = { category: '', q: '', sort: 'catalog', model: '' };
+      var raw = window.location.search.replace(/^\?/, '');
+      if (!raw) return result;
+      each(raw.split('&'), function (pair) {
+        if (!pair) return;
+        var index = pair.indexOf('=');
+        var key = decodeURIComponent(index === -1 ? pair : pair.slice(0, index));
+        var value = index === -1 ? '' : decodeURIComponent(pair.slice(index + 1).replace(/\+/g, ' '));
+        if (key === 'category') result.category = value;
+        else if (key === 'q') result.q = value;
+        else if (key === 'sort') result.sort = value;
+        else if (key === 'model') result.model = value;
+      });
+      return result;
+    }
+
+    function syncUrl(push) {
+      if (!window.history || !window.history.pushState) return;
+      var params = [];
+      if (state.category) params.push('category=' + encodeURIComponent(state.category));
+      if (state.query) params.push('q=' + encodeURIComponent(state.query));
+      if (state.sort !== 'catalog') params.push('sort=' + encodeURIComponent(state.sort));
+      if (state.current) params.push('model=' + encodeURIComponent(state.current.id));
+      var url = window.location.pathname + (params.length ? '?' + params.join('&') : '');
+      if (push) {
+        window.history.pushState({ catalog: true }, '', url);
+      } else {
+        window.history.replaceState({ catalog: true }, '', url);
+      }
+    }
+
+    function applyQuery(query) {
+      state.category = query.category || '';
+      state.query = query.q || '';
+      state.sort = ['title', 'parameters', 'methods'].indexOf(query.sort) === -1 ? 'catalog' : query.sort;
+      state.current = query.model ? findModel(query.model) : null;
+      dom.search.value = state.query;
+      dom.clear.hidden = !state.query;
+      dom.sort.value = state.sort;
+      syncChips();
+      applyFilters();
+      if (state.current) {
+        openModel(state.current.id, { push: false });
+      } else if (dom.backdrop.classList.contains('open')) {
+        closeModal({ push: false });
+      }
+    }
+
+    function restoreFromUrl() {
+      applyQuery(readQuery());
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Eventos                                                             */
+    /* ------------------------------------------------------------------ */
+
+    function onSearchInput() {
+      window.clearTimeout(searchTimer);
+      var value = dom.search.value.trim();
+      dom.clear.hidden = !value;
+      searchTimer = window.setTimeout(function () {
+        if (value === state.query) return;
+        state.query = value;
+        applyFilters();
+      }, SEARCH_DELAY);
+    }
+
+    function onFilterClick(event) {
+      var chip = closest(event.target, '[data-category]');
+      if (!chip) return;
+      state.category = chip.getAttribute('data-category') || '';
+      syncChips();
+      applyFilters();
+    }
+
+    function onGridClick(event) {
+      if (closest(event.target, '[data-action="reset"]')) {
+        resetFilters();
+        return;
+      }
+      var card = closest(event.target, '.card');
+      if (card) openModel(card.getAttribute('data-id'), { trigger: card });
+    }
+
+    function onGridKeydown(event) {
+      if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return;
+      var card = closest(event.target, '.card');
+      if (!card || event.target !== card) return;
+      event.preventDefault();
+      openModel(card.getAttribute('data-id'), { trigger: card });
+    }
+
+    function onDocumentKeydown(event) {
+      if (dom.backdrop.classList.contains('open')) {
+        onModalKeydown(event);
+        return;
+      }
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        if (dom.search.value) {
+          dom.search.value = '';
+          dom.clear.hidden = true;
+          onSearchInput();
+        }
+        return;
+      }
+      if (event.key === '/' && !isTyping(event.target)) {
+        event.preventDefault();
+        dom.search.focus();
+        dom.search.select();
+      }
+    }
+
+    function bindEvents() {
+      dom.search.addEventListener('input', onSearchInput);
+      dom.clear.addEventListener('click', function () {
+        dom.search.value = '';
+        dom.clear.hidden = true;
+        onSearchInput();
+        dom.search.focus();
+      });
+      dom.filters.addEventListener('click', onFilterClick);
+      dom.grid.addEventListener('click', onGridClick);
+      dom.grid.addEventListener('keydown', onGridKeydown);
+      dom.sort.addEventListener('change', function () {
+        state.sort = dom.sort.value;
+        applyFilters();
+      });
+      dom.reset.addEventListener('click', resetFilters);
+      dom.modalClose.addEventListener('click', function () { closeModal(); });
+      dom.backdrop.addEventListener('mousedown', function (event) {
+        backdropPressed = event.target === dom.backdrop;
+      });
+      dom.backdrop.addEventListener('click', function (event) {
+        if (event.target === dom.backdrop && backdropPressed) closeModal();
+        backdropPressed = false;
+      });
+      document.addEventListener('keydown', onDocumentKeydown);
+      window.addEventListener('popstate', restoreFromUrl);
+    }
+
+    function init() {
+      dom.grid = byId('grid');
+      dom.filters = byId('filters');
+      dom.search = byId('search');
+      dom.clear = byId('clear-search');
+      dom.sort = byId('sort');
+      dom.stats = byId('stats');
+      dom.resultBar = byId('result-bar');
+      dom.resultCount = byId('result-count');
+      dom.reset = byId('reset-filters');
+      dom.backdrop = byId('modal-backdrop');
+      dom.modal = byId('modal');
+      dom.modalTitle = byId('modal-title');
+      dom.modalSub = byId('modal-sub');
+      dom.modalBody = byId('modal-body');
+      dom.modalClose = byId('modal-close');
+      dom.toast = byId('toast');
+      byId('year').textContent = String(new Date().getFullYear());
+      bindEvents();
+      loadCatalog();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  })();
+</script>
+</body>
+</html>
+
