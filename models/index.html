@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#4f5bd5">
 <meta name="description" content="Catálogo interactivo de los modelos de la librería Likelihood: búsqueda, filtros por categoría, firmas, parámetros, métodos y ejemplos listos para copiar.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%AC%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>Catálogo de Modelos · Likelihood</title>
 <!--
   Interfaz del catálogo. Todos los datos provienen de la API del servidor
@@ -16,8 +16,10 @@
   Endpoints utilizados:
     GET /api/models             -> { total, categories, models:[modelBrief] }
     GET /api/models/<model_id>  -> { success, model }
+    GET /api/search?q=&limit=   -> sugerencias para el autocompletado
     GET /preview/<model_id>     -> vista previa renderizada por el servidor
     GET /api/notebook/<id>      -> descarga del notebook
+    GET /api/models/<id>/source -> código fuente del modelo
 
   El estado de la vista (categoría, búsqueda, orden y modelo abierto) se
   refleja en la URL para que los enlaces se puedan compartir.
@@ -256,6 +258,38 @@
   }
   .toast.show { opacity: 1; transform: translateX(0); }
 
+  /* ---------- Tema oscuro ---------- */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e6e8f0;
+      --muted: #9aa3b5;
+      --accent: #8ab4f8;
+      --accent-2: #c4a7f7;
+      --accent-soft: #262c40;
+      --line: #2d3446;
+      --ok: #68d391;
+      --danger: #fc8181;
+      --shadow-sm: 0 8px 24px rgba(0, 0, 0, .5);
+      --shadow-lg: 0 16px 36px rgba(0, 0, 0, .6);
+    }
+    body { background: linear-gradient(135deg, #1b2138 0%, #2a1e3c 100%); }
+    header.hero, .controls, .card, .notice, .modal { background: #161a24; }
+    .btn, .btn-secondary, .chip, select, input[type=search] { background: #161a24; color: var(--ink); }
+    input[type=search] { background: #101420; }
+    input[type=search]:focus { background: #101420; }
+    #clear-search { background: #2a3143; color: #c2cad9; }
+    kbd, .tag, .meta-line code { background: #2a3143; color: #c2cad9; }
+    .prose { background: #1c2130; color: #c9d1e0; }
+    .sig, .param-card { background: #232a3b; }
+    .methods li { background: #1c2130; }
+    .param-desc, .method-desc { color: #b6bfd0; }
+    .param-type, .method-origin { color: #9aa3b5; }
+    .skeleton { background: rgba(255, 255, 255, .12); }
+    .toast { background: #0c0f16; }
+    .modal .close:hover { background: #fff; color: #1f2430; }
+    .btn-primary, .btn-success { color: #fff; }
+  }
+
   /* ---------- Adaptación a pantallas pequeñas ---------- */
   @media (max-width: 720px) {
     body { padding: 14px 8px 36px; }
@@ -295,7 +329,9 @@
       <div class="search-field">
         <label class="sr-only" for="search">Buscar modelos</label>
         <input type="search" id="search" placeholder="🔍 Buscar modelo, método, parámetro…"
-               autocomplete="off" spellcheck="false" aria-describedby="search-hint">
+               autocomplete="off" spellcheck="false" aria-describedby="search-hint"
+               list="search-suggestions">
+        <datalist id="search-suggestions"></datalist>
         <button type="button" id="clear-search" hidden aria-label="Borrar la búsqueda">&times;</button>
       </div>
       <div class="select-wrap">
@@ -377,6 +413,7 @@
 
     var dom = {};
     var searchTimer = 0;
+    var suggestTimer = 0;
     var backdropPressed = false;
 
     /* ------------------------------------------------------------------ */
@@ -771,8 +808,9 @@
       html += '<h3>Métodos</h3><ul class="methods">' + methodsHtml(model) + '</ul>';
       html += '<h3>Ejemplo</h3><pre id="modal-example">' + esc(model.example || '# —') + '</pre>';
       html += '<div class="modal-actions">' +
-        '<a class="btn btn-primary" href="/preview/' + esc(id) + '" target="_blank" rel="noopener">🌐 Vista previa</a>' +
+        '<a class="btn btn-primary" href="/preview/' + esc(id) + '" target="_blank" rel="noopener">🌐 Vista previa y playground</a>' +
         '<a class="btn btn-secondary" href="/api/notebook/' + esc(id) + '" download>⬇️ Notebook</a>' +
+        '<a class="btn btn-secondary" href="/api/models/' + esc(id) + '/source?download=1" download>⬇️ Código fuente</a>' +
         '<a class="btn btn-secondary" href="/api/models/' + esc(id) + '" target="_blank" rel="noopener">🔌 JSON de la API</a>' +
         '<button class="btn btn-success" type="button" data-copy="#modal-example" data-toast="Ejemplo copiado">📋 Copiar ejemplo</button>' +
         '<button class="btn btn-secondary" type="button" data-copy="#modal-signature" data-toast="Firma copiada">📋 Copiar firma</button>' +
@@ -880,11 +918,36 @@
       window.clearTimeout(searchTimer);
       var value = dom.search.value.trim();
       dom.clear.hidden = !value;
+      loadSuggestions(value);
       searchTimer = window.setTimeout(function () {
         if (value === state.query) return;
         state.query = value;
         applyFilters();
       }, SEARCH_DELAY);
+    }
+
+    /* Autocompletado progresivo: si falla, la búsqueda local sigue funcionando. */
+    function loadSuggestions(value) {
+      window.clearTimeout(suggestTimer);
+      if (!dom.suggestions) return;
+      if (value.length < 2) {
+        dom.suggestions.innerHTML = '';
+        return;
+      }
+      suggestTimer = window.setTimeout(function () {
+        window.fetch(API + '/search?q=' + encodeURIComponent(value) + '&limit=6')
+          .then(function (response) {
+            return response.ok ? response.json() : null;
+          })
+          .then(function (data) {
+            if (!data || !data.suggestions) return;
+            dom.suggestions.innerHTML = data.suggestions.map(function (item) {
+              return '<option value="' + esc(item.title) + '" label="' +
+                esc(item.title + ' · ' + item.categoryLabel) + '"></option>';
+            }).join('');
+          })
+          .catch(function () { /* el autocompletado es opcional */ });
+      }, 250);
     }
 
     function onFilterClick(event) {
@@ -964,6 +1027,7 @@
       dom.grid = byId('grid');
       dom.filters = byId('filters');
       dom.search = byId('search');
+      dom.suggestions = byId('search-suggestions');
       dom.clear = byId('clear-search');
       dom.sort = byId('sort');
       dom.stats = byId('stats');

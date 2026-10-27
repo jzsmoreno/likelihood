@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#4f5bd5">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta name="description" content="{{MODEL_SHORT_DESCRIPTION}}">
 <title>Preview: {{MODEL_TITLE}}</title>
 <!--
@@ -33,6 +34,10 @@
     BACK_URL                    enlace de vuelta al catálogo
     NOTEBOOK_URL                descarga del notebook
     API_URL                     JSON del modelo en la API
+    SOURCE_URL                  código fuente en texto plano
+    SOURCE_DOWNLOAD_URL         código fuente como descarga .py
+    PLAYGROUND_URL              endpoint que construye el modelo
+    MODEL_PLAYGROUND_JSON       especificación del playground para el navegador
 
   (HOST_URL también está disponible: origen absoluto de la petición.)
 -->
@@ -48,6 +53,15 @@
     --code-bg: #1b1f2a;
     --code-ink: #d7dae0;
     --ok: #2f855a;
+    --danger: #c53030;
+    --surface-alt: #f7f8fc;
+    --surface-soft: #f2f4fb;
+    --surface-chip: #f0f1f6;
+    --surface-param: #f6f8fd;
+    --surface-method: #f6f9ff;
+    --body-ink: #3d4453;
+    --soft-ink: #4b5162;
+    --tag-ink: #5b6274;
     --radius: 18px;
     --shadow: 0 12px 32px rgba(15, 23, 42, .18);
   }
@@ -74,7 +88,7 @@
   }
   .skip {
     position: absolute; left: -9999px; top: 0; z-index: 50;
-    background: #fff; color: var(--accent); padding: 10px 16px; border-radius: 0 0 12px 0;
+    background: var(--card); color: var(--accent); padding: 10px 16px; border-radius: 0 0 12px 0;
     font-weight: 600; text-decoration: none;
   }
   .skip:focus { left: 0; }
@@ -92,7 +106,7 @@
   .topbar-side { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
   .model-id {
     font-family: ui-monospace, Consolas, monospace; font-size: .72rem; color: var(--muted);
-    background: #f4f5fa; border-radius: 999px; padding: 4px 10px;
+    background: var(--surface-soft); border-radius: 999px; padding: 4px 10px;
   }
 
   /* ---------- Tarjetas y secciones ---------- */
@@ -117,32 +131,32 @@
   }
   h2:first-of-type { margin-top: 0; }
   .prose {
-    background: #f7f8fc; border-left: 4px solid var(--accent); border-radius: 10px;
-    padding: 16px 18px; line-height: 1.75; color: #3d4453;
+    background: var(--surface-alt); border-left: 4px solid var(--accent); border-radius: 10px;
+    padding: 16px 18px; line-height: 1.75; color: var(--body-ink);
   }
   .sig {
-    background: #f2f4fb; border-radius: 10px; padding: 14px 16px; overflow-x: auto;
+    background: var(--surface-soft); border-radius: 10px; padding: 14px 16px; overflow-x: auto;
     font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: .85rem;
   }
   .tags { display: flex; flex-wrap: wrap; gap: 6px; }
   .tag {
-    background: #f0f1f6; color: #5b6274; border-radius: 999px;
+    background: var(--surface-chip); color: var(--tag-ink); border-radius: 999px;
     padding: 4px 11px; font-size: .68rem; font-weight: 600;
   }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
-  .param-card { background: #f6f8fd; border-left: 3px solid var(--accent); border-radius: 10px; padding: 12px 14px; }
+  .param-card { background: var(--surface-param); border-left: 3px solid var(--accent); border-radius: 10px; padding: 12px 14px; }
   .param-name { font-family: ui-monospace, Consolas, monospace; font-weight: 700; font-size: .85rem; word-break: break-all; }
-  .param-type { font-size: .72rem; color: #8b90a0; font-style: italic; margin: 3px 0 6px; word-break: break-word; }
-  .param-desc { font-size: .8rem; color: #4b5162; line-height: 1.5; }
+  .param-type { font-size: .72rem; color: var(--muted); font-style: italic; margin: 3px 0 6px; word-break: break-word; }
+  .param-desc { font-size: .8rem; color: var(--soft-ink); line-height: 1.5; }
   .methods { list-style: none; margin: 0; padding: 0; }
-  .methods li { background: #f6f9ff; border-left: 3px solid #48bb78; border-radius: 9px; padding: 10px 13px; margin-bottom: 7px; }
+  .methods li { background: var(--surface-method); border-left: 3px solid #48bb78; border-radius: 9px; padding: 10px 13px; margin-bottom: 7px; }
   .method-name { font-family: ui-monospace, Consolas, monospace; font-weight: 700; font-size: .82rem; word-break: break-all; }
-  .method-origin { margin-left: 8px; font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: #8b90a0; }
-  .method-desc { display: block; margin-top: 4px; font-size: .8rem; color: #4b5162; line-height: 1.5; }
+  .method-origin { margin-left: 8px; font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .method-desc { display: block; margin-top: 4px; font-size: .8rem; color: var(--soft-ink); line-height: 1.5; }
   .empty { color: var(--muted); font-style: italic; font-size: .85rem; }
   aside.meta { font-size: .78rem; color: var(--muted); margin-top: 12px; line-height: 1.8; }
   aside.meta p { margin: 0; }
-  aside.meta code { background: #f0f1f6; border-radius: 6px; padding: 2px 6px; }
+  aside.meta code { background: var(--surface-chip); border-radius: 6px; padding: 2px 6px; }
 
   /* ---------- Bloques de código ---------- */
   .code-head {
@@ -183,21 +197,47 @@
   .btn {
     border: 2px solid transparent; border-radius: 999px; padding: 10px 20px;
     font-weight: 600; font-size: .82rem; cursor: pointer; text-decoration: none;
-    display: inline-flex; align-items: center; gap: 8px; background: #fff; color: var(--ink);
+    display: inline-flex; align-items: center; gap: 8px; background: var(--card); color: var(--ink);
     transition: transform .15s ease, box-shadow .15s ease;
   }
   .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,23,42,.2); }
   .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
-  .btn-secondary { background: #fff; color: var(--accent); border-color: var(--accent); }
+  .btn-secondary { background: var(--card); color: var(--accent); border-color: var(--accent); }
   .btn-success { background: linear-gradient(135deg, #48bb78, var(--ok)); color: #fff; }
   .btn-small { padding: 6px 13px; font-size: .74rem; }
-  .btn-ghost { background: #fff; color: var(--accent); border-color: var(--line); }
+  .btn-ghost { background: var(--card); color: var(--accent); border-color: var(--line); }
+  .btn[disabled] { opacity: .6; cursor: progress; transform: none; box-shadow: none; }
+
+  /* ---------- Playground ---------- */
+  .playground-hint { margin: 0 0 14px; font-size: .82rem; color: var(--muted); line-height: 1.6; }
+  .playground-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .playground-field { background: var(--surface-param); border-left: 3px solid var(--accent); border-radius: 10px; padding: 11px 13px; }
+  .playground-field label { display: block; font-family: ui-monospace, Consolas, monospace; font-weight: 700; font-size: .8rem; word-break: break-all; }
+  .playground-field .field-type { display: block; font-size: .68rem; color: var(--muted); font-style: italic; margin: 2px 0 7px; }
+  .playground-field input[type=text], .playground-field input[type=number], .playground-field textarea {
+    width: 100%; font: inherit; font-size: .82rem; padding: 7px 10px; color: var(--ink);
+    background: var(--card); border: 2px solid var(--line); border-radius: 8px;
+  }
+  .playground-field textarea { min-height: 62px; resize: vertical; font-family: ui-monospace, Consolas, monospace; }
+  .playground-field input:focus, .playground-field textarea:focus { border-color: var(--accent); outline: none; }
+  .playground-field .field-check { display: flex; align-items: center; gap: 8px; font-family: inherit; font-weight: 600; }
+  .playground-field .field-check input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .playground-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+  .playground-status { font-size: .8rem; color: var(--muted); }
+  .playground-status.error { color: var(--danger); font-weight: 600; }
+  .playground-status.ok { color: var(--ok); font-weight: 600; }
+  .playground-output { margin-top: 14px; }
+  .playground-output pre { max-height: 420px; overflow: auto; }
+  .playground-detail { font-size: .76rem; color: var(--muted); margin-top: 8px; white-space: pre-wrap; word-break: break-word; }
+  details.playground-snippet { margin-top: 14px; }
+  details.playground-snippet summary { cursor: pointer; font-size: .8rem; font-weight: 600; color: var(--accent); }
+  details.playground-snippet pre { margin-top: 10px; }
 
   footer.credits { text-align: center; color: rgba(255,255,255,.85); font-size: .82rem; padding-top: 8px; }
   .back-top {
     position: fixed; right: 18px; bottom: 18px; z-index: 30;
     border: 0; border-radius: 999px; width: 46px; height: 46px; font-size: 1.1rem; cursor: pointer;
-    background: #fff; color: var(--accent); box-shadow: 0 10px 24px rgba(15, 23, 42, .3);
+    background: var(--card); color: var(--accent); box-shadow: 0 10px 24px rgba(15, 23, 42, .3);
   }
   .toast {
     position: fixed; top: 18px; right: 18px; z-index: 50;
@@ -207,6 +247,37 @@
     pointer-events: none; max-width: min(360px, 80vw);
   }
   .toast.show { opacity: 1; transform: translateX(0); }
+
+  /* ---------- Tema oscuro ---------- */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e6e8f0;
+      --muted: #9aa3b5;
+      --accent: #8ab4f8;
+      --accent-2: #c4a7f7;
+      --accent-soft: #262c40;
+      --line: #2d3446;
+      --card: #161a24;
+      --code-bg: #0d1017;
+      --code-ink: #d7dae0;
+      --ok: #68d391;
+      --danger: #fc8181;
+      --surface-alt: #1c2130;
+      --surface-soft: #232a3b;
+      --surface-chip: #2a3143;
+      --surface-param: #1c2130;
+      --surface-method: #1c2130;
+      --body-ink: #c9d1e0;
+      --soft-ink: #b6bfd0;
+      --tag-ink: #c2cad9;
+      --shadow: 0 12px 32px rgba(0, 0, 0, .55);
+    }
+    body { background: linear-gradient(135deg, #1b2138 0%, #2a1e3c 100%); }
+    .toast { background: #0c0f16; }
+    pre.clamped::after {
+      background: linear-gradient(to bottom, rgba(13, 16, 23, 0), var(--code-bg));
+    }
+  }
 
   /* ---------- Adaptación a pantallas pequeñas ---------- */
   @media (max-width: 720px) {
@@ -228,6 +299,7 @@
     .wrap { max-width: none; }
     .topbar, .card { box-shadow: none; margin-bottom: 12px; border-radius: 0; padding: 0; }
     nav.toc, .actions, .back-top, .toast, .skip, .code-head .btn { display: none !important; }
+    .playground-actions, .playground-output, details.playground-snippet { display: none !important; }
     pre, .prose, .sig, .param-card, .methods li { background: #fff !important; color: #000 !important; border-color: #999; }
     pre { border: 1px solid #ccc; white-space: pre-wrap; }
     pre.clamped { max-height: none; }
@@ -258,6 +330,7 @@
     <a href="#firma">Firma</a>
     <a href="#etiquetas">Etiquetas</a>
     <a href="#parametros">Parámetros</a>
+    <a href="#playground">Playground</a>
     <a href="#metodos">Métodos</a>
     <a href="#ejemplo">Ejemplo</a>
     <a href="#codigo">Código fuente</a>
@@ -283,6 +356,33 @@
 
     <section id="atributos">{{MODEL_ATTRIBUTES_SECTION}}</section>
 
+    <h2 id="playground">Playground</h2>
+    <p class="playground-hint">
+      Ajusta los hiperparámetros y ejecuta el constructor en el servidor para comprobar que el
+      modelo se crea con esa configuración. Solo se envían valores JSON: no se evalúa código.
+    </p>
+    <form id="playground-form" novalidate>
+      <div class="playground-fields" id="playground-fields"></div>
+      <div class="playground-actions">
+        <button class="btn btn-primary" type="submit" id="run-playground">▶️ Ejecutar modelo</button>
+        <button class="btn btn-secondary" type="button" id="reset-playground">↺ Restablecer valores</button>
+        <span class="playground-status" id="playground-status" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+    <div class="playground-output" id="playground-result" hidden>
+      <div class="code-head">
+        <span id="playground-result-title">Resultado de la ejecución</span>
+        <button class="btn btn-ghost btn-small" type="button" data-copy="#playground-output" data-toast="Resultado copiado">📋 Copiar resultado</button>
+      </div>
+      <pre id="playground-output"></pre>
+      <p class="playground-detail" id="playground-detail" hidden></p>
+    </div>
+    <details class="playground-snippet">
+      <summary>Código equivalente en Python</summary>
+      <pre id="playground-code"></pre>
+    </details>
+    <script type="application/json" id="playground-data">{{MODEL_PLAYGROUND_JSON}}</script>
+
     <h2 id="metodos">Métodos</h2>
     <ul class="methods">{{MODEL_METHODS}}</ul>
 
@@ -305,6 +405,7 @@
 
     <div class="actions">
       <a class="btn btn-primary" href="{{NOTEBOOK_URL}}" download>⬇️ Descargar notebook</a>
+      <a class="btn btn-secondary" href="{{SOURCE_DOWNLOAD_URL}}" download>⬇️ Descargar código fuente</a>
       <a class="btn btn-secondary" href="{{API_URL}}" target="_blank" rel="noopener">🔌 Ver JSON de la API</a>
       <button class="btn btn-secondary" type="button" data-copy="#signature" data-toast="Firma copiada">📋 Copiar firma</button>
       <button class="btn btn-secondary" type="button" data-copy="#import" data-toast="Importación copiada">📋 Copiar importación</button>
@@ -417,6 +518,236 @@
       dom.backTop.addEventListener('click', function () {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Playground                                                          */
+    /* ------------------------------------------------------------------ */
+
+    var playgroundDom = {
+      form: document.getElementById('playground-form'),
+      fields: document.getElementById('playground-fields'),
+      run: document.getElementById('run-playground'),
+      reset: document.getElementById('reset-playground'),
+      status: document.getElementById('playground-status'),
+      result: document.getElementById('playground-result'),
+      title: document.getElementById('playground-result-title'),
+      output: document.getElementById('playground-output'),
+      detail: document.getElementById('playground-detail'),
+      code: document.getElementById('playground-code')
+    };
+
+    var playgroundData = null;
+    try {
+      var specNode = document.getElementById('playground-data');
+      if (specNode && specNode.textContent.trim()) {
+        playgroundData = JSON.parse(specNode.textContent);
+      }
+    } catch (error) {
+      playgroundData = null;
+    }
+
+    function escapeHtml(value) {
+      return String(value === null || value === undefined ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function fieldControl(field, index) {
+      var id = 'pg-' + index;
+      var kind = field.kind;
+      var value = field.default;
+      if ((value === null || value === undefined) && field.required) {
+        value = field.sample;
+      }
+      var placeholder = field.required ? 'obligatorio' : 'opcional';
+      if (kind === 'bool') {
+        return '<label class="field-check" for="' + id + '">' +
+          '<input type="checkbox" id="' + id + '" data-kind="bool"' +
+          (value === true ? ' checked' : '') + '> activar</label>';
+      }
+      if (kind === 'int' || kind === 'float') {
+        return '<input type="number" id="' + id + '" data-kind="' + kind + '" step="' +
+          (kind === 'int' ? '1' : 'any') + '" value="' +
+          escapeHtml(value === null || value === undefined ? '' : String(value)) +
+          '" placeholder="' + placeholder + '">';
+      }
+      if (kind === 'raw') {
+        return '<textarea id="' + id + '" data-kind="raw" spellcheck="false" placeholder="JSON: [1, 2, 3]">' +
+          escapeHtml(value === null || value === undefined ? '' : JSON.stringify(value)) +
+          '</textarea>';
+      }
+      return '<input type="text" id="' + id + '" data-kind="' + kind + '" value="' +
+        escapeHtml(value === null || value === undefined ? '' : String(value)) +
+        '" placeholder="' + placeholder + '">';
+    }
+
+    function renderPlayground() {
+      if (!playgroundData || !playgroundDom.fields) return;
+      var fields = playgroundData.fields || [];
+      if (!fields.length) {
+        playgroundDom.fields.innerHTML =
+          '<p class="empty">Este modelo no declara parámetros configurables.</p>';
+      } else {
+        playgroundDom.fields.innerHTML = fields.map(function (field, index) {
+          return '<div class="playground-field">' +
+            '<label for="pg-' + index + '">' + escapeHtml(field.name) +
+              (field.required ? ' *' : '') + '</label>' +
+            '<span class="field-type">' + escapeHtml(field.type) + '</span>' +
+            fieldControl(field, index) + '</div>';
+        }).join('');
+      }
+      updateSnippet();
+    }
+
+    function readControl(control) {
+      var kind = control.getAttribute('data-kind');
+      if (kind === 'bool') return control.checked;
+      var text = control.value;
+      if (kind === 'raw') {
+        if (!text.trim()) return null;
+        return JSON.parse(text);
+      }
+      if (kind === 'int' || kind === 'float') {
+        if (!text.trim()) return null;
+        var number = Number(text);
+        if (!isFinite(number)) throw new Error('se esperaba un número');
+        return kind === 'int' ? Math.trunc(number) : number;
+      }
+      return text === '' ? null : text;
+    }
+
+    function collectParameters() {
+      var values = {};
+      var missing = [];
+      var invalid = [];
+      (playgroundData.fields || []).forEach(function (field, index) {
+        var control = document.getElementById('pg-' + index);
+        if (!control) return;
+        var value;
+        try {
+          value = readControl(control);
+        } catch (error) {
+          invalid.push(field.name + ': ' + error.message);
+          return;
+        }
+        if (value === null) {
+          if (field.required) missing.push(field.name);
+          return;
+        }
+        values[field.name] = value;
+      });
+      return { values: values, missing: missing, invalid: invalid };
+    }
+
+    function pyLiteral(value) {
+      if (value === null || value === undefined) return 'None';
+      if (typeof value === 'boolean') return value ? 'True' : 'False';
+      if (typeof value === 'number') return String(value);
+      if (typeof value === 'string') return JSON.stringify(value);
+      if (Object.prototype.toString.call(value) === '[object Array]') {
+        return '[' + value.map(pyLiteral).join(', ') + ']';
+      }
+      if (typeof value === 'object') {
+        return '{' + Object.keys(value).map(function (key) {
+          return JSON.stringify(key) + ': ' + pyLiteral(value[key]);
+        }).join(', ') + '}';
+      }
+      return JSON.stringify(value);
+    }
+
+    function updateSnippet() {
+      if (!playgroundData || !playgroundDom.code) return;
+      var collected = collectParameters();
+      var callArguments = Object.keys(collected.values).map(function (name) {
+        return name + '=' + pyLiteral(collected.values[name]);
+      });
+      playgroundDom.code.textContent = (playgroundData.importStatement || '') +
+        '\n\nmodel = ' + playgroundData.modelName + '(' + callArguments.join(', ') + ')';
+    }
+
+    function setStatus(message, kind) {
+      if (!playgroundDom.status) return;
+      playgroundDom.status.textContent = message;
+      playgroundDom.status.className = 'playground-status' + (kind ? ' ' + kind : '');
+    }
+
+    function showResult(text, detail, ok) {
+      if (!playgroundDom.result) return;
+      playgroundDom.result.hidden = false;
+      playgroundDom.title.textContent = ok ? 'Resultado de la ejecución' : 'No se pudo ejecutar';
+      playgroundDom.output.textContent = text;
+      playgroundDom.detail.hidden = !detail;
+      playgroundDom.detail.textContent = detail || '';
+    }
+
+    function runPlayground(event) {
+      event.preventDefault();
+      if (!playgroundData) return;
+      var collected = collectParameters();
+      if (collected.invalid.length) {
+        setStatus('Revisa: ' + collected.invalid.join('; '), 'error');
+        return;
+      }
+      if (collected.missing.length) {
+        setStatus('Faltan parámetros obligatorios: ' + collected.missing.join(', '), 'error');
+        return;
+      }
+      playgroundDom.run.disabled = true;
+      setStatus('Ejecutando…', '');
+      window.fetch(playgroundData.endpoint || '/api/playground', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model_id: playgroundData.modelId, parameters: collected.values })
+      }).then(function (response) {
+        return response.json().catch(function () { return null; }).then(function (data) {
+          return { ok: response.ok, data: data || {} };
+        });
+      }).then(function (response) {
+        var data = response.data;
+        if (!response.ok || data.success === false) {
+          setStatus('Error: ' + (data.error || 'no se pudo ejecutar el modelo'), 'error');
+          showResult(data.error || 'Error desconocido', data.detail || '', false);
+          return;
+        }
+        var lines = [
+          'tipo   : ' + (data.type || '—'),
+          'módulo : ' + (data.module || '—'),
+          'repr   : ' + (data.repr || '—')
+        ];
+        if (data.attributes && data.attributes.length) {
+          lines.push('atributos: ' + data.attributes.join(', '));
+        }
+        if (data.stdout) {
+          lines.push('', 'salida:', data.stdout);
+        }
+        var elapsed = typeof data.elapsed === 'number' ? ' en ' + data.elapsed + ' s' : '';
+        setStatus('Modelo construido' + elapsed, 'ok');
+        showResult(lines.join('\n'), data.stderr || '', true);
+      }).catch(function (error) {
+        setStatus('Error de red: ' + error.message, 'error');
+        showResult(String(error.message || error), '', false);
+      }).then(function () {
+        playgroundDom.run.disabled = false;
+      });
+    }
+
+    if (playgroundData && playgroundDom.form) {
+      renderPlayground();
+      playgroundDom.form.addEventListener('submit', runPlayground);
+      playgroundDom.form.addEventListener('input', updateSnippet);
+      playgroundDom.form.addEventListener('change', updateSnippet);
+      if (playgroundDom.reset) {
+        playgroundDom.reset.addEventListener('click', function () {
+          renderPlayground();
+          playgroundDom.result.hidden = true;
+          setStatus('Valores restablecidos', '');
+        });
+      }
+    } else if (playgroundDom.fields) {
+      playgroundDom.fields.innerHTML =
+        '<p class="empty">El playground no está disponible: falta la especificación del modelo.</p>';
+      if (playgroundDom.run) playgroundDom.run.disabled = true;
     }
 
     dom.year.textContent = String(new Date().getFullYear());
