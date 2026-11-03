@@ -134,12 +134,8 @@ def _method_kind(decorators: Sequence[str]) -> str:
     return "method"
 
 
-def guess_widget(type_hint: str) -> str:
-    """Map a type annotation onto a UI/ipywidgets control kind.
-
-    Only the *outer* type counts: ``Dict[int, Dict[str, List]]`` is a mapping,
-    not an integer, so it must not be rendered as a number input.
-    """
+def _scalar_widget(type_hint: str) -> str:
+    """Widget of a single type hint (no ``Optional``/``Union`` unwrapping)."""
     base = re.split(r"[\[\|,]", type_hint)[0].strip().strip("`").strip()
     base = base.split(".")[-1].lower()
     if base in ("int", "float", "bool", "str"):
@@ -147,6 +143,43 @@ def guess_widget(type_hint: str) -> str:
     if base == "path" or base.endswith("path"):
         return "text"
     return "raw"
+
+
+def _optional_inner(type_hint: str) -> str:
+    """Inner type of ``Optional[X]`` / ``X | None`` / ``Union[X, None]``.
+
+    A union of ``int`` and ``float`` collapses to ``float``; a union of
+    different widgets stays untouched (it is a raw JSON field, not a number).
+    """
+    text = (type_hint or "").strip().strip("`")
+    match = re.match(r"^(?:typing\.)?Optional\[(.+)\]$", text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    parts = [part.strip() for part in text.split("|")]
+    if len(parts) > 1:
+        rest = [part for part in parts if part not in ("None", "NoneType")]
+        if len(rest) == 1:
+            return rest[0]
+    match = re.match(r"^(?:typing\.)?Union\[(.+)\]$", text, re.DOTALL)
+    if match:
+        members = [member.strip() for member in match.group(1).split(",")]
+        members = [member for member in members if member not in ("None", "NoneType")]
+        widgets = {_scalar_widget(member) for member in members}
+        if widgets == {"int", "float"}:
+            return "float"
+        if len(widgets) == 1:
+            return members[0]
+    return text
+
+
+def guess_widget(type_hint: str) -> str:
+    """Map a type annotation onto a UI/ipywidgets control kind.
+
+    Only the *outer* type counts: ``Dict[int, Dict[str, List]]`` is a mapping,
+    not an integer, so it must not be rendered as a number input.
+    ``Optional[int]`` / ``int | None`` are numbers, not raw JSON fields.
+    """
+    return _scalar_widget(_optional_inner(type_hint))
 
 
 def _argument_nodes(args: ast.arguments) -> List[Tuple[ast.arg, str, Optional[ast.AST]]]:
@@ -189,6 +222,7 @@ def extract_parameters(
                 "default": default_text,
                 "required": default_text is None and kind in ("positional", "keyword_only"),
                 "kind": kind,
+                "positional_only": kind == "positional" and node in func.args.posonlyargs,
                 "variadic": kind in ("var_positional", "var_keyword"),
                 "description": documented,
                 "widget": guess_widget(type_hint),
@@ -200,10 +234,16 @@ def extract_parameters(
 def _signature_text(func: ast.FunctionDef, name: Optional[str] = None) -> str:
     """Rebuild a compact ``name(a, b=1) -> Ret`` signature from the AST."""
     parts: List[str] = []
+    keyword_only_seen = False
+    positional_only: List[str] = []
     for parameter in extract_parameters(func):
         prefix = ""
+        if parameter["kind"] == "keyword_only" and not keyword_only_seen:
+            parts.append("*")
+            keyword_only_seen = True
         if parameter["kind"] == "var_positional":
             prefix = "*"
+            keyword_only_seen = True
         elif parameter["kind"] == "var_keyword":
             prefix = "**"
         text = f"{prefix}{parameter['name']}"
@@ -212,6 +252,10 @@ def _signature_text(func: ast.FunctionDef, name: Optional[str] = None) -> str:
         if parameter["default"] is not None:
             text += f" = {parameter['default']}"
         parts.append(text)
+        if parameter["kind"] == "positional" and parameter.get("positional_only"):
+            positional_only.append(parameter["name"])
+    if positional_only:
+        parts.insert(len(positional_only), "/")
     returns = _annotation(func.returns, fallback="")
     suffix = f" -> {returns}" if returns and returns != "None" else ""
     return f"{name or func.name}({', '.join(parts)}){suffix}"
@@ -522,7 +566,7 @@ def _example_code(model: Dict[str, Any]) -> str:
         arguments.append(f"{parameter['name']}={name}")
 
     body = "\n".join(setup)
-    imports = [model["importStatement"]]
+    imports = [model["import_statement"]]
     if "np." in body:
         imports.append("import numpy as np")
     if "pd." in body:
@@ -534,7 +578,7 @@ def _example_code(model: Dict[str, Any]) -> str:
         lines.append("")
     lines.append(f"model = {model['name']}({', '.join(arguments)})")
 
-    calls = model.get("safeCalls") or []
+    calls = model.get("safe_calls") or []
     if calls:
         lines.append("")
         lines.append("# Ejemplo de uso")
@@ -557,7 +601,7 @@ def _plural(count: int, singular: str, plural: str) -> str:
 
 def _tags(model: Dict[str, Any]) -> List[str]:
     """Derive search tags from the category, the name and the class hierarchy."""
-    tags: List[str] = [model["categoryLabel"]]
+    tags: List[str] = [model["category_label"]]
     for word in split_identifier(model["name"]).split():
         if len(word) > 2 and word.lower() not in {tag.lower() for tag in tags}:
             tags.append(word)
@@ -572,22 +616,27 @@ def _tags(model: Dict[str, Any]) -> List[str]:
 
 
 def _to_model(record: Dict[str, Any]) -> Dict[str, Any]:
-    """Turn an AST record into the public catalog entry."""
+    """Turn an AST record into the public catalog entry.
+
+    Every key of the returned mapping is ``snake_case``: the JSON projections of
+    the web API mirror the catalog verbatim, so a single naming convention keeps
+    the payloads consistent with the ``offset``/``limit`` query parameters.
+    """
     model = dict(record)
     label, icon = category_meta(model["category"])
-    model["categoryLabel"] = label
+    model["category_label"] = label
     model["icon"] = icon
-    model["shortDescription"] = _first_paragraph(split_sections(model["docstring"]).get("", []))
-    model["fullDescription"] = model["docstring"].strip() or model["shortDescription"]
+    model["short_description"] = _first_paragraph(split_sections(model["docstring"]).get("", []))
+    model["full_description"] = model["docstring"].strip() or model["short_description"]
     model["title"] = split_identifier(model["name"])
-    model["importStatement"] = f"from {model['module']} import {model['name']}"
+    model["import_statement"] = f"from {model['module']} import {model['name']}"
     model["parameters"] = [
         {**parameter, "sample": _sample_expression(parameter)} for parameter in model["parameters"]
     ]
-    model["safeCalls"] = _call_safe_methods(model)
+    model["safe_calls"] = _call_safe_methods(model)
     model["example"] = _example_code(model)
     model["tags"] = _tags(model)
-    model["lineCount"] = model["source"].count("\n") + 1
+    model["line_count"] = model["source"].count("\n") + 1
     for private in ("_node", "docstring"):
         model.pop(private, None)
     return model
@@ -932,10 +981,10 @@ def _haystack(model: Dict[str, Any]) -> str:
         model["id"],
         model["title"],
         model["category"],
-        model["categoryLabel"],
+        model["category_label"],
         model["module"],
-        model["shortDescription"],
-        model["fullDescription"],
+        model["short_description"],
+        model["full_description"],
         " ".join(model["tags"]),
         " ".join(method["name"] for method in model["methods"]),
         " ".join(parameter["name"] for parameter in model["parameters"]),
@@ -943,18 +992,104 @@ def _haystack(model: Dict[str, Any]) -> str:
     return " ".join(parts).lower()
 
 
-def search_models(catalog: Sequence[Dict[str, Any]], query: str) -> List[Dict[str, Any]]:
-    """Free text search across names, descriptions, tags, methods and parameters."""
-    needle = query.strip().lower()
-    if not needle:
+def normalize_tags(tags: Sequence[str] | str | None) -> List[str]:
+    """Split a tag filter into a list of lower case, non empty tags.
+
+    Tags are separated by commas because a single tag may contain spaces
+    (``Deep Learning``).  Both ``"a,b"`` and ``["a", "b"]`` are accepted, which
+    lets the HTTP layer pass either repeated query parameters or one comma
+    separated value.
+    """
+    if tags is None:
+        return []
+    values = [tags] if isinstance(tags, str) else [str(value) for value in tags]
+    normalized: List[str] = []
+    for value in values:
+        for chunk in value.split(","):
+            tag = chunk.strip().lower()
+            if tag and tag not in normalized:
+                normalized.append(tag)
+    return normalized
+
+
+def filter_by_tags(
+    catalog: Sequence[Dict[str, Any]], tags: Sequence[str] | str | None
+) -> List[Dict[str, Any]]:
+    """Models carrying *every* tag of ``tags`` (case insensitive)."""
+    wanted = normalize_tags(tags)
+    if not wanted:
         return list(catalog)
+    selected: List[Dict[str, Any]] = []
+    for model in catalog:
+        available = {tag.lower() for tag in model["tags"]}
+        if all(tag in available for tag in wanted):
+            selected.append(model)
+    return selected
+
+
+def search_models(
+    catalog: Sequence[Dict[str, Any]],
+    query: str,
+    tags: Sequence[str] | str | None = None,
+) -> List[Dict[str, Any]]:
+    """Free text search across names, descriptions, tags, methods and parameters.
+
+    ``tags`` optionally narrows the result down to the models that declare all
+    of the given tags.
+    """
+    needle = query.strip().lower()
+    wanted = normalize_tags(tags)
+    if not needle:
+        return filter_by_tags(catalog, wanted)
     terms = [term for term in re.split(r"\s+", needle) if term]
     matches = []
     for model in catalog:
         haystack = _haystack(model)
         if all(term in haystack for term in terms):
             matches.append(model)
-    return matches
+    return filter_by_tags(matches, wanted)
+
+
+def facet_counts(catalog: Sequence[Dict[str, Any]], top: int = 25) -> Dict[str, Any]:
+    """Category and tag counters used by the faceted search.
+
+    Parameters
+    ----------
+    catalog:
+        Models the facets are computed on (the caller decides whether the tag
+        filter is applied before or after).
+    top:
+        Maximum number of tags returned, most frequent first.
+
+    Returns
+    -------
+    dict
+        ``{"categories": [...], "tags": [{"tag": ..., "count": ...}, ...]}``.
+    """
+    category_counts: Dict[str, int] = {}
+    tag_counts: Dict[str, int] = {}
+    labels: Dict[str, str] = {}
+    for model in catalog:
+        category = model["category"]
+        category_counts[category] = category_counts.get(category, 0) + 1
+        labels[category] = model["category_label"]
+        for tag in {tag: None for tag in model["tags"]}:  # unique, keeps order
+            key = tag.lower()
+            tag_counts[key] = tag_counts.get(key, 0) + 1
+    categories = [
+        {
+            "id": name,
+            "label": labels.get(name, name),
+            "icon": category_meta(name)[1],
+            "count": count,
+        }
+        for name, count in sorted(category_counts.items())
+    ]
+    tags = [
+        {"tag": name, "count": count}
+        for name, count in sorted(tag_counts.items(), key=lambda item: (-item[1], item[0]))[:top]
+    ]
+    return {"categories": categories, "tags": tags}
 
 
 def summarize(catalog: Sequence[Dict[str, Any]]) -> Dict[str, int]:

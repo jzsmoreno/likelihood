@@ -233,6 +233,38 @@
   details.playground-snippet summary { cursor: pointer; font-size: .8rem; font-weight: 600; color: var(--accent); }
   details.playground-snippet pre { margin-top: 10px; }
 
+  /* ---------- Pestañas del laboratorio (playground / invocar) ---------- */
+  .lab-tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin: 4px 0 16px; }
+  .lab-tab {
+    appearance: none; border: 1px solid transparent; border-bottom: none; background: transparent;
+    padding: 9px 16px; border-radius: 10px 10px 0 0; cursor: pointer; font: inherit;
+    font-size: .86rem; font-weight: 600; color: var(--muted); position: relative; top: 1px;
+  }
+  .lab-tab:hover { color: var(--ink); background: var(--surface-param); }
+  .lab-tab[aria-selected="true"] {
+    color: var(--accent); background: var(--surface); border-color: var(--line);
+    border-bottom: 1px solid var(--surface);
+  }
+  .lab-panel[hidden] { display: none; }
+  .invoke-method { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+  .invoke-method label { font-size: .8rem; font-weight: 700; }
+  .invoke-method select {
+    font: inherit; font-size: .85rem; padding: 8px 10px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); min-width: 220px;
+  }
+  .invoke-signature { font-family: ui-monospace, Consolas, monospace; font-size: .78rem; color: var(--muted); word-break: break-word; }
+  details.invoke-constructor { margin: 14px 0; }
+  details.invoke-constructor summary { cursor: pointer; font-size: .82rem; font-weight: 600; color: var(--accent); }
+  details.invoke-constructor .playground-fields { margin-top: 10px; }
+  .invoke-session { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 14px; font-size: .8rem; color: var(--muted); }
+  .invoke-session label { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ink); }
+  .invoke-session input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
+  .invoke-session .session-badge { font-family: ui-monospace, Consolas, monospace; font-size: .74rem; }
+  .invoke-deploy { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+  .invoke-endpoint { margin-top: 14px; }
+  .invoke-endpoint pre { white-space: pre-wrap; word-break: break-all; }
+  .invoke-endpoint .endpoint-url { font-weight: 700; color: var(--accent); }
+
   footer.credits { text-align: center; color: rgba(255,255,255,.85); font-size: .82rem; padding-top: 8px; }
   .back-top {
     position: fixed; right: 18px; bottom: 18px; z-index: 30;
@@ -356,32 +388,103 @@
 
     <section id="atributos">{{MODEL_ATTRIBUTES_SECTION}}</section>
 
-    <h2 id="playground">Playground</h2>
-    <p class="playground-hint">
-      Ajusta los hiperparámetros y ejecuta el constructor en el servidor para comprobar que el
-      modelo se crea con esa configuración. Solo se envían valores JSON: no se evalúa código.
-    </p>
-    <form id="playground-form" novalidate>
-      <div class="playground-fields" id="playground-fields"></div>
-      <div class="playground-actions">
-        <button class="btn btn-primary" type="submit" id="run-playground">▶️ Ejecutar modelo</button>
-        <button class="btn btn-secondary" type="button" id="reset-playground">↺ Restablecer valores</button>
-        <span class="playground-status" id="playground-status" role="status" aria-live="polite"></span>
-      </div>
-    </form>
-    <div class="playground-output" id="playground-result" hidden>
-      <div class="code-head">
-        <span id="playground-result-title">Resultado de la ejecución</span>
-        <button class="btn btn-ghost btn-small" type="button" data-copy="#playground-output" data-toast="Resultado copiado">📋 Copiar resultado</button>
-      </div>
-      <pre id="playground-output"></pre>
-      <p class="playground-detail" id="playground-detail" hidden></p>
+    <h2 id="playground">Laboratorio</h2>
+    <div class="lab-tabs" role="tablist" aria-label="Herramientas del modelo">
+      <button class="lab-tab" type="button" role="tab" id="tab-playground"
+              aria-controls="panel-playground" aria-selected="true"
+              data-lab-tab="playground">▶️ Playground</button>
+      <button class="lab-tab" type="button" role="tab" id="tab-invoke"
+              aria-controls="panel-invoke" aria-selected="false"
+              data-lab-tab="invoke">⚡ Invocar método</button>
     </div>
-    <details class="playground-snippet">
-      <summary>Código equivalente en Python</summary>
-      <pre id="playground-code"></pre>
-    </details>
-    <script type="application/json" id="playground-data">{{MODEL_PLAYGROUND_JSON}}</script>
+
+    <div class="lab-panel" id="panel-playground" role="tabpanel" aria-labelledby="tab-playground">
+      <p class="playground-hint">
+        Ajusta los hiperparámetros y ejecuta el constructor en el servidor para comprobar que el
+        modelo se crea con esa configuración. Solo se envían valores JSON: no se evalúa código.
+      </p>
+      <form id="playground-form" novalidate>
+        <div class="playground-fields" id="playground-fields"></div>
+        <div class="playground-actions">
+          <button class="btn btn-primary" type="submit" id="run-playground">▶️ Ejecutar modelo</button>
+          <button class="btn btn-secondary" type="button" id="reset-playground">↺ Restablecer valores</button>
+          <span class="playground-status" id="playground-status" role="status" aria-live="polite"></span>
+        </div>
+      </form>
+      <div class="playground-output" id="playground-result" hidden>
+        <div class="code-head">
+          <span id="playground-result-title">Resultado de la ejecución</span>
+          <button class="btn btn-ghost btn-small" type="button" data-copy="#playground-output" data-toast="Resultado copiado">📋 Copiar resultado</button>
+        </div>
+        <pre id="playground-output"></pre>
+        <p class="playground-detail" id="playground-detail" hidden></p>
+      </div>
+      <details class="playground-snippet">
+        <summary>Código equivalente en Python</summary>
+        <pre id="playground-code"></pre>
+      </details>
+      <script type="application/json" id="playground-data">{{MODEL_PLAYGROUND_JSON}}</script>
+    </div>
+
+    <div class="lab-panel" id="panel-invoke" role="tabpanel" aria-labelledby="tab-invoke" hidden>
+      <p class="playground-hint">
+        Llama a un método del modelo con argumentos JSON validados contra su firma real. La
+        primera llamada construye la clase y la mantiene viva; las siguientes reutilizan la
+        misma instancia (por ejemplo <code>fit</code> y después <code>predict</code>). Desmarca
+        <b>Instancia persistente</b> para reconstruir el modelo en cada llamada.
+      </p>
+      <div class="invoke-method">
+        <label for="invoke-method">Método</label>
+        <select id="invoke-method"></select>
+        <span class="invoke-signature" id="invoke-signature"></span>
+      </div>
+      <div class="playground-fields" id="invoke-fields"></div>
+      <details class="invoke-constructor">
+        <summary>Parámetros del constructor</summary>
+        <div class="playground-fields" id="invoke-constructor-fields"></div>
+        <p class="invoke-signature" id="invoke-constructor-note"></p>
+      </details>
+      <div class="invoke-session">
+        <label><input type="checkbox" id="invoke-use-session" checked> Instancia persistente</label>
+        <span class="session-badge" id="invoke-session-info">sin sesión</span>
+        <button class="btn btn-secondary btn-small" type="button" id="invoke-close-session" hidden>Cerrar sesión</button>
+      </div>
+      <div class="playground-actions">
+        <button class="btn btn-primary" type="button" id="run-invoke">⚡ Invocar método</button>
+        <button class="btn btn-secondary" type="button" id="sample-invoke">🧪 Datos de ejemplo</button>
+        <button class="btn btn-secondary" type="button" id="reset-invoke">↺ Restablecer argumentos</button>
+        <span class="playground-status" id="invoke-status" role="status" aria-live="polite"></span>
+      </div>
+      <div class="invoke-deploy">
+        <button class="btn btn-secondary" type="button" id="deploy-invoke">🚀 Desplegar como endpoint</button>
+        <span class="invoke-signature" id="invoke-deploy-note">Construye la instancia una vez y deja un endpoint para llamarla varias veces.</span>
+      </div>
+      <div class="playground-output invoke-endpoint" id="invoke-endpoint" hidden>
+        <div class="code-head">
+          <span>Endpoint persistente</span>
+          <span>
+            <button class="btn btn-ghost btn-small" type="button" data-copy="#invoke-endpoint-url" data-toast="URL copiada">📋 Copiar URL</button>
+            <button class="btn btn-ghost btn-small" type="button" data-copy="#invoke-endpoint-curl" data-toast="curl copiado">📋 Copiar curl</button>
+          </span>
+        </div>
+        <pre id="invoke-endpoint-url" class="endpoint-url"></pre>
+        <pre id="invoke-endpoint-curl"></pre>
+        <p class="playground-detail" id="invoke-endpoint-detail"></p>
+      </div>
+      <div class="playground-output" id="invoke-result" hidden>
+        <div class="code-head">
+          <span id="invoke-result-title">Resultado de la llamada</span>
+          <button class="btn btn-ghost btn-small" type="button" data-copy="#invoke-output" data-toast="Resultado copiado">📋 Copiar resultado</button>
+        </div>
+        <pre id="invoke-output"></pre>
+        <p class="playground-detail" id="invoke-detail" hidden></p>
+      </div>
+      <details class="playground-snippet invoke-snippet">
+        <summary>Código equivalente en Python</summary>
+        <pre id="invoke-code"></pre>
+      </details>
+      <script type="application/json" id="invoke-data">{{MODEL_INVOKE_JSON}}</script>
+    </div>
 
     <h2 id="metodos">Métodos</h2>
     <ul class="methods">{{MODEL_METHODS}}</ul>
@@ -553,8 +656,15 @@
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function fieldControl(field, index) {
-      var id = 'pg-' + index;
+    /* Resumen legible de los parámetros que necesitan objetos Python. */
+    function unsupportedSummary(list) {
+      return (list || []).map(function (item) {
+        return "'" + item.name + "' (" + item.type + ': ' + item.reason + ')';
+      }).join(', ');
+    }
+
+    function fieldControl(field, index, prefix) {
+      var id = (prefix || 'pg') + '-' + index;
       var kind = field.kind;
       var value = field.default;
       if ((value === null || value === undefined) && field.required) {
@@ -582,21 +692,39 @@
         '" placeholder="' + placeholder + '">';
     }
 
+    function renderFields(container, fields, prefix, emptyMessage) {
+      if (!container) return;
+      if (!fields.length) {
+        container.innerHTML = '<p class="empty">' + escapeHtml(emptyMessage) + '</p>';
+        return;
+      }
+      container.innerHTML = fields.map(function (field, index) {
+        return '<div class="playground-field">' +
+          '<label for="' + prefix + '-' + index + '">' + escapeHtml(field.name) +
+            (field.required ? ' *' : '') + '</label>' +
+          '<span class="field-type">' + escapeHtml(field.type) + '</span>' +
+          fieldControl(field, index, prefix) + '</div>';
+      }).join('');
+    }
+
     function renderPlayground() {
       if (!playgroundData || !playgroundDom.fields) return;
-      var fields = playgroundData.fields || [];
-      if (!fields.length) {
+      if (playgroundData.buildable === false) {
         playgroundDom.fields.innerHTML =
-          '<p class="empty">Este modelo no declara parámetros configurables.</p>';
-      } else {
-        playgroundDom.fields.innerHTML = fields.map(function (field, index) {
-          return '<div class="playground-field">' +
-            '<label for="pg-' + index + '">' + escapeHtml(field.name) +
-              (field.required ? ' *' : '') + '</label>' +
-            '<span class="field-type">' + escapeHtml(field.type) + '</span>' +
-            fieldControl(field, index) + '</div>';
-        }).join('');
+          '<p class="empty">No se puede construir desde el catálogo: ' +
+          escapeHtml(unsupportedSummary(playgroundData.unsupported)) +
+          '. Usa el ejemplo de Python.</p>';
+        if (playgroundDom.run) playgroundDom.run.disabled = true;
+        if (playgroundDom.reset) playgroundDom.reset.disabled = true;
+        updateSnippet();
+        return;
       }
+      renderFields(
+        playgroundDom.fields,
+        playgroundData.fields || [],
+        'pg',
+        'Este modelo no declara parámetros configurables.'
+      );
       updateSnippet();
     }
 
@@ -617,12 +745,12 @@
       return text === '' ? null : text;
     }
 
-    function collectParameters() {
+    function collectFields(spec, prefix) {
       var values = {};
       var missing = [];
       var invalid = [];
-      (playgroundData.fields || []).forEach(function (field, index) {
-        var control = document.getElementById('pg-' + index);
+      ((spec && spec.fields) || []).forEach(function (field, index) {
+        var control = document.getElementById(prefix + '-' + index);
         if (!control) return;
         var value;
         try {
@@ -638,6 +766,10 @@
         values[field.name] = value;
       });
       return { values: values, missing: missing, invalid: invalid };
+    }
+
+    function collectParameters() {
+      return collectFields(playgroundData, 'pg');
     }
 
     function pyLiteral(value) {
@@ -662,8 +794,8 @@
       var callArguments = Object.keys(collected.values).map(function (name) {
         return name + '=' + pyLiteral(collected.values[name]);
       });
-      playgroundDom.code.textContent = (playgroundData.importStatement || '') +
-        '\n\nmodel = ' + playgroundData.modelName + '(' + callArguments.join(', ') + ')';
+      playgroundDom.code.textContent = (playgroundData.import_statement || '') +
+        '\n\nmodel = ' + playgroundData.model_name + '(' + callArguments.join(', ') + ')';
     }
 
     function setStatus(message, kind) {
@@ -683,7 +815,7 @@
 
     function runPlayground(event) {
       event.preventDefault();
-      if (!playgroundData) return;
+      if (!playgroundData || playgroundData.buildable === false) return;
       var collected = collectParameters();
       if (collected.invalid.length) {
         setStatus('Revisa: ' + collected.invalid.join('; '), 'error');
@@ -698,7 +830,7 @@
       window.fetch(playgroundData.endpoint || '/api/playground', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model_id: playgroundData.modelId, parameters: collected.values })
+        body: JSON.stringify({ model_id: playgroundData.model_id, parameters: collected.values })
       }).then(function (response) {
         return response.json().catch(function () { return null; }).then(function (data) {
           return { ok: response.ok, data: data || {} };
@@ -750,7 +882,588 @@
       if (playgroundDom.run) playgroundDom.run.disabled = true;
     }
 
-    dom.year.textContent = String(new Date().getFullYear());
+    /* ------------------------------------------------------------------ */
+    /* Pestañas del laboratorio                                            */
+    /* ------------------------------------------------------------------ */
+
+    var labTabs = Array.prototype.slice.call(document.querySelectorAll('[data-lab-tab]'));
+
+    function selectLabTab(name, scroll) {
+      var active = name === 'invoke' ? 'invoke' : 'playground';
+      labTabs.forEach(function (tab) {
+        var selected = tab.getAttribute('data-lab-tab') === active;
+        tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+        tab.setAttribute('tabindex', selected ? '0' : '-1');
+      });
+      var panels = {
+        playground: document.getElementById('panel-playground'),
+        invoke: document.getElementById('panel-invoke')
+      };
+      ['playground', 'invoke'].forEach(function (key) {
+        if (panels[key]) panels[key].hidden = key !== active;
+      });
+      if (scroll) {
+        var heading = document.getElementById('playground');
+        if (heading) heading.scrollIntoView({ block: 'start' });
+      }
+    }
+
+    labTabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        selectLabTab(tab.getAttribute('data-lab-tab'), false);
+      });
+      tab.addEventListener('keydown', function (event) {
+        if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+        event.preventDefault();
+        var index = labTabs.indexOf(tab);
+        var offset = event.key === 'ArrowRight' ? 1 : labTabs.length - 1;
+        var next = labTabs[(index + offset) % labTabs.length];
+        if (!next) return;
+        next.focus();
+        selectLabTab(next.getAttribute('data-lab-tab'), false);
+      });
+    });
+
+    /* Los enlaces del índice #playground y #invocar abren su pestaña. */
+    document.addEventListener('click', function (event) {
+      var link = event.target.closest
+        ? event.target.closest('a[href="#invocar"], a[href="#playground"]')
+        : null;
+      if (!link) return;
+      selectLabTab(link.getAttribute('href') === '#invocar' ? 'invoke' : 'playground', true);
+    });
+
+    /* ------------------------------------------------------------------ */
+    /* Invocación de métodos                                               */
+    /* ------------------------------------------------------------------ */
+
+    var invokeDom = {
+      panel: document.getElementById('panel-invoke'),
+      select: document.getElementById('invoke-method'),
+      signature: document.getElementById('invoke-signature'),
+      fields: document.getElementById('invoke-fields'),
+      constructorFields: document.getElementById('invoke-constructor-fields'),
+      constructorNote: document.getElementById('invoke-constructor-note'),
+      useSession: document.getElementById('invoke-use-session'),
+      sessionInfo: document.getElementById('invoke-session-info'),
+      closeSession: document.getElementById('invoke-close-session'),
+      run: document.getElementById('run-invoke'),
+      sample: document.getElementById('sample-invoke'),
+      reset: document.getElementById('reset-invoke'),
+      deploy: document.getElementById('deploy-invoke'),
+      deployNote: document.getElementById('invoke-deploy-note'),
+      endpoint: document.getElementById('invoke-endpoint'),
+      endpointUrl: document.getElementById('invoke-endpoint-url'),
+      endpointCurl: document.getElementById('invoke-endpoint-curl'),
+      endpointDetail: document.getElementById('invoke-endpoint-detail'),
+      status: document.getElementById('invoke-status'),
+      result: document.getElementById('invoke-result'),
+      title: document.getElementById('invoke-result-title'),
+      output: document.getElementById('invoke-output'),
+      detail: document.getElementById('invoke-detail'),
+      code: document.getElementById('invoke-code')
+    };
+
+    var invokeData = null;
+    try {
+      var invokeNode = document.getElementById('invoke-data');
+      if (invokeNode && invokeNode.textContent.trim()) {
+        invokeData = JSON.parse(invokeNode.textContent);
+      }
+    } catch (error) {
+      invokeData = null;
+    }
+
+    var invokeSession = { id: null, calls: 0 };
+
+    function currentInvokeMethod() {
+      if (!invokeData || !invokeDom.select) return null;
+      var methods = invokeData.methods || [];
+      for (var i = 0; i < methods.length; i += 1) {
+        if (methods[i].name === invokeDom.select.value) return methods[i];
+      }
+      return methods.length ? methods[0] : null;
+    }
+
+    function setInvokeStatus(message, kind) {
+      if (!invokeDom.status) return;
+      invokeDom.status.textContent = message;
+      invokeDom.status.className = 'playground-status' + (kind ? ' ' + kind : '');
+    }
+
+    function showInvokeResult(text, detail, ok) {
+      if (!invokeDom.result) return;
+      invokeDom.result.hidden = false;
+      invokeDom.title.textContent = ok ? 'Resultado de la llamada' : 'No se pudo invocar';
+      invokeDom.output.textContent = text;
+      invokeDom.detail.hidden = !detail;
+      invokeDom.detail.textContent = detail || '';
+    }
+
+    function renderSessionInfo() {
+      if (invokeDom.sessionInfo) {
+        invokeDom.sessionInfo.textContent = invokeSession.id
+          ? 'sesión ' + invokeSession.id + ' · ' + invokeSession.calls +
+            (invokeSession.calls === 1 ? ' llamada' : ' llamadas')
+          : 'sin sesión';
+      }
+      if (invokeDom.closeSession) invokeDom.closeSession.hidden = !invokeSession.id;
+    }
+
+    function renderInvokeMethod() {
+      if (!invokeData) return;
+      var method = currentInvokeMethod();
+      renderFields(
+        invokeDom.fields,
+        (method && method.fields) || [],
+        'iv',
+        'Este método no recibe argumentos.'
+      );
+      if (invokeDom.signature) {
+        invokeDom.signature.textContent = method ? method.signature : '';
+      }
+      updateInvokeSnippet();
+    }
+
+    function renderInvokeConstructor() {
+      if (playgroundData && playgroundData.buildable === false) {
+        if (invokeDom.constructorFields) {
+          invokeDom.constructorFields.innerHTML =
+            '<p class="empty">No se puede construir desde el catálogo: ' +
+            escapeHtml(unsupportedSummary(playgroundData.unsupported)) +
+            '. Usa el ejemplo de Python.</p>';
+        }
+        if (invokeDom.constructorNote) {
+          invokeDom.constructorNote.textContent =
+            'Este modelo necesita objetos Python que la API no puede recibir como JSON.';
+        }
+        return;
+      }
+      var fields = (playgroundData && playgroundData.fields) || [];
+      renderFields(
+        invokeDom.constructorFields,
+        fields,
+        'ic',
+        'El constructor no declara parámetros: el modelo se crea sin argumentos.'
+      );
+      if (invokeDom.constructorNote) {
+        invokeDom.constructorNote.textContent = invokeSession.id
+          ? 'La instancia ya está creada: estos valores solo se usan al reconstruirla.'
+          : 'La primera llamada construye la clase con estos valores.';
+      }
+    }
+
+    function updateInvokeSnippet() {
+      if (!invokeData || !invokeDom.code) return;
+      var method = currentInvokeMethod();
+      var constructor = collectFields(playgroundData, 'ic');
+      var callArguments = method ? collectFields(method, 'iv') : { values: {} };
+      var constructorArguments = Object.keys(constructor.values).map(function (name) {
+        return name + '=' + pyLiteral(constructor.values[name]);
+      });
+      var argumentsList = Object.keys(callArguments.values).map(function (name) {
+        return name + '=' + pyLiteral(callArguments.values[name]);
+      });
+      var source = playgroundData || {};
+      var importStatement = invokeData.import_statement || source.import_statement || '';
+      var modelName = invokeData.model_name || source.model_name || invokeData.model_id;
+      var lines = [importStatement, ''];
+      lines.push('model = ' + modelName + '(' + constructorArguments.join(', ') + ')');
+      if (method) {
+        lines.push('result = model.' + method.name + '(' + argumentsList.join(', ') + ')');
+        lines.push('print(result)');
+      }
+      invokeDom.code.textContent = lines.join('\n');
+      renderEndpoint();
+    }
+
+    function renderInvoke() {
+      if (!invokeData) {
+        if (invokeDom.fields) {
+          invokeDom.fields.innerHTML =
+            '<p class="empty">La invocación no está disponible: falta la especificación del modelo.</p>';
+        }
+        if (invokeDom.run) invokeDom.run.disabled = true;
+        if (invokeDom.sample) invokeDom.sample.disabled = true;
+        if (invokeDom.deploy) invokeDom.deploy.disabled = true;
+        return;
+      }
+      if (invokeDom.select) {
+        invokeDom.select.innerHTML = (invokeData.methods || []).map(function (method) {
+          return '<option value="' + escapeHtml(method.name) + '">' + escapeHtml(method.name) + '</option>';
+        }).join('');
+        invokeDom.select.disabled = !(invokeData.methods || []).length;
+      }
+      if (invokeDom.useSession) {
+        invokeDom.useSession.disabled = !invokeData.sessions_enabled;
+        if (!invokeData.sessions_enabled) invokeDom.useSession.checked = false;
+      }
+      if (invokeDom.sample) {
+        invokeDom.sample.disabled = !(invokeData.methods || []).length;
+      }
+      if (invokeDom.deploy) {
+        invokeDom.deploy.disabled = !invokeData.sessions_enabled;
+      }
+      renderInvokeConstructor();
+      renderSessionInfo();
+      renderEndpoint();
+      if (invokeData.enabled === false) {
+        if (invokeDom.fields) {
+          invokeDom.fields.innerHTML =
+            '<p class="empty">La invocación de métodos está deshabilitada en este servidor ' +
+            '(LM_INVOKE=0).</p>';
+        }
+        if (invokeDom.run) invokeDom.run.disabled = true;
+        if (invokeDom.sample) invokeDom.sample.disabled = true;
+        if (invokeDom.deploy) invokeDom.deploy.disabled = true;
+        setInvokeStatus('Deshabilitada en el servidor', 'error');
+        return;
+      }
+      if (invokeData.buildable === false) {
+        if (invokeDom.fields) {
+          invokeDom.fields.innerHTML =
+            '<p class="empty">No se puede construir desde el catálogo: ' +
+            escapeHtml(unsupportedSummary(invokeData.unsupported)) +
+            '. Usa el ejemplo de Python.</p>';
+        }
+        if (invokeDom.run) invokeDom.run.disabled = true;
+        if (invokeDom.sample) invokeDom.sample.disabled = true;
+        if (invokeDom.deploy) invokeDom.deploy.disabled = true;
+        if (invokeDom.select) invokeDom.select.disabled = true;
+        setInvokeStatus('Requiere objetos Python', 'error');
+        return;
+      }
+      if (!(invokeData.methods || []).length) {
+        if (invokeDom.fields) {
+          invokeDom.fields.innerHTML =
+            '<p class="empty">Este modelo no expone métodos invocables con la política actual.</p>';
+        }
+        if (invokeDom.run) invokeDom.run.disabled = true;
+        setInvokeStatus('Sin métodos invocables', '');
+        return;
+      }
+      if (invokeDom.run) invokeDom.run.disabled = false;
+      renderInvokeMethod();
+    }
+
+    function describeInvokeError(data) {
+      var message = data.error || 'no se pudo invocar el método';
+      if (data.unknown && data.unknown.length) {
+        message += ' (argumentos desconocidos: ' + data.unknown.join(', ') + ')';
+      }
+      if (data.missing && data.missing.length) {
+        message += ' (faltan: ' + data.missing.join(', ') + ')';
+      }
+      return message;
+    }
+
+    function postJson(url, payload) {
+      return window.fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function (response) {
+        return response.json().catch(function () { return null; }).then(function (data) {
+          return { ok: response.ok, status: response.status, data: data || {} };
+        });
+      });
+    }
+
+    function openSession(parameters) {
+      return postJson(invokeData.sessions_url, { parameters: parameters }).then(function (response) {
+        if (!response.ok || response.data.success === false) {
+          throw new Error(describeInvokeError(response.data));
+        }
+        invokeSession.id = response.data.session_id;
+        invokeSession.calls = 0;
+        renderSessionInfo();
+        renderInvokeConstructor();
+        return invokeSession.id;
+      });
+    }
+
+    function closeSession(notify) {
+      var sessionId = invokeSession.id;
+      invokeSession.id = null;
+      invokeSession.calls = 0;
+      renderSessionInfo();
+      renderInvokeConstructor();
+      renderEndpoint();
+      if (!sessionId) return Promise.resolve();
+      var template = invokeData.session_url_template || '/api/sessions/{session_id}';
+      return window.fetch(template.replace('{session_id}', sessionId), {
+        method: 'DELETE'
+      }).then(function () {
+        if (notify) setInvokeStatus('Sesión cerrada', 'ok');
+      }).catch(function () {
+        /* la sesión expira sola en el servidor */
+      });
+    }
+
+    /* Rellena un control del formulario con un valor JSON. */
+    function fillField(control, value) {
+      var kind = control.getAttribute('data-kind');
+      if (kind === 'bool') {
+        control.checked = value === true;
+        return;
+      }
+      if (kind === 'raw') {
+        control.value = JSON.stringify(value);
+        return;
+      }
+      control.value = value === null || value === undefined ? '' : String(value);
+    }
+
+    function validatedConstructor() {
+      var constructor = collectFields(playgroundData, 'ic');
+      if (constructor.invalid.length) {
+        setInvokeStatus('Revisa el constructor: ' + constructor.invalid.join('; '), 'error');
+        return null;
+      }
+      if (constructor.missing.length) {
+        setInvokeStatus(
+          'Faltan parámetros del constructor: ' + constructor.missing.join(', '),
+          'error'
+        );
+        return null;
+      }
+      return constructor.values;
+    }
+
+    /* Pide al servidor datos dummy coherentes con el constructor elegido. */
+    function fillSampleArguments() {
+      var method = currentInvokeMethod();
+      if (!invokeData || invokeData.buildable === false || !method) {
+        if (invokeData && invokeData.buildable === false) {
+          setInvokeStatus('Requiere objetos Python', 'error');
+        } else {
+          setInvokeStatus('No hay ningún método que invocar', 'error');
+        }
+        return;
+      }
+      var parameters = validatedConstructor();
+      if (!parameters) return;
+      var endpoint = invokeData.sample_endpoint ||
+        '/api/models/' + invokeData.model_id + '/sample';
+      if (invokeDom.sample) invokeDom.sample.disabled = true;
+      setInvokeStatus('Generando datos de ejemplo…', '');
+      postJson(endpoint, { method: method.name, parameters: parameters })
+        .then(function (response) {
+          var data = response.data;
+          if (!response.ok || data.success === false) {
+            setInvokeStatus('Error: ' + describeInvokeError(data), 'error');
+            return;
+          }
+          var samples = data.arguments || {};
+          (method.fields || []).forEach(function (field, index) {
+            if (!Object.prototype.hasOwnProperty.call(samples, field.name)) return;
+            var control = document.getElementById('iv-' + index);
+            if (control) fillField(control, samples[field.name]);
+          });
+          updateInvokeSnippet();
+          setInvokeStatus('Datos de ejemplo generados', 'ok');
+        })
+        .catch(function (error) {
+          setInvokeStatus('Error de red: ' + error.message, 'error');
+        })
+        .then(function () {
+          if (invokeDom.sample) invokeDom.sample.disabled = false;
+        });
+    }
+
+    function endpointTemplate() {
+      return invokeData.session_invoke_url_template || '/api/sessions/{session_id}/invoke';
+    }
+
+    /* Muestra la URL y el curl del endpoint de la sesión abierta. */
+    function renderEndpoint() {
+      if (!invokeDom.endpoint || !invokeData) return;
+      if (!invokeSession.id) {
+        invokeDom.endpoint.hidden = true;
+        if (invokeDom.deploy) invokeDom.deploy.textContent = '🚀 Desplegar como endpoint';
+        if (invokeDom.deployNote) {
+          invokeDom.deployNote.textContent =
+            'Construye la instancia una vez y deja un endpoint para llamarla varias veces.';
+        }
+        return;
+      }
+      var url = window.location.origin +
+        endpointTemplate().replace('{session_id}', invokeSession.id);
+      var method = currentInvokeMethod();
+      var payload = {
+        method: method ? method.name : '...',
+        arguments: method ? collectFields(method, 'iv').values : {}
+      };
+      invokeDom.endpoint.hidden = false;
+      invokeDom.endpointUrl.textContent = url;
+      invokeDom.endpointCurl.textContent = [
+        'curl -s -X POST "' + url + '" \\',
+        "  -H 'Content-Type: application/json' \\",
+        "  -d '" + JSON.stringify(payload) + "'"
+      ].join('\n');
+      var ttl = invokeData.session_ttl_seconds;
+      invokeDom.endpointDetail.textContent =
+        (ttl ? 'La sesión se cierra sola tras ' + ttl + ' s de inactividad. ' : '') +
+        'Máximo de sesiones simultáneas: ' + (invokeData.max_sessions || '—') + '.';
+      if (invokeDom.deploy) invokeDom.deploy.textContent = '🚀 Reconstruir endpoint';
+      if (invokeDom.deployNote) {
+        invokeDom.deployNote.textContent =
+          'Sesión ' + invokeSession.id + ' activa: cada llamada reutiliza la instancia. ' +
+          'Reconstruir aplica los parámetros actuales.';
+      }
+    }
+
+    /* Construye la instancia una vez y publica su endpoint de invocación. */
+    function deployEndpoint() {
+      if (!invokeData || invokeData.buildable === false) return;
+      var parameters = validatedConstructor();
+      if (!parameters) return;
+      if (invokeDom.deploy) invokeDom.deploy.disabled = true;
+      setInvokeStatus(
+        invokeSession.id ? 'Reconstruyendo la instancia…' : 'Desplegando endpoint…',
+        ''
+      );
+      var promise = invokeSession.id
+        ? closeSession(false).then(function () { return openSession(parameters); })
+        : openSession(parameters);
+      promise.then(function () {
+        if (invokeDom.useSession) invokeDom.useSession.checked = true;
+        renderEndpoint();
+        setInvokeStatus('Endpoint listo', 'ok');
+      }).catch(function (error) {
+        setInvokeStatus('Error: ' + error.message, 'error');
+      }).then(function () {
+        if (invokeDom.deploy) invokeDom.deploy.disabled = false;
+      });
+    }
+
+    function runInvoke() {
+      if (!invokeData || invokeData.buildable === false) return;
+      var method = currentInvokeMethod();
+      if (!method) {
+        setInvokeStatus('No hay ningún método que invocar', 'error');
+        return;
+      }
+      var argumentsValues = collectFields(method, 'iv');
+      if (argumentsValues.invalid.length) {
+        setInvokeStatus('Revisa: ' + argumentsValues.invalid.join('; '), 'error');
+        return;
+      }
+      if (argumentsValues.missing.length) {
+        setInvokeStatus('Faltan argumentos: ' + argumentsValues.missing.join(', '), 'error');
+        return;
+      }
+      var constructorValues = collectFields(playgroundData, 'ic');
+      if (constructorValues.invalid.length) {
+        setInvokeStatus('Revisa el constructor: ' + constructorValues.invalid.join('; '), 'error');
+        return;
+      }
+      if (constructorValues.missing.length) {
+        setInvokeStatus(
+          'Faltan parámetros del constructor: ' + constructorValues.missing.join(', '),
+          'error'
+        );
+        return;
+      }
+      var useSession = invokeDom.useSession && invokeDom.useSession.checked;
+      if (invokeDom.run) invokeDom.run.disabled = true;
+      setInvokeStatus('Invocando…', '');
+      var request;
+      if (useSession) {
+        var sessionPromise = invokeSession.id
+          ? Promise.resolve(invokeSession.id)
+          : openSession(constructorValues.values);
+        request = sessionPromise.then(function (sessionId) {
+          var template = invokeData.session_invoke_url_template
+            || '/api/sessions/{session_id}/invoke';
+          return postJson(template.replace('{session_id}', sessionId), {
+            method: method.name,
+            arguments: argumentsValues.values
+          });
+        });
+      } else {
+        request = postJson(invokeData.endpoint, {
+          method: method.name,
+          arguments: argumentsValues.values,
+          parameters: constructorValues.values
+        });
+      }
+      request.then(function (response) {
+        var data = response.data;
+        if (!response.ok || data.success === false) {
+          if (response.status === 404 && useSession && invokeSession.id) {
+            invokeSession.id = null;
+            invokeSession.calls = 0;
+            renderSessionInfo();
+          }
+          setInvokeStatus('Error: ' + describeInvokeError(data), 'error');
+          showInvokeResult(data.error || 'Error desconocido', data.detail || '', false);
+          return;
+        }
+        if (useSession) {
+          invokeSession.id = data.session_id || invokeSession.id;
+          invokeSession.calls = typeof data.calls === 'number'
+            ? data.calls
+            : invokeSession.calls + 1;
+          renderSessionInfo();
+          renderInvokeConstructor();
+          renderEndpoint();
+        }
+        var lines = [
+          'método : ' + (data.method || method.name),
+          'tipo   : ' + (data.result_type || '—'),
+          'repr   : ' + (data.result_repr || '—')
+        ];
+        if (data.result !== undefined && data.result !== null) {
+          lines.push('', 'resultado:', JSON.stringify(data.result, null, 2));
+        }
+        if (data.stdout) lines.push('', 'salida:', data.stdout);
+        var elapsed = typeof data.elapsed === 'number' ? ' en ' + data.elapsed + ' s' : '';
+        setInvokeStatus('Llamada completada' + elapsed, 'ok');
+        showInvokeResult(lines.join('\n'), data.stderr || '', true);
+      }).catch(function (error) {
+        setInvokeStatus('Error: ' + error.message, 'error');
+        showInvokeResult(String(error.message || error), '', false);
+      }).then(function () {
+        if (invokeDom.run) invokeDom.run.disabled = false;
+      });
+    }
+
+    /* Arranque de la pestaña: sin esto el <select> queda vacío y los botones
+       no responden, porque nada llama a renderInvoke() ni registra eventos. */
+    renderInvoke();
+    if (invokeDom.select) {
+      invokeDom.select.addEventListener('change', renderInvokeMethod);
+    }
+    if (invokeDom.run) {
+      invokeDom.run.addEventListener('click', runInvoke);
+    }
+    if (invokeDom.sample) {
+      invokeDom.sample.addEventListener('click', fillSampleArguments);
+    }
+    if (invokeDom.deploy) {
+      invokeDom.deploy.addEventListener('click', deployEndpoint);
+    }
+    if (invokeDom.reset) {
+      invokeDom.reset.addEventListener('click', function () {
+        renderInvokeMethod();
+        renderInvokeConstructor();
+        if (invokeDom.result) invokeDom.result.hidden = true;
+        setInvokeStatus('Argumentos restablecidos', '');
+      });
+    }
+    if (invokeDom.useSession) {
+      invokeDom.useSession.addEventListener('change', function () {
+        if (!invokeDom.useSession.checked && invokeSession.id) {
+          closeSession(false);
+        }
+      });
+    }
+    if (invokeDom.closeSession) {
+      invokeDom.closeSession.addEventListener('click', function () {
+        closeSession(true);
+      });
+    }
   })();
 </script>
 </body>

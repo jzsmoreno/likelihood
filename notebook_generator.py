@@ -168,14 +168,14 @@ def _title_cell(model: Dict[str, Any]) -> Dict[str, Any]:
     source += f"**Módulo:** `{model['module']}`  \n"
     source += f"**Clase:** `{model['id']}`  \n"
     source += f"**Fuente:** `{model['path']}:{model['lineno']}`\n\n"
-    if model["shortDescription"]:
-        source += f"> {model['shortDescription']}\n"
+    if model["short_description"]:
+        source += f"> {model['short_description']}\n"
     return _markdown(source, tags=["title"])
 
 
 def _description_cell(model: Dict[str, Any]) -> Dict[str, Any]:
     """Full prose documentation of the model."""
-    return _markdown(f"## 📖 Descripción\n\n{model['fullDescription']}\n")
+    return _markdown(f"## 📖 Descripción\n\n{model['full_description']}\n")
 
 
 def _usage_cell(model: Dict[str, Any]) -> Dict[str, Any]:
@@ -186,7 +186,7 @@ def _usage_cell(model: Dict[str, Any]) -> Dict[str, Any]:
 def _signature_cell(model: Dict[str, Any]) -> Dict[str, Any]:
     """The constructor signature and the import statement."""
     source = "## 🧩 Constructor\n\n```python\n"
-    source += f"{model['importStatement']}\n\n{model['signature']}\n```\n"
+    source += f"{model['import_statement']}\n\n{model['signature']}\n```\n"
     if model.get("inheritedFrom"):
         source += f"\nHereda de `{model['inheritedFrom']}`.\n"
     return _markdown(source)
@@ -313,7 +313,7 @@ def _interactive_source(model: Dict[str, Any]) -> str:
         setup.append(f"{name} = {parameter['sample']}  # {parameter['type']}")
 
     body = "\n".join(setup)
-    imports = [model["importStatement"]]
+    imports = [model["import_statement"]]
     if "np." in body:
         imports.append("import numpy as np")
     if "pd." in body:
@@ -355,7 +355,7 @@ def _interactive_source(model: Dict[str, Any]) -> str:
         lines.append(f"        {parameter['name']!r}: {parameter['default']},")
     lines.append("    }")
     lines.append(f"    model = {model['id']}(**values)")
-    calls = model.get("safeCalls") or []
+    calls = model.get("safe_calls") or []
     if calls:
         lines.append(f"    # Sugerencias: {', '.join(calls)}")
     lines.append("    print('✅ Modelo construido:', type(model).__name__)")
@@ -380,20 +380,54 @@ def _widget_classes(kinds: Sequence[str]) -> List[str]:
     return [mapping[kind] for kind in kinds if kind in mapping]
 
 
-def build_notebook(model: Dict[str, Any]) -> Dict[str, Any]:
+def apply_parameter_values(model: Dict[str, Any], parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """Copy of ``model`` whose parameter defaults are the given values.
+
+    Overriding ``default``/``sample`` with ``repr(value)`` keeps every generator
+    below untouched: the widget expressions, the example and the parameter table
+    all read those two keys.  Variadic parameters and unknown names are ignored.
+    """
+    overrides = {key: value for key, value in parameters.items() if value is not None}
+    if not overrides:
+        return model
+    patched = dict(model)
+    patched["parameters"] = [dict(parameter) for parameter in model["parameters"]]
+    for parameter in patched["parameters"]:
+        name = parameter["name"]
+        if parameter.get("variadic") or name not in overrides:
+            continue
+        literal = repr(overrides[name])
+        parameter["default"] = literal
+        parameter["sample"] = literal
+    return patched
+
+
+def build_notebook(
+    model: Dict[str, Any],
+    parameters: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Build the complete notebook document for ``model``.
 
     Parameters
     ----------
     model :
         A catalog entry produced by :func:`model_catalog.build_catalog`.
+    parameters :
+        Values already validated by the playground (``coerce_playground_value``).
+        They become the defaults of the generated ``ipywidgets`` controls, which
+        is what lets ``POST /api/notebook`` bake a playground run into the
+        notebook.  ``None`` keeps the documented defaults.
 
     Returns
     -------
     dict
         A notebook following nbformat 4.5.
     """
+    if parameters:
+        model = apply_parameter_values(model, parameters)
     notebook = _empty_notebook(model)
+    if parameters:
+        notebook["metadata"]["likelihood"]["parameters"] = dict(parameters)
     cells: List[Dict[str, Any]] = notebook["cells"]
     cells.append(_title_cell(model))
     cells.append(_description_cell(model))

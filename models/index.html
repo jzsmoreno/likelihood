@@ -374,6 +374,12 @@
 
   <footer class="credits">
     <p>📊 Librería Likelihood · catálogo generado por introspección · <span id="year"></span></p>
+    <p class="credits-links">
+      <a href="/api/models">API</a> ·
+      <a href="/api/openapi.json">OpenAPI</a> ·
+      <a href="/docs">Documentación interactiva</a> ·
+      <a href="/api/health">Estado del servidor</a>
+    </p>
   </footer>
 </div>
 
@@ -554,8 +560,8 @@
       var parameters = 0;
       var methods = 0;
       each(state.models, function (model) {
-        parameters += model.parameterCount || 0;
-        methods += model.methodCount || 0;
+        parameters += model.parameter_count || 0;
+        methods += model.method_count || 0;
       });
       dom.stats.innerHTML =
         stat(state.total, 'modelos') +
@@ -599,8 +605,8 @@
       if (state.category && model.category !== state.category) return false;
       if (!terms.length) return true;
       var haystack = [
-        model.id, model.title, model.category, model.categoryLabel, model.module,
-        model.signature, model.shortDescription || '', (model.tags || []).join(' ')
+        model.id, model.title, model.category, model.category_label, model.module,
+        model.signature, model.short_description || '', (model.tags || []).join(' ')
       ].join(' ').toLowerCase();
       for (var i = 0; i < terms.length; i += 1) {
         if (haystack.indexOf(terms[i]) === -1) return false;
@@ -613,9 +619,9 @@
       if (state.sort === 'title') {
         sorted.sort(function (a, b) { return a.title.localeCompare(b.title, 'es'); });
       } else if (state.sort === 'parameters') {
-        sorted.sort(function (a, b) { return (b.parameterCount || 0) - (a.parameterCount || 0); });
+        sorted.sort(function (a, b) { return (b.parameter_count || 0) - (a.parameter_count || 0); });
       } else if (state.sort === 'methods') {
-        sorted.sort(function (a, b) { return (b.methodCount || 0) - (a.methodCount || 0); });
+        sorted.sort(function (a, b) { return (b.method_count || 0) - (a.method_count || 0); });
       }
       return sorted;
     }
@@ -660,21 +666,21 @@
     /* ------------------------------------------------------------------ */
 
     function cardHtml(model) {
-      var description = String(model.shortDescription || '');
+      var description = String(model.short_description || '');
       if (description.length > 170) description = description.slice(0, 170) + '…';
       var tags = (model.tags || []).slice(0, 6).map(function (tag) {
         return '<span class="tag">' + esc(tag) + '</span>';
       }).join('');
-      var label = model.title + ' (' + model.id + '), ' + model.categoryLabel + '. Abrir la ficha';
+      var label = model.title + ' (' + model.id + '), ' + model.category_label + '. Abrir la ficha';
       return '<div class="card" role="button" tabindex="0" data-id="' + esc(model.id) + '"' +
         ' aria-label="' + esc(label) + '">' +
-        '<span class="badge category-' + esc(model.category) + '">' + esc(model.categoryLabel) + '</span>' +
+        '<span class="badge category-' + esc(model.category) + '">' + esc(model.category_label) + '</span>' +
         '<h2><span class="icon" aria-hidden="true">' + esc(model.icon) + '</span>' + esc(model.title) + '</h2>' +
         '<p class="desc">' + esc(description) + '</p>' +
         '<div class="tags">' + tags + '</div>' +
         '<footer>' +
-          '<span>' + esc(model.parameterCount || 0) + ' parámetros · ' +
-            esc(model.methodCount || 0) + ' métodos</span>' +
+          '<span>' + esc(model.parameter_count || 0) + ' parámetros · ' +
+            esc(model.method_count || 0) + ' métodos</span>' +
           '<span class="module" title="' + esc(model.module) + '">' + esc(model.module) + '</span>' +
         '</footer>' +
       '</div>';
@@ -707,10 +713,10 @@
     function modalHeading(model) {
       dom.modalTitle.innerHTML =
         '<span class="badge category-' + esc(model.category || '') + '">' +
-          esc(model.categoryLabel || '') + '</span>' +
+          esc(model.category_label || '') + '</span>' +
         '<span class="icon" aria-hidden="true">' + esc(model.icon || '') + '</span>' +
         esc(model.title || model.id || '');
-      dom.modalSub.textContent = model.shortDescription || '';
+      dom.modalSub.textContent = model.short_description || '';
     }
 
     function openModalShell(model) {
@@ -797,12 +803,12 @@
       modalHeading(model);
       var id = encodeURIComponent(model.id);
       var html = '<h3>Descripción</h3><div class="prose">' +
-        esc(model.fullDescription || model.shortDescription || '') + '</div>';
+        esc(model.full_description || model.short_description || '') + '</div>';
       html += '<h3>Firma</h3><div class="sig" id="modal-signature">' + esc(model.signature || '') + '</div>';
-      html += '<p class="meta-line">Importación: <code>' + esc(model.importStatement || '') + '</code><br>' +
+      html += '<p class="meta-line">Importación: <code>' + esc(model.import_statement || '') + '</code><br>' +
         'Módulo: <code>' + esc(model.module || '') + '</code> · Fuente: <code>' +
         esc((model.path || '') + ':' + (model.lineno || '')) + '</code> · ' +
-        esc(model.lineCount || 0) + ' líneas</p>';
+        esc(model.line_count || 0) + ' líneas</p>';
       html += '<h3>Parámetros</h3>' + parametersHtml(model);
       html += attributesHtml(model);
       html += '<h3>Métodos</h3><ul class="methods">' + methodsHtml(model) + '</ul>';
@@ -943,7 +949,7 @@
             if (!data || !data.suggestions) return;
             dom.suggestions.innerHTML = data.suggestions.map(function (item) {
               return '<option value="' + esc(item.title) + '" label="' +
-                esc(item.title + ' · ' + item.categoryLabel) + '"></option>';
+                esc(item.title + ' · ' + item.category_label) + '"></option>';
             }).join('');
           })
           .catch(function () { /* el autocompletado es opcional */ });
