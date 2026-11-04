@@ -716,6 +716,48 @@ def test_autoclassifier_invoke_honours_input_shape_parm(client, session_store):
         client.delete(f"/api/sessions/{session_id}")
 
 
+def test_session_invoke_rebuilds_when_the_constructor_changes(client, shape_probe, session_store):
+    """A session must not keep an instance built with stale constructor values."""
+    opened = []
+    created = client.post(
+        "/api/models/ShapeProbe/sessions", json={"parameters": {"input_shape_parm": 4}}
+    )
+    assert created.status_code == 201
+    opened.append(created.json()["session_id"])
+    try:
+        first = client.post(f"/api/sessions/{opened[0]}/invoke", json={"method": "describe"})
+        assert first.status_code == 200
+        assert first.json()["rebuilt"] is False
+        assert first.json()["result"]["shape"] == [None, 4]
+
+        changed = client.post(
+            f"/api/sessions/{opened[0]}/invoke",
+            json={"method": "describe", "parameters": {"input_shape_parm": 6}},
+        )
+        assert changed.status_code == 200, changed.json()
+        body = changed.json()
+        assert body["rebuilt"] is True
+        assert body["session_id"] != opened[0]
+        assert body["parameters"] == {"input_shape_parm": 6}
+        assert body["result"]["shape"] == [None, 6]
+        opened.append(body["session_id"])
+        # The old worker is gone: its id can no longer be invoked.
+        assert client.get(f"/api/sessions/{opened[0]}").status_code == 404
+
+        # The same constructor values keep the live instance (and its counter).
+        same = client.post(
+            f"/api/sessions/{body['session_id']}/invoke",
+            json={"method": "describe", "parameters": {"input_shape_parm": 6}},
+        )
+        assert same.status_code == 200
+        assert same.json()["rebuilt"] is False
+        assert same.json()["session_id"] == body["session_id"]
+        assert same.json()["calls"] == 2
+    finally:
+        for session_id in opened:
+            client.delete(f"/api/sessions/{session_id}")
+
+
 def test_sessions_can_be_disabled(client, settings, monkeypatch):
     monkeypatch.setattr(settings, "sessions_enabled", False)
     response = client.get("/api/sessions")

@@ -129,6 +129,16 @@ def test_rate_limiter_and_metrics():
     assert snapshot["endpoints"]["GET /api/health"]["count"] == 2
 
 
+def test_parameters_signature_is_order_independent():
+    # The session rebuild compares constructor values, never raw payload order.
+    assert core.parameters_signature({"input_shape_parm": 4, "units": 8}) == (
+        core.parameters_signature({"units": 8, "input_shape_parm": 4})
+    )
+    assert core.parameters_signature({"input_shape_parm": 4}) != (
+        core.parameters_signature({"input_shape_parm": 6})
+    )
+
+
 def test_invoke_bootstrap_contracts():
     # The child interpreter must keep the shape/tuple/rebuild behaviour in sync.
     assert "constructor_parameters" in core._SANDBOX_PRELUDE

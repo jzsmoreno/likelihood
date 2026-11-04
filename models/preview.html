@@ -768,6 +768,55 @@
       return { values: values, missing: missing, invalid: invalid };
     }
 
+    /* Guarda el estado crudo de los controles para poder repintar el formulario
+       sin perder lo que escribió el usuario. */
+    function snapshotFields(fields, prefix) {
+      var snapshot = {};
+      (fields || []).forEach(function (field, index) {
+        var control = document.getElementById(prefix + '-' + index);
+        if (!control) return;
+        snapshot[field.name] = control.getAttribute('data-kind') === 'bool'
+          ? { bool: true, checked: control.checked }
+          : { bool: false, value: control.value };
+      });
+      return snapshot;
+    }
+
+    function restoreFields(fields, prefix, snapshot) {
+      if (!snapshot) return;
+      (fields || []).forEach(function (field, index) {
+        var saved = snapshot[field.name];
+        if (!saved) return;
+        var control = document.getElementById(prefix + '-' + index);
+        if (!control) return;
+        if (saved.bool) {
+          control.checked = saved.checked;
+        } else {
+          control.value = saved.value;
+        }
+      });
+    }
+
+    /* Firma estable del constructor: el orden de las claves no debe decidir si
+       hay que reconstruir la instancia. */
+    function canonicalValue(value) {
+      if (Object.prototype.toString.call(value) === '[object Array]') {
+        return value.map(canonicalValue);
+      }
+      if (value && typeof value === 'object') {
+        var sorted = {};
+        Object.keys(value).sort().forEach(function (key) {
+          sorted[key] = canonicalValue(value[key]);
+        });
+        return sorted;
+      }
+      return value;
+    }
+
+    function constructorSignature(values) {
+      return JSON.stringify(canonicalValue(values || {}));
+    }
+
     function collectParameters() {
       return collectFields(playgroundData, 'pg');
     }
@@ -1025,7 +1074,7 @@
       updateInvokeSnippet();
     }
 
-    function renderInvokeConstructor() {
+    function renderInvokeConstructor(forceDefaults) {
       if (playgroundData && playgroundData.buildable === false) {
         if (invokeDom.constructorFields) {
           invokeDom.constructorFields.innerHTML =
@@ -1040,12 +1089,17 @@
         return;
       }
       var fields = (playgroundData && playgroundData.fields) || [];
+      // Abrir o cerrar una sesión no debe devolver los campos a los valores por
+      // defecto: el formulario tiene que seguir mostrando los parámetros de la
+      // instancia viva para que la firma marque correctamente los cambios.
+      var previous = forceDefaults ? null : snapshotFields(fields, 'ic');
       renderFields(
         invokeDom.constructorFields,
         fields,
         'ic',
         'El constructor no declara parámetros: el modelo se crea sin argumentos.'
       );
+      restoreFields(fields, 'ic', previous);
       if (invokeDom.constructorNote) {
         invokeDom.constructorNote.textContent = invokeSession.id
           ? 'La instancia se reconstruye automáticamente si cambias estos valores.'
@@ -1176,7 +1230,7 @@
         }
         invokeSession.id = response.data.session_id;
         invokeSession.calls = 0;
-        invokeSession.signature = JSON.stringify(parameters || {});
+        invokeSession.signature = constructorSignature(parameters);
         renderSessionInfo();
         renderInvokeConstructor();
         return invokeSession.id;
@@ -1372,7 +1426,7 @@
       setInvokeStatus('Invocando…', '');
       var request;
       if (useSession) {
-        var signature = JSON.stringify(constructorValues.values);
+        var signature = constructorSignature(constructorValues.values);
         var sessionPromise = invokeSession.id && invokeSession.signature === signature
           ? Promise.resolve(invokeSession.id)
           : closeSession(false).then(function () {
@@ -1383,7 +1437,8 @@
             || '/api/sessions/{session_id}/invoke';
           return postJson(template.replace('{session_id}', sessionId), {
             method: method.name,
-            arguments: argumentsValues.values
+            arguments: argumentsValues.values,
+            parameters: constructorValues.values
           });
         });
       } else {
@@ -1407,6 +1462,7 @@
         }
         if (useSession) {
           invokeSession.id = data.session_id || invokeSession.id;
+          invokeSession.signature = signature;
           invokeSession.calls = typeof data.calls === 'number'
             ? data.calls
             : invokeSession.calls + 1;
@@ -1424,7 +1480,10 @@
         }
         if (data.stdout) lines.push('', 'salida:', data.stdout);
         var elapsed = typeof data.elapsed === 'number' ? ' en ' + data.elapsed + ' s' : '';
-        setInvokeStatus('Llamada completada' + elapsed, 'ok');
+        setInvokeStatus(
+          'Llamada completada' + elapsed + (data.rebuilt ? ' (instancia reconstruida)' : ''),
+          'ok'
+        );
         showInvokeResult(lines.join('\n'), data.stderr || '', true);
       }).catch(function (error) {
         setInvokeStatus('Error: ' + error.message, 'error');
@@ -1452,7 +1511,7 @@
     if (invokeDom.reset) {
       invokeDom.reset.addEventListener('click', function () {
         renderInvokeMethod();
-        renderInvokeConstructor();
+        renderInvokeConstructor(true);
         if (invokeDom.result) invokeDom.result.hidden = true;
         setInvokeStatus('Argumentos restablecidos', '');
       });

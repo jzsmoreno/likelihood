@@ -290,12 +290,18 @@ curl -s "http://127.0.0.1:8000/api/sessions/$SESSION"
 curl -s -X DELETE "http://127.0.0.1:8000/api/sessions/$SESSION"
 ```
 
-`GET /api/sessions` lista las sesiones abiertas (modelo, `calls`, `errors`,
-`idle_seconds`). Cada sesión es un proceso propio con `RLIMIT`, serializa sus
-llamadas y se cierra sola tras `LM_SESSION_TTL` segundos de inactividad; el
-store mantiene como máximo `LM_MAX_SESSIONS` (desaloja la menos usada) y una
-llamada que excede `LM_SESSION_TIMEOUT` mata el worker. `LM_SESSIONS=0`
-deshabilita todo el bloque.
+`GET /api/sessions` lista las sesiones abiertas (modelo, `parameters`, `calls`,
+`errors`, `idle_seconds`). Cada sesión es un proceso propio con `RLIMIT`,
+serializa sus llamadas y se cierra sola tras `LM_SESSION_TTL` segundos de
+inactividad; el store mantiene como máximo `LM_MAX_SESSIONS` (desaloja la menos
+usada) y una llamada que excede `LM_SESSION_TIMEOUT` mata el worker.
+`LM_SESSIONS=0` deshabilita todo el bloque.
+
+`POST /api/sessions/<id>/invoke` también acepta `parameters`. Si coinciden con
+los que construyeron la instancia, se reutiliza (el estado de `fit` sigue vivo);
+si cambian (por ejemplo `input_shape_parm`), el servidor reconstruye el modelo,
+devuelve `rebuilt: true` y un `session_id` nuevo, de modo que nunca se atiende
+una llamada con una instancia construida con parámetros obsoletos.
 
 En la pestaña *Invocar método*, **🚀 Desplegar como endpoint** crea la sesión con
 los parámetros del constructor y muestra la URL

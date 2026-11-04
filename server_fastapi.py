@@ -195,7 +195,11 @@ class InvokeRequest(_AliasedBody):
     method: str = Field(default="", description="Nombre del método a invocar.")
     arguments: Optional[Dict[str, Any]] = Field(default=None, description="Argumentos del método.")
     parameters: Optional[Dict[str, Any]] = Field(
-        default=None, description="Argumentos del constructor del modelo."
+        default=None,
+        description=(
+            "Argumentos del constructor del modelo. En una sesión, unos valores "
+            "distintos a los de la instancia viva la reconstruyen."
+        ),
     )
 
 
@@ -1033,19 +1037,36 @@ def build_router() -> APIRouter:
     def session_invoke(
         session_id: str, body: InvokeRequest, settings: ServerSettings = Depends(get_settings)
     ) -> Response:
-        """Call a method on the live instance of a session."""
+        """Call a method on the live instance of a session.
+
+        When the body carries ``parameters`` that differ from the values that
+        built the live instance, the worker is rebuilt with the new constructor
+        arguments and the response returns the id of the new session.  Reusing
+        an instance with stale constructor values (``input_shape_parm``,
+        ``n_states``...) is never allowed.
+        """
         require_sessions(settings)
         session = settings.sessions.get(session_id.strip())
         if session is None:
             raise core.ModelNotFound(f"Sesión no encontrada o expirada: {session_id}")
-        method, arguments, _ = core.prepare_invocation(
-            session.model, body.payload(), with_parameters=False
-        )
+        data = body.payload()
+        method, arguments, _ = core.prepare_invocation(session.model, data, with_parameters=False)
+        rebuilt = False
+        raw_parameters = data.get("parameters", data.get("params"))
+        if raw_parameters is not None:
+            if not isinstance(raw_parameters, dict):
+                raise core.ValidationError("El campo 'parameters' debe ser un objeto")
+            parameters = core.coerce_model_parameters(session.model, raw_parameters)
+            if core.parameters_signature(parameters) != session.parameters_signature:
+                session = settings.sessions.replace(session, parameters)
+                rebuilt = True
         result = session.invoke(method["name"], arguments)
         payload: Dict[str, Any] = {
             "success": True,
             "model_id": session.model["id"],
             "session_id": session.id,
+            "parameters": session.parameters,
+            "rebuilt": rebuilt,
             "method": method["name"],
             "arguments": arguments,
             "calls": session.calls,

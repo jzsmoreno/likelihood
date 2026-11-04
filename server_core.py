@@ -1932,6 +1932,16 @@ def run_invoke(
     return result
 
 
+def parameters_signature(parameters: Dict[str, Any]) -> str:
+    """Stable signature of the constructor values that built a session.
+
+    Constructor values are JSON literals (the same objects the playground
+    validates), so sorting the keys is enough to compare a payload with the
+    values of a live instance without depending on the key order.
+    """
+    return json.dumps(parameters or {}, sort_keys=True, default=str, ensure_ascii=False)
+
+
 class ModelSession:
     """A live model instance kept inside its own child process.
 
@@ -1946,11 +1956,14 @@ class ModelSession:
         self,
         session_id: str,
         model: Dict[str, Any],
+        parameters: Dict[str, Any],
         process: "subprocess.Popen[str]",
         timeout: float,
     ) -> None:
         self.id = session_id
         self.model = model
+        self.parameters = dict(parameters or {})
+        self.parameters_signature = parameters_signature(self.parameters)
         self.process = process
         self.timeout = timeout
         self.created_at = time.time()
@@ -2144,6 +2157,7 @@ class ModelSession:
             "module": self.info.get("module") or "",
             "repr": self.info.get("repr") or "",
             "attributes": self.info.get("attributes") or [],
+            "parameters": self.parameters,
             "created_at": self.created_at,
             "last_used": self.last_used,
             "idle_seconds": round(time.time() - self.last_used, 3),
@@ -2166,7 +2180,7 @@ def start_session(
         process = _spawn(_SESSION_BOOTSTRAP)
     except OSError as exc:  # pragma: no cover - python disappeared
         raise InvocationError(f"No se pudo iniciar la sesión: {exc}", status=503) from exc
-    session = ModelSession(session_id, model, process, timeout)
+    session = ModelSession(session_id, model, parameters, process, timeout)
     payload = json.dumps(
         {
             "module": model["module"],
@@ -2220,6 +2234,28 @@ class SessionStore:
         with self._lock:
             self._sessions[session.id] = session
         return session
+
+    def replace(self, session: ModelSession, parameters: Dict[str, Any]) -> ModelSession:
+        """Rebuild ``session`` with new constructor values.
+
+        A live instance cannot change its constructor arguments, so the worker is
+        replaced by one created with ``parameters`` and the old id stops working.
+        The previous session is detached while the replacement is built and put
+        back if the constructor fails, so a bad payload never kills a valid
+        session.
+        """
+        with self._lock:
+            previous = self._sessions.pop(session.id, None)
+        try:
+            replacement = self.create(session.model, parameters)
+        except BaseException:
+            if previous is not None:
+                with self._lock:
+                    self._sessions.setdefault(previous.id, previous)
+            raise
+        if previous is not None:
+            previous.close()
+        return replacement
 
     def get(self, session_id: str) -> Optional[ModelSession]:
         """The open session ``session_id``, or ``None``."""
