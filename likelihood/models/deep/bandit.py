@@ -5,6 +5,28 @@ import torch.nn as nn
 
 
 class MultiBanditNet(nn.Module):
+    """A neural network for the multi-armed bandit problem with several options.
+
+    Parameters
+    ----------
+    state_dim : int
+        Dimensionality of the state (observation) vector.
+    num_options : int
+        Number of distinct options (or bandits) to choose between.
+    num_actions_per_option : int or List[int]
+        Number of actions available for a single option, or a list giving the
+        number of actions for each option individually.
+    num_neurons : int, default 128
+        Width of the hidden layers in every sub-network.
+    num_layers : int, default 1
+        Number of hidden layers in the action networks.
+    activation : nn.Module, default ``nn.SELU()``
+        Activation function applied between the layers.
+    dropout_rate : float, default 0.3
+        Dropout probability applied to the action networks when greater than
+        zero; the option and value networks are not dropped.
+    """
+
     def __init__(
         self,
         state_dim: int,
