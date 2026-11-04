@@ -29,26 +29,38 @@ More examples will be added soon.
 
 ## Model catalog web server
 
-The repository includes a dependency-free web catalogue (`server.py`) that
-introspects the package sources through `model_catalog.py`. Nothing is hardcoded:
-the model list, signatures, parameters, methods, examples and notebooks are all
-derived from the real implementation.
+The repository includes a FastAPI catalogue (`server_fastapi.py`) backed by the
+shared domain layer in `server_core.py`, which introspects the package sources
+through `model_catalog.py`. Nothing is hardcoded: the model list, signatures,
+parameters, methods, examples and notebooks are all derived from the real
+implementation.
 
-Start the server:
+Install the optional server dependencies and start it:
 
 ```bash
-python3 server.py                 # http://127.0.0.1:8000
-python3 server.py --port 8080 -v  # custom port, log every request
-python3 server.py --list          # print the catalog and exit
+pip install "likelihood[server]"              # fastapi + uvicorn
+uvicorn server_fastapi:app --port 8000        # http://127.0.0.1:8000
+python3 server_fastapi.py --port 8080 -v      # custom port, log every request
+python3 server_fastapi.py --list              # print the catalog and exit
 ```
 
 The browser UI is available at `/` (search, category filters, model cards and a
 detail modal) and `/preview/<model_id>` (full documentation plus an interactive
-playground). `/docs` renders the OpenAPI document served by `/api/openapi.json`.
-Assets live in `models/` and are served with `ETag` and `Cache-Control` headers.
+playground). `/docs` is the FastAPI Swagger UI and `/api/openapi.json` the
+generated OpenAPI document. Assets live in `models/` and are served with `ETag`
+and `Cache-Control` headers.
 
 The catalog is re-introspected when a model source changes (`LM_CATALOG_TTL`), so
 editing `likelihood/models` is reflected without restarting the server.
+
+### Server architecture
+
+`server_core.py` keeps the framework-independent code (catalog introspection,
+sandboxed playground, method invocation, live sessions, asynchronous jobs,
+notebook and preview rendering). `server_fastapi.py` exposes it over HTTP with
+FastAPI routing, Pydantic request models, middleware and the generated OpenAPI
+document. The previous standard-library HTTP server was removed; every existing
+route and JSON shape is preserved.
 
 ### API
 
@@ -306,7 +318,6 @@ expire por inactividad.
 | `LM_API_TOKEN` | *(empty)* | Require `Authorization: Bearer <token>` on `/api` (health stays open) |
 | `LM_CORS_ORIGINS` | *(empty)* | Comma separated allowed origins (`*` allows any) |
 | `LM_RATE_LIMIT` | `0` | Requests per minute and client (`0` disables the limiter) |
-| `LM_REQUEST_TIMEOUT` | `30` | Seconds a client may take to send its request |
 | `LM_CATALOG_TTL` | `2` | Seconds between checks of the model sources (`0` disables hot reload) |
 | `LM_API_CACHE_CONTROL` | `public, max-age=60, must-revalidate` | `Cache-Control` of the cacheable JSON endpoints |
 | `LM_SEARCH_ALIAS_SUNSET` | `2026-12-31` | `Sunset` date advertised by `POST /api/search` |
@@ -337,11 +348,10 @@ The same options are available as flags: `--token`, `--cors-origin` (repeatable)
 
 ### Robustness and observability
 
-* Request bodies are read in 64 KiB chunks up to 1 MiB, both with
-  `Content-Length` and `Transfer-Encoding: chunked`; a client that declares more
-  bytes than it sends gets a `400`, a stalled one a `408`, an oversized one a
-  `413` and a non JSON content type a `415`.
-* Errors are mapped to their HTTP status (`400`, `401`, `404`, `405`, `408`,
+* JSON bodies are capped at 1 MiB (`413`); the asynchronous job endpoint also
+  reads chunked bodies in bounded chunks, and a non JSON content type is
+  rejected with `415`.
+* Errors are mapped to their HTTP status (`400`, `401`, `403`, `404`, `405`,
   `413`, `415`, `422`, `429`, `500`, `503`, `504`) and logged with the endpoint,
   the status, the latency and an `X-Request-Id` that is also returned to the
   client.
@@ -369,13 +379,15 @@ example and `ipywidgets` controls derived from the constructor signature.
 ## Running the tests
 
 ```bash
-python3 -m pytest tests/test_server.py -v   # web server, API and playground
-python3 -m pytest tests/test_hmm.py -v      # model tests (requires the full extras)
+python3 -m pytest tests/test_server_core.py -v    # catalog, coercion and invoke helpers
+python3 -m pytest tests/test_server_fastapi.py -v # FastAPI server, API and playground
+python3 -m pytest tests/test_hmm.py -v            # model tests (requires the full extras)
 ```
 
-`tests/test_server.py` boots the real HTTP server on a free port, so it covers
-routing, headers, caching (static and JSON `ETag`s), JSON projections, template
-rendering, error pages, the raw source download, the git diff/versions
-endpoints, the sandbox of the playground subprocess, the asynchronous jobs, the
-CORS/token/rate-limit layers and the body reader (chunked, truncated and
-oversized payloads) without any extra dependency beyond `pytest`.
+`tests/test_server_fastapi.py` drives the FastAPI application through its
+`TestClient` (install the `tests` extra for `pytest` and `httpx`). It covers the
+browser pages, static assets, JSON projections, caching (`ETag`s), error pages,
+the OpenAPI document, the playground subprocess, asynchronous jobs, method
+invocation (including `input_shape_parm`, tuple conversion and session rebuilds),
+authentication, rate limiting and CORS.
+

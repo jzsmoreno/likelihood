@@ -974,7 +974,7 @@
       invokeData = null;
     }
 
-    var invokeSession = { id: null, calls: 0 };
+    var invokeSession = { id: null, calls: 0, signature: null };
 
     function currentInvokeMethod() {
       if (!invokeData || !invokeDom.select) return null;
@@ -1048,7 +1048,7 @@
       );
       if (invokeDom.constructorNote) {
         invokeDom.constructorNote.textContent = invokeSession.id
-          ? 'La instancia ya está creada: estos valores solo se usan al reconstruirla.'
+          ? 'La instancia se reconstruye automáticamente si cambias estos valores.'
           : 'La primera llamada construye la clase con estos valores.';
       }
     }
@@ -1176,6 +1176,7 @@
         }
         invokeSession.id = response.data.session_id;
         invokeSession.calls = 0;
+        invokeSession.signature = JSON.stringify(parameters || {});
         renderSessionInfo();
         renderInvokeConstructor();
         return invokeSession.id;
@@ -1186,6 +1187,7 @@
       var sessionId = invokeSession.id;
       invokeSession.id = null;
       invokeSession.calls = 0;
+      invokeSession.signature = null;
       renderSessionInfo();
       renderInvokeConstructor();
       renderEndpoint();
@@ -1370,9 +1372,12 @@
       setInvokeStatus('Invocando…', '');
       var request;
       if (useSession) {
-        var sessionPromise = invokeSession.id
+        var signature = JSON.stringify(constructorValues.values);
+        var sessionPromise = invokeSession.id && invokeSession.signature === signature
           ? Promise.resolve(invokeSession.id)
-          : openSession(constructorValues.values);
+          : closeSession(false).then(function () {
+              return openSession(constructorValues.values);
+            });
         request = sessionPromise.then(function (sessionId) {
           var template = invokeData.session_invoke_url_template
             || '/api/sessions/{session_id}/invoke';
