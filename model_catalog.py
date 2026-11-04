@@ -1050,6 +1050,43 @@ def search_models(
     return filter_by_tags(matches, wanted)
 
 
+def related_models(
+    catalog: Sequence[Dict[str, Any]], model: Dict[str, Any], limit: int = 5
+) -> List[Dict[str, Any]]:
+    """Models that share tags or category with ``model``, best match first.
+
+    The score is ``2 * shared tags + 1 * same category``, so a model of another
+    category with two tags in common ranks above a sibling of the same
+    category.  Only models with a positive score are returned, and the result
+    is empty when the model declares neither tags nor a populated category.
+
+    Returns
+    -------
+    list of dict
+        ``[{"model": ..., "score": ..., "shared_tags": [...]}, ...]``.
+    """
+    own_tags = {tag.lower(): tag for tag in model["tags"]}
+    ranked: List[Tuple[int, List[str], Dict[str, Any]]] = []
+    for candidate in catalog:
+        if candidate["id"] == model["id"]:
+            continue
+        candidate_tags = {tag.lower() for tag in candidate["tags"]}
+        shared = [tag for key, tag in own_tags.items() if key in candidate_tags]
+        score = 2 * len(shared)
+        if candidate["category"] == model["category"]:
+            score += 1
+        if score <= 0:
+            continue
+        ranked.append((score, shared, candidate))
+    ranked.sort(key=lambda item: (-item[0], item[2]["title"].lower()))
+    if limit > 0:
+        ranked = ranked[:limit]
+    return [
+        {"model": candidate, "score": score, "shared_tags": shared}
+        for score, shared, candidate in ranked
+    ]
+
+
 def facet_counts(catalog: Sequence[Dict[str, Any]], top: int = 25) -> Dict[str, Any]:
     """Category and tag counters used by the faceted search.
 

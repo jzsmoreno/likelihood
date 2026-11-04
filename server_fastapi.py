@@ -17,10 +17,12 @@ The routes are the same as the previous standard-library implementation::
     GET    /                          the interactive catalogue (models/index.html)
     GET    /preview/<model_id>        server rendered HTML preview of a model
     GET    /api/health                liveness probe, counters, metrics and jobs
+    GET    /api/metrics               the same counters in Prometheus text format
     GET    /api/categories            categories with their model counts
     GET    /api/models                model list (``?category=``, ``?q=``, ``?tags=``,
-                                      ``?limit=``, ``?offset=``)
+                                      ``?sort=``, ``?order=``, ``?limit=``, ``?offset=``)
     GET    /api/models/<model_id>     everything known about one model
+    GET    /api/models/<id>/related   models that share tags or category with one model
     GET    /api/models/<id>/source    raw source (``?download=1``, ``?diff=<ref>``)
     GET    /api/models/<id>/versions  git commits that touched the source of a model
     GET    /api/search                ``?q=`` search with facets (autocomplete friendly)
@@ -38,11 +40,14 @@ The routes are the same as the previous standard-library implementation::
     POST   /api/models/<id>/sessions  build the model once and keep it alive
     POST   /api/sessions/<id>/invoke  call a method on the live instance
     DELETE /api/sessions/<id>         close a session
+    DELETE /api/playground/jobs/<id>  cancel a pending job or forget a finished one
     POST   /api/notebook              ``{"model_id": ..., "parameters": {...}}``
     POST   /api/search                deprecated alias of ``GET /api/search``
 
 The interactive documentation is served by FastAPI itself at ``/docs`` and the
-OpenAPI document at ``/api/openapi.json``.
+OpenAPI document at ``/api/openapi.json``.  ``HEAD`` is answered by every ``GET``
+route (RFC 9110 requires it) and the responses are compressed with gzip when the
+client accepts it (``LM_GZIP_MIN_BYTES``).
 
 Configuration
 -------------
@@ -75,7 +80,8 @@ import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
-from email.utils import formatdate
+from datetime import timezone
+from email.utils import formatdate, parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from urllib.parse import urlencode
@@ -85,6 +91,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.gzip import GZipMiddleware
 
 import notebook_generator
 import server_core as core
@@ -95,6 +102,7 @@ from model_catalog import (
     filter_by_tags,
     find_model,
     normalize_tags,
+    related_models,
     search_models,
     summarize,
 )
@@ -111,6 +119,22 @@ _JSON_TYPES = ("application/json", "text/json")
 _NOTEBOOK_TYPE = "application/x-ipynb+json"
 #: Methods advertised by the ``Allow`` header of the method rejections.
 _ALLOWED_METHODS = "GET, HEAD, POST, DELETE, OPTIONS"
+#: Path of the generated OpenAPI document (served by FastAPI itself).
+_OPENAPI_PATH = "/api/openapi.json"
+#: Headers added to every response of the application.
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Referrer-Policy": "no-referrer",
+}
+#: Sort keys accepted by ``GET /api/models?sort=``.
+SORT_KEYS: Dict[str, Any] = {
+    "id": lambda model: model["id"].lower(),
+    "title": lambda model: model["title"].lower(),
+    "category": lambda model: (model["category"], model["title"].lower()),
+    "parameters": lambda model: len(model["parameters"]),
+    "methods": lambda model: len(model["methods"]),
+}
 
 
 class ServerSettings:
@@ -138,6 +162,8 @@ class ServerSettings:
         self.sessions_enabled = core.SESSIONS_ENABLED
         self.api_token = core.API_TOKEN
         self.cors_origins: Tuple[str, ...] = core.CORS_ORIGINS
+        self.gzip_min_bytes = core.GZIP_MIN_BYTES
+        self.trust_proxy = core.TRUST_PROXY
         self.template: str = ""
 
     def refresh(self) -> None:
@@ -308,16 +334,107 @@ def cacheable_json(
     The catalog fingerprint plus the request path is a valid, cheap ``ETag``; a
     matching ``If-None-Match`` answers ``304`` without sending the body.
     """
-    digest = hashlib.sha1(
-        f"{cache_key}:{settings.store.fingerprint}:{API_VERSION}".encode("utf-8")
-    ).hexdigest()[:20]
-    etag = f'"{digest}"'
-    final_headers: Dict[str, str] = {"Cache-Control": core.API_CACHE_CONTROL, "ETag": etag}
+    etag = etag_for(cache_key, settings.store.fingerprint)
+    final_headers: Dict[str, str] = {
+        "Cache-Control": api_cache_control(settings),
+        "ETag": etag,
+        **vary_on_credentials(settings),
+    }
     final_headers.update(headers or {})
-    cached = (request.headers.get("if-none-match") or "").strip()
-    if cached in {etag, f"W/{etag}"}:
-        return bytes_response(304, b"", "application/json; charset=utf-8", final_headers)
+    if etag_matches(request.headers.get("if-none-match"), etag):
+        return not_modified(etag, final_headers)
     return json_response(200, payload, final_headers)
+
+
+def etag_for(key: str, fingerprint: str) -> str:
+    """Strong ``ETag`` of one representation derived from the catalog."""
+    digest = hashlib.sha1(f"{key}:{fingerprint}:{API_VERSION}".encode("utf-8")).hexdigest()[:20]
+    return f'"{digest}"'
+
+
+def etag_matches(header: str, etag: str) -> bool:
+    """Whether an ``If-None-Match`` header matches ``etag``.
+
+    Understands the ``*`` wildcard, the comma separated lists and the weak
+    ``W/"..."`` validators, which RFC 9110 allows on a ``GET``/``HEAD``.
+    """
+    value = (header or "").strip()
+    if not value:
+        return False
+    if value == "*":
+        return True
+    for candidate in value.split(","):
+        candidate = candidate.strip()
+        if candidate.startswith("W/"):
+            candidate = candidate[2:].strip()
+        if candidate and candidate == etag:
+            return True
+    return False
+
+
+def not_modified(etag: str, headers: Optional[Dict[str, str]] = None) -> Response:
+    """``304`` answer: the validators of the ``200``, no body."""
+    final_headers: Dict[str, str] = {"ETag": etag}
+    final_headers.update(headers or {})
+    return bytes_response(304, b"", "application/json; charset=utf-8", final_headers)
+
+
+def api_cache_control(settings: ServerSettings) -> str:
+    """``Cache-Control`` of the catalog responses.
+
+    When ``LM_API_TOKEN`` protects the API the responses become ``private``: a
+    shared cache must never hand an authorised answer to an anonymous client,
+    no matter how permissive ``LM_API_CACHE_CONTROL`` is.
+    """
+    directive = core.API_CACHE_CONTROL.strip()
+    if not settings.api_token:
+        return directive
+    if directive.lower().startswith("public"):
+        return "private" + directive[len("public") :]
+    return directive
+
+
+def vary_on_credentials(settings: ServerSettings) -> Dict[str, str]:
+    """``Vary`` header that keeps token protected answers apart."""
+    if not settings.api_token:
+        return {}
+    return {"Vary": "Authorization, X-API-Token"}
+
+
+def merge_vary(response: Response, value: str) -> None:
+    """Append ``value`` to the ``Vary`` header of ``response`` (once)."""
+    existing = response.headers.get("vary")
+    if not existing:
+        response.headers["Vary"] = value
+        return
+    if value.lower() not in existing.lower():
+        response.headers["Vary"] = f"{existing}, {value}"
+
+
+class HeadAsGet:
+    """Answer ``HEAD`` with the ``GET`` handler of the same path.
+
+    Starlette only knows the methods that were registered, so a ``HEAD`` used to
+    answer ``405`` although every ``Allow`` header advertises it.  The request is
+    routed as a ``GET`` and the body is dropped, which keeps the status and the
+    headers (``ETag``, ``Content-Length``, ``Content-Type``) of the equivalent
+    ``GET`` -- exactly what RFC 9110 asks for.
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http" or scope["method"] != "HEAD":
+            await self.app(scope, receive, send)
+            return
+
+        async def without_body(message: Dict[str, Any]) -> None:
+            if message["type"] == "http.response.body":
+                message = {**message, "body": b""}
+            await send(message)
+
+        await self.app(dict(scope, method="GET"), receive, without_body)
 
 
 # ---------------------------------------------------------------------------
@@ -425,6 +542,21 @@ def pagination(query: Dict[str, List[str]]) -> Tuple[Optional[int], int]:
         raise core.ValidationError(str(exc)) from exc
 
 
+def sort_models(models: List[Dict[str, Any]], query: Dict[str, List[str]]) -> List[Dict[str, Any]]:
+    """Apply the ``?sort=``/``?order=`` ordering to the filtered catalog."""
+    key = (query.get("sort") or [""])[0].strip().lower()
+    if not key:
+        return models
+    if key not in SORT_KEYS:
+        raise core.ValidationError(
+            f"Parámetro 'sort' inválido: {key!r}; usa uno de {', '.join(sorted(SORT_KEYS))}"
+        )
+    order = (query.get("order") or ["asc"])[0].strip().lower() or "asc"
+    if order not in {"asc", "desc"}:
+        raise core.ValidationError("El parámetro 'order' debe ser 'asc' o 'desc'")
+    return sorted(models, key=SORT_KEYS[key], reverse=order == "desc")
+
+
 def filtered_models(settings: ServerSettings, query: Dict[str, List[str]]) -> List[Dict[str, Any]]:
     """Apply the ``category``, ``q`` and ``tags`` filters to the catalog."""
     selected = settings.catalog
@@ -437,7 +569,7 @@ def filtered_models(settings: ServerSettings, query: Dict[str, List[str]]) -> Li
     tags = query.get("tags") or []
     if tags:
         selected = filter_by_tags(selected, tags)
-    return selected
+    return sort_models(selected, query)
 
 
 def page_url(query: Dict[str, List[str]], offset: int, limit: Optional[int]) -> str:
@@ -527,6 +659,19 @@ def search_payload(
 # ---------------------------------------------------------------------------
 
 
+def fresh_enough(modified_since: str, mtime: float) -> bool:
+    """Whether ``If-Modified-Since`` says the cached copy is still valid."""
+    try:
+        parsed = parsedate_to_datetime(modified_since)
+    except (TypeError, ValueError):
+        return False
+    if parsed is None:  # pragma: no cover - parsedate_to_datetime raises instead
+        return False
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return int(mtime) <= parsed.timestamp()
+
+
 def serve_asset(asset: Path, request: Request) -> Response:
     """Serve one static asset with ``ETag`` and ``Last-Modified``."""
     try:
@@ -542,8 +687,14 @@ def serve_asset(asset: Path, request: Request) -> Response:
         "ETag": etag,
         "Last-Modified": formatdate(stat.st_mtime, usegmt=True),
     }
-    if request.headers.get("if-none-match") == etag:
+    if etag_matches(request.headers.get("if-none-match"), etag):
         return bytes_response(304, b"", content_type, headers)
+    # ``If-Modified-Since`` is only honoured when no ``If-None-Match`` was sent,
+    # as RFC 9110 requires for the validators that are weaker than the ETag.
+    if not (request.headers.get("if-none-match") or "").strip():
+        modified_since = (request.headers.get("if-modified-since") or "").strip()
+        if modified_since and fresh_enough(modified_since, stat.st_mtime):
+            return bytes_response(304, b"", content_type, headers)
     return bytes_response(200, body, content_type, headers)
 
 
@@ -567,29 +718,52 @@ def cors_headers(settings: ServerSettings, request: Request) -> Dict[str, str]:
 
 
 def authenticate(settings: ServerSettings, request: Request) -> None:
-    """Reject ``/api`` requests that do not carry the configured token."""
+    """Reject ``/api`` requests that do not carry the configured token.
+
+    ``GET /api/health`` stays reachable without credentials (load balancers and
+    Kubernetes probes need it) but only answers its liveness fields; sending the
+    token unlocks the full report.
+    """
+    request.state.authenticated = False
     path = request.url.path
-    if not settings.api_token or not path.startswith("/api/"):
+    if not settings.api_token:
+        request.state.authenticated = True
         return
-    if path == "/api/health":
-        return  # liveness probes stay open, they expose no model data
     header = request.headers.get("authorization") or ""
     if header.lower().startswith("bearer "):
         token = header[7:].strip()
     else:
         token = (request.headers.get("x-api-token") or "").strip()
     if token and hmac.compare_digest(token, settings.api_token):
+        request.state.authenticated = True
         return
+    if path == "/api/health" or not path.startswith("/api/"):
+        return  # the probes stay open, the rest of the API does not
     raise core.AuthenticationError(
         "Token de API inválido o ausente",
         headers={"WWW-Authenticate": 'Bearer realm="likelihood"'},
     )
 
 
+def client_address(settings: ServerSettings, request: Request) -> str:
+    """Address used by the rate limiter and the request log.
+
+    Behind a reverse proxy every request comes from the proxy, so a per client
+    limit needs the ``X-Forwarded-For`` chain.  That header is client controlled
+    and therefore only read when ``LM_TRUST_PROXY`` is enabled.
+    """
+    if settings.trust_proxy:
+        forwarded = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        if forwarded:
+            return forwarded
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
 def enforce_rate_limit(settings: ServerSettings, request: Request) -> None:
     """Apply the sliding window limiter, when one is configured."""
-    client = request.client.host if request.client and request.client.host else "unknown"
-    retry_after = settings.rate_limiter.hit(client)
+    retry_after = settings.rate_limiter.hit(client_address(settings, request))
     if retry_after is None:
         return
     wait = max(1, math.ceil(retry_after))
@@ -609,14 +783,14 @@ def preflight_response(settings: ServerSettings, request: Request) -> Response:
             {
                 "success": False,
                 "error": f"Método no soportado: {request.method}",
-                "allow": "GET, HEAD, POST",
+                "allow": _ALLOWED_METHODS,
             },
-            {"Allow": "GET, HEAD, POST"},
+            {"Allow": _ALLOWED_METHODS},
         )
     headers = cors_headers(settings, request)
     headers.update(
         {
-            "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
+            "Access-Control-Allow-Methods": "GET, HEAD, POST, DELETE, OPTIONS",
             "Access-Control-Allow-Headers": (
                 "Content-Type, Authorization, X-API-Token, If-None-Match"
             ),
@@ -638,38 +812,70 @@ def build_router() -> APIRouter:
     # -- catalogue metadata -------------------------------------------------
 
     @router.get("/api/health", tags=["metadata"])
-    def health(settings: ServerSettings = Depends(get_settings)) -> Response:
-        """Liveness probe, counters, metrics and the state of the background pools."""
+    def health(request: Request, settings: ServerSettings = Depends(get_settings)) -> Response:
+        """Liveness probe, counters, metrics and the state of the background pools.
+
+        When ``LM_API_TOKEN`` protects the API, an anonymous probe (Kubernetes,
+        a load balancer...) only receives the liveness fields; the operational
+        details need the token.
+        """
         counts = summarize(settings.catalog)
-        return json_response(
+        payload: Dict[str, Any] = {
+            "success": True,
+            "status": "ok",
+            "version": core.package_version(),
+            "api_version": API_VERSION,
+            "models": counts["total"],
+            "categories": len(category_index(settings.catalog)),
+        }
+        if not settings.api_token or getattr(request.state, "authenticated", False):
+            payload.update(
+                {
+                    "summary": counts,
+                    "playground": {
+                        "enabled": bool(settings.playground_enabled),
+                        "timeout_seconds": core.PLAYGROUND_TIMEOUT,
+                        "blocked_modules": sorted(core.PLAYGROUND_BLOCKED_MODULES),
+                    },
+                    "jobs": settings.jobs.snapshot(),
+                    "sessions": settings.sessions.snapshot(),
+                    "invoke": {
+                        "enabled": bool(settings.invoke_enabled),
+                        "sessions_enabled": bool(settings.sessions_enabled),
+                        "timeout_seconds": core.INVOKE_TIMEOUT,
+                        "max_concurrency": core.INVOKE_MAX_CONCURRENCY,
+                        "side_effects_blocked": not core.INVOKE_ALLOW_SIDE_EFFECTS,
+                        "allowed_methods": sorted(core.INVOKE_ALLOWED_METHODS),
+                        "blocked_methods": sorted(core.INVOKE_BLOCKED_METHODS),
+                    },
+                    "catalog": {
+                        "reloads": settings.store.reloads,
+                        "ttl_seconds": settings.store.ttl,
+                    },
+                    "server": {
+                        "compression_min_bytes": settings.gzip_min_bytes,
+                        "trust_proxy": settings.trust_proxy,
+                        "cors_origins": list(settings.cors_origins),
+                        "rate_limit": settings.rate_limiter.limit,
+                    },
+                    "metrics": settings.metrics.snapshot(),
+                }
+            )
+        return json_response(200, payload, {"Cache-Control": "no-store"})
+
+    @router.get("/api/metrics", tags=["metadata"])
+    def metrics_endpoint(settings: ServerSettings = Depends(get_settings)) -> Response:
+        """The request counters in the Prometheus text exposition format.
+
+        Point a ``scrape_configs`` entry at this path to graph the traffic,
+        the error ratio and the latency of every endpoint.
+        """
+        body = settings.metrics.prometheus().encode("utf-8")
+        return bytes_response(
             200,
-            {
-                "success": True,
-                "status": "ok",
-                "version": core.package_version(),
-                "api_version": API_VERSION,
-                "models": counts["total"],
-                "categories": len(category_index(settings.catalog)),
-                "summary": counts,
-                "playground": {
-                    "enabled": bool(settings.playground_enabled),
-                    "timeout_seconds": core.PLAYGROUND_TIMEOUT,
-                    "blocked_modules": sorted(core.PLAYGROUND_BLOCKED_MODULES),
-                },
-                "jobs": settings.jobs.snapshot(),
-                "sessions": settings.sessions.snapshot(),
-                "invoke": {
-                    "enabled": bool(settings.invoke_enabled),
-                    "sessions_enabled": bool(settings.sessions_enabled),
-                    "timeout_seconds": core.INVOKE_TIMEOUT,
-                    "max_concurrency": core.INVOKE_MAX_CONCURRENCY,
-                    "side_effects_blocked": not core.INVOKE_ALLOW_SIDE_EFFECTS,
-                    "allowed_methods": sorted(core.INVOKE_ALLOWED_METHODS),
-                    "blocked_methods": sorted(core.INVOKE_BLOCKED_METHODS),
-                },
-                "catalog": {"reloads": settings.store.reloads, "ttl_seconds": settings.store.ttl},
-                "metrics": settings.metrics.snapshot(),
-            },
+            body,
+            "text/plain; version=0.0.4; charset=utf-8",
+            {"Cache-Control": "no-store"},
         )
 
     @router.get("/api/categories", tags=["metadata"])
@@ -759,6 +965,35 @@ def build_router() -> APIRouter:
             f"/api/models/{model['id']}",
         )
 
+    @router.get("/api/models/{model_id}/related", tags=["models"])
+    def model_related(
+        model_id: str, request: Request, settings: ServerSettings = Depends(get_settings)
+    ) -> Response:
+        """Models that share tags or category with ``model_id``, best match first."""
+        model = model_or_404(settings, model_id)
+        query = query_dict(request)
+        limit, _ = pagination({**query, "limit": query.get("limit") or ["5"]})
+        related = related_models(settings.catalog, model, limit if limit is not None else 5)
+        cache_key = f"/api/models/{model['id']}/related?limit={limit}"
+        return cacheable_json(
+            settings,
+            request,
+            {
+                "success": True,
+                "model_id": model["id"],
+                "count": len(related),
+                "related": [
+                    {
+                        **core.model_brief(entry["model"]),
+                        "score": entry["score"],
+                        "shared_tags": entry["shared_tags"],
+                    }
+                    for entry in related
+                ],
+            },
+            cache_key,
+        )
+
     @router.get("/api/models/{model_id}/source", tags=["models"])
     def model_source(
         model_id: str, request: Request, settings: ServerSettings = Depends(get_settings)
@@ -779,9 +1014,15 @@ def build_router() -> APIRouter:
         download = (query.get("download") or [""])[0].strip().lower()
         if download in {"1", "true", "yes", "download"}:
             headers["Content-Disposition"] = f'attachment; filename="{model["id"]}.py"'
-        return bytes_response(
-            200, model["source"].encode("utf-8"), "text/x-python; charset=utf-8", headers
-        )
+        source = model["source"].encode("utf-8")
+        # The source of a model only changes when its file does, which the
+        # catalog fingerprint already tracks: repeated views cost a ``304``.
+        etag = etag_for(f"/api/models/{model['id']}/source", settings.store.fingerprint)
+        headers["ETag"] = etag
+        headers["Cache-Control"] = core.STATIC_CACHE_CONTROL
+        if etag_matches(request.headers.get("if-none-match"), etag):
+            return bytes_response(304, b"", "text/x-python; charset=utf-8", headers)
+        return bytes_response(200, source, "text/x-python; charset=utf-8", headers)
 
     @router.get("/api/models/{model_id}/versions", tags=["models"])
     def model_versions(
@@ -909,6 +1150,36 @@ def build_router() -> APIRouter:
         payload.update(job.to_dict())
         payload["poll_url"] = f"/api/playground/jobs/{job.id}"
         return json_response(200, payload)
+
+    @router.delete("/api/playground/jobs/{job_id}", tags=["playground"])
+    def job_delete(job_id: str, settings: ServerSettings = Depends(get_settings)) -> Response:
+        """Cancel a queued job, or forget a job that already finished.
+
+        A run in progress is never killed (each one owns a child process), so a
+        running job stops before its next run and reports ``cancelling`` until
+        it reports ``cancelled``.
+        """
+        job_id = job_id.strip()
+        job = settings.jobs.cancel(job_id)
+        if job is None:
+            raise core.ModelNotFound(f"Job no encontrado o expirado: {job_id}")
+        if job.cancel_requested and job.status == "running":
+            status = "cancelling"
+        else:
+            status = job.status
+            settings.jobs.forget(job_id)
+        return json_response(
+            200,
+            {
+                "success": True,
+                "job_id": job.id,
+                "status": status,
+                "poll_url": f"/api/playground/jobs/{job.id}",
+                "runs": len(job.runs),
+                "completed": len(job.results),
+            },
+            {"Cache-Control": "no-store"},
+        )
 
     @router.get("/api/playground/{model_id}", tags=["playground"])
     def playground_spec_endpoint(
@@ -1328,6 +1599,12 @@ def create_app(
         return json_response(exc.status_code, {"success": False, "error": str(exc.detail)}, headers)
 
     # -- middleware ---------------------------------------------------------
+    #   Outermost first: ``observability`` sees the method the client sent, the
+    #   compression wraps the final body and ``HeadAsGet`` routes ``HEAD``
+    #   requests through the ``GET`` handler.
+    app.add_middleware(HeadAsGet)
+    if state.gzip_min_bytes > 0:
+        app.add_middleware(GZipMiddleware, minimum_size=state.gzip_min_bytes)
 
     @app.middleware("http")
     async def observability(request: Request, call_next):
@@ -1335,7 +1612,31 @@ def create_app(
         request.state.request_id = uuid.uuid4().hex[:12]
         started = time.monotonic()
         route = core.endpoint_label(request.method, request.url.path)
-        client = request.client.host if request.client and request.client.host else "-"
+        client = client_address(state, request)
+
+        async def _finish(answer: Response) -> Response:
+            """Common headers, metrics record and access log of a response."""
+            for key, value in SECURITY_HEADERS.items():
+                answer.headers.setdefault(key, value)
+            answer.headers["X-API-Version"] = API_VERSION
+            answer.headers["X-Request-Id"] = request.state.request_id
+            for key, value in cors_headers(state, request).items():
+                if key.lower() == "vary":
+                    merge_vary(answer, value)
+                else:
+                    answer.headers.setdefault(key, value)
+            elapsed = (time.monotonic() - started) * 1000.0
+            state.metrics.record(route, answer.status_code, elapsed / 1000.0)
+            LOGGER.info(
+                "[%s] %s %s %d %.1f ms",
+                request.state.request_id,
+                client,
+                route,
+                answer.status_code,
+                elapsed,
+            )
+            return answer
+
         try:
             if request.method == "OPTIONS":
                 response = preflight_response(state, request)
@@ -1348,7 +1649,25 @@ def create_app(
                 authenticate(state, request)
                 enforce_rate_limit(state, request)
                 state.refresh()
+                openapi_etag = ""
+                if request.url.path == _OPENAPI_PATH:
+                    # FastAPI serves the OpenAPI document itself, without any
+                    # validator; give it the ``ETag``/``Cache-Control`` support
+                    # the rest of the derived endpoints already have.
+                    openapi_etag = etag_for(_OPENAPI_PATH, state.store.fingerprint)
+                    if etag_matches(request.headers.get("if-none-match"), openapi_etag):
+                        response = not_modified(
+                            openapi_etag,
+                            {
+                                "Cache-Control": api_cache_control(state),
+                                **vary_on_credentials(state),
+                            },
+                        )
+                        return await _finish(response)
                 response = await call_next(request)
+                if openapi_etag:
+                    response.headers.setdefault("Cache-Control", api_cache_control(state))
+                    response.headers.setdefault("ETag", openapi_etag)
         except core.APIError as exc:
             LOGGER.warning(
                 "[%s] %s %s -> %d: %s",
@@ -1371,21 +1690,8 @@ def create_app(
                 {"success": False, "error": "Error interno del servidor"},
                 {"X-Request-Id": request.state.request_id},
             )
-        response.headers["X-API-Version"] = API_VERSION
-        response.headers["X-Request-Id"] = request.state.request_id
-        for key, value in cors_headers(state, request).items():
-            response.headers.setdefault(key, value)
-        elapsed = (time.monotonic() - started) * 1000.0
-        state.metrics.record(route, response.status_code, elapsed / 1000.0)
-        LOGGER.info(
-            "[%s] %s %s %d %.1f ms",
-            request.state.request_id,
-            client,
-            route,
-            response.status_code,
-            elapsed,
-        )
-        return response
+
+        return await _finish(response)
 
     app.include_router(build_router())
     return app
@@ -1412,6 +1718,9 @@ def run(host: str = core.DEFAULT_HOST, port: int = core.DEFAULT_PORT, **options:
 
 def _main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Sirve el catálogo de modelos de Likelihood.")
+    parser.add_argument(
+        "--version", action="version", version=f"likelihood {core.package_version()}"
+    )
     parser.add_argument(
         "--host",
         default=core.DEFAULT_HOST,
@@ -1455,6 +1764,16 @@ def _main(argv: Optional[Sequence[str]] = None) -> int:
         default=None,
         help="peticiones por minuto y cliente (equivale a LM_RATE_LIMIT)",
     )
+    parser.add_argument(
+        "--trust-proxy",
+        action="store_true",
+        help="usa X-Forwarded-For para identificar al cliente (equivale a LM_TRUST_PROXY)",
+    )
+    parser.add_argument(
+        "--no-compression",
+        action="store_true",
+        help="no comprime las respuestas con gzip (equivale a LM_GZIP_MIN_BYTES=0)",
+    )
     parser.add_argument("--verbose", "-v", action="store_true", help="registra cada petición")
     arguments = parser.parse_args(argv)
 
@@ -1477,6 +1796,10 @@ def _main(argv: Optional[Sequence[str]] = None) -> int:
         )
     if arguments.rate_limit is not None:
         settings.rate_limiter = core.RateLimiter(arguments.rate_limit)
+    if arguments.trust_proxy:
+        settings.trust_proxy = True
+    if arguments.no_compression:
+        settings.gzip_min_bytes = 0
 
     if arguments.list:
         for model in settings.catalog:

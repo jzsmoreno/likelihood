@@ -248,6 +248,7 @@
   .btn-secondary { background: #fff; color: var(--accent); border-color: var(--accent); }
   .btn-success { background: linear-gradient(135deg, #48bb78, var(--ok)); color: #fff; }
   .btn-small { padding: 6px 13px; font-size: .74rem; }
+  .related { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 
   /* ---------- Aviso flotante ---------- */
   .toast {
@@ -798,6 +799,31 @@
       }).join('');
     }
 
+    function relatedHtml(related) {
+      if (!related || !related.length) return '';
+      return '<h3>Modelos relacionados</h3><div class="related">' + related.map(function (entry) {
+        return '<button class="btn btn-secondary btn-small" type="button" data-related="' +
+          esc(entry.id) + '" title="' + esc(entry.short_description || entry.title) + '">' +
+          esc(entry.icon || '📦') + ' ' + esc(entry.title || entry.id) + '</button>';
+      }).join('') + '</div>';
+    }
+
+    /* La sección es opcional: si /related falla, la ficha se queda como está. */
+    function loadRelated(id, requestId) {
+      var container = dom.modalBody.querySelector('#modal-related');
+      if (!container) return;
+      window.fetch(API + '/models/' + encodeURIComponent(id) + '/related?limit=4')
+        .then(function (response) {
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          return response.json();
+        })
+        .then(function (data) {
+          if (requestId !== state.requestId) return;
+          container.innerHTML = relatedHtml(data && data.related);
+        })
+        .catch(function () { /* sin recomendaciones */ });
+    }
+
     function renderModal(model) {
       state.current = model;
       modalHeading(model);
@@ -813,6 +839,7 @@
       html += attributesHtml(model);
       html += '<h3>Métodos</h3><ul class="methods">' + methodsHtml(model) + '</ul>';
       html += '<h3>Ejemplo</h3><pre id="modal-example">' + esc(model.example || '# —') + '</pre>';
+      html += '<div id="modal-related"></div>';
       html += '<div class="modal-actions">' +
         '<a class="btn btn-primary" href="/preview/' + esc(id) + '" target="_blank" rel="noopener">🌐 Vista previa y playground</a>' +
         '<a class="btn btn-secondary" href="/api/notebook/' + esc(id) + '" download>⬇️ Notebook</a>' +
@@ -823,6 +850,7 @@
       '</div>';
       dom.modalBody.innerHTML = html;
       bindCopyButtons(dom.modalBody);
+      loadRelated(model.id, state.requestId);
     }
 
     function closeModal(options) {
@@ -1018,6 +1046,10 @@
       });
       dom.reset.addEventListener('click', resetFilters);
       dom.modalClose.addEventListener('click', function () { closeModal(); });
+      dom.modalBody.addEventListener('click', function (event) {
+        var button = closest(event.target, '[data-related]');
+        if (button) openModel(button.getAttribute('data-related'), { trigger: null });
+      });
       dom.backdrop.addEventListener('mousedown', function (event) {
         backdropPressed = event.target === dom.backdrop;
       });

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -17,6 +19,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+import model_catalog  # noqa: E402
 import server_core as core  # noqa: E402
 
 
@@ -127,6 +130,85 @@ def test_rate_limiter_and_metrics():
     assert snapshot["total_requests"] == 2
     assert snapshot["total_errors"] == 1
     assert snapshot["endpoints"]["GET /api/health"]["count"] == 2
+
+
+def test_metrics_prometheus_exposition():
+    metrics = core.Metrics()
+    metrics.record("GET /api/models/<model_id>", 200, 0.02)
+    metrics.record("GET /api/models/<model_id>", 500, 0.01)
+    text = metrics.prometheus()
+    assert "# TYPE likelihood_uptime_seconds gauge" in text
+    assert "# TYPE likelihood_requests_total counter" in text
+    assert 'likelihood_requests_total{endpoint="GET /api/models/<model_id>"} 2' in text
+    assert 'likelihood_request_errors_total{endpoint="GET /api/models/<model_id>"} 1' in text
+    assert 'likelihood_responses_total{status="500"} 1' in text
+    assert 'quantile="0.5"' in text and 'quantile="0.95"' in text
+    assert text.endswith("\n")
+
+    escaped = core.Metrics()
+    escaped.record('GET "/x\\y"', 200, 0.01)
+    # Backslashes and quotes of the label value are escaped for Prometheus.
+    assert 'endpoint="GET \\"/x\\\\y\\""' in escaped.prometheus()
+
+
+def test_related_models_scores_shared_tags_above_the_category():
+    def entry(identifier, category, tags):
+        return {"id": identifier, "title": identifier, "category": category, "tags": tags}
+
+    base = entry("Base", "regression", ["Time Series"])
+    sibling = entry("Sibling", "regression", [])
+    cousin = entry("Cousin", "deep", ["Time Series"])
+
+    ranked = model_catalog.related_models([base, sibling, cousin], base)
+    assert [item["model"]["id"] for item in ranked] == ["Cousin", "Sibling"]
+    assert ranked[0]["score"] == 2 and ranked[0]["shared_tags"] == ["Time Series"]
+    assert ranked[1]["score"] == 1 and ranked[1]["shared_tags"] == []
+    assert (
+        model_catalog.related_models([base, sibling, cousin], base, limit=1)[0]["model"] == cousin
+    )
+    assert model_catalog.related_models([base], base) == []
+
+
+def test_related_models_of_the_real_catalog():
+    model = next(item for item in core.CATALOG if item["id"] == "Arima")
+    related = model_catalog.related_models(core.CATALOG, model, limit=4)
+    assert all(item["model"]["id"] != "Arima" for item in related)
+    scores = [item["score"] for item in related]
+    assert scores == sorted(scores, reverse=True)
+    assert all(score >= 1 for score in scores)
+
+
+def test_job_queue_cancel_stops_the_remaining_runs(monkeypatch):
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow_run(model, parameters):
+        started.set()
+        release.wait(10)
+        return {"type": "Fake", "repr": "Fake()"}
+
+    monkeypatch.setattr(core, "run_playground", slow_run)
+    queue = core.JobQueue(workers=1)
+    runs = [{"model": {"id": "Fake"}, "parameters": {}} for _ in range(3)]
+    job = queue.submit(runs)
+    try:
+        assert started.wait(10)
+        cancelled = queue.cancel(job.id)
+        assert cancelled is job
+        assert job.cancel_requested is True
+        release.set()
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline and not job.done:
+            time.sleep(0.02)
+        assert job.status == "cancelled"
+        assert len(job.results) == 1  # the run in flight finishes, the rest never start
+        assert job.active is False and job.to_dict()["cancel_requested"] is True
+        assert queue.forget(job.id) is job
+        assert queue.get(job.id) is None
+        assert queue.cancel("missing") is None
+    finally:
+        release.set()
+        queue.shutdown()
 
 
 def test_parameters_signature_is_order_independent():

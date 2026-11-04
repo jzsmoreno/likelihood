@@ -42,13 +42,14 @@ pip install "likelihood[server]"              # fastapi + uvicorn
 uvicorn server_fastapi:app --port 8000        # http://127.0.0.1:8000
 python3 server_fastapi.py --port 8080 -v      # custom port, log every request
 python3 server_fastapi.py --list              # print the catalog and exit
+python3 server_fastapi.py --version           # package version and exit
 ```
 
 The browser UI is available at `/` (search, category filters, model cards and a
-detail modal) and `/preview/<model_id>` (full documentation plus an interactive
-playground). `/docs` is the FastAPI Swagger UI and `/api/openapi.json` the
-generated OpenAPI document. Assets live in `models/` and are served with `ETag`
-and `Cache-Control` headers.
+detail modal with the related models) and `/preview/<model_id>` (full
+documentation plus an interactive playground). `/docs` is the FastAPI Swagger UI
+and `/api/openapi.json` the generated OpenAPI document. Assets live in `models/`
+and are served with `ETag` and `Cache-Control` headers.
 
 The catalog is re-introspected when a model source changes (`LM_CATALOG_TTL`), so
 editing `likelihood/models` is reflected without restarting the server.
@@ -66,18 +67,21 @@ route and JSON shape is preserved.
 
 | Method | Path | Description |
 | ------ | ---- | ----------- |
-| `GET` | `/api/health` | Liveness probe with counters, per endpoint metrics and job stats |
+| `GET` | `/api/health` | Liveness probe with counters, per endpoint metrics and job stats (the operational detail requires the token when `LM_API_TOKEN` is set) |
+| `GET` | `/api/metrics` | The same counters in the Prometheus text exposition format |
 | `GET` | `/api/openapi.json` | OpenAPI 3.1 document generated from the catalog |
 | `GET` | `/docs` | Small viewer for the OpenAPI document |
 | `GET` | `/api/categories` | Categories with their model counts |
-| `GET` | `/api/models` | Model list; accepts `category`, `q`, `tags`, `limit` and `offset` |
+| `GET` | `/api/models` | Model list; accepts `category`, `q`, `tags`, `sort`, `order`, `limit` and `offset` |
 | `GET` | `/api/models/<id>` | Everything known about one model (incl. playground spec) |
+| `GET` | `/api/models/<id>/related` | Models that share tags or category with it (`?limit=`) |
 | `GET` | `/api/models/<id>/source` | Raw source; `?download=1` sends it as `.py`, `?diff=<ref>` a git diff |
 | `GET` | `/api/models/<id>/versions` | Commits that touched the source of the model (`?limit=`) |
 | `GET` | `/api/search?q=<term>` | Faceted search: results, suggestions and `facets` |
 | `GET` | `/api/playground/<id>` | Playground specification of one model |
 | `GET` | `/api/playground/jobs` | Most recent asynchronous playground jobs |
 | `GET` | `/api/playground/jobs/<job_id>` | State and results of one job |
+| `DELETE` | `/api/playground/jobs/<job_id>` | Cancel a queued job or forget a finished one |
 | `GET` | `/api/models/<id>/invoke` | Methods that may be called on a model (with their arguments) |
 | `POST` | `/api/models/<id>/invoke` | `{"method": ..., "arguments": {...}}` builds the model and calls it |
 | `POST` | `/api/models/<id>/sample` | `{"method": ..., "parameters": {...}}` returns dummy JSON arguments |
@@ -101,9 +105,22 @@ consumed the old names.
 `GET /api/models` is backwards compatible: without `limit` it returns every
 model. With pagination the response adds `matched`, `offset`, `limit`,
 `has_more` and `next` (the URL of the following page, also advertised through
-`Link: <...>; rel="next"`). `GET /api/models`, `/api/categories`,
-`/api/models/<id>` and `/api/openapi.json` also send `ETag` and `Cache-Control`,
-so conditional requests answer `304` while the model sources do not change.
+`Link: <...>; rel="next"`). `GET /api/models` also sorts the result with
+`?sort=id|title|category|parameters|methods` and `?order=asc|desc` (the default
+keeps the catalog order, which is by category and title).
+
+`GET /api/models`, `/api/categories`, `/api/models/<id>`,
+`/api/models/<id>/related`, `/api/models/<id>/source`, `/api/openapi.json` and
+the static assets send `ETag` and `Cache-Control`, so conditional requests answer
+`304` while the model sources do not change. `If-None-Match` understands the `*`
+wildcard, comma separated lists and the weak `W/"..."` validators, and the assets
+also honour `If-Modified-Since`. When `LM_API_TOKEN` is set the catalog responses
+become `private` and `Vary` on the credentials, so a shared cache can never hand
+an authorised answer to an anonymous client.
+
+Every `GET` route also answers `HEAD` (the body is dropped, the headers and the
+status are the ones of the equivalent `GET`), and responses larger than
+`LM_GZIP_MIN_BYTES` are compressed with gzip when the client accepts it.
 
 `POST /api/search` still works but is deprecated: it answers with
 `Deprecation: true`, a `Sunset` date (`LM_SEARCH_ALIAS_SUNSET`, default
@@ -169,8 +186,11 @@ curl -s http://127.0.0.1:8000/api/playground/jobs/<job_id> | python3 -m json.too
 ```
 
 `status` is one of `pending`, `running`, `succeeded`, `partial` (some runs
-failed) or `failed`; `results` holds one entry per run. Jobs are pruned after
-`LM_JOBS_RETENTION` seconds and at most `LM_MAX_JOBS` are kept in memory.
+failed), `failed` or `cancelled`; `results` holds one entry per run. Jobs are
+pruned after `LM_JOBS_RETENTION` seconds and at most `LM_MAX_JOBS` are kept in
+memory. `DELETE /api/playground/jobs/<job_id>` cancels a queued job (`cancelling`
+while the run in flight finishes, then `cancelled`) and forgets a job that
+already finished.
 
 #### Notebooks with the playground values
 
@@ -321,11 +341,13 @@ expire por inactividad.
 | -------- | ------- | ------- |
 | `LM_HOST` | `127.0.0.1` | Interface to bind (`SERVER_HOST` is also accepted) |
 | `LM_PORT` | `8000` | TCP port (`SERVER_PORT` is also accepted) |
-| `LM_API_TOKEN` | *(empty)* | Require `Authorization: Bearer <token>` on `/api` (health stays open) |
+| `LM_API_TOKEN` | *(empty)* | Require `Authorization: Bearer <token>` on `/api` (health stays open, but only reports liveness) |
 | `LM_CORS_ORIGINS` | *(empty)* | Comma separated allowed origins (`*` allows any) |
 | `LM_RATE_LIMIT` | `0` | Requests per minute and client (`0` disables the limiter) |
 | `LM_CATALOG_TTL` | `2` | Seconds between checks of the model sources (`0` disables hot reload) |
 | `LM_API_CACHE_CONTROL` | `public, max-age=60, must-revalidate` | `Cache-Control` of the cacheable JSON endpoints |
+| `LM_GZIP_MIN_BYTES` | `1024` | Smallest response compressed with gzip (`0` disables the compression) |
+| `LM_TRUST_PROXY` | `0` | `1` reads `X-Forwarded-For` to identify the client (rate limiting, logs) |
 | `LM_SEARCH_ALIAS_SUNSET` | `2026-12-31` | `Sunset` date advertised by `POST /api/search` |
 | `LM_PLAYGROUND` | `1` | Set to `0`/`false` to disable `POST /api/playground` |
 | `LM_PLAYGROUND_TIMEOUT` | `60` | Maximum seconds per playground run |
@@ -350,7 +372,8 @@ expire por inactividad.
 | `LM_SESSION_TIMEOUT` | `LM_INVOKE_TIMEOUT` | Maximum seconds per call on a session |
 
 The same options are available as flags: `--token`, `--cors-origin` (repeatable),
-`--rate-limit`, `--no-playground` and `--no-invoke` (read-only catalog).
+`--rate-limit`, `--no-playground` and `--no-invoke` (read-only catalog), plus
+`--trust-proxy`, `--no-compression` and `--version`.
 
 ### Robustness and observability
 
@@ -363,7 +386,18 @@ The same options are available as flags: `--token`, `--cors-origin` (repeatable)
   client.
 * `GET /api/health` reports `metrics.endpoints` with the request count, the
   status distribution and the `p50`/`p95`/`max` latency per endpoint, plus the
-  job queue and catalog reload counters.
+  job queue, the session store and the catalog reload counters. With
+  `LM_API_TOKEN` an anonymous probe only receives the liveness fields
+  (`status`, `version`, `models`, `categories`); send the token for the rest.
+* `GET /api/metrics` exposes the same counters in the Prometheus text format
+  (`likelihood_requests_total`, `likelihood_request_errors_total`,
+  `likelihood_request_duration_seconds`, `likelihood_responses_total`), labelled
+  by the coarse endpoint bucket so their cardinality stays bounded.
+* Every response carries `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: SAMEORIGIN` and `Referrer-Policy: no-referrer`.
+* A queued playground job can be cancelled (and a finished one forgotten) with
+  `DELETE /api/playground/jobs/<job_id>`; a run in flight — one child process —
+  is never killed half way, so the job stops before its next run.
 * The catalog is rebuilt automatically when a model source changes (checked at
   most once every `LM_CATALOG_TTL` seconds), so editing the package no longer
   requires a restart. `--package-dir` keeps working as before.
@@ -392,8 +426,10 @@ python3 -m pytest tests/test_hmm.py -v            # model tests (requires the fu
 
 `tests/test_server_fastapi.py` drives the FastAPI application through its
 `TestClient` (install the `tests` extra for `pytest` and `httpx`). It covers the
-browser pages, static assets, JSON projections, caching (`ETag`s), error pages,
-the OpenAPI document, the playground subprocess, asynchronous jobs, method
-invocation (including `input_shape_parm`, tuple conversion and session rebuilds),
-authentication, rate limiting and CORS.
+browser pages, static assets, JSON projections, caching (`ETag`s, `If-None-Match`
+lists, `If-Modified-Since`), error pages, the OpenAPI document, `HEAD` and gzip,
+the security headers, the Prometheus endpoint, the playground subprocess,
+asynchronous jobs (including cancellation), method invocation (including
+`input_shape_parm`, tuple conversion and session rebuilds), authentication, the
+cache policy of token protected answers, rate limiting and CORS.
 

@@ -76,6 +76,14 @@ STATIC_CACHE_CONTROL = "public, max-age=300, must-revalidate"
 API_CACHE_CONTROL = os.environ.get("LM_API_CACHE_CONTROL") or "public, max-age=60, must-revalidate"
 #: Version exposed through ``X-API-Version`` and the OpenAPI document.
 API_VERSION = "1.0"
+#: Smallest response that is compressed with gzip, in bytes
+#: (``LM_GZIP_MIN_BYTES``; ``0`` disables the compression middleware).
+_GZIP_MIN_RAW = (os.environ.get("LM_GZIP_MIN_BYTES") or "").strip()
+GZIP_MIN_BYTES = max(0, int(_GZIP_MIN_RAW)) if _GZIP_MIN_RAW else 1024
+#: Honour ``X-Forwarded-For`` when identifying the client (``LM_TRUST_PROXY``).
+#: Enable it **only** behind a reverse proxy that overwrites the header,
+#: otherwise a client could spoof its address to escape the rate limiter.
+TRUST_PROXY = _env_flag("LM_TRUST_PROXY", False)
 #: Seconds a ``POST /api/playground`` run may take.
 PLAYGROUND_TIMEOUT = float(os.environ.get("LM_PLAYGROUND_TIMEOUT") or 60)
 #: CPU seconds the playground child may consume before the kernel kills it.
@@ -264,6 +272,11 @@ CATALOG: List[Dict[str, Any]] = CATALOG_STORE.load()
 MODELS_BY_ID: Dict[str, Dict[str, Any]] = CATALOG_STORE.by_id
 
 
+def _prom_label(value: Any) -> str:
+    """Escape ``value`` so it can be used inside a Prometheus label."""
+    return str(value).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
 class Metrics:
     """Per endpoint counters and latency percentiles behind ``GET /api/health``."""
 
@@ -330,6 +343,55 @@ class Metrics:
                 "statuses": dict(self.statuses),
                 "endpoints": endpoints,
             }
+
+    def prometheus(self, namespace: str = "likelihood") -> str:
+        """The same counters in the Prometheus text exposition format.
+
+        Every series carries the ``endpoint`` label (``GET /api/models``), which
+        is the coarse bucket of :func:`endpoint_label`, so the cardinality stays
+        bounded no matter which model ids are requested.
+        """
+        snapshot = self.snapshot()
+        lines: List[str] = []
+
+        def series(name: str, kind: str, help_text: str) -> None:
+            lines.append(f"# HELP {namespace}_{name} {help_text}")
+            lines.append(f"# TYPE {namespace}_{name} {kind}")
+
+        series("uptime_seconds", "gauge", "Seconds since the server started.")
+        lines.append(f"{namespace}_uptime_seconds {snapshot['uptime_seconds']}")
+
+        series("requests_total", "counter", "Requests served, per endpoint.")
+        for name, entry in snapshot["endpoints"].items():
+            lines.append(
+                f'{namespace}_requests_total{{endpoint="{_prom_label(name)}"}} {entry["count"]}'
+            )
+
+        series("request_errors_total", "counter", "Responses with a 4xx/5xx status.")
+        for name, entry in snapshot["endpoints"].items():
+            lines.append(
+                f'{namespace}_request_errors_total{{endpoint="{_prom_label(name)}"}} '
+                f'{entry["errors"]}'
+            )
+
+        series("request_duration_seconds", "summary", "Latency of the served requests.")
+        for name, entry in snapshot["endpoints"].items():
+            label = _prom_label(name)
+            for quantile, key in ((0.5, "p50"), (0.95, "p95")):
+                lines.append(
+                    f'{namespace}_request_duration_seconds{{endpoint="{label}",'
+                    f'quantile="{quantile}"}} {entry["latency_ms"][key] / 1000.0}'
+                )
+            lines.append(
+                f'{namespace}_request_duration_seconds_max{{endpoint="{label}"}} '
+                f'{entry["latency_ms"]["max"] / 1000.0}'
+            )
+
+        series("responses_total", "counter", "Responses grouped by HTTP status code.")
+        for status, count in snapshot["statuses"].items():
+            lines.append(f'{namespace}_responses_total{{status="{_prom_label(status)}"}} {count}')
+
+        return "\n".join(lines) + "\n"
 
 
 METRICS = Metrics()
@@ -2336,6 +2398,7 @@ class PlaygroundJob:
         self.finished_at: Optional[float] = None
         self.results: List[Dict[str, Any]] = []
         self.error = ""
+        self.cancel_requested = False
 
     @property
     def batch(self) -> bool:
@@ -2345,7 +2408,12 @@ class PlaygroundJob:
     @property
     def done(self) -> bool:
         """True once the job reached a final state."""
-        return self.status in {"succeeded", "failed", "partial"}
+        return self.status in {"succeeded", "failed", "partial", "cancelled"}
+
+    @property
+    def active(self) -> bool:
+        """True while the job still has work to do."""
+        return self.status in {"pending", "running"}
 
     def elapsed(self) -> Optional[float]:
         """Seconds between the start and the end of the job, when known."""
@@ -2365,6 +2433,7 @@ class PlaygroundJob:
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "elapsed": self.elapsed(),
+            "cancel_requested": self.cancel_requested,
             "error": self.error,
         }
         if include_results:
@@ -2430,6 +2499,8 @@ class JobQueue:
         job.started_at = time.time()
         successes = 0
         for run in job.runs:
+            if job.cancel_requested:
+                break
             model = run["model"]
             parameters = run["parameters"]
             try:
@@ -2464,7 +2535,10 @@ class JobQueue:
             entry.update(result)
             job.results.append(entry)
         total = len(job.runs)
-        if successes == total:
+        if job.cancel_requested:
+            job.status = "cancelled"
+            job.error = job.error or f"Job cancelado tras {successes} de {total} ejecuciones"
+        elif successes == total:
             job.status = "succeeded"
         elif successes:
             job.status = "partial"
@@ -2473,6 +2547,34 @@ class JobQueue:
             errors = [result.get("error", "") for result in job.results if result.get("error")]
             job.error = "; ".join(errors)[:500]
         job.finished_at = time.time()
+
+    def cancel(self, job_id: str) -> Optional[PlaygroundJob]:
+        """Ask ``job_id`` to stop; ``None`` when the job is unknown.
+
+        A job that has not started yet is marked ``cancelled`` right away.  A
+        running job keeps the outcome of the run in flight and stops before the
+        next one, because a model executes in its own child process and is not
+        interrupted half way.  Finished jobs are returned untouched (``DELETE``
+        is idempotent, and :meth:`forget` removes them from the store).
+        """
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                return None
+            if job.active:
+                job.cancel_requested = True
+                if job.status == "pending":
+                    job.status = "cancelled"
+                    job.finished_at = time.time()
+            return job
+
+    def forget(self, job_id: str) -> Optional[PlaygroundJob]:
+        """Remove a *finished* job from the store; the job object is returned."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None or job.active:
+                return job
+            return self._jobs.pop(job_id, None)
 
     def get(self, job_id: str) -> Optional[PlaygroundJob]:
         """The job with ``job_id``, or ``None`` when unknown or expired."""

@@ -328,6 +328,37 @@ def test_model_detail_and_unknown(client):
     assert missing.json()["success"] is False
 
 
+def test_related_models(client):
+    model = server.CATALOG[0]
+    response = client.get(f"/api/models/{model['id']}/related")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["model_id"] == model["id"]
+    assert data["count"] == len(data["related"])
+    assert all(entry["id"] != model["id"] for entry in data["related"])
+    assert all(entry["score"] > 0 for entry in data["related"])
+    scores = [entry["score"] for entry in data["related"]]
+    assert scores == sorted(scores, reverse=True)
+    limited = client.get(f"/api/models/{model['id']}/related?limit=1")
+    assert limited.json()["count"] <= 1
+    assert client.get("/api/models/does-not-exist/related").status_code == 404
+    assert client.get(f"/api/models/{model['id']}/related?limit=0").status_code == 400
+
+
+def test_models_sorting(client):
+    descending = client.get("/api/models?sort=parameters&order=desc")
+    assert descending.status_code == 200
+    counts = [model["parameter_count"] for model in descending.json()["models"]]
+    assert counts == sorted(counts, reverse=True)
+
+    by_title = client.get("/api/models?sort=title").json()["models"]
+    titles = [model["title"].lower() for model in by_title]
+    assert titles == sorted(titles)
+
+    assert client.get("/api/models?sort=does-not-exist").status_code == 400
+    assert client.get("/api/models?sort=id&order=sideways").status_code == 400
+
+
 def test_model_source_and_download(client):
     model_id = first_model_id()
     response = client.get("/api/models/" + model_id + "/source")
@@ -432,8 +463,143 @@ def test_notebook_download_and_post(client):
 
 
 # ---------------------------------------------------------------------------
+# Transport, caching and observability
+# ---------------------------------------------------------------------------
+
+
+def test_head_requests_use_the_get_handlers(client):
+    response = client.head("/api/models")
+    assert response.status_code == 200
+    assert response.headers["Content-Type"].startswith("application/json")
+    assert response.content == b""
+    assert client.head("/api/health").status_code == 200
+    assert client.head("/").status_code == 200
+
+
+def test_responses_are_compressed_when_accepted(client):
+    compressed = client.get("/", headers={"Accept-Encoding": "gzip"})
+    assert compressed.headers["Content-Encoding"] == "gzip"
+    assert b"<!DOCTYPE html>" in compressed.content  # httpx already inflated it
+    plain = client.get("/", headers={"Accept-Encoding": "identity"})
+    assert "Content-Encoding" not in plain.headers
+
+
+def test_every_response_carries_the_security_headers(client):
+    for path in ("/", "/api/models", "/api/health", "/preview/" + first_model_id()):
+        response = client.get(path)
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
+        assert response.headers["Referrer-Policy"] == "no-referrer"
+
+
+def test_conditional_requests_accept_wildcards_lists_and_weak_tags(client):
+    response = client.get("/api/models?limit=1")
+    etag = response.headers["ETag"]
+    wildcard = client.get("/api/models?limit=1", headers={"If-None-Match": "*"})
+    assert wildcard.status_code == 304
+    listed = client.get("/api/models?limit=1", headers={"If-None-Match": f'"nope", W/{etag}'})
+    assert listed.status_code == 304
+    stale = client.get("/api/models?limit=1", headers={"If-None-Match": '"stale"'})
+    assert stale.status_code == 200
+
+
+def test_openapi_document_supports_conditional_requests(client):
+    first = client.get("/api/openapi.json")
+    assert first.status_code == 200
+    etag = first.headers["ETag"]
+    assert etag
+    assert first.headers["Cache-Control"]
+    cached = client.get("/api/openapi.json", headers={"If-None-Match": etag})
+    assert cached.status_code == 304
+    assert cached.content == b""
+
+
+def test_static_assets_honour_if_modified_since(client):
+    first = client.get("/favicon.svg")
+    assert first.status_code == 200
+    fresh = client.get(
+        "/favicon.svg", headers={"If-Modified-Since": first.headers["Last-Modified"]}
+    )
+    assert fresh.status_code == 304
+    stale = client.get(
+        "/favicon.svg", headers={"If-Modified-Since": "Thu, 01 Jan 1970 00:00:00 GMT"}
+    )
+    assert stale.status_code == 200
+
+
+def test_model_source_supports_conditional_requests(client):
+    url = f"/api/models/{first_model_id()}/source"
+    first = client.get(url)
+    etag = first.headers["ETag"]
+    assert etag
+    assert client.get(url, headers={"If-None-Match": etag}).status_code == 304
+
+
+# ---------------------------------------------------------------------------
 # Errors, authentication, CORS and limits
 # ---------------------------------------------------------------------------
+
+
+def test_metrics_endpoint_exposes_prometheus_text(client):
+    client.get("/api/models")
+    response = client.get("/api/metrics")
+    assert response.status_code == 200
+    assert response.headers["Content-Type"].startswith("text/plain")
+    assert response.headers["Cache-Control"] == "no-store"
+    assert "# TYPE likelihood_uptime_seconds gauge" in response.text
+    assert 'likelihood_requests_total{endpoint="GET /api/models"}' in response.text
+    assert 'likelihood_responses_total{status="200"}' in response.text
+
+
+def test_metrics_endpoint_requires_the_token(client, settings, monkeypatch):
+    monkeypatch.setattr(settings, "api_token", "secret")
+    assert client.get("/api/metrics").status_code == 401
+    allowed = client.get("/api/metrics", headers={"X-API-Token": "secret"})
+    assert allowed.status_code == 200
+
+
+def test_authenticated_answers_are_private(client, settings, monkeypatch):
+    monkeypatch.setattr(settings, "api_token", "secret")
+    response = client.get("/api/models", headers={"Authorization": "Bearer secret"})
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"].startswith("private")
+    assert "X-API-Token" in response.headers["Vary"]
+
+
+def test_health_hides_the_internals_from_anonymous_probes(client, settings, monkeypatch):
+    monkeypatch.setattr(settings, "api_token", "secret")
+    anonymous = client.get("/api/health")
+    assert anonymous.status_code == 200
+    assert {"models", "status"} <= set(anonymous.json())
+    assert "metrics" not in anonymous.json()
+    full = client.get("/api/health", headers={"Authorization": "Bearer secret"}).json()
+    assert full["metrics"]["total_requests"] >= 1
+    assert full["server"]["trust_proxy"] is False
+
+
+def test_forwarded_for_is_only_used_with_trust_proxy(client, settings, monkeypatch):
+    monkeypatch.setattr(settings, "rate_limiter", server.RateLimiter(2))
+    monkeypatch.setattr(settings, "trust_proxy", True)
+    headers = {"X-Forwarded-For": "203.0.113.7, 10.0.0.1"}
+    assert client.get("/api/health", headers=headers).status_code == 200
+    assert client.get("/api/health", headers=headers).status_code == 200
+    assert client.get("/api/health", headers=headers).status_code == 429
+    # A different forwarded address owns a different bucket.
+    other = dict(headers, **{"X-Forwarded-For": "203.0.113.8"})
+    assert client.get("/api/health", headers=other).status_code == 200
+
+
+def test_job_can_be_cancelled_or_forgotten(client, calculator):
+    created = client.post(
+        "/api/playground/jobs", json={"model_id": "Calculator", "parameters": {"value": 1}}
+    )
+    assert created.status_code == 202
+    job_id = created.json()["job_id"]
+    cancelled = client.delete(f"/api/playground/jobs/{job_id}")
+    assert cancelled.status_code == 200
+    assert cancelled.json()["job_id"] == job_id
+    assert cancelled.json()["status"] in {"cancelled", "cancelling", "succeeded"}
+    assert client.delete("/api/playground/jobs/does-not-exist").status_code == 404
 
 
 def test_unknown_api_endpoint(client):
