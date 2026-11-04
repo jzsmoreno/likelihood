@@ -1504,7 +1504,13 @@ def build_router() -> APIRouter:
                 404, "Modelo no encontrado", f'No existe ningún modelo con el id "{parts[-1]}".'
             )
         host = str(request.base_url).rstrip("/")
-        document = core.render_preview(model, settings.preview_template(), back_url="/", host=host)
+        document = core.render_preview(
+            model,
+            settings.preview_template(),
+            back_url="/",
+            host=host,
+            related=related_models(settings.catalog, model, limit=4),
+        )
         return bytes_response(
             200,
             document.encode("utf-8"),

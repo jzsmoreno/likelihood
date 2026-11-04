@@ -33,7 +33,7 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Sequence, Tuple
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 from model_catalog import (
     DEFAULT_PACKAGE_DIR,
@@ -468,6 +468,8 @@ def model_brief(model: Dict[str, Any]) -> Dict[str, Any]:
         "tags": model["tags"],
         "module": model["module"],
         "signature": model["signature"],
+        "import_statement": model.get("import_statement")
+        or (f"from {model['module']} import {model['id']}"),
         "parameter_count": len(model["parameters"]),
         "method_count": len(model["methods"]),
         "line_count": model["line_count"],
@@ -2704,9 +2706,19 @@ def _escape(value: Any) -> str:
     return html.escape(str(value), quote=True)
 
 
-def tags_html(model: Dict[str, Any]) -> str:
-    """``<span>`` badges for the model tags."""
-    return "".join(f'<span class="tag">{_escape(tag)}</span>' for tag in model["tags"])
+def tag_url(tag: str, back_url: str = "/") -> str:
+    """Catalogue URL that filters by ``tag`` (``/?tag=Deep%20Learning``)."""
+    base = back_url.split("?")[0] or "/"
+    return f"{base}?tag={quote(tag, safe='')}"
+
+
+def tags_html(model: Dict[str, Any], back_url: str = "/") -> str:
+    """Links to the catalogue filtered by each tag of the model."""
+    return "".join(
+        f'<a class="tag" href="{_escape(tag_url(tag, back_url))}"'
+        f' title="Ver los modelos con la etiqueta {_escape(tag)}">{_escape(tag)}</a>'
+        for tag in model["tags"]
+    )
 
 
 def parameters_html(model: Dict[str, Any]) -> str:
@@ -2773,6 +2785,36 @@ def attributes_section_html(model: Dict[str, Any]) -> str:
     return f'<h2>Atributos</h2>\n<div class="grid">{cards}</div>'
 
 
+def related_html(entries: Sequence[Dict[str, Any]]) -> str:
+    """Section with links to the models related to the current one.
+
+    ``entries`` are the records of :func:`model_catalog.related_models`, so the
+    shared tags (or the category, when there are none) tell *why* a model is
+    being suggested.  An empty list renders nothing at all.
+    """
+    cards: List[str] = []
+    for entry in entries:
+        model = entry["model"]
+        shared = list(entry.get("shared_tags") or [])
+        hint = "Comparte: " + ", ".join(shared[:3]) if shared else model["category_label"]
+        cards.append(
+            f'<a class="related-card" href="/preview/{quote(model["id"], safe="")}">'
+            f'<span class="related-icon" aria-hidden="true">{_escape(model["icon"])}</span>'
+            '<span class="related-body">'
+            f'<span class="related-title">{_escape(model["title"])}</span>'
+            f'<span class="related-desc">{_escape(model["short_description"])}</span>'
+            f'<span class="related-hint">{_escape(hint)}</span>'
+            "</span></a>"
+        )
+    if not cards:
+        return ""
+    return (
+        '<h2 id="relacionados">Modelos relacionados</h2>\n<div class="related-grid">'
+        + ("".join(cards))
+        + "</div>"
+    )
+
+
 def load_template(path: Path = PREVIEW_TEMPLATE) -> str:
     """Read the preview template, falling back to a minimal document."""
     try:
@@ -2793,6 +2835,7 @@ def render_preview(
     template: str,
     back_url: str = "/",
     host: str = "",
+    related: Optional[Sequence[Dict[str, Any]]] = None,
 ) -> str:
     """Render the HTML preview of ``model`` from ``template``.
 
@@ -2809,10 +2852,11 @@ def render_preview(
         "CATEGORY_CLASS": f"category-{_escape(model['category'])}",
         "MODEL_SHORT_DESCRIPTION": _escape(model["short_description"]),
         "MODEL_DESCRIPTION": _escape(model["full_description"]).replace("\n", "<br>"),
-        "MODEL_TAGS": tags_html(model),
+        "MODEL_TAGS": tags_html(model, back_url),
         "MODEL_PARAMETERS": parameters_html(model),
         "MODEL_ATTRIBUTES_SECTION": attributes_section_html(model),
         "MODEL_METHODS": methods_html(model),
+        "MODEL_RELATED": related_html(list(related or [])),
         "MODEL_SOURCE": _escape(model["source"]),
         "MODEL_EXAMPLE": _escape(model["example"]),
         "MODEL_IMPORT": _escape(model["import_statement"]),

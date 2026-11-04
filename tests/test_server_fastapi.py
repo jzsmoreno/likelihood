@@ -24,6 +24,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+import model_catalog  # noqa: E402
 import server_core as server  # noqa: E402
 import server_fastapi  # noqa: E402
 
@@ -448,6 +449,33 @@ def test_preview_pages(client):
     missing = client.get("/preview/does-not-exist")
     assert missing.status_code == 404
     assert missing.headers["Content-Type"].startswith("text/html")
+
+
+def test_preview_links_the_tags_and_the_related_models(client):
+    """The preview page navigates back to the catalogue instead of dead ends."""
+    probe = None
+    for candidate in server.CATALOG:
+        entries = model_catalog.related_models(server.CATALOG, candidate, limit=4)
+        if entries:
+            probe = (candidate, entries)
+            break
+    assert probe is not None, "the catalog should relate at least one model"
+    model, entries = probe
+
+    response = client.get("/preview/" + model["id"])
+    assert response.status_code == 200
+    html = response.text
+    # Etiquetas -> catálogo filtrado por etiqueta.
+    assert 'class="tag" href="/?tag=' in html
+    # Modelos relacionados con enlaces a sus vistas previas.
+    assert 'id="relacionados"' in html
+    for entry in entries:
+        assert f'/preview/{entry["model"]["id"]}' in html
+    # El panel de invocación y el playground siguen embebidos.
+    assert 'id="playground-data"' in html
+    assert 'id="invoke-data"' in html
+    # Ningún marcador de plantilla queda sin sustituir.
+    assert "{{" not in html
 
 
 def test_notebook_download_and_post(client):

@@ -104,6 +104,7 @@
   .topbar h1 .icon { line-height: 1; }
   .topbar p { margin: 0; color: var(--muted); max-width: 60ch; line-height: 1.6; }
   .topbar-side { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .topbar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .model-id {
     font-family: ui-monospace, Consolas, monospace; font-size: .72rem; color: var(--muted);
     background: var(--surface-soft); border-radius: 999px; padding: 4px 10px;
@@ -142,7 +143,29 @@
   .tag {
     background: var(--surface-chip); color: var(--tag-ink); border-radius: 999px;
     padding: 4px 11px; font-size: .68rem; font-weight: 600;
+    text-decoration: none; border: 1px solid transparent;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
   }
+  a.tag:hover, a.tag:focus-visible { background: var(--accent); color: #fff; }
+
+  /* ---------- Modelos relacionados ---------- */
+  .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .related-card {
+    display: flex; gap: 12px; align-items: flex-start; text-decoration: none;
+    background: var(--surface-param); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    border-radius: 12px; padding: 12px 14px; color: inherit;
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  }
+  .related-card:hover, .related-card:focus-visible {
+    transform: translateY(-2px); box-shadow: 0 10px 24px rgba(15, 23, 42, .16);
+    border-color: var(--accent); outline: none;
+  }
+  .related-icon { font-size: 1.35rem; line-height: 1.2; }
+  .related-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .related-title { font-weight: 700; font-size: .86rem; color: var(--accent); }
+  .related-desc { font-size: .76rem; color: var(--soft-ink); line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .related-hint { font-size: .68rem; color: var(--muted); font-style: italic; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
   .param-card { background: var(--surface-param); border-left: 3px solid var(--accent); border-radius: 10px; padding: 12px 14px; }
   .param-name { font-family: ui-monospace, Consolas, monospace; font-weight: 700; font-size: .85rem; word-break: break-all; }
@@ -186,8 +209,14 @@
   nav.toc a {
     color: var(--accent); text-decoration: none; font-size: .78rem; font-weight: 600;
     background: var(--accent-soft); border-radius: 999px; padding: 5px 12px;
+    transition: background .15s ease, color .15s ease;
   }
   nav.toc a:hover { background: var(--accent); color: #fff; }
+  nav.toc a.active { background: var(--accent); color: #fff; }
+  @media (min-width: 900px) {
+    /* La barra de secciones acompaña la lectura del documento. */
+    nav.toc { position: sticky; top: 10px; z-index: 20; }
+  }
 
   /* ---------- Acciones y botones ---------- */
   .actions {
@@ -242,16 +271,17 @@
   }
   .lab-tab:hover { color: var(--ink); background: var(--surface-param); }
   .lab-tab[aria-selected="true"] {
-    color: var(--accent); background: var(--surface); border-color: var(--line);
-    border-bottom: 1px solid var(--surface);
+    color: var(--accent); background: var(--card); border-color: var(--line);
+    border-bottom: 1px solid var(--card);
   }
   .lab-panel[hidden] { display: none; }
   .invoke-method { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
   .invoke-method label { font-size: .8rem; font-weight: 700; }
   .invoke-method select {
     font: inherit; font-size: .85rem; padding: 8px 10px; border-radius: 9px;
-    border: 1px solid var(--line); background: var(--surface); color: var(--ink); min-width: 220px;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink); min-width: 220px;
   }
+  .invoke-method select:focus { border-color: var(--accent); outline: none; }
   .invoke-signature { font-family: ui-monospace, Consolas, monospace; font-size: .78rem; color: var(--muted); word-break: break-word; }
   details.invoke-constructor { margin: 14px 0; }
   details.invoke-constructor summary { cursor: pointer; font-size: .82rem; font-weight: 600; color: var(--accent); }
@@ -332,7 +362,10 @@
     .topbar, .card { box-shadow: none; margin-bottom: 12px; border-radius: 0; padding: 0; }
     nav.toc, .actions, .back-top, .toast, .skip, .code-head .btn { display: none !important; }
     .playground-actions, .playground-output, details.playground-snippet { display: none !important; }
+    .lab-tabs, .invoke-session, .invoke-deploy { display: none !important; }
     pre, .prose, .sig, .param-card, .methods li { background: #fff !important; color: #000 !important; border-color: #999; }
+    .related-card { box-shadow: none !important; transform: none !important; }
+    .related-desc { -webkit-line-clamp: unset; display: block; }
     pre { border: 1px solid #ccc; white-space: pre-wrap; }
     pre.clamped { max-height: none; }
     pre.clamped::after { display: none; }
@@ -352,20 +385,25 @@
     <div class="topbar-side">
       <span class="badge {{CATEGORY_CLASS}}">{{MODEL_CATEGORY}}</span>
       <span class="model-id">{{MODEL_ID}}</span>
-      <a class="btn btn-secondary" href="{{BACK_URL}}">← Volver al catálogo</a>
+      <span class="topbar-actions">
+        <button class="btn btn-secondary btn-small" type="button" data-copy-url data-toast="Enlace copiado">🔗 Copiar enlace</button>
+        <a class="btn btn-secondary btn-small" href="{{BACK_URL}}">← Volver al catálogo</a>
+      </span>
     </div>
   </header>
 
-  <nav class="toc" aria-label="Secciones del modelo">
+  <nav class="toc" aria-label="Secciones del modelo" id="toc">
     <span class="toc-label">Ir a</span>
     <a href="#descripcion">Descripción</a>
     <a href="#firma">Firma</a>
     <a href="#etiquetas">Etiquetas</a>
     <a href="#parametros">Parámetros</a>
     <a href="#playground">Playground</a>
+    <a href="#playground" data-lab-tab-link="invoke">Invocar método</a>
     <a href="#metodos">Métodos</a>
     <a href="#ejemplo">Ejemplo</a>
     <a href="#codigo">Código fuente</a>
+    <a href="#relacionados" id="toc-relacionados">Relacionados</a>
   </nav>
 
   <main class="card" id="main">
@@ -391,10 +429,10 @@
     <h2 id="playground">Laboratorio</h2>
     <div class="lab-tabs" role="tablist" aria-label="Herramientas del modelo">
       <button class="lab-tab" type="button" role="tab" id="tab-playground"
-              aria-controls="panel-playground" aria-selected="true"
+              aria-controls="panel-playground" aria-selected="true" tabindex="0"
               data-lab-tab="playground">▶️ Playground</button>
       <button class="lab-tab" type="button" role="tab" id="tab-invoke"
-              aria-controls="panel-invoke" aria-selected="false"
+              aria-controls="panel-invoke" aria-selected="false" tabindex="-1"
               data-lab-tab="invoke">⚡ Invocar método</button>
     </div>
 
@@ -421,6 +459,10 @@
       </div>
       <details class="playground-snippet">
         <summary>Código equivalente en Python</summary>
+        <div class="code-head">
+          <span>Constructor con los valores del formulario</span>
+          <button class="btn btn-ghost btn-small" type="button" data-copy="#playground-code" data-toast="Código copiado">📋 Copiar código</button>
+        </div>
         <pre id="playground-code"></pre>
       </details>
       <script type="application/json" id="playground-data">{{MODEL_PLAYGROUND_JSON}}</script>
@@ -481,6 +523,10 @@
       </div>
       <details class="playground-snippet invoke-snippet">
         <summary>Código equivalente en Python</summary>
+        <div class="code-head">
+          <span>Construcción y llamada al método</span>
+          <button class="btn btn-ghost btn-small" type="button" data-copy="#invoke-code" data-toast="Código copiado">📋 Copiar código</button>
+        </div>
         <pre id="invoke-code"></pre>
       </details>
       <script type="application/json" id="invoke-data">{{MODEL_INVOKE_JSON}}</script>
@@ -506,12 +552,15 @@
     </div>
     <pre id="source" class="clamped">{{MODEL_SOURCE}}</pre>
 
+    {{MODEL_RELATED}}
+
     <div class="actions">
       <a class="btn btn-primary" href="{{NOTEBOOK_URL}}" download>⬇️ Descargar notebook</a>
       <a class="btn btn-secondary" href="{{SOURCE_DOWNLOAD_URL}}" download>⬇️ Descargar código fuente</a>
       <a class="btn btn-secondary" href="{{API_URL}}" target="_blank" rel="noopener">🔌 Ver JSON de la API</a>
       <button class="btn btn-secondary" type="button" data-copy="#signature" data-toast="Firma copiada">📋 Copiar firma</button>
       <button class="btn btn-secondary" type="button" data-copy="#import" data-toast="Importación copiada">📋 Copiar importación</button>
+      <button class="btn btn-secondary" type="button" data-copy-url data-toast="Enlace copiado">🔗 Copiar enlace</button>
       <button class="btn btn-secondary" type="button" id="print-page">🖨️ Imprimir</button>
       <a class="btn btn-secondary" href="{{BACK_URL}}">← Volver al catálogo</a>
     </div>
@@ -586,7 +635,12 @@
 
     /* Un único listener para todos los botones de copia. */
     document.addEventListener('click', function (event) {
-      var button = event.target.closest ? event.target.closest('[data-copy]') : null;
+      if (!event.target.closest) return;
+      if (event.target.closest('[data-copy-url]')) {
+        copyText(window.location.href, 'Enlace copiado');
+        return;
+      }
+      var button = event.target.closest('[data-copy]');
       if (!button) return;
       var target = document.querySelector(button.getAttribute('data-copy'));
       if (!target) {
@@ -951,6 +1005,12 @@
       ['playground', 'invoke'].forEach(function (key) {
         if (panels[key]) panels[key].hidden = key !== active;
       });
+      /* El hash refleja la pestaña abierta: el enlace se puede compartir. */
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(
+          null, '', active === 'invoke' ? '#invocar' : '#playground'
+        );
+      }
       if (scroll) {
         var heading = document.getElementById('playground');
         if (heading) heading.scrollIntoView({ block: 'start' });
@@ -975,12 +1035,73 @@
 
     /* Los enlaces del índice #playground y #invocar abren su pestaña. */
     document.addEventListener('click', function (event) {
-      var link = event.target.closest
-        ? event.target.closest('a[href="#invocar"], a[href="#playground"]')
-        : null;
+      var link = event.target.closest ? event.target.closest('a[href^="#"]') : null;
       if (!link) return;
-      selectLabTab(link.getAttribute('href') === '#invocar' ? 'invoke' : 'playground', true);
+      var target = link.getAttribute('data-lab-tab-link');
+      if (!target && link.getAttribute('href') !== '#playground') return;
+      event.preventDefault();
+      selectLabTab(target || 'playground', true);
     });
+
+    /* ------------------------------------------------------------------ */
+    /* Índice pegajoso con sección activa                                  */
+    /* ------------------------------------------------------------------ */
+
+    (function initToc() {
+      var toc = document.getElementById('toc');
+      if (!toc) return;
+      var related = document.getElementById('relacionados');
+      var relatedLink = document.getElementById('toc-relacionados');
+      if (relatedLink && !related) relatedLink.hidden = true;
+      if (!related && relatedLink) relatedLink.parentNode.removeChild(relatedLink);
+
+      var links = Array.prototype.slice.call(
+        toc.querySelectorAll('a[href^="#"]:not([data-lab-tab-link])')
+      );
+      var sections = links.map(function (link) {
+        return { link: link, section: document.getElementById(link.getAttribute('href').slice(1)) };
+      }).filter(function (entry) { return entry.section; });
+      if (!sections.length) return;
+
+      var active = null;
+      var scheduled = false;
+
+      function paint() {
+        scheduled = false;
+        var best = sections[0];
+        sections.forEach(function (entry) {
+          if (entry.section.getBoundingClientRect().top <= 140) best = entry;
+        });
+        if (best === active) return;
+        active = best;
+        sections.forEach(function (entry) {
+          var selected = entry === best;
+          if (selected) {
+            entry.link.classList.add('active');
+            entry.link.setAttribute('aria-current', 'true');
+          } else {
+            entry.link.classList.remove('active');
+            entry.link.removeAttribute('aria-current');
+          }
+        });
+      }
+
+      function schedule() {
+        if (scheduled) return;
+        scheduled = true;
+        if (window.requestAnimationFrame) window.requestAnimationFrame(paint);
+        else window.setTimeout(paint, 16);
+      }
+
+      window.addEventListener('scroll', schedule, { passive: true });
+      window.addEventListener('resize', schedule);
+      paint();
+    })();
+
+    /* Un enlace directo a la pestaña de invocación la deja abierta. */
+    if (window.location.hash === '#invocar') {
+      selectLabTab('invoke', false);
+    }
 
     /* ------------------------------------------------------------------ */
     /* Invocación de métodos                                               */

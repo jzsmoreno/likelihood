@@ -115,6 +115,35 @@ def test_content_type_for():
     assert core.content_type_for(Path("model.ipynb")) == ("application/x-ipynb+json; charset=utf-8")
 
 
+def test_tag_links_point_to_the_catalogue_filter():
+    assert core.tag_url("Deep Learning") == "/?tag=Deep%20Learning"
+    assert core.tag_url("Time Series", "/?category=x") == "/?tag=Time%20Series"
+    html = core.tags_html({"tags": ["Regression", "Time Series"]})
+    assert html.count('class="tag"') == 2
+    assert 'href="/?tag=Regression"' in html
+
+
+def test_related_section_explains_the_match():
+    model = {
+        "id": "Base",
+        "icon": "🧪",
+        "title": "Base",
+        "category_label": "Testing",
+        "short_description": "Sonda de prueba",
+    }
+    html = core.related_html([{"model": model, "score": 3, "shared_tags": ["Regression"]}])
+    assert 'id="relacionados"' in html
+    assert 'class="related-card" href="/preview/Base"' in html
+    assert "Comparte: Regression" in html
+    assert core.related_html([]) == ""
+
+
+def test_model_brief_exposes_the_import_statement():
+    model = next(item for item in core.CATALOG if item["id"] == "Arima")
+    brief = core.model_brief(model)
+    assert brief["import_statement"] == model["import_statement"]
+
+
 def test_rate_limiter_and_metrics():
     limiter = core.RateLimiter(2)
     assert limiter.hit("client") is None
