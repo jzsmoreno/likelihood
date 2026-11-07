@@ -49,25 +49,6 @@ The browser UI is available at `/` and `/preview/<model_id>`. `/docs` is the
 FastAPI Swagger UI and `/api/openapi.json` the generated OpenAPI document. Assets
 live in `models/` and are served with `ETag` and `Cache-Control` headers.
 
-**Catálogo (`/`).** La búsqueda puntúa los resultados (el identificador y el
-título pesan más que la descripción), resalta los términos encontrados y admite
-varios criterios de orden con su dirección (`?sort=`,`?dir=`). Se filtra por
-categoría y por etiqueta —las etiquetas de cada tarjeta son botones que filtran
-al pulsarlas— y todos los filtros activos aparecen como pastillas que se pueden
-quitar de una en una. Cada tarjeta es un `<article>` con enlace real a la vista
-previa y acciones rápidas: **Ficha** (modal), **Vista previa**, **Notebook** y
-**Copiar importación**. Atajos: `/` o `⌘`/`Ctrl`+`K` enfocan la búsqueda y `Esc`
-la limpia o cierra la ficha. La URL refleja categoría, etiqueta, búsqueda, orden
-y modelo abierto, así que cualquier vista se puede compartir.
-
-**Vista previa (`/preview/<id>`).** Documentación completa, firma, parámetros,
-métodos, ejemplo, código fuente, playground e invocación de métodos en pestañas.
-El índice de secciones se queda fijo al desplazarse y marca la sección activa;
-las etiquetas enlazan de vuelta al catálogo filtrado; al final se listan los
-**modelos relacionados** (con el motivo de la sugerencia) y hay botones para
-copiar la firma, la importación, el código de los formularios y el enlace de la
-página. Tema claro/oscuro, estilos de impresión y `prefers-reduced-motion`.
-
 The catalog is re-introspected when a model source changes (`LM_CATALOG_TTL`), so
 editing `likelihood/models` is reflected without restarting the server.
 
@@ -113,11 +94,6 @@ route and JSON shape is preserved.
 | `POST` | `/api/notebook` | `{"model_id": "...", "parameters": {...}}` returns the notebook JSON |
 | `POST` | `/api/search` | **Deprecated** alias of `GET /api/search` |
 
-Every key of the JSON payloads is `snake_case` (`category_label`,
-`short_description`, `parameter_count`, `has_more`, `model_id`, ...), matching the
-query parameters (`offset`, `limit`, `tags`). The rename from the previous mixed
-casing (`categoryLabel`, `hasMore`, ...) is a breaking change for clients that
-consumed the old names.
 
 `GET /api/models` is backwards compatible: without `limit` it returns every
 model. With pagination the response adds `matched`, `offset`, `limit`,
