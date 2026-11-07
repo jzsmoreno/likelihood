@@ -189,9 +189,6 @@ def get_settings(request: Request) -> ServerSettings:
     return request.app.state.settings
 
 
-# ---------------------------------------------------------------------------
-# Request bodies (Pydantic models, so FastAPI documents and validates them)
-# ---------------------------------------------------------------------------
 
 
 class _AliasedBody(BaseModel):
@@ -262,9 +259,6 @@ class SearchRequest(_AliasedBody):
     tags: List[str] = Field(default_factory=list, description="Etiquetas que filtrar.")
 
 
-# ---------------------------------------------------------------------------
-# Responses
-# ---------------------------------------------------------------------------
 
 
 def json_response(
@@ -437,9 +431,6 @@ class HeadAsGet:
         await self.app(dict(scope, method="GET"), receive, without_body)
 
 
-# ---------------------------------------------------------------------------
-# Request parsing
-# ---------------------------------------------------------------------------
 
 
 async def read_body(request: Request) -> bytes:
@@ -497,9 +488,6 @@ def query_dict(request: Request) -> Dict[str, List[str]]:
     return query
 
 
-# ---------------------------------------------------------------------------
-# Catalog helpers ported from the standard-library handlers
-# ---------------------------------------------------------------------------
 
 
 def model_or_404(settings: ServerSettings, model_id: str) -> Dict[str, Any]:
@@ -654,9 +642,6 @@ def search_payload(
     }
 
 
-# ---------------------------------------------------------------------------
-# Static assets and cross-cutting concerns
-# ---------------------------------------------------------------------------
 
 
 def fresh_enough(modified_since: str, mtime: float) -> bool:
@@ -800,9 +785,6 @@ def preflight_response(settings: ServerSettings, request: Request) -> Response:
     return Response(status_code=204, headers=headers)
 
 
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
 
 
 def build_router() -> APIRouter:
@@ -1529,9 +1511,6 @@ def build_router() -> APIRouter:
     return router
 
 
-# ---------------------------------------------------------------------------
-# Application factory
-# ---------------------------------------------------------------------------
 
 
 def create_app(
