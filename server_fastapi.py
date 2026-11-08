@@ -189,8 +189,6 @@ def get_settings(request: Request) -> ServerSettings:
     return request.app.state.settings
 
 
-
-
 class _AliasedBody(BaseModel):
     """Base body that tolerates the legacy aliases (``id``, ``params``, ...)."""
 
@@ -257,8 +255,6 @@ class SearchRequest(_AliasedBody):
 
     query: Optional[str] = Field(default=None, description="Término de búsqueda.")
     tags: List[str] = Field(default_factory=list, description="Etiquetas que filtrar.")
-
-
 
 
 def json_response(
@@ -431,8 +427,6 @@ class HeadAsGet:
         await self.app(dict(scope, method="GET"), receive, without_body)
 
 
-
-
 async def read_body(request: Request) -> bytes:
     """Read the raw body, enforcing the :data:`MAX_BODY_BYTES` ceiling."""
     declared = (request.headers.get("content-length") or "").strip()
@@ -486,8 +480,6 @@ def query_dict(request: Request) -> Dict[str, List[str]]:
     for key, value in request.query_params.multi_items():
         query.setdefault(key, []).append(value)
     return query
-
-
 
 
 def model_or_404(settings: ServerSettings, model_id: str) -> Dict[str, Any]:
@@ -642,8 +634,6 @@ def search_payload(
     }
 
 
-
-
 def fresh_enough(modified_since: str, mtime: float) -> bool:
     """Whether ``If-Modified-Since`` says the cached copy is still valid."""
     try:
@@ -783,8 +773,6 @@ def preflight_response(settings: ServerSettings, request: Request) -> Response:
         }
     )
     return Response(status_code=204, headers=headers)
-
-
 
 
 def build_router() -> APIRouter:
@@ -1509,8 +1497,6 @@ def build_router() -> APIRouter:
         return serve_asset(asset, request)
 
     return router
-
-
 
 
 def create_app(
