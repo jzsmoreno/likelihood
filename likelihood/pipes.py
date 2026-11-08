@@ -1,3 +1,13 @@
+"""
+Likelihood: Data preprocessing pipelines and model training utilities.
+
+This module assembles the individual preprocessing components
+(:class:`~likelihood.tools.impute.SimpleImputer`, encoders, scalers, and
+feature selectors) into an ordered :class:`Pipeline` that cleans and transforms
+tabular data prior to model training. It also provides helper functions to save
+and load fitted pipelines.
+"""
+
 import json
 import pickle
 import re
@@ -14,6 +24,36 @@ from likelihood.tools.tools import DataFrameEncoder, DataScaler, LinearRegressio
 
 
 class Pipeline:
+    """
+    A preprocessing pipeline that orchestrates a sequence of transformations
+    applied to a tabular dataset prior to model training.
+
+    The pipeline is configured through a JSON file that specifies the target
+    column and the ordered list of preprocessing steps (imputation, scaling,
+    encoding, feature selection, and so on). Upon instantiation it loads and
+    validates that configuration, and upon :meth:`fit` it runs the configured
+    steps over the input data and returns the cleaned feature matrix together
+    with the extracted target vector.
+
+    Attributes
+    ----------
+    config : `dict`
+        The validated JSON configuration dictionary.
+    target_col : `str`
+        Name of the target column.
+    steps : `list`
+        Ordered list of preprocessing step names.
+    compute_importance : `bool`
+        Whether feature importance should be computed.
+    fitted_components : `dict`
+        State of the fitted preprocessing components.
+    fitted_idx : `list`
+        Indices of the columns that were fitted.
+    columns_bin_sizes : `dict` or `None`
+        Bin sizes for range-encoded columns, if any.
+
+    """
+
     def __init__(self, config_path: str) -> None:
         """
         Initialize the pipeline with a JSON configuration file.
