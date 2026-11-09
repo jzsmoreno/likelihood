@@ -91,6 +91,15 @@ class VanillaGNNLayer(tf.keras.layers.Layer):
         return x
 
     def get_config(self) -> Dict[str, Any]:
+        """Get the configuration dictionary for serialization.
+
+        Returns
+        -------
+        config : `Dict[str, Any]`
+            The configuration dictionary containing layer parameters including
+            ``dim_in``, ``dim_out``, ``rank``, and ``kernel_initializer``.
+        """
+
         config = super(VanillaGNNLayer, self).get_config()
         config.update(
             {

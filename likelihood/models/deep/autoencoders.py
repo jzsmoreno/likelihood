@@ -30,6 +30,7 @@ tf.get_logger().setLevel("ERROR")
 
 
 class EarlyStopping:
+    """Early stopping callback to monitor validation loss and stop training when no improvement."""
     def __init__(self, patience: int = 10, min_delta: float = 0.001) -> None:
         self.patience = patience
         self.min_delta = min_delta
@@ -38,6 +39,14 @@ class EarlyStopping:
         self.stop_training: bool = False
 
     def __call__(self, current_loss: float) -> None:
+        """Update the stopping criteria based on the current loss.
+
+        Parameters
+        ----------
+        current_loss : float
+            The current loss value to evaluate against the best loss.
+        """
+
         if self.best_loss - current_loss > self.min_delta:
             self.best_loss = current_loss
             self.counter = 0

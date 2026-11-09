@@ -14,11 +14,21 @@ def flatten_chain(matrix: List[List[Any]]) -> List[Any]:
 
 
 class ActionSpace:
+    """Action space representing a discrete set of actions.
+
+    Parameters
+    ----------
+    num_actions : int
+        The number of possible actions.
+    """
+
     def __init__(self, num_actions: int) -> None:
         self._num_actions = num_actions
 
     @property
     def n(self) -> int:
+        """The number of actions in the space."""
+
         return self._num_actions
 
 

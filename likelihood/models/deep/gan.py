@@ -51,6 +51,18 @@ class GANRegressor(tf.keras.Model):
         self.build(dummy_input.shape)
 
     def build(self, input_shape: Tuple[int, ...]) -> None:
+        """Build the GAN model architecture.
+
+        Parameters
+        ----------
+        input_shape : `Tuple[int, ...]`
+            The shape of the input tensor.
+
+        Returns
+        -------
+        None
+        """
+
         self.gan = tf.keras.models.Sequential([self.generator, self.discriminator], name="gan")
 
         self.generator.compile(
@@ -289,9 +301,30 @@ class GANRegressor(tf.keras.Model):
         return pd.DataFrame(history.history)
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        """Compute the output tensor by passing inputs through the generator.
+
+        Parameters
+        ----------
+        inputs : `tf.Tensor`
+            Input tensor to the model.
+
+        Returns
+        -------
+        `tf.Tensor`
+            Output tensor of shape (batch_size, 1).
+        """
+
         return self.generator(inputs)[:, 0]
 
     def get_config(self) -> Dict[str, Any]:
+        """Get configuration dictionary for serialization.
+
+        Returns
+        -------
+        config : `Dict[str, Any]`
+            Configuration dictionary.
+        """
+
         config = {
             "input_shape_parm": self.input_shape_parm,
             "output_shape_parm": self.output_shape_parm,
@@ -310,6 +343,19 @@ class GANRegressor(tf.keras.Model):
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> "GANRegressor":
+        """Reconstruct an instance from its configuration dictionary.
+
+        Parameters
+        ----------
+        config : `Dict[str, Any]`
+            Configuration dictionary containing the instance's parameters.
+
+        Returns
+        -------
+        `GANRegressor`
+            Reconstructed instance.
+        """
+
         return cls(
             input_shape_parm=config["input_shape_parm"],
             output_shape_parm=config["output_shape_parm"],
