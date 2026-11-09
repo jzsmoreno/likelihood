@@ -194,6 +194,14 @@ class AbstractArima(FeaturesArima):
         return np.array(y_pred)
 
     def save_model(self, name: str = "model") -> None:
+        """Save the model parameters to a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default "model".
+        """
+
         with open(name + ".pkl", "wb") as file:
             pickle.dump(self.theta_trained, file)
 

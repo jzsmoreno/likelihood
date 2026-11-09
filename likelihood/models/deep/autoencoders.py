@@ -369,6 +369,14 @@ class AutoClassifier(tf.keras.Model):
         )
 
     def build(self, input_shape: tuple) -> None:
+        """Build the model architecture for the AutoClassifier.
+
+        Parameters
+        ----------
+        input_shape : tuple
+            The shape of the input data.
+        """
+
         if self.vae_mode:
             inputs = tf.keras.Input(shape=self.input_shape_parm, name="encoder_input")
             x = tf.keras.layers.Dense(

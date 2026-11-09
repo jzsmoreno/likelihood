@@ -287,6 +287,21 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
 
     @classmethod
     def load(cls, filepath: str, base_model_class: Optional[Type] = None) -> "EnsembleClassifier":
+        """Load an EnsembleClassifier instance from a saved directory.
+
+        Parameters
+        ----------
+        filepath : str
+            Path to the .pkl file containing the saved ensemble metadata.
+        base_model_class : type, optional
+            The base model class to use for reconstructing models. Defaults to AutoClassifier.
+
+        Returns
+        -------
+        EnsembleClassifier
+            The loaded ensemble instance.
+        """
+
         filepath = filepath.rstrip(".pkl")
 
         parent_dir = os.path.dirname(filepath)
