@@ -1,3 +1,5 @@
+"""Ensemble model definitions."""
+
 import json
 import os
 from typing import Any, Dict, List, Optional, Tuple, Type
@@ -326,6 +328,7 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
         return ensemble
 
     def __repr__(self) -> str:
+        """Return a human-readable representation of the ensemble."""
         return (
             f"EnsembleClassifier(n_models={self.n_models}, "
             f"voting_method='{self.voting_method}', "

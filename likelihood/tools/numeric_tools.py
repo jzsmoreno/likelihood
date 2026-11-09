@@ -1,3 +1,5 @@
+"""Numerical data manipulation utilities for numeric columns."""
+
 from typing import Dict
 
 import numpy as np

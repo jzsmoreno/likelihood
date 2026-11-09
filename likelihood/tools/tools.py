@@ -1,3 +1,5 @@
+"""Data science numerical and statistical utility functions."""
+
 import math
 import os
 import pickle

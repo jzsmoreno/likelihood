@@ -1,3 +1,5 @@
+"""Bandit model definitions."""
+
 from typing import List
 
 import torch

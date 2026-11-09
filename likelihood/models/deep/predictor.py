@@ -1,3 +1,5 @@
+"""Deep predictor model definitions."""
+
 import os
 import random
 import warnings

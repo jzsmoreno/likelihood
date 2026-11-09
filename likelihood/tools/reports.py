@@ -1,3 +1,5 @@
+"""Utilities for generating HTML and text reports."""
+
 import datetime
 import json
 import math

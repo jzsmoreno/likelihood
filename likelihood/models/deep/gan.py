@@ -1,3 +1,5 @@
+"""Generative adversarial network model definitions."""
+
 import os
 from typing import Any, Dict, Tuple
 

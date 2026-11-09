@@ -1,3 +1,5 @@
+"""Utility tools for machine-learning models, model suppression, and LoRA layer management."""
+
 import logging
 import os
 
@@ -33,6 +35,8 @@ from .tools import cal_average
 
 
 class suppress_prints:
+    """Context manager that suppresses stdout while the block is executed."""
+
     def __enter__(self):
         self.original_stdout = sys.stdout
         sys.stdout = open(os.devnull, "w")
@@ -371,6 +375,8 @@ def train_and_insights(
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="LoRALayer")
 class LoRALayer(tf.keras.layers.Layer):
+    """A LoRA (Low-Rank Adaptation) layer for fine-tuning large models."""
+
     def __init__(
         self,
         units: int,

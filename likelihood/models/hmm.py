@@ -1,3 +1,5 @@
+"""Hidden Markov Model utilities."""
+
 from __future__ import annotations
 
 import copy

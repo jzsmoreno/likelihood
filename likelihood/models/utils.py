@@ -1,3 +1,5 @@
+"""Utility helpers for model training."""
+
 import numpy as np
 
 from likelihood.tools import cal_average

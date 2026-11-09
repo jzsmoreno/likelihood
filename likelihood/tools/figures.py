@@ -1,3 +1,5 @@
+"""Utilities for generating figures and visualizations."""
+
 import os
 import warnings
 from typing import Optional

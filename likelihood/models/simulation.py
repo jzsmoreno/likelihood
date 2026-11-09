@@ -1,3 +1,5 @@
+"""Simulation utilities for generating synthetic datasets and quartile categories."""
+
 import pickle
 from typing import Dict, List, Tuple, Union
 

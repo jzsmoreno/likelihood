@@ -1,3 +1,5 @@
+"""Categorical embedding utilities for encoding discrete features."""
+
 from __future__ import annotations
 
 import logging
@@ -22,6 +24,8 @@ tf.get_logger().setLevel("ERROR")
 
 
 class CategoricalEmbedder:
+    """Embeds categorical features into low-dimensional vectors."""
+
     def __init__(self, embedding_dim: int = 32) -> None:
         self.embedding_dim = embedding_dim
         self.label_encoders: Dict[str, Any] = {}

@@ -1,3 +1,5 @@
+"""Deep autoencoder model definitions."""
+
 import logging
 import os
 from functools import partial
