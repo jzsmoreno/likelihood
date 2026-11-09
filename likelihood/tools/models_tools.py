@@ -49,6 +49,30 @@ class suppress_prints:
 def suppress_warnings(
     func: Callable[..., Any],
 ) -> Callable[..., Any]:
+    """Decorator that suppresses warnings raised by the decorated function.
+
+    This decorator wraps a function and catches all warnings within its execution,
+    effectively silencing any warning messages that would otherwise be displayed.
+
+    Parameters
+    ----------
+    func : Callable[..., Any]
+        The function to wrap with warning suppression.
+
+    Returns
+    -------
+    Callable[..., Any]
+        A wrapped version of the original function that executes without raising warnings.
+
+    Examples
+    --------
+    >>> @suppress_warnings
+    ... def risky_function():
+    ...     import warnings
+    ...     warnings.warn("This is a warning")
+    >>> risky_function()  # No warning will be displayed
+    """
+
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any):
         with warnings.catch_warnings():
@@ -388,6 +412,30 @@ class LoRALayer(tf.keras.layers.Layer):
         self.rank = rank
 
     def build(self, input_shape: tf.TensorShape):
+        """Build the LoRA layer weights based on the input shape.
+
+        This method initializes the weight matrices (A and B) for the LoRA decomposition
+        and validates that the rank parameter is appropriate given the input/output dimensions.
+
+        Parameters
+        ----------
+        input_shape : tf.TensorShape
+            The shape of the input tensor, used to determine the dimensionality of
+            the weight matrices.
+
+        Raises
+        ------
+        ValueError
+            If rank is greater than input dimension or number of units.
+
+        Notes
+        -----
+        Creates two trainable weight matrices:
+        - A: Shape (input_dim, rank) with random_normal initialization
+        - B: Shape (rank, units) with random_normal initialization
+
+        The LoRA approximation computes: inputs @ A @ B instead of the full weight matrix.
+        """
         input_dim = input_shape[-1]
         print(f"Input shape: {input_shape}")
 
@@ -410,6 +458,26 @@ class LoRALayer(tf.keras.layers.Layer):
         print(f"LoRA weights shape: A{self.A.shape}, B{self.B.shape}")
 
     def call(self, inputs: Any) -> Any:
+        """Apply the LoRA layer to the input tensor.
+
+        This method computes the LoRA approximation by multiplying the input with
+        the weight matrices A and B: output = inputs @ A @ B
+
+        Parameters
+        ----------
+        inputs : Any
+            The input tensor to apply the LoRA transformation to.
+
+        Returns
+        -------
+        Any
+            The output tensor after applying the LoRA layer multiplication.
+
+        Notes
+        -----
+        This method performs the forward pass of the LoRA layer, computing the
+        low-rank approximation without modifying the original weights.
+        """
         lora_output = tf.matmul(tf.matmul(inputs, self.A), self.B)
         return lora_output
 
@@ -418,6 +486,33 @@ def apply_lora(
     model: tf.keras.Model,
     rank: int = 4,
 ) -> tf.keras.Model:
+    """Apply LoRA (Low-Rank Adaptation) to Dense layers in a Keras model.
+
+    This function creates a new model with LoRA layers applied to all Dense layers
+    in the original model. LoRA is a parameter-efficient fine-tuning method that
+    decomposes weight matrices into two lower-rank matrices.
+
+    Parameters
+    ----------
+    model : tf.keras.Model
+        The original Keras model to apply LoRA to. All Dense layers will have
+        LoRA applied.
+    rank : int, optional
+        The rank parameter for LoRA decomposition (default is 4). This determines
+        the dimensionality of the low-rank approximation.
+
+    Returns
+    -------
+    tf.keras.Model
+        A new Keras model with LoRA layers applied to all Dense layers.
+
+    Notes
+    -----
+    For each Dense layer in the original model, a corresponding LoRALayer is inserted
+    that computes: output = inputs @ W_original + (inputs @ A @ B) where A and B are
+    low-rank matrices. The rank parameter controls the trade-off between model size
+    and adaptation capacity.
+    """
     inputs = tf.keras.Input(shape=model.input_shape[1:])
     x = inputs
 
@@ -499,6 +594,39 @@ def print_trajectory_info(
     terminate: bool,
     done: bool,
 ) -> None:
+    """Print trajectory information for reinforcement learning episodes.
+
+    This function displays formatted information about a single transition in a
+    reinforcement learning episode, including state, action, reward, and termination
+    status.
+
+    Parameters
+    ----------
+    state : Any
+        The initial state before the action was taken.
+    selected_option : Any
+        The option or decision selected at the given state.
+    action : Any
+        The action executed in the environment.
+    reward : Any
+        The reward received after executing the action.
+    next_state : Any
+        The resulting state after executing the action.
+    terminate : bool
+        Whether the episode has terminated.
+    done : bool
+        Additional flag indicating if the episode is complete.
+
+    Returns
+    -------
+    None
+        This function prints information to stdout but does not return a value.
+
+    Notes
+    -----
+    The output is formatted with separators for readability and includes all key
+    components of a reinforcement learning transition tuple (s, a, r, s', done).
+    """
     print("=" * 50)
     print("TRAJECTORY INFO".center(50, "="))
     print("=" * 50)

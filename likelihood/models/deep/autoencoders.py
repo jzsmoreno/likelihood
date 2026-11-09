@@ -645,6 +645,24 @@ class AutoClassifier(tf.keras.Model):
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> "AutoClassifier":
+        """Create an AutoClassifier instance from a configuration dictionary.
+
+        This class method deserializes a configuration dictionary and creates
+        an AutoClassifier instance with the specified parameters.
+
+        Parameters
+        ----------
+        config : Dict[str, Any]
+            A dictionary containing the configuration parameters for the AutoClassifier.
+            Expected keys include: input_shape_parm, num_classes, units, activation,
+            classifier_activation, num_layers, dropout, l2_reg, vae_mode, vae_units,
+            lora_mode, and lora_rank.
+
+        Returns
+        -------
+        AutoClassifier
+            A new AutoClassifier instance configured according to the provided dictionary.
+        """
         return cls(
             input_shape_parm=config["input_shape_parm"],
             num_classes=config["num_classes"],
