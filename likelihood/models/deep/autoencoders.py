@@ -142,6 +142,20 @@ def sampling(mean: tf.Tensor, log_var: tf.Tensor, epsilon_value: float = 1e-8) -
 
 
 def check_for_nans(tensors: List[tf.Tensor], name: str = "Tensor") -> bool:
+    """Check if any tensor contains NaN or Inf values.
+
+    Parameters
+    ----------
+    tensors : List[tf.Tensor]
+        List of tensors to check.
+    name : str, optional
+        Name of the tensor group for warning messages, by default "Tensor".
+
+    Returns
+    -------
+    bool
+        True if any tensor contains NaN or Inf, False otherwise.
+    """
     for t in tensors:
         if tf.reduce_any(tf.math.is_nan(t)) or tf.reduce_any(tf.math.is_inf(t)):
             print(f"Warning: {name} contains NaNs or Infs")
@@ -302,6 +316,18 @@ class AutoClassifier(tf.keras.Model):
         self.lora_rank: int = kwargs.get("lora_rank", 4)
 
     def build_encoder_decoder(self, input_shape: tuple) -> None:
+        """Build the encoder and decoder layers for the autoencoder.
+
+        Parameters
+        ----------
+        input_shape : tuple
+            The shape of the input data.
+
+        Returns
+        -------
+        None
+            The method initializes the encoder and decoder attributes.
+        """
         self.encoder = (
             tf.keras.Sequential(
                 [

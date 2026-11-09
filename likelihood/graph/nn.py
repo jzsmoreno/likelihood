@@ -234,6 +234,17 @@ class VanillaGNNLayer(tf.keras.layers.Layer):
         self.linear = None
 
     def build(self, input_shape: Tuple[int, ...]) -> None:
+        """Build the layer architecture based on the rank.
+
+        Parameters
+        ----------
+        input_shape : `Tuple[int, ...]`
+            The shape of the input tensors.
+
+        Returns
+        -------
+        None
+        """
         if self.rank:
             self.linear = LoRALayer(self.dim_out, rank=self.rank)
         else:
@@ -243,11 +254,33 @@ class VanillaGNNLayer(tf.keras.layers.Layer):
         super(VanillaGNNLayer, self).build(input_shape)
 
     def call(self, x: np.ndarray, adjacency: tf.SparseTensor) -> np.ndarray:
+        """Forward pass of the layer over the graph.
+
+        Parameters
+        ----------
+        x : `np.ndarray`
+            The input node features.
+        adjacency : `tf.SparseTensor`
+            The graph adjacency matrix.
+
+        Returns
+        -------
+        `np.ndarray`
+            The layer output.
+        """
         x = self.linear(x)
         x = tf.sparse.sparse_dense_matmul(adjacency, x)
         return x
 
     def get_config(self) -> Dict[str, Any]:
+        """Get the configuration dictionary for serialization.
+
+        Returns
+        -------
+        `Dict[str, Any]`
+            The configuration dictionary containing layer parameters including
+            ``dim_out``, ``rank``, and ``kernel_initializer``.
+        """
         config = super(VanillaGNNLayer, self).get_config()
         config.update(
             {
@@ -409,6 +442,14 @@ class VanillaGNN(tf.keras.Model):
         return tf.argmax(out, axis=1, output_type=tf.int32).numpy()
 
     def get_config(self) -> Dict[str, Any]:
+        """Get the configuration dictionary for serialization.
+
+        Returns
+        -------
+        `Dict[str, Any]`
+            The configuration dictionary containing model parameters including
+            ``dim_in``, ``dim_h``, ``dim_out``, and ``rank``.
+        """
         config = {
             "dim_in": self.dim_in,
             "dim_h": self.dim_h,
@@ -420,6 +461,18 @@ class VanillaGNN(tf.keras.Model):
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> "VanillaGNN":
+        """Create a VanillaGNN instance from a configuration dictionary.
+
+        Parameters
+        ----------
+        config : `Dict[str, Any]`
+            The configuration dictionary containing model parameters.
+
+        Returns
+        -------
+        `VanillaGNN`
+            An instance of VanillaGNN initialized with the given configuration.
+        """
         return cls(
             dim_in=config["dim_in"],
             dim_h=config["dim_h"],

@@ -353,6 +353,14 @@ class VanillaGNN:
         return instance
 
     def get_config(self) -> Dict[str, Any]:
+        """Get the configuration dictionary for serialization.
+
+        Returns
+        -------
+        `Dict[str, Any]`
+            The configuration dictionary containing model parameters including
+            ``dim_in``, ``dim_h``, ``dim_out``, and ``rank``.
+        """
         return {
             "dim_in": self.dim_in,
             "dim_h": self.dim_h,
