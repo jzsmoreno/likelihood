@@ -10,6 +10,18 @@ from scipy.spatial import KDTree
 
 
 def flatten_chain(matrix: List[List[Any]]) -> List[Any]:
+    """Flatten a chain of lists into a single list.
+
+    Parameters
+    ----------
+    matrix : List[List[Any]]
+        A list of lists to be flattened.
+
+    Returns
+    -------
+    List[Any]
+        A single list containing all elements from the nested lists.
+    """
     return list(chain.from_iterable(matrix))
 
 

@@ -528,6 +528,18 @@ class AutoClassifier(tf.keras.Model):
         self.freeze_encoder_decoder()
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
+        """Perform the forward pass of the AutoClassifier.
+
+        Parameters
+        ----------
+        x : tf.Tensor
+            Input tensor.
+
+        Returns
+        -------
+        tf.Tensor
+            Output tensor.
+        """
         if self.vae_mode:
             mean, log_var = self.encoder(x)
             encoded = sampling(mean, log_var)
@@ -607,6 +619,13 @@ class AutoClassifier(tf.keras.Model):
                 raise ValueError(f"Layer type {type(layer)} not supported for copying.")
 
     def get_config(self) -> Dict[str, Any]:
+        """Get the configuration dictionary for serialization.
+
+        Returns
+        -------
+        config : dict
+            Configuration dictionary containing the parameters for the AutoClassifier.
+        """
         config = {
             "input_shape_parm": self.input_shape_parm,
             "num_classes": self.num_classes,

@@ -64,6 +64,20 @@ class SimulationEngine(FeatureSelection):
         super().__init__(**kwargs)
 
     def predict(self, df: DataFrame, column: str) -> np.ndarray | list:
+        """Predict values for the given column using the trained simulation engine.
+
+        Parameters
+        ----------
+        df : DataFrame
+            Input data frame containing the features.
+        column : str
+            The column name to predict.
+
+        Returns
+        -------
+        np.ndarray | list
+            Predicted values.
+        """
         w, quick_encoder, names_cols, dfe, numeric_dict = self.w_dict[column]
 
         df = df[names_cols].copy()
@@ -113,6 +127,18 @@ class SimulationEngine(FeatureSelection):
         return dict(zip(keys, values))
 
     def fit(self, df: DataFrame, n_importances: int, **kwargs) -> None:
+        """Fit the simulation engine to the provided dataset.
+
+        Parameters
+        ----------
+        df : DataFrame
+            The input data frame containing the features.
+        n_importances : int
+            The number of importances to consider.
+        **kwargs : dict
+            Additional keyword arguments for fitting.
+        """
+
         self.df = df
         self.n_importances = n_importances
         self.get_digraph(self.df, self.n_importances, self.use_scaler)
@@ -164,6 +190,21 @@ class SimulationEngine(FeatureSelection):
         ]
 
     def pred_outliers(self, value: Union[Union[float, int], str] | list, colname: str) -> List[str]:
+        """Determine if values are outliers based on probability thresholds.
+
+        Parameters
+        ----------
+        value : Union[Union[float, int], str] | list
+            The input value(s) to evaluate.
+        colname : str
+            The column name associated with the input.
+
+        Returns
+        -------
+        List[str]
+            List of labels indicating "inlier" or "outlier" for each input.
+        """
+
         return [
             (
                 "inlier"

@@ -206,6 +206,13 @@ class AbstractArima(FeaturesArima):
             pickle.dump(self.theta_trained, file)
 
     def load_model(self, name: str = "model") -> None:
+        """Load the model parameters from a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default "model".
+        """
         with open(name + ".pkl", "rb") as file:
             self.theta_trained = pickle.load(file)
 
@@ -263,6 +270,12 @@ class AbstractArima(FeaturesArima):
         plt.show()
 
     def summary(self) -> None:
+        """Print a summary of the model parameters.
+
+        Returns
+        -------
+        None
+        """
         print("\nSummary:")
         print("-----------------------")
         print("Lenght of theta: {}".format(len(self.theta_trained)))
@@ -299,6 +312,17 @@ class FourierRegression(AbstractArima):
         self.datapoints_ = datapoints
 
     def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False) -> None:
+        """Fit the FourierRegression model by denoising the datapoints.
+
+        Parameters
+        ----------
+        sigma : int
+            Sigma parameter for denoising.
+        mov : int
+            Moving window size.
+        mode : bool
+            Denoising mode.
+        """
         self.sigma = sigma
         self.mode = mode
         self.mov = mov
