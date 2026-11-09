@@ -186,10 +186,7 @@ def _extract_missing_docstrings(output):
 
 
 def _format_missing_docstrings(undocumented):
-    """Format missing docstrings into a readable report.
-
-    Violations are grouped by source file and separated into modules,
-    classes, methods, and functions.
+    """Format missing docstrings as a hierarchical list.
 
     Parameters
     ----------
@@ -199,8 +196,7 @@ def _format_missing_docstrings(undocumented):
     Returns
     -------
     str
-        Human-readable report containing the source files, undocumented
-        entities, line numbers, and total number of violations.
+        Readable hierarchical report grouped by source file and entity type.
     """
     files = defaultdict(
         lambda: {
@@ -218,58 +214,49 @@ def _format_missing_docstrings(undocumented):
     total = sum(len(entries) for entries in undocumented.values())
 
     if total == 0:
-        return "All public modules, classes, functions, and methods " "have docstrings."
+        return "All public entities have docstrings."
 
     output = [
+        "FAILED: Missing public docstrings",
         "",
-        "=" * 65,
-        "MISSING PUBLIC DOCSTRINGS",
-        "=" * 65,
+        f"Found {total} missing docstrings in {len(files)} files.",
     ]
 
-    for path in sorted(files):
+    for index, path in enumerate(sorted(files), start=1):
         entries = files[path]
 
-        output.extend(["", f"File: {path}"])
+        output.extend(["", f"{index}. {path}"])
 
-        for module in entries["modules"]:
-            output.append(f"  Missing module docstring (line {module['lineno']})")
+        categories = [
+            ("modules", "Modules"),
+            ("classes", "Classes"),
+            ("methods", "Methods"),
+            ("functions", "Functions"),
+        ]
 
-        if entries["classes"]:
-            output.append("  Missing class docstrings:")
+        for key, label in categories:
+            if not entries[key]:
+                continue
 
-            for klass in sorted(
-                entries["classes"],
+            output.append(f"   {label}:")
+
+            for entry in sorted(
+                entries[key],
                 key=lambda item: item["lineno"],
             ):
-                output.append(f"    - {klass['name']} (line {klass['lineno']})")
+                if key == "modules":
+                    name = "Missing module docstring"
+                elif key == "methods":
+                    name = f"{entry['class']}.{entry['name']}"
+                else:
+                    name = entry["name"]
 
-        if entries["methods"]:
-            output.append("  Missing method docstrings:")
-
-            for method in sorted(
-                entries["methods"],
-                key=lambda item: item["lineno"],
-            ):
-                output.append(
-                    f"    - {method['class']}.{method['name']} " f"(line {method['lineno']})"
-                )
-
-        if entries["functions"]:
-            output.append("  Missing function docstrings:")
-
-            for function in sorted(
-                entries["functions"],
-                key=lambda item: item["lineno"],
-            ):
-                output.append(f"    - {function['name']} " f"(line {function['lineno']})")
+                output.append(f"      - {name} (line {entry['lineno']})")
 
     output.extend(
         [
             "",
-            "-" * 65,
-            f"Total: {total} missing docstring(s)",
-            "-" * 65,
+            f"Total: {total} missing docstrings",
         ]
     )
 

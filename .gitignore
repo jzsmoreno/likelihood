@@ -133,6 +133,7 @@ dmypy.json
 *my_dir*
 # Ignore <files>.txt for testing
 /examples/*.txt
+output.txt
 
 # Ignore <files>.png for testing
 /examples/*.png
