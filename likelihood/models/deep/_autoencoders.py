@@ -23,17 +23,53 @@ from .autoencoders import (
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="stabilize_log_var")
 def stabilize_log_var(x: tf.Tensor) -> tf.Tensor:
+    """Add a small constant to the log variance to avoid numerical instability.
+
+    Parameters
+    ----------
+    x : `tf.Tensor`
+        The log variance.
+
+    Returns
+    -------
+    `tf.Tensor`
+        The stabilized log variance.
+    """
     return x + 1e-7
 
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="sampling_wrapper")
 def sampling_wrapper(args: Tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
+    """Sample from the latent distribution given the mean and log variance.
+
+    Parameters
+    ----------
+    args : `Tuple[tf.Tensor, tf.Tensor]`
+        The tuple of the mean and log variance.
+
+    Returns
+    -------
+    `tf.Tensor`
+        The sampled values.
+    """
     mean, log_var = args
     return sampling(mean, log_var)
 
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="sampling_output_shape")
 def sampling_output_shape(input_shapes: List[int]) -> int:
+    """Return the output shape of the sampling layer.
+
+    Parameters
+    ----------
+    input_shapes : `List[int]`
+        The input shapes.
+
+    Returns
+    -------
+    `int`
+        The batch size.
+    """
     return input_shapes[0]
 
 
@@ -82,6 +118,21 @@ class AutoClassifier:
         activation: str,
         **kwargs: Any,
     ) -> None:
+        """Initialize the auto-classifier model.
+
+        Parameters
+        ----------
+        input_shape_parm : `int` or `None`
+            The shape of the input data.
+        num_classes : `int` or `None`
+            The number of classes in the dataset.
+        units : `int`
+            The number of neurons in each hidden layer.
+        activation : `str`
+            The type of activation function to use for the neural network layers.
+        **kwargs : `dict`
+            Additional keyword arguments for model configuration.
+        """
         self.input_shape_parm = input_shape_parm
         self.num_classes = num_classes
         self.units = units
@@ -386,19 +437,21 @@ class AutoClassifier:
         self._build_main_model()
 
     def set_encoder_decoder(self, source_model: "AutoClassifier") -> None:
-        """
-        Sets the encoder and decoder layers from another AutoClassifier instance,
-        ensuring compatibility in dimensions.
+        """Set the encoder and decoder layers from another AutoClassifier instance.
+
+        This ensures compatibility in dimensions.
 
         Parameters
         ----------
-        source_model : AutoClassifier
+        source_model : `AutoClassifier`
             The source model to copy the encoder and decoder layers from.
+
         Raises
         ------
         ValueError
             If the input shape or units of the source model do not match.
         """
+
         if not isinstance(source_model, AutoClassifier):
             raise ValueError("Source model must be an instance of AutoClassifier.")
 
@@ -445,13 +498,13 @@ class AutoClassifier:
         return self._main_model.predict(*args, **kwargs)
 
     def save(self, filepath: str, **kwargs: Any) -> None:
-        """
-        Save the complete model including all components.
+        """Save the complete model including all components.
 
         Parameters
         ----------
-        filepath : str
-            Path where to save the model."""
+        filepath : `str`
+            Path where to save the model.
+        """
         import os
 
         # Create directory if it doesn't exist

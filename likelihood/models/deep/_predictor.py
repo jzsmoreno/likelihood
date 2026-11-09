@@ -298,7 +298,26 @@ class GetInsights:
         save_path: Optional[str] = None,
     ) -> None:
         """
-        Visualize Dense layers in self.model.encoder and self.model.decoder as directed graphs.
+        Visualize the Dense layers of the encoder and decoder as directed graphs.
+
+        Builds a directed graph for each of the encoder and decoder, connecting each
+        Dense layer to the next and highlighting the strongest weighted connections,
+        then displays each graph along with a bar chart of the input-layer feature
+        importances.
+
+        Parameters
+        ----------
+        threshold_factor : `float`, optional
+            Multiplier applied to the mean absolute weight of a layer, used to determine
+            which edges are drawn (default is `1.0`).
+        top_k : `int`, optional
+            Number of strongest edges to display per layer (default is `5`).
+        save_path : `str`, optional
+            File path at which to save the figure (default is `None`).
+
+        Returns
+        -------
+        `None`
         """
 
         def get_top_k_edges(

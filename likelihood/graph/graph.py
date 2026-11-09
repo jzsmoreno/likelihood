@@ -1,3 +1,21 @@
+"""Build and visualize dynamic graphs from feature-importance data.
+
+This module provides :class:`DynamicGraph`, which constructs a directed,
+weighted network from a tabular dataset using feature-importance scores and
+renders it with :mod:`pyvis`. It can also convert the interactive network back
+into a static :class:`networkx.Graph`.
+
+Examples
+--------
+>>> import pandas as pd
+>>> import numpy as np
+>>> from likelihood.graph import DynamicGraph
+>>> df = pd.DataFrame(np.random.rand(3, 100).T, columns=["x1", "x2", "x3"])
+>>> df["y"] = np.random.rand(len(df))
+>>> graph = DynamicGraph(df, n_importances=2)
+>>> graph.fit()
+"""
+
 from typing import List
 
 import networkx as nx
@@ -9,7 +27,17 @@ from likelihood.tools import FeatureSelection
 
 
 class DynamicGraph(FeatureSelection):
-    """A class to represent a dynamic graph"""
+    """Represent a dynamic graph built from feature-importance data.
+
+    Parameters
+    ----------
+    df : `pd.DataFrame`
+        The input data containing the features.
+    n_importances : `int`
+        The number of features to use for computing the graph edges.
+    **kwargs : `dict`
+        Additional keyword arguments passed to :class:`FeatureSelection`.
+    """
 
     def __init__(self, df: pd.DataFrame, n_importances: int, **kwargs) -> None:
         self.G = Network(notebook=True, cdn_resources="remote", directed=True)
@@ -52,6 +80,13 @@ class DynamicGraph(FeatureSelection):
         display(HTML(html_file_content))
 
     def pyvis_to_networkx(self) -> nx.Graph:
+        """Convert the interactive pyvis network into a static networkx graph.
+
+        Returns
+        -------
+        `nx.Graph`
+            The equivalent undirected networkx graph.
+        """
         nx_graph = nx.Graph()
         nodes = [d["id"] for d in self.G.nodes]
         for node_dic in self.G.nodes:
