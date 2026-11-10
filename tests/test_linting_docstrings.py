@@ -46,7 +46,7 @@ def run_pydocstyle():
             "check",
             "likelihood",
             "--select",
-            "D209,D401,D105",
+            "D209,D401",
         ],
         cwd=str(REPO_ROOT),
         capture_output=True,

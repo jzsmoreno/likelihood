@@ -267,7 +267,8 @@ class GetInsights:
 
     def viz_encoder_decoder_graphs(self, threshold_factor=1.0, top_k=5, save_path=None):
         """Visualize Dense layers in self.model.encoder and self.model.decoder as directed
-        graphs."""
+        graphs.
+        """
 
         def get_top_k_edges(weights, labels_src, labels_dst_prefix, k):
             flat_weights = np.abs(weights.flatten())
