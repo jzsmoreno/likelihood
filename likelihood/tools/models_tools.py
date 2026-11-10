@@ -1714,6 +1714,31 @@ def display_network_analysis(
     temperature: float = 1.0,
     plot_graph: bool = True,
 ) -> None:
+    """
+    Analyze and visualize network statistics for a given model and sample data.
+
+    This function performs network analysis on the provided model using the sample
+    data and optionally displays the results as a graph.
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        The PyTorch neural network model to analyze.
+    sample_data : np.ndarray
+        Input data used for the network analysis.
+    multiple_option : bool, optional
+        If True, enable multiple option analysis. Default is False.
+    temperature : float, optional
+        Temperature parameter for the analysis. Default is 1.0.
+    plot_graph : bool, optional
+        If True, display the analysis graph. Default is True.
+
+    Returns
+    -------
+    None
+        This function does not return any value. It performs analysis and optionally
+        displays a graph.
+    """
     option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
         model, sample_data, multiple_option, temperature, plot_graph
     )

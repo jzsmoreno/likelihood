@@ -14,6 +14,37 @@ def get_metrics(
     predicted_column_name: str,
     verbose: bool = False,
 ) -> Dict[str, float]:
+    """Calculate performance metrics from a DataFrame containing actual and predicted values.
+
+    Computes accuracy, precision, recall, F1-score, and Cohen's kappa from the provided
+    dataset. Results are printed if verbose is True, otherwise returned as a dictionary.
+
+    Parameters
+    ----------
+    dataset : pd.DataFrame
+        Input DataFrame containing the actual and predicted class columns.
+    actual_column_name : str
+        Name of the column with the true/actual class labels.
+    predicted_column_name : str
+        Name of the column with the model's predicted class labels.
+    verbose : bool, optional
+        If True, print the computed metrics to stdout. Default is False.
+
+    Returns
+    -------
+    Dict[str, float]
+        A dictionary containing the following keys and their corresponding metric values:
+        - 'accuracy': Overall accuracy percentage
+        - 'precision': Precision score
+        - 'recall': Recall score
+        - 'f1_score': F1-score
+        - 'kappa': Cohen's kappa coefficient
+
+    Notes
+    -----
+    Metrics are calculated from a confusion matrix derived from the dataset. All metrics
+    are expressed as percentages except for Cohen's kappa, which is a normalized value.
+    """
     # Variables to keep track of the number of correct and total predictions
     true_positives = 0  # Correctly predicted positives
     true_negatives = 0  # Correctly predicted negatives

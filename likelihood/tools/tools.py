@@ -970,6 +970,25 @@ class PerformanceMeasures:
         pass
 
     def f_mean(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> float:
+        """Calculate and display the mean F1-score across all class labels.
+
+        Computes the F1-score for each label, prints individual scores and the mean,
+        then returns the averaged value.
+
+        Parameters
+        ----------
+        y_true : np.ndarray
+            Array of true class labels.
+        y_pred : np.ndarray
+            Array of predicted class labels.
+        labels : List[int]
+            List of all class labels to include in the calculation.
+
+        Returns
+        -------
+        float
+            The mean F1-score across all specified labels, rounded to 4 decimal places.
+        """
         F_vec = self._f1_score(y_true, y_pred, labels)
         mean_f_measure = np.mean(F_vec)
         mean_f_measure = np.around(mean_f_measure, decimals=4)
@@ -982,6 +1001,25 @@ class PerformanceMeasures:
         return mean_f_measure
 
     def resp(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -> float:
+        """Calculate and display the response rate metric (Res_p).
+
+        Computes a weighted response rate metric based on F1-scores for each label,
+        accounting for class distribution imbalances. Prints and returns the result.
+
+        Parameters
+        ----------
+        y_true : np.ndarray
+            Array of true class labels.
+        y_pred : np.ndarray
+            Array of predicted class labels.
+        labels : List[int]
+            List of all class labels to include in the calculation.
+
+        Returns
+        -------
+        float
+            The Res_p (response rate) metric value, rounded to 4 decimal places.
+        """
         T_C = len(y_true)
         sum1, sum2 = 0.0, 0.0
         F_vec = self._f1_score(y_true, y_pred, labels)
@@ -1043,6 +1081,27 @@ class OneHotEncoder:
         self.num_categories = None
 
     def encode(self, x: np.ndarray | list, fit: bool = True):
+        """Convert categorical integer data to one-hot encoded binary array.
+
+        Transforms input integers into a binary matrix representation where each row
+        has a 1 at the position corresponding to its category value and NaN positions
+        are handled appropriately.
+
+        Parameters
+        ----------
+        x : np.ndarray or list
+            Input array of integer category labels. May contain NaN values.
+        fit : bool, optional
+            If True, initialize the encoder with the maximum category value in x.
+            If False, update num_categories if any new categories are encountered.
+            Default is True.
+
+        Returns
+        -------
+        np.ndarray
+            A 2D binary array of shape (len(x), num_categories) where each row has a 1
+            at the index corresponding to its category value and 0 elsewhere.
+        """
         if not isinstance(x, np.ndarray):
             x = np.array(x)
         valid_mask = ~np.isnan(x)
@@ -1059,6 +1118,23 @@ class OneHotEncoder:
         return y
 
     def decode(self, x: np.ndarray | list) -> np.ndarray:
+        """Convert one-hot encoded binary array back to original category labels.
+
+        Transforms a one-hot encoded matrix back into the original integer category
+        labels. Rows with no 1s (invalid entries) are returned as NaN.
+
+        Parameters
+        ----------
+        x : np.ndarray or list
+            A 2D binary array from the encode method, where each row has a single 1
+            at the position corresponding to its category.
+
+        Returns
+        -------
+        np.ndarray
+            A 1D array of integer category labels, with NaN values for any rows that
+            had no 1s in the original encoded array.
+        """
         if not isinstance(x, np.ndarray):
             x = np.array(x)
 
