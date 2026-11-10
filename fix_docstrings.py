@@ -423,7 +423,12 @@ def transform_docstring_token(token_text, rule, replacement=None):
                 stripped = content.rstrip()
 
                 if stripped[-1] not in ".!?":
-                    lines[i] = stripped + "." + content[len(stripped) :] + line[len(content) :]
+                    lines[i] = (
+                        stripped
+                        + "."
+                        + content[len(stripped):]
+                        + line[len(content):]
+                    )
 
                 break
 
@@ -442,9 +447,6 @@ def transform_docstring_token(token_text, rule, replacement=None):
             lines.insert(next_index, newline)
 
     elif rule == "D209":
-        if len(body.splitlines()) < 2:
-            return None
-
         if not body.endswith(("\n", "\r")):
             lines.append(newline)
 

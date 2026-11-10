@@ -476,7 +476,7 @@ class Arima(AbstractArima):
         noise: float = 0,
         tol: float = 1e-5,
     ) -> None:
-        """Initializes the ARIMA model with given parameters.
+        """Initialize the ARIMA model with given parameters.
 
         Parameters
         ----------
@@ -507,7 +507,7 @@ class Arima(AbstractArima):
         self.tol = tol
 
     def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -> np.ndarray:
-        """Computes the prior probability or prediction based on ARIMA model.
+        """Compute the prior probability or prediction based on ARIMA model.
 
         Parameters
         ----------

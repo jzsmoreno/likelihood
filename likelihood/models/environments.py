@@ -74,7 +74,7 @@ class OptionCriticEnv:
         self,
         episodes: Dict[int, Dict[str, List]],
     ) -> None:
-        """Initializes the OptionCriticEnv with a dataset of episodes.
+        """Initialize the OptionCriticEnv with a dataset of episodes.
 
         Parameters
         ----------
@@ -199,7 +199,7 @@ class OptionCriticEnv:
         decimals: int = 6,
     ) -> Tuple:
         """
-        Builds a canonical transition key:
+        Build a canonical transition key:
         ((state_tuple), option(s)..., action(s)...)
         """
         state_key = tuple(round(float(x), decimals) for x in state)
@@ -218,7 +218,7 @@ class OptionCriticEnv:
         return value
 
     def reset(self) -> tuple[np.ndarray, dict]:
-        """Resets the environment to a random episode and returns the initial state.
+        """Reset the environment to a random episode and returns the initial state.
 
         Returns
         -------
@@ -237,7 +237,7 @@ class OptionCriticEnv:
     def step(
         self, action: int | List[int], option: int | List[int]
     ) -> tuple[np.ndarray, float, bool, bool, dict]:
-        """Takes an action with a specific option and returns the next state, reward, and
+        """Take an action with a specific option and returns the next state, reward, and
         termination status.
 
         Parameters

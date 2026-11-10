@@ -24,7 +24,7 @@ warnings.simplefilter("ignore", filter)
 
 
 def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -> Generator:
-    """Generates 'batch_size'-sized minibatches from the dataset.
+    """Generate 'batch_size'-sized minibatches from the dataset.
 
     Parameters
     ----------
@@ -52,7 +52,7 @@ def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -> Generat
 
 
 def difference_quotient(f: Callable, x: float, h: float) -> Callable:
-    """Calculates the difference quotient of `f` evaluated at `x` and `x + h`
+    """Calculate the difference quotient of `f` evaluated at `x` and `x + h`
 
     Parameters
     ----------
@@ -72,7 +72,7 @@ def difference_quotient(f: Callable, x: float, h: float) -> Callable:
 
 
 def partial_difference_quotient(f: Callable, v: np.ndarray, i: int, h: float) -> np.ndarray:
-    """Calculates the partial difference quotient of `f`
+    """Calculate the partial difference quotient of `f`
 
     Parameters
     ----------
@@ -95,7 +95,7 @@ def partial_difference_quotient(f: Callable, v: np.ndarray, i: int, h: float) ->
 
 
 def estimate_gradient(f: Callable, v: np.ndarray, h: float = 1e-4) -> List[np.ndarray]:
-    """Calculates the gradient of `f` at `v`
+    """Calculate the gradient of `f` at `v`
 
     Parameters
     ----------
@@ -194,7 +194,7 @@ def cdf(
     savename: str | None = None,
     key: str | None = None,
 ) -> tuple:
-    """Calculates the cumulative distribution function of the data.
+    """Calculate the cumulative distribution function of the data.
 
     Parameters
     ----------
@@ -261,7 +261,7 @@ def cdf(
 
 
 def calculate_probability(x: np.ndarray, points: int = 1, cond: bool = True) -> np.ndarray:
-    """Calculates the probability of the data based on the CDF fit.
+    """Calculate the probability of the data based on the CDF fit.
 
     Parameters
     ----------
@@ -369,7 +369,7 @@ class AutoCorrelation(CorrelationBase):
 def fft_denoise(
     dataset: np.ndarray, sigma: float = 0, mode: bool = True
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Performs noise removal using the Fast Fourier Transform.
+    """Perform noise removal using the Fast Fourier Transform.
 
     Parameters
     ----------
@@ -420,7 +420,7 @@ def fft_denoise(
 
 
 def get_period(dataset: np.ndarray) -> float:
-    """Calculates the periodicity of a `dataset`.
+    """Calculate the periodicity of a `dataset`.
 
     Parameters
     ----------
@@ -456,7 +456,7 @@ def get_period(dataset: np.ndarray) -> float:
 
 
 def sigmoide_inv(y: float) -> float:
-    """Calculates the inverse of the sigmoid function.
+    """Calculate the inverse of the sigmoid function.
 
     Parameters
     ----------
@@ -472,7 +472,7 @@ def sigmoide_inv(y: float) -> float:
 
 
 def sigmoide(x: float) -> float:
-    """The sigmoid function."""
+    """Compute the sigmoid function ."""
     return 1 / (1 + math.exp(-x))
 
 
@@ -482,11 +482,11 @@ class LogisticRegression:
     __slots__ = ["importance", "X", "y", "w"]
 
     def __init__(self) -> None:
-        """The class initializer."""
+        """Initialize the class ."""
         self.importance = []
 
     def fit(self, dataset: np.ndarray, values: np.ndarray) -> None:
-        """Performs linear multiple model training.
+        """Perform linear multiple model training.
 
         Parameters
         ----------
@@ -517,7 +517,7 @@ class LogisticRegression:
                 self.importance.append(a)
 
     def predict(self, datapoints: np.ndarray) -> np.ndarray:
-        """Performs predictions for a set of points.
+        """Perform predictions for a set of points.
 
         Parameters
         ----------
@@ -533,7 +533,7 @@ class LogisticRegression:
         return sig(np.array(self.importance) @ datapoints)
 
     def get_importances(self, print_important_features: bool = False) -> np.ndarray:
-        """Returns the important features.
+        """Return the important features.
 
         Parameters
         ----------
@@ -557,11 +557,11 @@ class LinearRegression:
     __slots__ = ["importance", "X", "y", "w"]
 
     def __init__(self) -> None:
-        """The class initializer."""
+        """Initialize the class ."""
         self.importance = []
 
     def fit(self, dataset: np.ndarray, values: np.ndarray, verbose: bool = False) -> None:
-        """Performs linear multiple model training.
+        """Perform linear multiple model training.
 
         Parameters
         ----------
@@ -591,7 +591,7 @@ class LinearRegression:
             print("RMSE: {:.4f}".format(mean_square_error(self.y, self.predict(self.X))))
 
     def predict(self, datapoints: np.ndarray) -> np.ndarray:
-        """Performs predictions for a set of points.
+        """Perform predictions for a set of points.
 
         Parameters
         ----------
@@ -601,7 +601,7 @@ class LinearRegression:
         return np.array(self.importance) @ datapoints
 
     def get_importances(self, print_important_features: bool = False) -> np.ndarray:
-        """Returns the important features.
+        """Return the important features.
 
         Parameters
         ----------
@@ -620,7 +620,7 @@ class LinearRegression:
 
 
 def cal_average(y: np.ndarray, alpha: float = 1):
-    """Calculates the moving average of the data.
+    """Calculate the moving average of the data.
 
     Parameters
     ----------
@@ -652,7 +652,7 @@ class DataScaler:
     __slots__ = ["dataset_", "_n", "data_scaled", "values", "inv_fitting"]
 
     def __init__(self, dataset: np.ndarray, n: int | None = 1) -> None:
-        """Initializes the parameters required for scaling the data."""
+        """Initialize the parameters required for scaling the data."""
         self.dataset_ = dataset.copy()
         self._n = n
 
@@ -716,7 +716,7 @@ class DataScaler:
         return self.data_scaled
 
     def scale(self, dataset_: np.ndarray) -> np.ndarray:
-        """Performs the inverse operation to the rescale function.
+        """Perform the inverse operation to the rescale function.
 
         Parameters
         ----------
@@ -740,7 +740,7 @@ class DataScaler:
 
 
 def generate_series(n: int, n_steps: int, incline: bool = True):
-    """Function that generates `n` series of length `n_steps`"""
+    """Generates `n` series of length `n_steps`"""
     freq1, freq2, offsets1, offsets2 = np.random.rand(4, n, 1)
 
     if incline:
@@ -759,7 +759,7 @@ def generate_series(n: int, n_steps: int, incline: bool = True):
 
 
 def mean_square_error(y_true: np.ndarray, y_pred: np.ndarray, print_error: bool = False):
-    """Calculates the Root Mean Squared Error.
+    """Calculate the Root Mean Squared Error.
 
     Parameters
     ----------
@@ -792,7 +792,7 @@ class DataFrameEncoder:
     ]
 
     def __init__(self, data: pd.DataFrame) -> None:
-        """Sets the columns of the `DataFrame`"""
+        """Set the columns of the `DataFrame`"""
         self._df = data.copy()
         self._names = data.columns
         self._encode_columns = []
@@ -801,7 +801,7 @@ class DataFrameEncoder:
         self.median_list = []
 
     def load_config(self, path_to_dictionaries: str = "./", **kwargs) -> None:
-        """Loads dictionaries from a given directory.
+        """Load dictionaries from a given directory.
 
         Keyword Arguments
         -----------------
@@ -849,7 +849,7 @@ class DataFrameEncoder:
             self._save_encoder(path_to_save, dictionary_name)
 
     def encode(self, path_to_save: str = "./", **kwargs) -> pd.DataFrame:
-        """Encodes the `object` type columns of the dataframe.
+        """Encode the `object` type columns of the dataframe.
 
         Keyword Arguments
         -----------------
@@ -879,7 +879,7 @@ class DataFrameEncoder:
             return self._df
 
     def decode(self) -> pd.DataFrame:
-        """Decodes the `int` type columns of the `DataFrame`"""
+        """Decode the `int` type columns of the `DataFrame`"""
         j = 0
         df_decoded = self._df.copy()
         if len(self.median_list) == len(self._encode_columns):
@@ -905,7 +905,7 @@ class DataFrameEncoder:
             print(f"{warning_type}: {msg}")
 
     def get_dictionaries(self) -> Tuple[List[dict], List[dict]]:
-        """Allows to return the `list` of dictionaries for `encoding` and `decoding`"""
+        """Allow to return the `list` of dictionaries for `encoding` and `decoding`"""
         try:
             return self.encoding_list, self.decoding_list
         except ValueError as e:
@@ -915,7 +915,7 @@ class DataFrameEncoder:
             print(f"{warning_type}: {msg}")
 
     def _save_encoder(self, path_to_save: str, dictionary_name: str) -> None:
-        """Method to serialize the `encoding_list`, `decoding_list` and `_encode_columns` list."""
+        """Serialize the `encoding_list`, `decoding_list` and `_encode_columns` list."""
         with open(path_to_save + dictionary_name + ".pkl", "wb") as f:
             pickle.dump(
                 [self.encoding_list, self.decoding_list, self._encode_columns, self.median_list], f
@@ -1133,7 +1133,7 @@ class FeatureSelection:
     __slots__ = ["not_features", "X", "all_features_imp_graph", "w_dict", "scaler"]
 
     def __init__(self, not_features: list[str] = []) -> None:
-        """The initializer of the class.
+        """Initialize the class .
 
         The initial parameter is a list of strings with variables to discard.
         """
@@ -1242,7 +1242,7 @@ class FeatureSelection:
 
 
 def check_nan_inf(df: pd.DataFrame, verbose: bool = False) -> pd.DataFrame:
-    """Checks for NaN and Inf values in the DataFrame.
+    """Check for NaN and Inf values in the DataFrame.
 
     If any are found, they will be removed.
         Parameters

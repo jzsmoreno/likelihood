@@ -87,13 +87,13 @@ def _empty_notebook(model: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _markdown(source: str, tags: Optional[Sequence[str]] = None) -> Dict[str, Any]:
-    """A markdown cell normalised to a trailing newline."""
+    """Normalize a markdown cell normalised to a trailing newline."""
     metadata: Dict[str, Any] = {"tags": list(tags)} if tags else {}
     return {"cell_type": "markdown", "metadata": metadata, "source": source.rstrip() + "\n"}
 
 
 def _code(source: str, tags: Optional[Sequence[str]] = None) -> Dict[str, Any]:
-    """A code cell that has never been executed."""
+    """Check whether a code cell that has never been executed."""
     metadata: Dict[str, Any] = {"tags": list(tags)} if tags else {}
     return {
         "cell_type": "code",
@@ -161,7 +161,7 @@ def _attribute_table(attributes: Sequence[Dict[str, Any]]) -> str:
 
 
 def _title_cell(model: Dict[str, Any]) -> Dict[str, Any]:
-    """Opening cell: title, provenance and summary."""
+    """Create an opening cell: title, provenance and summary."""
     label, icon = category_meta(model["category"])
     source = f"# {model['icon']} {model['title']}\n\n"
     source += f"**Categoría:** {icon} {label} `({model['category']})`  \n"
@@ -184,7 +184,7 @@ def _usage_cell(model: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _signature_cell(model: Dict[str, Any]) -> Dict[str, Any]:
-    """The constructor signature and the import statement."""
+    """Return the constructor signature and the import statement."""
     source = "## 🧩 Constructor\n\n```python\n"
     source += f"{model['import_statement']}\n\n{model['signature']}\n```\n"
     if model.get("inheritedFrom"):
@@ -215,7 +215,7 @@ def _source_cell(model: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _is_safe_literal(text: Optional[str]) -> bool:
-    """True when ``text`` is a literal (tuple, number, quoted string, ``None``)."""
+    """Check whether ``text`` is a literal (tuple, number, quoted string, ``None``)."""
     if not text:
         return False
     try:
@@ -247,7 +247,7 @@ def _split_parameters(
 
 
 def _widget_value(parameter: Dict[str, Any]) -> str:
-    """A value expression that is valid for the widget of ``parameter``."""
+    """Return a value expression that is valid for the widget of ``parameter``."""
     kind = parameter["widget"]
     default = parameter["default"]
     if kind == "bool":
@@ -270,7 +270,7 @@ def _widget_value(parameter: Dict[str, Any]) -> str:
 
 
 def _widget_expression(parameter: Dict[str, Any]) -> str:
-    """The ipywidgets constructor for ``parameter``."""
+    """Return the ipywidgets constructor for ``parameter``."""
     name = parameter["name"]
     value = _widget_value(parameter)
     kind = parameter["widget"]

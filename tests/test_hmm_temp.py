@@ -26,7 +26,7 @@ def hmm_3states():
 
 @pytest.fixture
 def short_seq():
-    """A short observation sequence used across multiple tests."""
+    """Return a short observation sequence used across multiple tests."""
     return [0, 1, 0, 0, 1]
 
 

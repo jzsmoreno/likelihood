@@ -10,7 +10,7 @@ def generate_html_pipeline(
     save_to_file: bool = False,
     file_name: str = "data_processing_report.html",
 ) -> str:
-    """Generates an HTML report for a data processing pipeline with an improved layout using a
+    """Generate an HTML report for a data processing pipeline with an improved layout using a
     tabbed interface, better typography, animations, and accessible markup."""
     css = """
     <style>

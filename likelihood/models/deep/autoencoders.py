@@ -115,7 +115,7 @@ def vae_loss(
 
 
 def sampling(mean: tf.Tensor, log_var: tf.Tensor, epsilon_value: float = 1e-8) -> tf.Tensor:
-    """Samples from the distribution.
+    """Sample from the distribution.
 
     Parameters
     ----------
@@ -165,7 +165,7 @@ def cal_loss_step(
     vae_mode: bool = False,
     training: bool = True,
 ) -> tf.Tensor:
-    """Calculates the loss value on a batch of data.
+    """Calculate the loss value on a batch of data.
 
     Parameters
     ----------
@@ -560,7 +560,7 @@ class AutoClassifier(tf.keras.Model):
             layer.trainable = True
 
     def set_encoder_decoder(self, source_model: "AutoClassifier") -> None:
-        """Sets the encoder and decoder layers from another AutoClassifier instance, ensuring
+        """Set the encoder and decoder layers from another AutoClassifier instance, ensuring
         compatibility in dimensions. Only works if vae_mode is False.
 
         Parameters
@@ -684,7 +684,7 @@ def call_existing_code(
     num_layers: int = 1,
     **kwargs,
 ) -> AutoClassifier:
-    """Calls an existing AutoClassifier instance.
+    """Call an existing AutoClassifier instance.
 
     Parameters
     ----------
@@ -741,7 +741,7 @@ def call_existing_code(
 def build_model(
     hp: keras_tuner.HyperParameters, input_shape_parm: None | int, num_classes: None | int, **kwargs
 ) -> AutoClassifier:
-    """Builds a neural network model using Keras Tuner's search algorithm.
+    """Build a neural network model using Keras Tuner's search algorithm.
 
     Parameters
     ----------
@@ -882,7 +882,7 @@ def setup_model(
     method: str = "Hyperband",
     **kwargs,
 ) -> Tuple[AutoClassifier, pd.DataFrame]:
-    """Setup model for training and tuning.
+    """Set up model for training and tuning.
 
     Parameters
     ----------

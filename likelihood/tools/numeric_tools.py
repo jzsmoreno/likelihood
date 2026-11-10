@@ -230,7 +230,7 @@ def xicor(X: np.ndarray, Y: np.ndarray, ties: bool = True, random_seed: int = No
 
 
 def ecprint(A: np.ndarray) -> None:
-    """Function that prints the augmented matrix.
+    """Prints the augmented matrix.
 
     Parameters
     ----------
@@ -262,7 +262,7 @@ def sor_elimination(
     error: float = 1e-3,
     verbose: bool = True,
 ) -> np.ndarray:
-    """Computes the Successive Over-Relaxation algorithm.
+    """Compute the Successive Over-Relaxation algorithm.
 
     Parameters
     ----------
@@ -307,7 +307,7 @@ def sor_elimination(
 
 
 def gauss_elimination(A: np.ndarray | list, pr: int = 2) -> np.ndarray:
-    """Computes the Gauss elimination algorithm.
+    """Compute the Gauss elimination algorithm.
 
     Parameters
     ----------

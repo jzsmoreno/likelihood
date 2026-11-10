@@ -178,7 +178,7 @@ class ServerSettings:
         )
 
     def preview_template(self) -> str:
-        """The preview template, loaded lazily and cached per app."""
+        """Load the preview template , loaded lazily and cached per app."""
         if not self.template:
             self.template = core.load_template()
         return self.template
@@ -195,7 +195,7 @@ class _AliasedBody(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     def payload(self) -> Dict[str, Any]:
-        """The request data as a plain dict, dropping the ``None`` placeholders."""
+        """Return the request data as a plain dict, dropping the ``None`` placeholders."""
         data = {key: value for key, value in self.model_dump().items() if value is not None}
         data.update(self.model_extra or {})
         return data
@@ -475,7 +475,7 @@ async def read_json(request: Request, allow_list: bool = False) -> Any:
 
 
 def query_dict(request: Request) -> Dict[str, List[str]]:
-    """The query string as ``{key: [values]}`` (blank values preserved)."""
+    """Return the query string as ``{key: [values]}`` (blank values preserved)."""
     query: Dict[str, List[str]] = {}
     for key, value in request.query_params.multi_items():
         query.setdefault(key, []).append(value)
@@ -566,7 +566,7 @@ def page_url(query: Dict[str, List[str]], offset: int, limit: Optional[int]) -> 
 
 
 def notebook_parameters(settings: ServerSettings, data: Dict[str, Any]) -> Dict[str, Any]:
-    """Validated parameter values that become the widget defaults."""
+    """Return validated parameter values that become the widget defaults."""
     raw = data.get("parameters", data.get("params")) if isinstance(data, dict) else None
     if raw is None:
         return {}
@@ -833,7 +833,7 @@ def build_router() -> APIRouter:
 
     @router.get("/api/metrics", tags=["metadata"])
     def metrics_endpoint(settings: ServerSettings = Depends(get_settings)) -> Response:
-        """The request counters in the Prometheus text exposition format.
+        """Return the request counters in the Prometheus text exposition format.
 
         Point a ``scrape_configs`` entry at this path to graph the traffic, the error ratio and the
         latency of every endpoint.
@@ -905,7 +905,7 @@ def build_router() -> APIRouter:
     def search_alias(
         body: SearchRequest, settings: ServerSettings = Depends(get_settings)
     ) -> Response:
-        """Deprecated alias of ``GET /api/search`` (kept for old clients)."""
+        """Provide a deprecated alias of ``GET /api/search`` (kept for old clients)."""
         data = body.payload()
         term = str(data.get("query") or data.get("q") or "").strip()
         if not term:
@@ -1016,7 +1016,7 @@ def build_router() -> APIRouter:
     def invoke_spec_endpoint(
         model_id: str, settings: ServerSettings = Depends(get_settings)
     ) -> Response:
-        """The methods a client may call on ``model_id``."""
+        """Return the methods a client may call on ``model_id``."""
         model = model_or_404(settings, model_id)
         return json_response(200, {"success": True, **core.invoke_spec(model)})
 
@@ -1050,7 +1050,7 @@ def build_router() -> APIRouter:
 
     @router.get("/api/playground/jobs", tags=["playground"])
     def job_list(request: Request, settings: ServerSettings = Depends(get_settings)) -> Response:
-        """The most recent jobs, without their results."""
+        """Retrieve the most recent jobs , without their results."""
         query = query_dict(request)
         limit, _ = pagination({**query, "limit": query.get("limit") or ["20"]})
         jobs = settings.jobs.recent(limit or 20)
@@ -1197,7 +1197,7 @@ def build_router() -> APIRouter:
     def sample(
         model_id: str, body: SampleRequest, settings: ServerSettings = Depends(get_settings)
     ) -> Response:
-        """Dummy arguments for one method of ``model_id``."""
+        """Generate dummy arguments for one method of ``model_id``."""
         require_invoke(settings)
         model = model_or_404(settings, model_id)
         data = body.payload()
@@ -1436,7 +1436,7 @@ def build_router() -> APIRouter:
 
     @router.get("/", tags=["pages"])
     def index(request: Request) -> Response:
-        """The interactive catalogue shipped in ``models/index.html``."""
+        """Load the interactive catalogue shipped in ``models/index.html``."""
         return serve_asset(core.INDEX_FILE, request)
 
     @router.get("/index.html", tags=["pages"])
@@ -1453,7 +1453,7 @@ def build_router() -> APIRouter:
 
     @router.get("/preview", tags=["pages"])
     def preview_missing() -> Response:
-        """A preview without a model id is a client error."""
+        """Handle a preview without a model id is a client error."""
         return html_error(400, "Petición inválida", "Falta el identificador del modelo.")
 
     @router.get("/preview/{remainder:path}", tags=["pages"])
@@ -1575,14 +1575,14 @@ def create_app(
 
     @app.middleware("http")
     async def observability(request: Request, call_next):
-        """Authentication, rate limiting, metrics, logging and CORS headers."""
+        """Configure authentication, rate limiting, metrics, logging and CORS headers."""
         request.state.request_id = uuid.uuid4().hex[:12]
         started = time.monotonic()
         route = core.endpoint_label(request.method, request.url.path)
         client = client_address(state, request)
 
         async def _finish(answer: Response) -> Response:
-            """Common headers, metrics record and access log of a response."""
+            """Return common headers, metrics record and access log of a response."""
             for key, value in SECURITY_HEADERS.items():
                 answer.headers.setdefault(key, value)
             answer.headers["X-API-Version"] = API_VERSION

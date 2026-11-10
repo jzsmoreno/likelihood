@@ -636,7 +636,7 @@ def call_existing_code(
     num_layers: int = 1,
     **kwargs: Any,
 ) -> AutoClassifier:
-    """Calls an existing AutoClassifier instance.
+    """Call an existing AutoClassifier instance.
 
     Parameters
     ----------
@@ -696,7 +696,7 @@ def build_model(
     num_classes: Optional[int],
     **kwargs: Any,
 ) -> AutoClassifier:
-    """Builds a neural network model using Keras Tuner's search algorithm.
+    """Build a neural network model using Keras Tuner's search algorithm.
 
     Parameters
     ----------
@@ -837,7 +837,7 @@ def setup_model(
     method: str = "Hyperband",
     **kwargs,
 ) -> AutoClassifier:
-    """Setup model for training and tuning.
+    """Set up model for training and tuning.
 
     Parameters
     ----------

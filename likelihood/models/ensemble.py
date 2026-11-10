@@ -244,7 +244,7 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
         return self.scores
 
     def _save_keras_model(self, model: Any, path: str) -> None:
-        """Internal helper to save a Keras model depending on TF version."""
+        """Save a Keras model depending on TF version."""
         is_updated = version.parse(tf.__version__) > version.parse("2.15.0")
 
         if is_updated:
@@ -317,7 +317,7 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
             base_model_class = AutoClassifier
 
         def _load_keras_model(path: str) -> Any:
-            """Internal helper to load a Keras model depending on TF version."""
+            """Load a Keras model depending on TF version."""
             is_updated = version.parse(tf.__version__) > version.parse("2.15.0")
 
             if is_updated:

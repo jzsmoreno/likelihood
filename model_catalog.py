@@ -115,7 +115,7 @@ def _default(node: Optional[ast.AST]) -> Optional[str]:
 
 
 def _decorators(node: ast.AST) -> List[str]:
-    """Simple names of the decorators applied to ``node``."""
+    """Return simple names of the decorators applied to ``node``."""
     names: List[str] = []
     for decorator in getattr(node, "decorator_list", []):
         text = _unparse(decorator) or ""
@@ -309,7 +309,7 @@ def _join_description(lines: Sequence[str]) -> str:
 
 
 def _looks_like_entry(name: str) -> bool:
-    """True when a docstring line start looks like a ``name`` entry."""
+    """Check whether a docstring line start looks like a ``name`` entry."""
     return bool(name) and " " not in name.replace(",", "")
 
 
@@ -423,7 +423,7 @@ def _public_methods(cls: ast.ClassDef) -> List[ast.FunctionDef]:
 
 
 def _init_function(cls: ast.ClassDef) -> Optional[ast.FunctionDef]:
-    """The ``__init__`` of ``cls`` when it declares one."""
+    """Return the ``__init__`` of ``cls`` when it declares one."""
     for method in _callable_records(cls):
         if method.name == "__init__":
             return method
@@ -431,7 +431,7 @@ def _init_function(cls: ast.ClassDef) -> Optional[ast.FunctionDef]:
 
 
 def _documented_methods(docstring: str) -> List[Dict[str, str]]:
-    """Method entries listed in the ``Methods`` section of ``docstring``."""
+    """Return method entries listed in the ``Methods`` section of ``docstring``."""
     sections = split_sections(docstring or "")
     lines = sections.get("Methods") or sections.get("Public Methods") or []
     return parse_labelled_entries(lines)
@@ -491,7 +491,7 @@ _CONTAINER_SAMPLES: Tuple[Tuple[str, str], ...] = (
 
 
 def _sample_expression(parameter: Dict[str, Any]) -> str:
-    """A syntactically valid placeholder value for ``parameter``."""
+    """Create a syntactically valid placeholder value for ``parameter``."""
     type_hint = parameter["type"]
     widget = guess_widget(type_hint)
     if widget in ("str", "text"):
@@ -519,7 +519,7 @@ _SIDE_EFFECT_METHODS = ("save", "load", "plot", "write", "download", "delete", "
 
 
 def _is_literal(value: str) -> bool:
-    """True when ``value`` is a scalar literal that can be inlined in a call."""
+    """Check whether ``value`` is a scalar literal that can be inlined in a call."""
     if value in ("True", "False", "None"):
         return True
     if value.startswith(('"', "'")):
@@ -674,7 +674,7 @@ def _candidate_classes(tree: ast.Module) -> List[ast.ClassDef]:
 
 
 def _base_class_names(cls: ast.ClassDef) -> List[str]:
-    """Simple names of the classes ``cls`` inherits from."""
+    """Return simple names of the classes ``cls`` inherits from."""
     names: List[str] = []
     for base in cls.bases:
         text = _unparse(base) or ""
@@ -792,7 +792,7 @@ def class_index(package_dir: Path) -> Dict[str, ast.ClassDef]:
 def base_chain(
     cls: ast.ClassDef, index: Dict[str, ast.ClassDef], limit: int = 10
 ) -> List[ast.ClassDef]:
-    """Resolvable ancestors of ``cls``, nearest first."""
+    """Return resolvable ancestors of ``cls``, nearest first."""
     chain: List[ast.ClassDef] = []
     seen = {cls.name}
     queue = list(_base_class_names(cls))

@@ -21,7 +21,7 @@ def act_pred(
     reg_line: bool = True,
     save_dir: Optional[str] = None,
 ) -> None:
-    """Creates a scatter plot of actual vs predicted values along with histograms and a regression
+    """Create a scatter plot of actual vs predicted values along with histograms and a regression
     line.
 
     Parameters
@@ -118,7 +118,7 @@ def act_pred(
 def residual(
     y_act: np.ndarray, y_pred: np.ndarray, name: str = "example", save_dir: str = None
 ) -> None:
-    """Plots the residual errors between the actual and predicted values.
+    """Plot the residual errors between the actual and predicted values.
 
     This function generates a residual plot by calculating the difference between the
     actual values (y_act) and predicted values (y_pred). The plot shows the residuals
@@ -192,7 +192,7 @@ def residual(
 def residual_hist(
     y_act: np.ndarray, y_pred: np.ndarray, name: str = "example", save_dir: Optional[str] = None
 ) -> None:
-    """Generates a residual error histogram with kernel density estimate (KDE) for the given true
+    """Generate a residual error histogram with kernel density estimate (KDE) for the given true
     and predicted values. Optionally saves the plot to a specified directory.
 
     Parameters
@@ -265,7 +265,7 @@ def loss_curve(
     name: str = "example",
     save_dir: Optional[str] = None,
 ) -> None:
-    """Plots the loss curve for both training and validation errors over epochs, and optionally
+    """Plot the loss curve for both training and validation errors over epochs, and optionally
     saves the plot as an image.
 
     Parameters

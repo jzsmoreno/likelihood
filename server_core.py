@@ -247,7 +247,7 @@ class CatalogStore:
         return mtimes
 
     def changed(self) -> bool:
-        """True when a source file was added, removed or modified."""
+        """Check whether a source file was added, removed or modified."""
         return self.source_mtimes() != self._mtimes
 
     def refresh(self, force: bool = False) -> bool:
@@ -345,7 +345,7 @@ class Metrics:
             }
 
     def prometheus(self, namespace: str = "likelihood") -> str:
-        """The same counters in the Prometheus text exposition format.
+        """Return the same counters in the Prometheus text exposition format.
 
         Every series carries the ``endpoint`` label (``GET /api/models``), which is the coarse
         bucket of :func:`endpoint_label`, so the cardinality stays bounded no matter which model ids
@@ -824,7 +824,7 @@ def _sample_value(parameter: Dict[str, Any], parameters: Optional[Dict[str, Any]
 
 
 def _dict_with_integer_keys(type_hint: str) -> bool:
-    """True for ``Dict[int, ...]``: JSON object keys are always strings."""
+    """Check whether ``Dict[int, ...]``: JSON object keys are always strings."""
     lowered = (type_hint or "").lower()
     return bool(re.search(r"(?:dict|mapping)\s*\[\s*(?:int|integer|np\.int\d*)", lowered))
 
@@ -850,7 +850,7 @@ def parameter_is_jsonable(parameter: Dict[str, Any]) -> bool:
 
 
 def unsupported_parameters(model: Dict[str, Any]) -> List[Dict[str, str]]:
-    """Required constructor parameters that cannot be expressed as JSON."""
+    """Return required constructor parameters that cannot be expressed as JSON."""
     blocked: List[Dict[str, str]] = []
     for parameter in model.get("parameters") or []:
         if parameter.get("variadic") or not parameter.get("required"):
@@ -921,7 +921,7 @@ def playground_spec(model: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def constructor_samples(model: Dict[str, Any]) -> Dict[str, Any]:
-    """Constructor values used as the context of the generated samples.
+    """Return constructor values used as the context of the generated samples.
 
     Every parameter takes its default; required ones fall back to the generated sample
     (``Arima.datapoints`` becomes a small matrix, for instance).
@@ -957,7 +957,7 @@ NON_EMPTY_HINTS = ("ndarray", "tensor", "array", "series", "dataframe")
 
 
 def _expects_container(type_hint: str) -> bool:
-    """True when the annotation describes a JSON collection."""
+    """Check whether the annotation describes a JSON collection."""
     lowered = (type_hint or "").lower()
     scalar = any(hint in lowered for hint in ("str", "int", "float", "bool"))
     if scalar and ("union" in lowered or "|" in lowered):
@@ -1486,7 +1486,7 @@ class InvocationError(PlaygroundError):
 
 
 def _last_error_line(stderr: str) -> str:
-    """The final meaningful line of a traceback (usually the exception)."""
+    """Return the final meaningful line of a traceback (usually the exception)."""
     for line in reversed([line.strip() for line in stderr.splitlines()]):
         if line:
             return line
@@ -1510,7 +1510,7 @@ def playground_limits() -> Dict[str, int]:
 def sandbox_payload(
     model: Dict[str, Any], types: Optional[Dict[str, str]] = None
 ) -> Dict[str, Any]:
-    """Configuration shared by every child interpreter (limits, guard, marker)."""
+    """Configure settings shared by every child interpreter (limits, guard, marker)."""
     return {
         "marker": _PLAYGROUND_MARKER,
         "limits": playground_limits(),
@@ -1548,7 +1548,7 @@ def _spawn(script: str) -> subprocess.Popen:
 
 
 def _marker_payload(line: str) -> Optional[str]:
-    """The JSON written after the marker in a child line, if any."""
+    """Return the JSON written after the marker in a child line, if any."""
     if line.startswith(_PLAYGROUND_MARKER):
         return line[len(_PLAYGROUND_MARKER) :]
     return None
@@ -1715,7 +1715,7 @@ def invokable_methods(model: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def find_method(model: Dict[str, Any], name: str) -> Optional[Dict[str, Any]]:
-    """The catalog entry of ``name`` inside ``model``, if it exists."""
+    """Retrieve the catalog entry of ``name`` inside ``model``, if it exists."""
     for method in model.get("methods") or []:
         if method.get("name") == name:
             return method
@@ -1723,7 +1723,7 @@ def find_method(model: Dict[str, Any], name: str) -> Optional[Dict[str, Any]]:
 
 
 def method_for_invocation(model: Dict[str, Any], name: str) -> Dict[str, Any]:
-    """The catalog entry of an invokable ``name`` (raises the API errors)."""
+    """Retrieve the catalog entry of an invokable ``name`` (raises the API errors)."""
     cleaned = (name or "").strip()
     if not cleaned:
         raise ValidationError("El campo 'method' es obligatorio")
@@ -1822,7 +1822,7 @@ def coerce_model_parameters(
 
 
 def resolved_parameters(model: Dict[str, Any], raw: Dict[str, Any]) -> Dict[str, Any]:
-    """Constructor values for a sample request: ``raw`` plus the catalog defaults."""
+    """Return constructor values for a sample request: ``raw`` plus the catalog defaults."""
     provided = coerce_model_parameters(model, raw, require_all=False)
     values = {**constructor_samples(model), **provided}
     missing = [
@@ -2177,7 +2177,7 @@ class ModelSession:
     # -- lifecycle --------------------------------------------------------
 
     def alive(self) -> bool:
-        """True when the worker process is still running."""
+        """Check whether the worker process is still running."""
         return not self._closed and self.process.poll() is None
 
     def _terminate(self) -> None:
@@ -2319,7 +2319,7 @@ class SessionStore:
         return replacement
 
     def get(self, session_id: str) -> Optional[ModelSession]:
-        """The open session ``session_id``, or ``None``."""
+        """Retrieve the open session ``session_id``, or ``None``."""
         with self._lock:
             self._prune()
             return self._sessions.get(session_id)
@@ -2575,7 +2575,7 @@ class JobQueue:
             return self._jobs.pop(job_id, None)
 
     def get(self, job_id: str) -> Optional[PlaygroundJob]:
-        """The job with ``job_id``, or ``None`` when unknown or expired."""
+        """Retrieve the job with ``job_id``, or ``None`` when unknown or expired."""
         with self._lock:
             self._prune()
             return self._jobs.get(job_id)
@@ -2622,7 +2622,7 @@ def _git(*arguments: str, timeout: float = 10.0) -> subprocess.CompletedProcess:
 
 
 def git_versions(path: str, limit: int = 10) -> List[Dict[str, str]]:
-    """Commits that touched ``path``, newest first.
+    """Return commits that touched ``path``, newest first.
 
     Raises :class:`APIError` with status ``503`` when git is unavailable or the path has no history,
     which is the honest answer for that endpoint.
@@ -2770,7 +2770,7 @@ def attributes_html(model: Dict[str, Any]) -> str:
 
 
 def attributes_section_html(model: Dict[str, Any]) -> str:
-    """The complete ``Atributos`` section, or an empty string when absent.
+    """Return the complete ``Atributos`` section, or an empty string when absent.
 
     Rendering the heading together with its content means the template never has to hide empty
     sections with JavaScript.

@@ -38,7 +38,7 @@ class GetInsights:
     """
 
     def __init__(self, model: AutoClassifier, inputs: np.ndarray) -> None:
-        """Initializes the GetInsights class.
+        """Initialize the GetInsights class.
 
         Parameters
         ----------

@@ -49,7 +49,7 @@ class suppress_prints:
 def suppress_warnings(
     func: Callable[..., Any],
 ) -> Callable[..., Any]:
-    """Decorator that suppresses warnings raised by the decorated function.
+    """Create a decorator that suppresses warnings raised by the decorated function.
 
     This decorator wraps a function and catches all warnings within its execution,
     effectively silencing any warning messages that would otherwise be displayed.
@@ -89,7 +89,7 @@ class TransformRange:
     """
 
     def __init__(self, columns_bin_sizes: Dict[str, int]) -> None:
-        """Initializes the class with the original DataFrame.
+        """Initialize the class with the original DataFrame.
 
         Parameters
         ----------
@@ -107,7 +107,7 @@ class TransformRange:
     def _create_bins_and_labels(
         self, min_val: Union[int, float], max_val: Union[int, float], bin_size: int
     ) -> Tuple[np.ndarray, List[str]]:
-        """Creates the bin edges and their labels.
+        """Create the bin edges and their labels.
 
         Parameters
         ----------
@@ -158,7 +158,7 @@ class TransformRange:
     def _transform_column_to_ranges(
         self, df: pd.DataFrame, column: str, bin_size: int, fit: bool = True
     ) -> pd.Series:
-        """Transforms a column in the DataFrame into range bins.
+        """Transform a column in the DataFrame into range bins.
 
         Parameters
         ----------
@@ -215,7 +215,7 @@ class TransformRange:
     def transform(
         self, df: pd.DataFrame, drop_original: bool = False, fit: bool = True
     ) -> pd.DataFrame:
-        """Creates a new DataFrame with range columns.
+        """Create a new DataFrame with range columns.
 
         Parameters
         ----------
@@ -286,7 +286,7 @@ class TransformRange:
 
 
 def remove_collinearity(df: pd.DataFrame, threshold: float = 0.9):
-    """Removes highly collinear features from the DataFrame based on a correlation threshold.
+    """Remove highly collinear features from the DataFrame based on a correlation threshold.
 
     This function calculates the correlation matrix of the DataFrame and removes columns
     that are highly correlated with any other column in the DataFrame. It uses an absolute
@@ -634,7 +634,7 @@ def print_trajectory_info(
 
 
 def get_selected_probs(action_probs: torch.Tensor, action: torch.Tensor | int):
-    """Retrieves the probabilities of selected actions from a single-batch action probability
+    """Retrieve the probabilities of selected actions from a single-batch action probability
     distribution.
 
     Parameters
@@ -794,7 +794,7 @@ def ppo_loss(
     action_probs: torch.Tensor,
     epsilon: float = 0.2,
 ) -> torch.Tensor:
-    """Computes the Proximal Policy Optimization (PPO) loss using the clipped objective.
+    """Compute the Proximal Policy Optimization (PPO) loss using the clipped objective.
 
     Parameters
     ----------
@@ -837,7 +837,7 @@ def grpo_loss(
     epsilon: float = 0.2,
     beta_kl: float = 0.04,
 ) -> torch.Tensor:
-    """Computes the Group Relative Policy Optimization (GRPO) loss.
+    """Compute the Group Relative Policy Optimization (GRPO) loss.
 
     GRPO replaces the value-function-based advantage of PPO with group-relative
     advantages (normalized within a group of samples) and adds a KL divergence
@@ -1304,7 +1304,7 @@ def plot_two_region_histograms_boxplots(
     action_outputs: Dict[str, np.ndarray],
 ) -> None:
     """
-    Creates a figure with:
+    Create a figure with:
       - Top panel: overlaid histograms for option outputs.
       - Bottom panel: boxplots for action outputs.
 
@@ -1594,7 +1594,7 @@ def network_analysis_table(
     train_option: bool = False,
     temperature: float = 1.0,
 ) -> str:
-    """Creates a well-formatted table showing statistics for option_network and action_networks.
+    """Create a well-formatted table showing statistics for option_network and action_networks.
 
     Parameters
     ----------

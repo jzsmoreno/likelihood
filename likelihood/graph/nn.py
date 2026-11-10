@@ -88,7 +88,7 @@ def compare_pair(
 def cal_adjacency_matrix(
     df: pd.DataFrame, exclude_subset: List[str] = [], sparse: bool = True, **kwargs
 ) -> Tuple[dict, np.ndarray]:
-    """Calculates the adjacency matrix for a given DataFrame using parallel processing.
+    """Calculate the adjacency matrix for a given DataFrame using parallel processing.
 
     Parameters
     ----------

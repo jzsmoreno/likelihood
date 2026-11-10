@@ -211,7 +211,7 @@ def shape_probe(tmp_path, monkeypatch, settings):
 
 @pytest.fixture(scope="module")
 def client():
-    """A running FastAPI application backed by an ephemeral test client."""
+    """Create a running FastAPI application backed by an ephemeral test client."""
     app = server_fastapi.create_app()
     with TestClient(app) as test_client:
         yield test_client
@@ -219,7 +219,7 @@ def client():
 
 @pytest.fixture
 def settings(client):
-    """The mutable runtime state of the application under test."""
+    """Return the mutable runtime state of the application under test."""
     return client.app.state.settings
 
 

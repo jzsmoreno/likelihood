@@ -9,7 +9,7 @@ import numpy as np
 
 
 def lnprior(theta: np.ndarray, conditions: List[Tuple[float, float]]) -> float:
-    """Computes the prior probability.
+    """Compute the prior probability.
 
     Parameters
     ----------
@@ -43,7 +43,7 @@ def fun_like(
     conditions: List[Tuple[float, float]] = None,
     var2: float = 1.0,
 ) -> float:
-    """Computes the likelihood.
+    """Compute the likelihood.
 
     Parameters
     ----------
@@ -86,7 +86,7 @@ def fun_like(
 
 
 def update_theta(theta: np.ndarray, d: float) -> np.ndarray:
-    """Updates the theta parameters.
+    """Update the theta parameters.
 
     Parameters
     ----------
@@ -115,7 +115,7 @@ def walk(
     tol: float = 1e-4,
     mode: bool = True,
 ) -> Tuple[np.ndarray, List[np.ndarray], float]:
-    """Executes the walker implementation.
+    """Execute the walker implementation.
 
     Parameters
     ----------
@@ -199,7 +199,7 @@ def walkers(
     mode: bool = False,
     figname: str = "fig_out.png",
 ) -> Tuple[List[np.ndarray], List[float]]:
-    """Executes multiple walkers.
+    """Execute multiple walkers.
 
     Parameters
     ----------
