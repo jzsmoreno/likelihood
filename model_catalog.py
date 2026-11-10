@@ -148,8 +148,8 @@ def _scalar_widget(type_hint: str) -> str:
 def _optional_inner(type_hint: str) -> str:
     """Inner type of ``Optional[X]`` / ``X | None`` / ``Union[X, None]``.
 
-    A union of ``int`` and ``float`` collapses to ``float``; a union of
-    different widgets stays untouched (it is a raw JSON field, not a number).
+    A union of ``int`` and ``float`` collapses to ``float``; a union of different widgets stays
+    untouched (it is a raw JSON field, not a number).
     """
     text = (type_hint or "").strip().strip("`")
     match = re.match(r"^(?:typing\.)?Optional\[(.+)\]$", text, re.DOTALL)
@@ -175,9 +175,9 @@ def _optional_inner(type_hint: str) -> str:
 def guess_widget(type_hint: str) -> str:
     """Map a type annotation onto a UI/ipywidgets control kind.
 
-    Only the *outer* type counts: ``Dict[int, Dict[str, List]]`` is a mapping,
-    not an integer, so it must not be rendered as a number input.
-    ``Optional[int]`` / ``int | None`` are numbers, not raw JSON fields.
+    Only the *outer* type counts: ``Dict[int, Dict[str, List]]`` is a mapping, not an integer, so it
+    must not be rendered as a number input. ``Optional[int]`` / ``int | None`` are numbers, not raw
+    JSON fields.
     """
     return _scalar_widget(_optional_inner(type_hint))
 
@@ -264,8 +264,8 @@ def _signature_text(func: ast.FunctionDef, name: Optional[str] = None) -> str:
 def split_sections(docstring: str) -> Dict[str, List[str]]:
     """Split a numpydoc docstring into ``{section name: lines}``.
 
-    The prose that introduces the docstring is stored under the ``""`` key.
-    Sections are detected as ``Title`` followed by a line of dashes.
+    The prose that introduces the docstring is stored under the ``""`` key. Sections are detected as
+    ``Title`` followed by a line of dashes.
     """
     lines = dedent_lines(docstring)
     sections: Dict[str, List[str]] = {"": []}
@@ -316,8 +316,8 @@ def _looks_like_entry(name: str) -> bool:
 def parse_typed_entries(lines: Sequence[str]) -> List[Dict[str, str]]:
     """Parse ``name : type`` entries from a docstring section.
 
-    Works for ``Parameters``, ``Attributes`` and ``Other Parameters``.  Text
-    lines that belong to the previous entry become its ``description``.
+    Works for ``Parameters``, ``Attributes`` and ``Other Parameters``.  Text lines that belong to
+    the previous entry become its ``description``.
     """
     entries: List[Dict[str, Any]] = []
     for raw in lines:
@@ -618,9 +618,9 @@ def _tags(model: Dict[str, Any]) -> List[str]:
 def _to_model(record: Dict[str, Any]) -> Dict[str, Any]:
     """Turn an AST record into the public catalog entry.
 
-    Every key of the returned mapping is ``snake_case``: the JSON projections of
-    the web API mirror the catalog verbatim, so a single naming convention keeps
-    the payloads consistent with the ``offset``/``limit`` query parameters.
+    Every key of the returned mapping is ``snake_case``: the JSON projections of the web API mirror
+    the catalog verbatim, so a single naming convention keeps the payloads consistent with the
+    ``offset``/``limit`` query parameters.
     """
     model = dict(record)
     label, icon = category_meta(model["category"])
@@ -662,9 +662,9 @@ def _module_name(module_path: Path, package_dir: Path, package: str) -> str:
 def _candidate_classes(tree: ast.Module) -> List[ast.ClassDef]:
     """Public, top-level classes defined by ``tree``.
 
-    Helper *functions* are deliberately ignored: the catalog describes the
-    models of the library, and those are always classes (loss functions,
-    sampling helpers, callbacks, ... are implementation details).
+    Helper *functions* are deliberately ignored: the catalog describes the models of the library,
+    and those are always classes (loss functions, sampling helpers, callbacks, ... are
+    implementation details).
     """
     return [
         node
@@ -770,9 +770,9 @@ def _public_module_first(path: Path) -> Tuple[int, str]:
 def class_index(package_dir: Path) -> Dict[str, ast.ClassDef]:
     """Map every class defined in the surrounding package to its AST node.
 
-    Base classes are resolved through this index so that a model inherits the
-    methods and parameter documentation implemented by its parents
-    (``Arima`` -> ``AbstractArima``, ``SimulationEngine`` -> ``FeatureSelection``).
+    Base classes are resolved through this index so that a model inherits the methods and parameter
+    documentation implemented by its parents (``Arima`` -> ``AbstractArima``, ``SimulationEngine``
+    -> ``FeatureSelection``).
     """
     index: Dict[str, ast.ClassDef] = {}
     root = package_dir.parent
@@ -825,9 +825,9 @@ _DEFAULT_IN_TEXT = re.compile(r"[Dd]efaults?\s*(?:is|to|:|=)?\s*`?([^`.,;)\n]+)`
 def _keyword_parameters(docstring: str, known: set) -> List[Dict[str, Any]]:
     """Recover the keyword arguments a constructor accepts through ``**kwargs``.
 
-    Many models forward optional settings through ``**kwargs`` and document them
-    in a ``Keyword Arguments`` section.  Those entries are real, user facing
-    parameters, so they are surfaced alongside the declared signature.
+    Many models forward optional settings through ``**kwargs`` and document them in a ``Keyword
+    Arguments`` section.  Those entries are real, user facing parameters, so they are surfaced
+    alongside the declared signature.
     """
     sections = split_sections(docstring)
     entries: List[Dict[str, str]] = []
@@ -995,10 +995,9 @@ def _haystack(model: Dict[str, Any]) -> str:
 def normalize_tags(tags: Sequence[str] | str | None) -> List[str]:
     """Split a tag filter into a list of lower case, non empty tags.
 
-    Tags are separated by commas because a single tag may contain spaces
-    (``Deep Learning``).  Both ``"a,b"`` and ``["a", "b"]`` are accepted, which
-    lets the HTTP layer pass either repeated query parameters or one comma
-    separated value.
+    Tags are separated by commas because a single tag may contain spaces (``Deep Learning``).  Both
+    ``"a,b"`` and ``["a", "b"]`` are accepted, which lets the HTTP layer pass either repeated query
+    parameters or one comma separated value.
     """
     if tags is None:
         return []
@@ -1034,8 +1033,7 @@ def search_models(
 ) -> List[Dict[str, Any]]:
     """Free text search across names, descriptions, tags, methods and parameters.
 
-    ``tags`` optionally narrows the result down to the models that declare all
-    of the given tags.
+    ``tags`` optionally narrows the result down to the models that declare all of the given tags.
     """
     needle = query.strip().lower()
     wanted = normalize_tags(tags)

@@ -1,9 +1,8 @@
 """Tests for the framework-independent domain layer (:mod:`server_core`).
 
-The HTTP surface lives in ``tests/test_server_fastapi.py``; this module covers
-the catalog/introspection helpers, the JSON coercion rules, pagination, static
-asset resolution, the rate limiter, the metrics and the invoke bootstrap
-contracts that are easy to regress.
+The HTTP surface lives in ``tests/test_server_fastapi.py``; this module covers the
+catalog/introspection helpers, the JSON coercion rules, pagination, static asset resolution, the
+rate limiter, the metrics and the invoke bootstrap contracts that are easy to regress.
 """
 
 from __future__ import annotations

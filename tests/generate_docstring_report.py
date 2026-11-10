@@ -174,7 +174,6 @@ def generate_docstring_template(entry):
         return '''"""
     TODO: Describe the purpose of this module.
     """'''
-
     if entity_type == "class":
         return f'''    """
     TODO: Describe the purpose of {name}.

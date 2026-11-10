@@ -23,8 +23,7 @@ class SimpleImputer:
         n_features: int | None = None,
         use_scaler: bool = False,
     ) -> None:
-        """
-        Initialize the imputer.
+        """Initialize the imputer.
 
         Parameters
         ----------
@@ -39,8 +38,7 @@ class SimpleImputer:
         self.cols_transf = pd.Series([])
 
     def fit(self, X: pd.DataFrame) -> None:
-        """
-        Fit the imputer to the data.
+        """Fit the imputer to the data.
 
         Parameters
         ----------
@@ -61,8 +59,7 @@ class SimpleImputer:
     def transform(
         self, X: pd.DataFrame, boundary: bool = True, inplace: bool = True
     ) -> pd.DataFrame:
-        """
-        Impute missing values in the data.
+        """Impute missing values in the data.
 
         Parameters
         ----------
@@ -117,8 +114,7 @@ class SimpleImputer:
     def fit_transform(
         self, X: pd.DataFrame, boundary: bool = True, inplace: bool = True
     ) -> pd.DataFrame:
-        """
-        Fit and transform the data.
+        """Fit and transform the data.
 
         Parameters
         ----------
@@ -138,8 +134,7 @@ class SimpleImputer:
         X: pd.Series,
         column_exception: str,
     ) -> pd.DataFrame:
-        """
-        Set missing values to zero, except for `column_exception`.
+        """Set missing values to zero, except for `column_exception`.
 
         Parameters
         ----------
@@ -154,8 +149,7 @@ class SimpleImputer:
         return data
 
     def _check_dtype_convert(self, value: Union[int, float], to_compare: Union[int, float]) -> None:
-        """
-        Check if the value is an integer and convert it to float if it is.
+        """Check if the value is an integer and convert it to float if it is.
 
         Parameters
         ----------
@@ -172,8 +166,7 @@ class SimpleImputer:
         return value
 
     def _get_dict_params(self, df: pd.DataFrame) -> dict:
-        """
-        Get the parameters for the imputer.
+        """Get the parameters for the imputer.
 
         Parameters
         ----------
@@ -193,15 +186,13 @@ class SimpleImputer:
         return params
 
     def eval(self, X: pd.DataFrame) -> None:
-        """
-        Create a histogram of the imputed values.
+        """Create a histogram of the imputed values.
 
         Parameters
         ----------
         X: pd.DataFrame
             Dataframe to create the histogram from.
         """
-
         if not isinstance(X, pd.DataFrame):
             raise ValueError("Input X must be a pandas DataFrame.")
 
@@ -261,8 +252,7 @@ class SimpleImputer:
         plt.show()
 
     def save(self, filename: str = "./imputer") -> None:
-        """
-        Save the state of the SimpleImputer to a file.
+        """Save the state of the SimpleImputer to a file.
 
         Parameters
         ----------
@@ -275,8 +265,7 @@ class SimpleImputer:
 
     @staticmethod
     def load(filename: str = "./imputer") -> "SimpleImputer":
-        """
-        Load the state of a SimpleImputer from a file.
+        """Load the state of a SimpleImputer from a file.
 
         Parameters
         ----------

@@ -20,9 +20,7 @@ from likelihood.tools import get_metrics
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="GANRegressor")
 class GANRegressor(tf.keras.Model):
-    """
-    GANRegressor is a custom Keras model that combines a generator and a discriminator
-    """
+    """GANRegressor is a custom Keras model that combines a generator and a discriminator."""
 
     def __init__(
         self,
@@ -62,7 +60,6 @@ class GANRegressor(tf.keras.Model):
         -------
         None
         """
-
         self.gan = tf.keras.models.Sequential([self.generator, self.discriminator], name="gan")
 
         self.generator.compile(
@@ -120,8 +117,7 @@ class GANRegressor(tf.keras.Model):
         validation_split: float = 0.2,
         verbose: int = 1,
     ) -> pd.DataFrame:
-        """
-        Train the GAN model.
+        """Train the GAN model.
 
         Parameters
         ----------
@@ -254,8 +250,7 @@ class GANRegressor(tf.keras.Model):
         validation_split: float = 0.2,
         patience: int = 3,
     ) -> pd.DataFrame:
-        """
-        Train the generator model.
+        """Train the generator model.
 
         Parameters
         ----------
@@ -313,7 +308,6 @@ class GANRegressor(tf.keras.Model):
         `tf.Tensor`
             Output tensor of shape (batch_size, 1).
         """
-
         return self.generator(inputs)[:, 0]
 
     def get_config(self) -> Dict[str, Any]:
@@ -324,7 +318,6 @@ class GANRegressor(tf.keras.Model):
         config : `Dict[str, Any]`
             Configuration dictionary.
         """
-
         config = {
             "input_shape_parm": self.input_shape_parm,
             "output_shape_parm": self.output_shape_parm,
@@ -355,7 +348,6 @@ class GANRegressor(tf.keras.Model):
         `GANRegressor`
             Reconstructed instance.
         """
-
         return cls(
             input_shape_parm=config["input_shape_parm"],
             output_shape_parm=config["output_shape_parm"],

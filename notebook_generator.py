@@ -370,7 +370,7 @@ def _interactive_source(model: Dict[str, Any]) -> str:
 
 
 def _widget_classes(kinds: Sequence[str]) -> List[str]:
-    """ipywidgets class names for the requested control kinds."""
+    """Ipywidgets class names for the requested control kinds."""
     mapping = {
         "int": "IntSlider",
         "float": "FloatSlider",

@@ -1,8 +1,7 @@
 """Reinforcement learning algorithms and utilities for the likelihood package.
 
-This module provides utilities for training and evaluating reinforcement
-learning (RL) models, including environment wrappers, exploration policies,
-and training loops.
+This module provides utilities for training and evaluating reinforcement learning (RL) models,
+including environment wrappers, exploration policies, and training loops.
 """
 
 import os
@@ -42,13 +41,12 @@ def print_progress_bar(iteration: int, total: int, length: int = 30) -> None:
 class Env:
     """Wraps a Keras model to provide a reinforcement learning environment.
 
-    The environment samples actions from the model's predicted probability
-    distribution and records the resulting transitions for training.
+    The environment samples actions from the model's predicted probability distribution and records
+    the resulting transitions for training.
     """
 
     def __init__(self, model: Any, maxlen: int = 100, name: str = "likenasium") -> None:
-        """
-        Initialize the environment with a model.
+        """Initialize the environment with a model.
 
         Parameters
         ----------
@@ -71,8 +69,7 @@ class Env:
     def step(
         self, state: np.ndarray, action: int, verbose: int = 0
     ) -> Tuple[Any, int, float, Any, bool]:
-        """
-        Perform an environment step with the given action.
+        """Perform an environment step with the given action.
 
         Parameters
         ----------
@@ -128,8 +125,7 @@ class Env:
 
 
 class AutoQL:
-    """
-    AutoQL: A reinforcement learning agent using Q-learning with Epsilon-greedy policy.
+    """AutoQL: A reinforcement learning agent using Q-learning with Epsilon-greedy policy.
 
     This class implements a Q-learning agent with:
     - Epsilon-greedy policy for exploration

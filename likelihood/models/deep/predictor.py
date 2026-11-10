@@ -28,9 +28,8 @@ from likelihood.models.deep.autoencoders import AutoClassifier, sampling
 
 
 class GetInsights:
-    """
-    A class to analyze the output of a neural network model, including visualizations
-    of the weights, t-SNE representation, and feature statistics.
+    """A class to analyze the output of a neural network model, including visualizations of the
+    weights, t-SNE representation, and feature statistics.
 
     Parameters
     ----------
@@ -41,8 +40,7 @@ class GetInsights:
     """
 
     def __init__(self, model: AutoClassifier, inputs: np.ndarray) -> None:
-        """
-        Initializes the GetInsights class.
+        """Initializes the GetInsights class.
 
         Parameters
         ----------
@@ -67,8 +65,7 @@ class GetInsights:
         self.sorted_names = self._generate_sorted_color_names()
 
     def _generate_sorted_color_names(self) -> list:
-        """
-        Generate sorted color names based on their HSV values.
+        """Generate sorted color names based on their HSV values.
 
         Parameters
         ----------
@@ -95,9 +92,7 @@ class GetInsights:
         max_rows: int = 5,
         **kwargs,
     ) -> None:
-        """
-        Generate and display an embedded HTML report in a Jupyter Notebook cell.
-        """
+        """Generate and display an embedded HTML report in a Jupyter Notebook cell."""
         display(HTML("<h2 style='margin-top:20px;'>📊 Predictor Analysis</h2>"))
         display(
             HTML(
@@ -165,10 +160,8 @@ class GetInsights:
         )
 
     def viz_classifier_graphs(self, threshold_factor=1.0, top_k=5, save_path=None):
-        """
-        Visualize all Dense layers in self.model.classifier as a single directed graph,
-        connecting each Dense layer to the next.
-        """
+        """Visualize all Dense layers in self.model.classifier as a single directed graph,
+        connecting each Dense layer to the next."""
 
         def get_top_k_edges(weights, src_prefix, dst_prefix, k):
             flat_weights = np.abs(weights.flatten())
@@ -272,9 +265,8 @@ class GetInsights:
         draw_graph(G, pos, "Classifier Dense Layers Graph", save_path)
 
     def viz_encoder_decoder_graphs(self, threshold_factor=1.0, top_k=5, save_path=None):
-        """
-        Visualize Dense layers in self.model.encoder and self.model.decoder as directed graphs.
-        """
+        """Visualize Dense layers in self.model.encoder and self.model.decoder as directed
+        graphs."""
 
         def get_top_k_edges(weights, labels_src, labels_dst_prefix, k):
             flat_weights = np.abs(weights.flatten())
@@ -435,8 +427,7 @@ class GetInsights:
         highlight: bool = True,
         **kwargs,
     ) -> pd.DataFrame:
-        """
-        Analyze the model's predictions and visualize data.
+        """Analyze the model's predictions and visualize data.
 
         Parameters
         ----------
@@ -478,8 +469,7 @@ class GetInsights:
         return self._statistics(self.data_input)
 
     def _prepare_inputs(self, inputs: np.ndarray, frac: float) -> np.ndarray:
-        """
-        Prepare the input data, possibly selecting a fraction of it.
+        """Prepare the input data, possibly selecting a fraction of it.
 
         Parameters
         ----------
@@ -500,8 +490,7 @@ class GetInsights:
         return inputs
 
     def _encode_decode(self, inputs: np.ndarray) -> tuple:
-        """
-        Perform encoding and decoding on the input data.
+        """Perform encoding and decoding on the input data.
 
         Parameters
         ----------
@@ -523,8 +512,7 @@ class GetInsights:
     def _visualize_data(
         self, inputs: np.ndarray, reconstructed: np.ndarray, cmap: str, aspect: str
     ) -> None:
-        """
-        Visualize the original data and the reconstructed data.
+        """Visualize the original data and the reconstructed data.
 
         Parameters
         ----------
@@ -559,8 +547,7 @@ class GetInsights:
         encoded: np.ndarray,
         y_labels: List[str],
     ) -> None:
-        """
-        Prepare data for statistical analysis.
+        """Prepare data for statistical analysis.
 
         Parameters
         ----------
@@ -595,8 +582,7 @@ class GetInsights:
         self.data_input["class"] = self.classification
 
     def _get_tsne_repr(self, inputs: np.ndarray = None, frac: float = None) -> None:
-        """
-        Perform t-SNE dimensionality reduction on the input data.
+        """Perform t-SNE dimensionality reduction on the input data.
 
         Parameters
         ----------
@@ -622,8 +608,7 @@ class GetInsights:
         self.reduced_data_tsne = tsne.fit_transform(self.latent_representations)
 
     def _viz_tsne_repr(self, **kwargs) -> None:
-        """
-        Visualize the t-SNE representation of the latent space.
+        """Visualize the t-SNE representation of the latent space.
 
         Parameters
         ----------
@@ -658,8 +643,7 @@ class GetInsights:
         plt.show()
 
     def _viz_radviz(self, data: pd.DataFrame, color_column: str, title: str) -> None:
-        """
-        Visualize the data using RadViz.
+        """Visualize the data using RadViz.
 
         Parameters
         ----------
@@ -689,8 +673,7 @@ class GetInsights:
     def _viz_weights(
         self, cmap: str = "viridis", aspect: str = "auto", highlight: bool = True, **kwargs
     ) -> None:
-        """
-        Visualize the encoder layer weights of the model.
+        """Visualize the encoder layer weights of the model.
 
         Parameters
         ----------
@@ -729,8 +712,7 @@ class GetInsights:
         plt.show()
 
     def _statistics(self, data_input: pd.DataFrame) -> pd.DataFrame:
-        """
-        Compute statistical summaries of the input data.
+        """Compute statistical summaries of the input data.
 
         Parameters
         ----------

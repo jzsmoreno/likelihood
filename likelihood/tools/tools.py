@@ -16,18 +16,15 @@ if version.parse(np.__version__) < version.parse("2.0.0"):
     filter = np.RankWarning
 else:
     filter = np.exceptions.RankWarning
-
 warnings.simplefilter("ignore", filter)
-
 # -------------------------------------------------------------------------
 
-"""
-Data Science from Scratch, Second Edition, by Joel Grus (O'Reilly).Copyright 2019 Joel Grus, 978-1-492-04113-9
-"""
+"""Data Science from Scratch, Second Edition, by Joel Grus (O'Reilly).Copyright 2019 Joel Grus,
+978-1-492-04113-9."""
 
 
 def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -> Generator:
-    """Generates 'batch_size'-sized minibatches from the dataset
+    """Generates 'batch_size'-sized minibatches from the dataset.
 
     Parameters
     ----------
@@ -43,7 +40,6 @@ def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -> Generat
     `Generator`
         A list of lists containing the mini-batches. Each sublist is a separate mini-batch with length `batch_size`.
     """
-
     # start indexes 0, batch_size, 2 * batch_size, ...
     batch_starts = [start for start in range(0, len(dataset), batch_size)]
 
@@ -124,9 +120,8 @@ def estimate_gradient(f: Callable, v: np.ndarray, h: float = 1e-4) -> List[np.nd
 def generate_feature_yaml(
     df: pd.DataFrame, ignore_features: List[str] = None, yaml_string: bool = False
 ) -> Dict | str:
-    """
-    Generate a YAML string containing information about ordinal, numeric, and categorical features
-    based on the given DataFrame.
+    """Generate a YAML string containing information about ordinal, numeric, and categorical
+    features based on the given DataFrame.
 
     Parameters
     ----------
@@ -183,7 +178,6 @@ def cal_missing_values(df: pd.DataFrame) -> None:
     -------
     `None` : Prints out a table with columns as index and percentages of missing values as data.
     """
-
     col = df.columns
     print("Total size :", "{:,}".format(len(df)))
     for i in col:
@@ -226,7 +220,6 @@ def cdf(
     sorted_x : `np.ndarray`
         Sorted input data.
     """
-
     if len(x) == 0:
         raise ValueError("Input array 'x' must not be empty.")
 
@@ -284,7 +277,6 @@ def calculate_probability(x: np.ndarray, points: int = 1, cond: bool = True) -> 
     p : `np.ndarray`
         Array containing the probabilities of the data.
     """
-
     if len(x) == 0:
         raise ValueError("Input array 'x' must not be empty.")
 
@@ -395,7 +387,6 @@ def fft_denoise(
     periods : `np.ndarray`
         Array of estimated periods for each sample in `dataset`.
     """
-
     if not (0 <= sigma <= 1):
         raise ValueError("sigma must be between 0 and 1")
 
@@ -465,7 +456,7 @@ def get_period(dataset: np.ndarray) -> float:
 
 
 def sigmoide_inv(y: float) -> float:
-    """Calculates the inverse of the sigmoid function
+    """Calculates the inverse of the sigmoid function.
 
     Parameters
     ----------
@@ -477,27 +468,25 @@ def sigmoide_inv(y: float) -> float:
     `float`
         value of evaluated function.
     """
-
     return math.log(y / (1 - y))
 
 
 def sigmoide(x: float) -> float:
-    """The sigmoid function"""
+    """The sigmoid function."""
     return 1 / (1 + math.exp(-x))
 
 
 class LogisticRegression:
-    """class implementing multiple logistic regression"""
+    """Class implementing multiple logistic regression."""
 
     __slots__ = ["importance", "X", "y", "w"]
 
     def __init__(self) -> None:
-        """The class initializer"""
-
+        """The class initializer."""
         self.importance = []
 
     def fit(self, dataset: np.ndarray, values: np.ndarray) -> None:
-        """Performs linear multiple model training
+        """Performs linear multiple model training.
 
         Parameters
         ----------
@@ -510,9 +499,7 @@ class LogisticRegression:
         -------
         importance : `np.ndarray`
             An array containing the importance of each feature.
-
         """
-
         self.X = dataset
         self.y = values
 
@@ -530,8 +517,7 @@ class LogisticRegression:
                 self.importance.append(a)
 
     def predict(self, datapoints: np.ndarray) -> np.ndarray:
-        """
-        Performs predictions for a set of points
+        """Performs predictions for a set of points.
 
         Parameters
         ----------
@@ -541,15 +527,13 @@ class LogisticRegression:
         Returns
         -------
         `np.ndarray`
-
         """
         sig = np.vectorize(sigmoide)
 
         return sig(np.array(self.importance) @ datapoints)
 
     def get_importances(self, print_important_features: bool = False) -> np.ndarray:
-        """
-        Returns the important features
+        """Returns the important features.
 
         Parameters
         ----------
@@ -568,17 +552,16 @@ class LogisticRegression:
 
 
 class LinearRegression:
-    """class implementing multiple linear regression"""
+    """Class implementing multiple linear regression."""
 
     __slots__ = ["importance", "X", "y", "w"]
 
     def __init__(self) -> None:
-        """The class initializer"""
-
+        """The class initializer."""
         self.importance = []
 
     def fit(self, dataset: np.ndarray, values: np.ndarray, verbose: bool = False) -> None:
-        """Performs linear multiple model training
+        """Performs linear multiple model training.
 
         Parameters
         ----------
@@ -591,7 +574,6 @@ class LinearRegression:
         -------
         `None` : The function doesn't return anything.
         """
-
         self.X = dataset
         self.y = values
 
@@ -609,20 +591,17 @@ class LinearRegression:
             print("RMSE: {:.4f}".format(mean_square_error(self.y, self.predict(self.X))))
 
     def predict(self, datapoints: np.ndarray) -> np.ndarray:
-        """
-        Performs predictions for a set of points
+        """Performs predictions for a set of points.
 
         Parameters
         ----------
         datapoints : `np.ndarray`
             An array containing the values of the independent variable.
-
         """
         return np.array(self.importance) @ datapoints
 
     def get_importances(self, print_important_features: bool = False) -> np.ndarray:
-        """
-        Returns the important features
+        """Returns the important features.
 
         Parameters
         ----------
@@ -641,7 +620,7 @@ class LinearRegression:
 
 
 def cal_average(y: np.ndarray, alpha: float = 1):
-    """Calculates the moving average of the data
+    """Calculates the moving average of the data.
 
     Parameters
     ----------
@@ -655,7 +634,6 @@ def cal_average(y: np.ndarray, alpha: float = 1):
     average : `float`
         The average of the data.
     """
-
     window_size = int(alpha * len(y))
     if len(y) < 2:
         return y
@@ -669,17 +647,17 @@ def cal_average(y: np.ndarray, alpha: float = 1):
 
 
 class DataScaler:
-    """numpy array `scaler` and `rescaler`"""
+    """Numpy array `scaler` and `rescaler`"""
 
     __slots__ = ["dataset_", "_n", "data_scaled", "values", "inv_fitting"]
 
     def __init__(self, dataset: np.ndarray, n: int | None = 1) -> None:
-        """Initializes the parameters required for scaling the data"""
+        """Initializes the parameters required for scaling the data."""
         self.dataset_ = dataset.copy()
         self._n = n
 
     def rescale(self, dataset_: np.ndarray | None = None) -> np.ndarray:
-        """Perform a standard rescaling of the data
+        """Perform a standard rescaling of the data.
 
         Returns
         -------
@@ -738,7 +716,7 @@ class DataScaler:
         return self.data_scaled
 
     def scale(self, dataset_: np.ndarray) -> np.ndarray:
-        """Performs the inverse operation to the rescale function
+        """Performs the inverse operation to the rescale function.
 
         Parameters
         ----------
@@ -781,7 +759,7 @@ def generate_series(n: int, n_steps: int, incline: bool = True):
 
 
 def mean_square_error(y_true: np.ndarray, y_pred: np.ndarray, print_error: bool = False):
-    """Calculates the Root Mean Squared Error
+    """Calculates the Root Mean Squared Error.
 
     Parameters
     ----------
@@ -802,7 +780,7 @@ def mean_square_error(y_true: np.ndarray, y_pred: np.ndarray, print_error: bool 
 
 
 class DataFrameEncoder:
-    """Allows encoding and decoding Dataframes"""
+    """Allows encoding and decoding Dataframes."""
 
     __slots__ = [
         "_df",
@@ -823,7 +801,7 @@ class DataFrameEncoder:
         self.median_list = []
 
     def load_config(self, path_to_dictionaries: str = "./", **kwargs) -> None:
-        """Loads dictionaries from a given directory
+        """Loads dictionaries from a given directory.
 
         Keyword Arguments
         -----------------
@@ -871,7 +849,7 @@ class DataFrameEncoder:
             self._save_encoder(path_to_save, dictionary_name)
 
     def encode(self, path_to_save: str = "./", **kwargs) -> pd.DataFrame:
-        """Encodes the `object` type columns of the dataframe
+        """Encodes the `object` type columns of the dataframe.
 
         Keyword Arguments
         -----------------
@@ -937,14 +915,14 @@ class DataFrameEncoder:
             print(f"{warning_type}: {msg}")
 
     def _save_encoder(self, path_to_save: str, dictionary_name: str) -> None:
-        """Method to serialize the `encoding_list`, `decoding_list` and `_encode_columns` list"""
+        """Method to serialize the `encoding_list`, `decoding_list` and `_encode_columns` list."""
         with open(path_to_save + dictionary_name + ".pkl", "wb") as f:
             pickle.dump(
                 [self.encoding_list, self.decoding_list, self._encode_columns, self.median_list], f
             )
 
     def _code_transformation_to(self, character: str, dictionary_list: List[dict]) -> int:
-        """Auxiliary function to perform data transformation using a dictionary
+        """Auxiliary function to perform data transformation using a dictionary.
 
         Parameters
         ----------
@@ -964,7 +942,7 @@ class DataFrameEncoder:
 
 
 class PerformanceMeasures:
-    """Class with methods to measure performance"""
+    """Class with methods to measure performance."""
 
     def __init__(self) -> None:
         pass
@@ -1070,8 +1048,8 @@ class PerformanceMeasures:
 
 
 class OneHotEncoder:
-    """
-    Class used to encode categorical variables.
+    """Class used to encode categorical variables.
+
     It receives an array of integers and returns a binary array using the one-hot encoding method.
     """
 
@@ -1147,8 +1125,7 @@ class OneHotEncoder:
 
 
 class FeatureSelection:
-    """
-    Generate the data graph using a variation of the feature selection algorithm.
+    """Generate the data graph using a variation of the feature selection algorithm.
 
     - The method `get_digraph` returns the network based on the feature selection method.
     """
@@ -1156,7 +1133,10 @@ class FeatureSelection:
     __slots__ = ["not_features", "X", "all_features_imp_graph", "w_dict", "scaler"]
 
     def __init__(self, not_features: list[str] = []) -> None:
-        """The initializer of the class. The initial parameter is a list of strings with variables to discard."""
+        """The initializer of the class.
+
+        The initial parameter is a list of strings with variables to discard.
+        """
         self.not_features: List[str] = not_features
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
@@ -1164,8 +1144,7 @@ class FeatureSelection:
     def get_digraph(
         self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
     ) -> str:
-        """
-        Get directed graph showing importance of features.
+        """Get directed graph showing importance of features.
 
         Parameters
         ----------
@@ -1180,7 +1159,6 @@ class FeatureSelection:
             A string representation of the directed graph.
         """
         self._load_data(dataset)
-
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
@@ -1264,20 +1242,19 @@ class FeatureSelection:
 
 
 def check_nan_inf(df: pd.DataFrame, verbose: bool = False) -> pd.DataFrame:
+    """Checks for NaN and Inf values in the DataFrame.
+
+    If any are found, they will be removed.
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The input DataFrame to be checked.
+
+        Returns
+        -------
+        pd.DataFrame
+            A new DataFrame with NaN and Inf values removed.
     """
-    Checks for NaN and Inf values in the DataFrame. If any are found, they will be removed.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        The input DataFrame to be checked.
-
-    Returns
-    -------
-    pd.DataFrame
-        A new DataFrame with NaN and Inf values removed.
-    """
-
     nan_values = df.isnull().values.any()
     inf_values = np.isinf(df.select_dtypes(include="number")).values.any()
 

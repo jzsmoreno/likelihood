@@ -1,8 +1,8 @@
 """Neural network building blocks for graph-based learning.
 
-This module provides adjacency-matrix construction from tabular data and the
-vanilla graph neural network stack (:class:`Data`, :class:`VanillaGNNLayer`,
-:class:`VanillaGNN`) used to model node features over a graph adjacency matrix.
+This module provides adjacency-matrix construction from tabular data and the vanilla graph neural
+network stack (:class:`Data`, :class:`VanillaGNNLayer`, :class:`VanillaGNN`) used to model node
+features over a graph adjacency matrix.
 """
 
 import logging
@@ -88,8 +88,7 @@ def compare_pair(
 def cal_adjacency_matrix(
     df: pd.DataFrame, exclude_subset: List[str] = [], sparse: bool = True, **kwargs
 ) -> Tuple[dict, np.ndarray]:
-    """
-    Calculates the adjacency matrix for a given DataFrame using parallel processing.
+    """Calculates the adjacency matrix for a given DataFrame using parallel processing.
 
     Parameters
     ----------

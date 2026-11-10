@@ -105,8 +105,7 @@ class MultiBanditNet(nn.Module):
         self.max_num_actions = max(self.num_actions)
 
     def apply_initialization(self, method: str = "xavier_uniform") -> None:
-        """
-        Applies a specific initialization method to all linear layers in the network.
+        """Applies a specific initialization method to all linear layers in the network.
 
         Parameters
         ----------

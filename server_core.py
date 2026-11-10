@@ -190,9 +190,9 @@ PLAYGROUND_ENABLED = _env_flag("LM_PLAYGROUND", True)
 class CatalogStore:
     """Keep the introspected catalog in sync with the model sources.
 
-    The catalog used to be built once at import time, so editing a model forced a
-    restart.  The store remembers the ``mtime`` of every source file and rebuilds
-    the catalog when one of them changes, at most once every ``ttl`` seconds.
+    The catalog used to be built once at import time, so editing a model forced a restart.  The
+    store remembers the ``mtime`` of every source file and rebuilds the catalog when one of them
+    changes, at most once every ``ttl`` seconds.
     """
 
     def __init__(self, package_dir: Optional[Path] = None, ttl: float = CATALOG_TTL) -> None:
@@ -293,8 +293,8 @@ class Metrics:
     def record(self, endpoint: str, status: int, duration: float) -> None:
         """Account one request of ``endpoint`` that finished with ``status``.
 
-        Unknown labels beyond ``max_endpoints`` are folded into ``other`` so an
-        arbitrary amount of distinct URLs cannot grow the counters forever.
+        Unknown labels beyond ``max_endpoints`` are folded into ``other`` so an arbitrary amount of
+        distinct URLs cannot grow the counters forever.
         """
         with self._lock:
             if endpoint not in self.endpoints and len(self.endpoints) >= self._max_endpoints:
@@ -347,9 +347,9 @@ class Metrics:
     def prometheus(self, namespace: str = "likelihood") -> str:
         """The same counters in the Prometheus text exposition format.
 
-        Every series carries the ``endpoint`` label (``GET /api/models``), which
-        is the coarse bucket of :func:`endpoint_label`, so the cardinality stays
-        bounded no matter which model ids are requested.
+        Every series carries the ``endpoint`` label (``GET /api/models``), which is the coarse
+        bucket of :func:`endpoint_label`, so the cardinality stays bounded no matter which model ids
+        are requested.
         """
         snapshot = self.snapshot()
         lines: List[str] = []
@@ -432,8 +432,8 @@ RATE_LIMITER = RateLimiter(RATE_LIMIT)
 def endpoint_label(method: str, path: str) -> str:
     """Group requests into a small set of metric buckets.
 
-    ``/api/models/Arima`` and ``/api/models/HMM`` are reported together as
-    ``GET /api/models/<model_id>`` so the counters stay readable.
+    ``/api/models/Arima`` and ``/api/models/HMM`` are reported together as ``GET
+    /api/models/<model_id>`` so the counters stay readable.
     """
     clean = path.rstrip("/") or "/"
     patterns = (
@@ -734,10 +734,10 @@ def _clamp(value: int, bounds: Tuple[int, int]) -> int:
 def dummy_json_value(name: str, type_hint: str, parameters: Optional[Dict[str, Any]] = None) -> Any:
     """JSON placeholder for an argument called ``name`` typed ``type_hint``.
 
-    The payload is derived from the constructor parameters (number of states,
-    window size, features...) so ``fit``/``predict``/``forward`` can be tried
-    from the invoke tab without writing JSON by hand.  It is only a sample: it
-    never evaluates code and the caller is expected to edit it.
+    The payload is derived from the constructor parameters (number of states, window size,
+    features...) so ``fit``/``predict``/``forward`` can be tried from the invoke tab without writing
+    JSON by hand.  It is only a sample: it never evaluates code and the caller is expected to edit
+    it.
     """
     parameters = parameters or {}
     lowered = (name or "").lower()
@@ -795,11 +795,10 @@ def dummy_json_value(name: str, type_hint: str, parameters: Optional[Dict[str, A
 def _sample_value(parameter: Dict[str, Any], parameters: Optional[Dict[str, Any]] = None) -> Any:
     """JSON friendly sample of ``parameter``, generated when it is needed.
 
-    The catalog records Python source expressions (``np.array([])``, ``[]``),
-    which are not JSON values, and the parameters of a method do not record a
-    sample at all.  The value prefers the default (what the model really uses),
-    then a name aware scalar, then the catalog sample, and finally a small
-    payload shaped from the constructor ``parameters``.
+    The catalog records Python source expressions (``np.array([])``, ``[]``), which are not JSON
+    values, and the parameters of a method do not record a sample at all.  The value prefers the
+    default (what the model really uses), then a name aware scalar, then the catalog sample, and
+    finally a small payload shaped from the constructor ``parameters``.
     """
     default = _default_value(parameter)
     if default not in (None, [], {}, (), ""):
@@ -833,9 +832,9 @@ def _dict_with_integer_keys(type_hint: str) -> bool:
 def parameter_is_jsonable(parameter: Dict[str, Any]) -> bool:
     """Whether the constructor parameter can be sent as JSON to the child.
 
-    ``env``/``model`` style parameters receive Python objects, so the model can
-    only be built from Python (or from a session created in Python); the API
-    says so instead of failing later with a confusing missing-field error.
+    ``env``/``model`` style parameters receive Python objects, so the model can only be built from
+    Python (or from a session created in Python); the API says so instead of failing later with a
+    confusing missing-field error.
     """
     if parameter.get("variadic"):
         return False
@@ -924,8 +923,8 @@ def playground_spec(model: Dict[str, Any]) -> Dict[str, Any]:
 def constructor_samples(model: Dict[str, Any]) -> Dict[str, Any]:
     """Constructor values used as the context of the generated samples.
 
-    Every parameter takes its default; required ones fall back to the generated
-    sample (``Arima.datapoints`` becomes a small matrix, for instance).
+    Every parameter takes its default; required ones fall back to the generated sample
+    (``Arima.datapoints`` becomes a small matrix, for instance).
     """
     values: Dict[str, Any] = {}
     for field in playground_fields(model):
@@ -1034,8 +1033,8 @@ def coerce_playground_value(field: Dict[str, Any], value: Any) -> Any:
 def parse_pagination(query: Dict[str, List[str]]) -> Tuple[Optional[int], int]:
     """Validate the ``limit``/``offset`` query parameters.
 
-    ``limit`` is ``None`` when the caller did not ask for pagination, which
-    keeps the endpoint backwards compatible.
+    ``limit`` is ``None`` when the caller did not ask for pagination, which keeps the endpoint
+    backwards compatible.
     """
     raw_limit = (query.get("limit") or [""])[0].strip()
     raw_offset = (query.get("offset") or ["0"])[0].strip()
@@ -1497,9 +1496,8 @@ def _last_error_line(stderr: str) -> str:
 def playground_limits() -> Dict[str, int]:
     """``resource`` limits applied inside the playground child process.
 
-    The values are absolute (bytes, seconds, file descriptors) and are only
-    *lowered*, never raised: the child can never get more than the parent, so a
-    leaked limit cannot weaken the server.
+    The values are absolute (bytes, seconds, file descriptors) and are only *lowered*, never raised:
+    the child can never get more than the parent, so a leaked limit cannot weaken the server.
     """
     return {
         "cpu": PLAYGROUND_CPU_SECONDS,
@@ -1659,8 +1657,8 @@ def method_fields(
 ) -> List[Dict[str, Any]]:
     """Describe the arguments of ``method`` exactly like the playground does.
 
-    ``parameters`` are the constructor values the model will be built with;
-    they shape the generated samples (``n_states``, ``window``, ``n_features``).
+    ``parameters`` are the constructor values the model will be built with; they shape the generated
+    samples (``n_states``, ``window``, ``n_features``).
     """
     fields: List[Dict[str, Any]] = []
     for parameter in method.get("parameters") or []:
@@ -1746,8 +1744,8 @@ def sample_arguments(
 ) -> Dict[str, Any]:
     """JSON placeholders for every argument of ``method``.
 
-    ``parameters`` shape the payload exactly like the constructor that will be
-    used when the method is invoked (states, window, features...).
+    ``parameters`` shape the payload exactly like the constructor that will be used when the method
+    is invoked (states, window, features...).
     """
     context = constructor_samples(model) if parameters is None else parameters
     return {
@@ -1999,9 +1997,9 @@ def run_invoke(
 def parameters_signature(parameters: Dict[str, Any]) -> str:
     """Stable signature of the constructor values that built a session.
 
-    Constructor values are JSON literals (the same objects the playground
-    validates), so sorting the keys is enough to compare a payload with the
-    values of a live instance without depending on the key order.
+    Constructor values are JSON literals (the same objects the playground validates), so sorting the
+    keys is enough to compare a payload with the values of a live instance without depending on the
+    key order.
     """
     return json.dumps(parameters or {}, sort_keys=True, default=str, ensure_ascii=False)
 
@@ -2302,11 +2300,10 @@ class SessionStore:
     def replace(self, session: ModelSession, parameters: Dict[str, Any]) -> ModelSession:
         """Rebuild ``session`` with new constructor values.
 
-        A live instance cannot change its constructor arguments, so the worker is
-        replaced by one created with ``parameters`` and the old id stops working.
-        The previous session is detached while the replacement is built and put
-        back if the constructor fails, so a bad payload never kills a valid
-        session.
+        A live instance cannot change its constructor arguments, so the worker is replaced by one
+        created with ``parameters`` and the old id stops working. The previous session is detached
+        while the replacement is built and put back if the constructor fails, so a bad payload never
+        kills a valid session.
         """
         with self._lock:
             previous = self._sessions.pop(session.id, None)
@@ -2385,10 +2382,10 @@ INVOKE_SLOTS = threading.BoundedSemaphore(INVOKE_MAX_CONCURRENCY)
 class PlaygroundJob:
     """One asynchronous playground request, possibly holding several runs.
 
-    ``POST /api/playground/jobs`` returns its id immediately; the client polls
-    ``GET /api/playground/jobs/<id>`` until ``status`` leaves ``pending``/
-    ``running``.  A pool of worker threads keeps the cost of the background
-    machinery bounded while every model still runs in its own child process.
+    ``POST /api/playground/jobs`` returns its id immediately; the client polls ``GET
+    /api/playground/jobs/<id>`` until ``status`` leaves ``pending``/ ``running``.  A pool of worker
+    threads keeps the cost of the background machinery bounded while every model still runs in its
+    own child process.
     """
 
     def __init__(self, runs: List[Dict[str, Any]]) -> None:
@@ -2553,11 +2550,10 @@ class JobQueue:
     def cancel(self, job_id: str) -> Optional[PlaygroundJob]:
         """Ask ``job_id`` to stop; ``None`` when the job is unknown.
 
-        A job that has not started yet is marked ``cancelled`` right away.  A
-        running job keeps the outcome of the run in flight and stops before the
-        next one, because a model executes in its own child process and is not
-        interrupted half way.  Finished jobs are returned untouched (``DELETE``
-        is idempotent, and :meth:`forget` removes them from the store).
+        A job that has not started yet is marked ``cancelled`` right away.  A running job keeps the
+        outcome of the run in flight and stops before the next one, because a model executes in its
+        own child process and is not interrupted half way.  Finished jobs are returned untouched
+        (``DELETE`` is idempotent, and :meth:`forget` removes them from the store).
         """
         with self._lock:
             job = self._jobs.get(job_id)
@@ -2628,8 +2624,8 @@ def _git(*arguments: str, timeout: float = 10.0) -> subprocess.CompletedProcess:
 def git_versions(path: str, limit: int = 10) -> List[Dict[str, str]]:
     """Commits that touched ``path``, newest first.
 
-    Raises :class:`APIError` with status ``503`` when git is unavailable or the
-    path has no history, which is the honest answer for that endpoint.
+    Raises :class:`APIError` with status ``503`` when git is unavailable or the path has no history,
+    which is the honest answer for that endpoint.
     """
     completed = _git(
         "log",
@@ -2776,8 +2772,8 @@ def attributes_html(model: Dict[str, Any]) -> str:
 def attributes_section_html(model: Dict[str, Any]) -> str:
     """The complete ``Atributos`` section, or an empty string when absent.
 
-    Rendering the heading together with its content means the template never
-    has to hide empty sections with JavaScript.
+    Rendering the heading together with its content means the template never has to hide empty
+    sections with JavaScript.
     """
     cards = attributes_html(model)
     if not cards:
@@ -2788,9 +2784,9 @@ def attributes_section_html(model: Dict[str, Any]) -> str:
 def related_html(entries: Sequence[Dict[str, Any]]) -> str:
     """Section with links to the models related to the current one.
 
-    ``entries`` are the records of :func:`model_catalog.related_models`, so the
-    shared tags (or the category, when there are none) tell *why* a model is
-    being suggested.  An empty list renders nothing at all.
+    ``entries`` are the records of :func:`model_catalog.related_models`, so the shared tags (or the
+    category, when there are none) tell *why* a model is being suggested.  An empty list renders
+    nothing at all.
     """
     cards: List[str] = []
     for entry in entries:
@@ -2839,9 +2835,9 @@ def render_preview(
 ) -> str:
     """Render the HTML preview of ``model`` from ``template``.
 
-    Placeholders are plain ``{{NAME}}`` tokens replaced through ``str.replace``;
-    this keeps the CSS/JS braces of the template untouched and avoids the
-    ``str.format`` escaping problems of inline f-strings.
+    Placeholders are plain ``{{NAME}}`` tokens replaced through ``str.replace``; this keeps the
+    CSS/JS braces of the template untouched and avoids the ``str.format`` escaping problems of
+    inline f-strings.
     """
     label, icon = category_meta(model["category"])
     values = {
@@ -2940,9 +2936,9 @@ def content_type_for(path: Path) -> str:
 def resolve_asset(path: str, root: Path = ASSETS_DIR) -> Optional[Path]:
     """Map a URL path onto an existing file inside ``root``.
 
-    Returns ``None`` when the path escapes ``root``, points at a hidden file or
-    does not resolve to a readable file.  This replaces the naive
-    ``base / user_input`` joins that allowed directory traversal.
+    Returns ``None`` when the path escapes ``root``, points at a hidden file or does not resolve to
+    a readable file.  This replaces the naive ``base / user_input`` joins that allowed directory
+    traversal.
     """
     relative = unquote(path).lstrip("/")
     if not relative:

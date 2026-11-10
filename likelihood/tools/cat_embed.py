@@ -32,8 +32,7 @@ class CategoricalEmbedder:
         self.embeddings: Dict[str, tf.Variable] = {}
 
     def fit(self, df: pd.DataFrame, categorical_cols: List[str]) -> None:
-        """
-        Fit the embeddings on the given data.
+        """Fit the embeddings on the given data.
 
         Parameters
         ----------
@@ -66,8 +65,7 @@ class CategoricalEmbedder:
             self.embeddings[col] = tf.Variable(embedding_matrix, dtype=tf.float32)
 
     def transform(self, df: pd.DataFrame, categorical_cols: List[str]) -> pd.DataFrame:
-        """
-        Transform the data using the fitted embeddings.
+        """Transform the data using the fitted embeddings.
 
         Parameters
         ----------
@@ -80,7 +78,6 @@ class CategoricalEmbedder:
         -------
         Transformed Pandas DataFrame with original columns except `categorical_cols` replaced by their embedding representations.
         """
-
         df_processed = df.copy()
 
         for col in categorical_cols:
@@ -109,8 +106,7 @@ class CategoricalEmbedder:
         return df_processed
 
     def inverse_transform(self, df: pd.DataFrame, categorical_cols: List[str]) -> pd.DataFrame:
-        """
-        Inverse transform the data using the fitted embeddings.
+        """Inverse transform the data using the fitted embeddings.
 
         Parameters
         ----------
@@ -123,7 +119,6 @@ class CategoricalEmbedder:
         -------
         Transformed Pandas DataFrame with original columns replaced by their categorical labels.
         """
-
         df_processed = df.copy()
 
         for col in categorical_cols:
@@ -148,29 +143,25 @@ class CategoricalEmbedder:
         return df_processed
 
     def save_embeddings(self, path: str) -> None:
-        """
-        Save the embeddings to a directory.
+        """Save the embeddings to a directory.
 
         Parameters
         ----------
         path : `str`
             Path to the directory where embeddings will be saved.
         """
-
         os.makedirs(path, exist_ok=True)
         for col, embedding in self.embeddings.items():
             np.save(os.path.join(path, f"{col}_embedding.npy"), embedding.numpy())
 
     def load_embeddings(self, path: str) -> None:
-        """
-        Load the embeddings from a directory.
+        """Load the embeddings from a directory.
 
         Parameters
         ----------
         path : `str`
             Path to the directory where embeddings are saved.
         """
-
         for col in self.label_encoders.keys():
             embedding_path = os.path.join(path, f"{col}_embedding.npy")
             if not os.path.exists(embedding_path):

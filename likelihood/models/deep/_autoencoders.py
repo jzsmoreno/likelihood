@@ -74,8 +74,8 @@ def sampling_output_shape(input_shapes: List[int]) -> int:
 
 
 class AutoClassifier:
-    """
-    An auto-classifier model that automatically determines the best classification strategy based on the input data.
+    """An auto-classifier model that automatically determines the best classification strategy based
+    on the input data.
 
     Parameters
     ----------
@@ -352,8 +352,7 @@ class AutoClassifier:
         patience: int = 10,
         **kwargs: Any,
     ) -> None:
-        """
-        Trains the encoder and decoder on the input data.
+        """Trains the encoder and decoder on the input data.
 
         Parameters
         ----------
@@ -413,7 +412,8 @@ class AutoClassifier:
         self.freeze_encoder_decoder()
 
     def freeze_encoder_decoder(self) -> None:
-        """Freezes the encoder and decoder layers to prevent them from being updated during training."""
+        """Freezes the encoder and decoder layers to prevent them from being updated during
+        training."""
         if self._encoder:
             for layer in self._encoder.layers:
                 layer.trainable = False
@@ -451,7 +451,6 @@ class AutoClassifier:
         ValueError
             If the input shape or units of the source model do not match.
         """
-
         if not isinstance(source_model, AutoClassifier):
             raise ValueError("Source model must be an instance of AutoClassifier.")
 
@@ -539,8 +538,7 @@ class AutoClassifier:
 
     @classmethod
     def load(cls: type["AutoClassifier"], filepath: str) -> "AutoClassifier":
-        """
-        Load a complete model from saved components.
+        """Load a complete model from saved components.
 
         Parameters
         ----------
@@ -638,8 +636,7 @@ def call_existing_code(
     num_layers: int = 1,
     **kwargs: Any,
 ) -> AutoClassifier:
-    """
-    Calls an existing AutoClassifier instance.
+    """Calls an existing AutoClassifier instance.
 
     Parameters
     ----------

@@ -99,7 +99,6 @@ class VanillaGNNLayer(tf.keras.layers.Layer):
             The configuration dictionary containing layer parameters including
             ``dim_in``, ``dim_out``, ``rank``, and ``kernel_initializer``.
         """
-
         config = super(VanillaGNNLayer, self).get_config()
         config.update(
             {
@@ -300,8 +299,7 @@ class VanillaGNN:
         return tf.argmax(out, axis=1, output_type=tf.int32).numpy()
 
     def save(self, filepath: str, **kwargs) -> None:
-        """
-        Save the complete model including all components.
+        """Save the complete model including all components.
 
         Parameters
         ----------
@@ -325,8 +323,7 @@ class VanillaGNN:
 
     @classmethod
     def load(cls, filepath: str) -> "VanillaGNN":
-        """
-        Load a complete model from saved components.
+        """Load a complete model from saved components.
 
         Parameters
         ----------

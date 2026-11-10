@@ -937,22 +937,19 @@ def generate_html_pipeline(
         charts_html += (
             '<div style="grid-column:1/-1" class="subsection-label">🔗 Correlation Analysis</div>'
         )
-        charts_html += """
-        <div class="chart-card heatmap-wrapper">
-            <div class="chart-header">
-                <h4>Correlation Matrix</h4>
-                <div class="chart-toggle">
-                    <button data-type="pearson" onclick="drawHeatmap(document.getElementById('heatmap-canvas'),'pearson')">Pearson</button>
-                    <button data-type="spearman" onclick="drawHeatmap(document.getElementById('heatmap-canvas'),'spearman')">Spearman</button>
-                    <button data-type="kendall" onclick="drawHeatmap(document.getElementById('heatmap-canvas'),'kendall')">Kendall</button>
-                </div>
-            </div>
-            <div class="chart-body"><canvas id="heatmap-canvas"></canvas></div>
-            <div class="heatmap-legend">
-                <span>-1</span><canvas id="heatmap-legend-grad" width="120" height="12" class="grad"></canvas><span>+1</span>
-                <span style="margin-left:auto">● Strong &gt; 0.7 &nbsp; ◐ Moderate 0.4–0.7 &nbsp; ○ Weak &lt; 0.4</span>
-            </div>
-        </div>"""
+        charts_html += """<div class="chart-card heatmap-wrapper"> <div class="chart-header">
+                       <h4>Correlation Matrix</h4> <div class="chart-toggle"> <button data-
+                       type="pearson" onclick="drawHeatmap(document.getElementById('heatmap-
+                       canvas'),'pearson')">Pearson</button> <button data-type="spearman"
+                       onclick="drawHeatmap(document.getElementById('heatmap-
+                       canvas'),'spearman')">Spearman</button> <button data-type="kendall"
+                       onclick="drawHeatmap(document.getElementById('heatmap-
+                       canvas'),'kendall')">Kendall</button> </div> </div> <div class="chart-
+                       body"><canvas id="heatmap-canvas"></canvas></div> <div class="heatmap-
+                       legend"> <span>-1</span><canvas id="heatmap-legend-grad" width="120"
+                       height="12" class="grad"></canvas><span>+1</span> <span style="margin-
+                       left:auto">● Strong &gt; 0.7 &nbsp; ◐ Moderate 0.4–0.7 &nbsp; ○ Weak &lt;
+                       0.4</span> </div> </div>"""
     charts_html += "</div>"
 
     has_viz = bool(numeric_cols or categorical_cols or onehot_groups)

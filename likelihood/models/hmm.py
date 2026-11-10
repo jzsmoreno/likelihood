@@ -544,8 +544,7 @@ def aligned_decoding_accuracy(
     sequences: list[list[int]],
     true_states: list[list[int]],
 ) -> float:
-    """
-    Compute Viterbi decoding accuracy after optimal hidden-state label alignment.
+    """Compute Viterbi decoding accuracy after optimal hidden-state label alignment.
 
     Hidden-state labels learned by an HMM are arbitrary. For example,
     predicted state 0 may correspond to ground-truth state 2. This function
@@ -1178,8 +1177,7 @@ def train_best_hmm(
     random_state=42,
     show_results=True,
 ):
-    """
-    Train multiple HMM configurations and return the best model.
+    """Train multiple HMM configurations and return the best model.
 
     Parameters
     ----------
@@ -1215,7 +1213,6 @@ def train_best_hmm(
     history_df : pandas.DataFrame
         Results from every configuration and restart.
     """
-
     best_model = None
     best_result = None
     best_accuracy = -np.inf

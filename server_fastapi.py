@@ -140,9 +140,9 @@ SORT_KEYS: Dict[str, Any] = {
 class ServerSettings:
     """Runtime state shared by every request of a :func:`create_app` instance.
 
-    The mutable switches (token, CORS origins, feature flags, limiters) live here
-    instead of on a request handler class, so several apps can coexist in the
-    same process -- which is what the test-suite relies on.
+    The mutable switches (token, CORS origins, feature flags, limiters) live here instead of on a
+    request handler class, so several apps can coexist in the same process -- which is what the
+    test-suite relies on.
     """
 
     def __init__(self, package_dir: Optional[Path] = None) -> None:
@@ -321,8 +321,8 @@ def cacheable_json(
 ) -> Response:
     """JSON response with ``ETag``/``Cache-Control`` support.
 
-    The catalog fingerprint plus the request path is a valid, cheap ``ETag``; a
-    matching ``If-None-Match`` answers ``304`` without sending the body.
+    The catalog fingerprint plus the request path is a valid, cheap ``ETag``; a matching ``If-None-
+    Match`` answers ``304`` without sending the body.
     """
     etag = etag_for(cache_key, settings.store.fingerprint)
     final_headers: Dict[str, str] = {
@@ -345,8 +345,8 @@ def etag_for(key: str, fingerprint: str) -> str:
 def etag_matches(header: str, etag: str) -> bool:
     """Whether an ``If-None-Match`` header matches ``etag``.
 
-    Understands the ``*`` wildcard, the comma separated lists and the weak
-    ``W/"..."`` validators, which RFC 9110 allows on a ``GET``/``HEAD``.
+    Understands the ``*`` wildcard, the comma separated lists and the weak ``W/"..."`` validators,
+    which RFC 9110 allows on a ``GET``/``HEAD``.
     """
     value = (header or "").strip()
     if not value:
@@ -372,9 +372,9 @@ def not_modified(etag: str, headers: Optional[Dict[str, str]] = None) -> Respons
 def api_cache_control(settings: ServerSettings) -> str:
     """``Cache-Control`` of the catalog responses.
 
-    When ``LM_API_TOKEN`` protects the API the responses become ``private``: a
-    shared cache must never hand an authorised answer to an anonymous client,
-    no matter how permissive ``LM_API_CACHE_CONTROL`` is.
+    When ``LM_API_TOKEN`` protects the API the responses become ``private``: a shared cache must
+    never hand an authorised answer to an anonymous client, no matter how permissive
+    ``LM_API_CACHE_CONTROL`` is.
     """
     directive = core.API_CACHE_CONTROL.strip()
     if not settings.api_token:
@@ -695,9 +695,8 @@ def cors_headers(settings: ServerSettings, request: Request) -> Dict[str, str]:
 def authenticate(settings: ServerSettings, request: Request) -> None:
     """Reject ``/api`` requests that do not carry the configured token.
 
-    ``GET /api/health`` stays reachable without credentials (load balancers and
-    Kubernetes probes need it) but only answers its liveness fields; sending the
-    token unlocks the full report.
+    ``GET /api/health`` stays reachable without credentials (load balancers and Kubernetes probes
+    need it) but only answers its liveness fields; sending the token unlocks the full report.
     """
     request.state.authenticated = False
     path = request.url.path
@@ -723,9 +722,9 @@ def authenticate(settings: ServerSettings, request: Request) -> None:
 def client_address(settings: ServerSettings, request: Request) -> str:
     """Address used by the rate limiter and the request log.
 
-    Behind a reverse proxy every request comes from the proxy, so a per client
-    limit needs the ``X-Forwarded-For`` chain.  That header is client controlled
-    and therefore only read when ``LM_TRUST_PROXY`` is enabled.
+    Behind a reverse proxy every request comes from the proxy, so a per client limit needs the
+    ``X-Forwarded-For`` chain.  That header is client controlled and therefore only read when
+    ``LM_TRUST_PROXY`` is enabled.
     """
     if settings.trust_proxy:
         forwarded = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
@@ -785,9 +784,8 @@ def build_router() -> APIRouter:
     def health(request: Request, settings: ServerSettings = Depends(get_settings)) -> Response:
         """Liveness probe, counters, metrics and the state of the background pools.
 
-        When ``LM_API_TOKEN`` protects the API, an anonymous probe (Kubernetes,
-        a load balancer...) only receives the liveness fields; the operational
-        details need the token.
+        When ``LM_API_TOKEN`` protects the API, an anonymous probe (Kubernetes, a load balancer...)
+        only receives the liveness fields; the operational details need the token.
         """
         counts = summarize(settings.catalog)
         payload: Dict[str, Any] = {
@@ -837,8 +835,8 @@ def build_router() -> APIRouter:
     def metrics_endpoint(settings: ServerSettings = Depends(get_settings)) -> Response:
         """The request counters in the Prometheus text exposition format.
 
-        Point a ``scrape_configs`` entry at this path to graph the traffic,
-        the error ratio and the latency of every endpoint.
+        Point a ``scrape_configs`` entry at this path to graph the traffic, the error ratio and the
+        latency of every endpoint.
         """
         body = settings.metrics.prometheus().encode("utf-8")
         return bytes_response(
@@ -1125,9 +1123,8 @@ def build_router() -> APIRouter:
     def job_delete(job_id: str, settings: ServerSettings = Depends(get_settings)) -> Response:
         """Cancel a queued job, or forget a job that already finished.
 
-        A run in progress is never killed (each one owns a child process), so a
-        running job stops before its next run and reports ``cancelling`` until
-        it reports ``cancelled``.
+        A run in progress is never killed (each one owns a child process), so a running job stops
+        before its next run and reports ``cancelling`` until it reports ``cancelled``.
         """
         job_id = job_id.strip()
         job = settings.jobs.cancel(job_id)
@@ -1280,11 +1277,10 @@ def build_router() -> APIRouter:
     ) -> Response:
         """Call a method on the live instance of a session.
 
-        When the body carries ``parameters`` that differ from the values that
-        built the live instance, the worker is rebuilt with the new constructor
-        arguments and the response returns the id of the new session.  Reusing
-        an instance with stale constructor values (``input_shape_parm``,
-        ``n_states``...) is never allowed.
+        When the body carries ``parameters`` that differ from the values that built the live
+        instance, the worker is rebuilt with the new constructor arguments and the response returns
+        the id of the new session.  Reusing an instance with stale constructor values
+        (``input_shape_parm``, ``n_states``...) is never allowed.
         """
         require_sessions(settings)
         session = settings.sessions.get(session_id.strip())

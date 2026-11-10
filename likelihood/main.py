@@ -1,4 +1,5 @@
-"""Module for core likelihood computations, including data preprocessing, model fitting, and analysis utilities."""
+"""Module for core likelihood computations, including data preprocessing, model fitting, and
+analysis utilities."""
 
 from typing import Callable, List, Optional, Tuple
 

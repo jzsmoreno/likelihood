@@ -40,13 +40,11 @@ class ActionSpace:
     @property
     def n(self) -> int:
         """The number of actions in the space."""
-
         return self._num_actions
 
 
 class OptionCriticEnv:
-    """
-    An environment for Option Critic reinforcement learning that processes a dataset of episodes.
+    """An environment for Option Critic reinforcement learning that processes a dataset of episodes.
 
     Attributes
     ----------
@@ -76,8 +74,7 @@ class OptionCriticEnv:
         self,
         episodes: Dict[int, Dict[str, List]],
     ) -> None:
-        """
-        Initializes the OptionCriticEnv with a dataset of episodes.
+        """Initializes the OptionCriticEnv with a dataset of episodes.
 
         Parameters
         ----------
@@ -221,8 +218,7 @@ class OptionCriticEnv:
         return value
 
     def reset(self) -> tuple[np.ndarray, dict]:
-        """
-        Resets the environment to a random episode and returns the initial state.
+        """Resets the environment to a random episode and returns the initial state.
 
         Returns
         -------
@@ -241,8 +237,8 @@ class OptionCriticEnv:
     def step(
         self, action: int | List[int], option: int | List[int]
     ) -> tuple[np.ndarray, float, bool, bool, dict]:
-        """
-        Takes an action with a specific option and returns the next state, reward, and termination status.
+        """Takes an action with a specific option and returns the next state, reward, and
+        termination status.
 
         Parameters
         ----------

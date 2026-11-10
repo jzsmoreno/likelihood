@@ -47,7 +47,6 @@ class EarlyStopping:
         current_loss : float
             The current loss value to evaluate against the best loss.
         """
-
         if self.best_loss - current_loss > self.min_delta:
             self.best_loss = current_loss
             self.counter = 0
@@ -59,8 +58,7 @@ class EarlyStopping:
 
 
 def mse_loss(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-    """
-    Mean squared error loss function.
+    """Mean squared error loss function.
 
     Parameters
     ----------
@@ -77,8 +75,7 @@ def mse_loss(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
 
 
 def kl_loss(mean: tf.Tensor, log_var: tf.Tensor) -> tf.Tensor:
-    """
-    Kullback-Leibler divergence loss function.
+    """Kullback-Leibler divergence loss function.
 
     Parameters
     ----------
@@ -97,8 +94,7 @@ def kl_loss(mean: tf.Tensor, log_var: tf.Tensor) -> tf.Tensor:
 def vae_loss(
     y_true: tf.Tensor, y_pred: tf.Tensor, mean: tf.Tensor, log_var: tf.Tensor
 ) -> tf.Tensor:
-    """
-    Variational autoencoder loss function.
+    """Variational autoencoder loss function.
 
     Parameters
     ----------
@@ -119,8 +115,7 @@ def vae_loss(
 
 
 def sampling(mean: tf.Tensor, log_var: tf.Tensor, epsilon_value: float = 1e-8) -> tf.Tensor:
-    """
-    Samples from the distribution.
+    """Samples from the distribution.
 
     Parameters
     ----------
@@ -253,8 +248,8 @@ def train_step(
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="AutoClassifier")
 class AutoClassifier(tf.keras.Model):
-    """
-    An auto-classifier model that automatically determines the best classification strategy based on the input data.
+    """An auto-classifier model that automatically determines the best classification strategy based
+    on the input data.
 
     Parameters
     ----------
@@ -376,7 +371,6 @@ class AutoClassifier(tf.keras.Model):
         input_shape : tuple
             The shape of the input data.
         """
-
         if self.vae_mode:
             inputs = tf.keras.Input(shape=self.input_shape_parm, name="encoder_input")
             x = tf.keras.layers.Dense(
@@ -551,7 +545,8 @@ class AutoClassifier(tf.keras.Model):
         return classification
 
     def freeze_encoder_decoder(self) -> None:
-        """Freezes the encoder and decoder layers to prevent them from being updated during training."""
+        """Freezes the encoder and decoder layers to prevent them from being updated during
+        training."""
         for layer in self.encoder.layers:
             layer.trainable = False
         for layer in self.decoder.layers:
@@ -565,8 +560,8 @@ class AutoClassifier(tf.keras.Model):
             layer.trainable = True
 
     def set_encoder_decoder(self, source_model: "AutoClassifier") -> None:
-        """Sets the encoder and decoder layers from another AutoClassifier instance,
-        ensuring compatibility in dimensions. Only works if vae_mode is False.
+        """Sets the encoder and decoder layers from another AutoClassifier instance, ensuring
+        compatibility in dimensions. Only works if vae_mode is False.
 
         Parameters
         ----------
@@ -689,8 +684,7 @@ def call_existing_code(
     num_layers: int = 1,
     **kwargs,
 ) -> AutoClassifier:
-    """
-    Calls an existing AutoClassifier instance.
+    """Calls an existing AutoClassifier instance.
 
     Parameters
     ----------

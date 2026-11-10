@@ -14,7 +14,7 @@ from likelihood.tools import *
 
 
 class AbstractArima(FeaturesArima):
-    """A class that implements the auto-regressive arima (1, 0, 0) model
+    """A class that implements the auto-regressive arima (1, 0, 0) model.
 
     Parameters
     ----------
@@ -201,7 +201,6 @@ class AbstractArima(FeaturesArima):
         name : str, optional
             The name of the file to load from, by default "model".
         """
-
         with open(name + ".pkl", "wb") as file:
             pickle.dump(self.theta_trained, file)
 
@@ -306,7 +305,7 @@ class AbstractArima(FeaturesArima):
 
 
 class FourierRegression(AbstractArima):
-    """A class that implements the arima model with FFT noise filtering
+    """A class that implements the arima model with FFT noise filtering.
 
     Parameters
     ----------
@@ -318,7 +317,6 @@ class FourierRegression(AbstractArima):
     new_datapoints : np.ndarray
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
-
     """
 
     __slots__ = ["datapoints_", "sigma", "mode", "mov", "n_walkers", "name"]

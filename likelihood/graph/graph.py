@@ -53,7 +53,7 @@ class DynamicGraph(FeatureSelection):
         self._make_network()
 
     def _make_network(self) -> None:
-        """Create nodes and edges of the network based on feature importance scores"""
+        """Create nodes and edges of the network based on feature importance scores."""
         self._add_nodes()
         for i in range(len(self.all_features_imp_graph)):
             node = self.all_features_imp_graph[i][0]
@@ -69,7 +69,7 @@ class DynamicGraph(FeatureSelection):
             self.G.add_node(n_id=i, label=node)
 
     def draw(self, name: str = "graph.html", **kwargs) -> None:
-        """Display the network using HTML format"""
+        """Display the network using HTML format."""
         spring_length = kwargs.get("spring_length", 500)
         node_distance = kwargs.get("node_distance", 100)
         self.G.repulsion(node_distance=node_distance, spring_length=spring_length)

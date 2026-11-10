@@ -83,8 +83,7 @@ def suppress_warnings(
 
 
 class TransformRange:
-    """
-    Generates a new DataFrame with ranges represented as strings.
+    """Generates a new DataFrame with ranges represented as strings.
 
     Transforms numerical columns into categorical range bins with descriptive labels.
     """
@@ -108,8 +107,7 @@ class TransformRange:
     def _create_bins_and_labels(
         self, min_val: Union[int, float], max_val: Union[int, float], bin_size: int
     ) -> Tuple[np.ndarray, List[str]]:
-        """
-        Creates the bin edges and their labels.
+        """Creates the bin edges and their labels.
 
         Parameters
         ----------
@@ -160,8 +158,7 @@ class TransformRange:
     def _transform_column_to_ranges(
         self, df: pd.DataFrame, column: str, bin_size: int, fit: bool = True
     ) -> pd.Series:
-        """
-        Transforms a column in the DataFrame into range bins.
+        """Transforms a column in the DataFrame into range bins.
 
         Parameters
         ----------
@@ -218,8 +215,7 @@ class TransformRange:
     def transform(
         self, df: pd.DataFrame, drop_original: bool = False, fit: bool = True
     ) -> pd.DataFrame:
-        """
-        Creates a new DataFrame with range columns.
+        """Creates a new DataFrame with range columns.
 
         Parameters
         ----------
@@ -262,8 +258,7 @@ class TransformRange:
         return result_df
 
     def get_range_info(self, column: str) -> Dict[str, Union[int, float, List[str]]]:
-        """
-        Get information about the range transformation for a specific column.
+        """Get information about the range transformation for a specific column.
 
         Parameters
         ----------
@@ -291,8 +286,7 @@ class TransformRange:
 
 
 def remove_collinearity(df: pd.DataFrame, threshold: float = 0.9):
-    """
-    Removes highly collinear features from the DataFrame based on a correlation threshold.
+    """Removes highly collinear features from the DataFrame based on a correlation threshold.
 
     This function calculates the correlation matrix of the DataFrame and removes columns
     that are highly correlated with any other column in the DataFrame. It uses an absolute
@@ -329,8 +323,7 @@ def train_and_insights(
     frac: float = 1.0,
     **kwargs: Optional[Dict],
 ) -> tf.keras.Model:
-    """
-    Train a Keras model and provide insights on the training and validation metrics.
+    """Train a Keras model and provide insights on the training and validation metrics.
 
     Parameters
     ----------
@@ -527,8 +520,8 @@ def apply_lora(
 
 
 def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -> pd.DataFrame:
-    """
-    Calculate various graph metrics based on the given adjacency matrix and return them in a single DataFrame.
+    """Calculate various graph metrics based on the given adjacency matrix and return them in a
+    single DataFrame.
 
     Parameters
     ----------
@@ -641,8 +634,8 @@ def print_trajectory_info(
 
 
 def get_selected_probs(action_probs: torch.Tensor, action: torch.Tensor | int):
-    """
-    Retrieves the probabilities of selected actions from a single-batch action probability distribution.
+    """Retrieves the probabilities of selected actions from a single-batch action probability
+    distribution.
 
     Parameters
     ----------
@@ -819,7 +812,6 @@ def ppo_loss(
     loss : `torch.Tensor`
         The PPO loss, averaged across the batch of samples. The loss is computed using the clipped objective to penalize large policy updates.
     """
-
     if advantages.dim() == 1:
         advantages = advantages.unsqueeze(-1)
 
@@ -1328,7 +1320,6 @@ def plot_two_region_histograms_boxplots(
     -------
     None
     """
-
     sns.set_theme(style="whitegrid", context="notebook")
     show_actions = len(action_outputs) <= 5
     is_dark = plt.rcParams.get("figure.facecolor") not in ["#ffffff", "white"]
@@ -1475,8 +1466,7 @@ def analyze_network_variations(
     temperature: float = 1.0,
     plot_graph: bool = False,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, int]:
-    """
-    Analyzes the output variations of option_network and action_networks for a given sample.
+    """Analyzes the output variations of option_network and action_networks for a given sample.
 
     Parameters
     ----------
@@ -1604,8 +1594,7 @@ def network_analysis_table(
     train_option: bool = False,
     temperature: float = 1.0,
 ) -> str:
-    """
-    Creates a well-formatted table showing statistics for option_network and action_networks.
+    """Creates a well-formatted table showing statistics for option_network and action_networks.
 
     Parameters
     ----------
@@ -1627,7 +1616,6 @@ def network_analysis_table(
     str
         Formatted string with network analysis tables.
     """
-
     option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
         model,
         sample_data,
@@ -1714,8 +1702,7 @@ def display_network_analysis(
     temperature: float = 1.0,
     plot_graph: bool = True,
 ) -> None:
-    """
-    Analyze and visualize network statistics for a given model and sample data.
+    """Analyze and visualize network statistics for a given model and sample data.
 
     This function performs network analysis on the provided model using the sample
     data and optionally displays the results as a graph.

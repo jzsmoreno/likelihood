@@ -59,9 +59,8 @@ def categories_by_quartile(df: DataFrame, column: str) -> Tuple[str, str]:
 
 
 class SimulationEngine(FeatureSelection):
-    """
-    This class implements a predictive model that utilizes multiple linear regression for numerical target variables
-    and multiple logistic regression for categorical target variables.
+    """This class implements a predictive model that utilizes multiple linear regression for
+    numerical target variables and multiple logistic regression for categorical target variables.
 
     The class provides methods for training the model on a given dataset, making predictions,
     and evaluating the model's performance.
@@ -164,7 +163,6 @@ class SimulationEngine(FeatureSelection):
         **kwargs : dict
             Additional keyword arguments for fitting.
         """
-
         self.df = df
         self.n_importances = n_importances
         self.get_digraph(self.df, self.n_importances, self.use_scaler)
@@ -256,7 +254,6 @@ class SimulationEngine(FeatureSelection):
         List[str]
             List of labels indicating "inlier" or "outlier" for each input.
         """
-
         return [
             (
                 "inlier"
@@ -276,8 +273,7 @@ class SimulationEngine(FeatureSelection):
         return df
 
     def save(self, filename: str = "./simulation_model") -> None:
-        """
-        Save the state of the SimulationEngine to a file.
+        """Save the state of the SimulationEngine to a file.
 
         Parameters
         ----------
@@ -290,8 +286,7 @@ class SimulationEngine(FeatureSelection):
 
     @staticmethod
     def load(filename: str = "./simulation_model") -> "SimulationEngine":
-        """
-        Load the state of a SimulationEngine from a file.
+        """Load the state of a SimulationEngine from a file.
 
         Parameters
         ----------

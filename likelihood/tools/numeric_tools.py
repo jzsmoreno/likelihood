@@ -145,7 +145,6 @@ def xi_corr(df: pd.DataFrame) -> pd.DataFrame:
         A square dataframe with variable names as both index and columns,
         containing their corresponding correlation coefficients.
     """
-
     columns = df.select_dtypes(include="number").columns
     n = len(columns)
 
@@ -161,26 +160,23 @@ def xi_corr(df: pd.DataFrame) -> pd.DataFrame:
                 correlation = xicor(x, y)
                 correlations.loc[col1, col2] = round(correlation, 8)
                 correlations.loc[col2, col1] = round(correlation, 8)  # Mirror the correlation
-
     return correlations
 
 
-"""
-@article{Chatterjee2019ANC,
-  title={A New Coefficient of Correlation},
-  author={Sourav Chatterjee},
-  journal={Journal of the American Statistical Association},
-  year={2019},
-  volume={116},
-  pages={2009 - 2022},
-  url={https://api.semanticscholar.org/CorpusID:202719281}
-} 
-"""
+#   @article{Chatterjee2019ANC,
+#     title={A New Coefficient of Correlation},
+#     author={Sourav Chatterjee},
+#     journal={Journal of the American Statistical Association},
+#     year={2019},
+#     volume={116},
+#     pages={2009 - 2022},
+#     url={https://api.semanticscholar.org/CorpusID:202719281}
+#   }
+# -------------------------------------------------------------------------
 
 
 def xicor(X: np.ndarray, Y: np.ndarray, ties: bool = True, random_seed: int = None) -> float:
-    """
-    Calculate a generalized coefficient of correlation between two variables.
+    """Calculate a generalized coefficient of correlation between two variables.
 
     This coefficient is an extension of Pearson's correlation, accounting for ties with optional randomization.
 
@@ -326,7 +322,6 @@ def gauss_elimination(A: np.ndarray | list, pr: int = 2) -> np.ndarray:
     X : `np.ndarray`
         The solution of the system of $n$ equationsS
     """
-
     n = len(A)
     X = [0 for _ in range(n)]
 
@@ -371,8 +366,7 @@ def gauss_elimination(A: np.ndarray | list, pr: int = 2) -> np.ndarray:
 
 
 def find_multiples(target: int) -> tuple[int, int] | None:
-    """
-    Find two factors of a given target number that are as close to each other as possible.
+    """Find two factors of a given target number that are as close to each other as possible.
 
     Parameters
     ----------
