@@ -175,6 +175,7 @@ PHRASE_FIXES = [
     (r"^the json written after\b", "Return the JSON written after"),
     (r"^the catalog entry of\b", "Retrieve the catalog entry of"),
     (r"^the complete ``atributos`` section\b", "Return the complete ``Atributos`` section"),
+    (r"^the ``[^`]+`` most recent\b", "Return the"),
 ]
 
 
@@ -419,18 +420,19 @@ def transform_docstring_token(token_text, rule, replacement=None):
         for i, line in enumerate(lines):
             content = line.rstrip("\r\n")
 
-            if content.strip():
-                stripped = content.rstrip()
+            if not content.strip():
+                continue
 
-                if stripped[-1] not in ".!?":
-                    lines[i] = (
-                        stripped
-                        + "."
-                        + content[len(stripped):]
-                        + line[len(content):]
-                    )
+            stripped = content.rstrip()
 
-                break
+            # Remove a trailing colon before adding the period.
+            if stripped.endswith(":"):
+                stripped = stripped[:-1].rstrip()
+
+            if stripped and stripped[-1] not in ".!?":
+                lines[i] = stripped + "." + content[len(content.rstrip()) :] + line[len(content) :]
+
+            break
 
     elif rule == "D205":
         summary_index = next(
@@ -441,10 +443,14 @@ def transform_docstring_token(token_text, rule, replacement=None):
         if summary_index is None:
             return None
 
-        next_index = summary_index + 1
+        description_index = summary_index + 1
 
-        if next_index < len(lines) and lines[next_index].strip():
-            lines.insert(next_index, newline)
+        if description_index >= len(lines):
+            return None
+
+        # Separate summary and description.
+        if lines[description_index].strip():
+            lines.insert(description_index, newline)
 
     elif rule == "D209":
         if not body.endswith(("\n", "\r")):
@@ -609,7 +615,17 @@ def main():
     entries = read_entries()
 
     valid_entries = [
-        entry for entry in entries if entry.strip() and not entry.strip().startswith("Found")
+        entry
+        for entry in entries
+        if (
+            entry.strip()
+            and not entry.strip().startswith("Found")
+            and not re.match(
+                r"^\[\*\]\s+\d+\s+fixable\b",
+                entry.strip(),
+                re.IGNORECASE,
+            )
+        )
     ]
 
     print(f"Total entries: {len(valid_entries)}")
@@ -620,6 +636,7 @@ def main():
     processed = []
 
     counts = {rule: 0 for rule in SUPPORTED_RULES}
+    would_fix_counts = {rule: 0 for rule in SUPPORTED_RULES}
     reasons = {}
 
     def skip(entry, reason):
@@ -719,6 +736,7 @@ def main():
             print(f"    Message: {message}")
 
         would_fix += 1
+        would_fix_counts[rule] += 1
 
         if dry_run:
             continue
@@ -762,7 +780,10 @@ def main():
     print("\nFIXES BY RULE")
 
     for rule, count in sorted(counts.items()):
-        print(f"{rule}: {count}")
+        if dry_run:
+            print(f"{rule}: {would_fix_counts[rule]} (would fix)")
+        else:
+            print(f"{rule}: {count}")
 
     if reasons:
         print("\nSKIP REASONS")
