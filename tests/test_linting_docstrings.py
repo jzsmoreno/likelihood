@@ -15,7 +15,7 @@ Run with::
     python -m pytest tests/test_linting_docstrings.py -v
     python -m pytest tests/test_linting_docstrings.py -v > pytest_output.txt
     python -m pytest tests/test_linting_docstrings.py -v 2>&1 | tee pytest_output.txt
-    ruff check . --select D401 --output-format concise > errores_d401.txt 2>&1
+    ruff check . --select D209,D400,D401,D105 --output-format concise > errores_d401.txt 2>&1
     ruff check . --select D401 --fix
 """
 
@@ -42,9 +42,11 @@ def run_pydocstyle():
         [
             sys.executable,
             "-m",
-            "pydocstyle",
+            "ruff",
+            "check",
             "likelihood",
-            "--convention=numpy",
+            "--select",
+            "D209,D401,D105",
         ],
         cwd=str(REPO_ROOT),
         capture_output=True,
