@@ -13,6 +13,10 @@ D103 - Missing docstring in public function
 Run with::
 
     python -m pytest tests/test_linting_docstrings.py -v
+    python -m pytest tests/test_linting_docstrings.py -v > pytest_output.txt
+    python -m pytest tests/test_linting_docstrings.py -v 2>&1 | tee pytest_output.txt
+    ruff check . --select D401 --output-format concise > errores_d401.txt 2>&1
+    ruff check . --select D401 --fix
 """
 
 import ast

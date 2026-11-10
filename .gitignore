@@ -134,6 +134,8 @@ dmypy.json
 # Ignore <files>.txt for testing
 /examples/*.txt
 output.txt
+errores_d401.txt
+pytest_output.txt
 
 # Ignore <files>.png for testing
 /examples/*.png
