@@ -161,7 +161,8 @@ class GetInsights:
 
     def viz_classifier_graphs(self, threshold_factor=1.0, top_k=5, save_path=None):
         """Visualize all Dense layers in self.model.classifier as a single directed graph,
-        connecting each Dense layer to the next."""
+        connecting each Dense layer to the next.
+        """
 
         def get_top_k_edges(weights, src_prefix, dst_prefix, k):
             flat_weights = np.abs(weights.flatten())

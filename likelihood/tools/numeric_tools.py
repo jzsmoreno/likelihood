@@ -230,7 +230,7 @@ def xicor(X: np.ndarray, Y: np.ndarray, ties: bool = True, random_seed: int = No
 
 
 def ecprint(A: np.ndarray) -> None:
-    """Prints the augmented matrix.
+    """Print the augmented matrix.
 
     Parameters
     ----------

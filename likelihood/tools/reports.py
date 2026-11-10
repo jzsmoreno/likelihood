@@ -16,7 +16,7 @@ def generate_html_pipeline(
     file_name: str = "data_processing_report.html",
 ) -> str:
     """
-    Generate an HTML report for a data processing pipeline with:
+    Generate an HTML report for a data processing pipeline with.
       - Tabbed interface (Initial / Steps / Final / Visualizations)
       - Stat cards summary bar
       - Automatic chart generation from sample_data:

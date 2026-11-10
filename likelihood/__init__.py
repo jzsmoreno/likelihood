@@ -1,4 +1,4 @@
-"""Likelihood: Initialize the Package =====================================
+"""Likelihood: Initialize the Package =====================================.
 
 This is the entry point of the Likelihood package. It initializes all necessary modules and provides a central hub for accessing various tools and functions.
 

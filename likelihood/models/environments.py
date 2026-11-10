@@ -199,7 +199,7 @@ class OptionCriticEnv:
         decimals: int = 6,
     ) -> Tuple:
         """
-        Build a canonical transition key:
+        Build a canonical transition key.
         ((state_tuple), option(s)..., action(s)...)
         """
         state_key = tuple(round(float(x), decimals) for x in state)

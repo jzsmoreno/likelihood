@@ -546,7 +546,8 @@ class AutoClassifier(tf.keras.Model):
 
     def freeze_encoder_decoder(self) -> None:
         """Freezes the encoder and decoder layers to prevent them from being updated during
-        training."""
+        training.
+        """
         for layer in self.encoder.layers:
             layer.trainable = False
         for layer in self.decoder.layers:

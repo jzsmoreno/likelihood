@@ -11,7 +11,8 @@ def generate_html_pipeline(
     file_name: str = "data_processing_report.html",
 ) -> str:
     """Generate an HTML report for a data processing pipeline with an improved layout using a
-    tabbed interface, better typography, animations, and accessible markup."""
+    tabbed interface, better typography, animations, and accessible markup.
+    """
     css = """
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');

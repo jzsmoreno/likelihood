@@ -168,7 +168,8 @@ class GetInsights:
         save_path: Optional[str] = None,
     ) -> None:
         """Visualize all Dense layers in self.model.classifier as a single directed graph,
-        connecting each Dense layer to the next."""
+        connecting each Dense layer to the next.
+        """
 
         def get_top_k_edges(
             weights: np.ndarray, src_prefix: str, dst_prefix: str, k: int

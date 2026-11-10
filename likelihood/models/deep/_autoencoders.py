@@ -413,7 +413,8 @@ class AutoClassifier:
 
     def freeze_encoder_decoder(self) -> None:
         """Freezes the encoder and decoder layers to prevent them from being updated during
-        training."""
+        training.
+        """
         if self._encoder:
             for layer in self._encoder.layers:
                 layer.trainable = False

@@ -254,7 +254,8 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
 
     def save(self, filepath: str) -> None:
         """Save ensemble metadata and models inside a directory named after the last part of
-        filepath."""
+        filepath.
+        """
         filepath = filepath.rstrip(".pkl")
         parent_dir = os.path.dirname(filepath)
         folder_name = os.path.basename(filepath)

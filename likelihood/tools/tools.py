@@ -52,7 +52,7 @@ def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -> Generat
 
 
 def difference_quotient(f: Callable, x: float, h: float) -> Callable:
-    """Calculate the difference quotient of `f` evaluated at `x` and `x + h`
+    """Calculate the difference quotient of `f` evaluated at `x` and `x + h`.
 
     Parameters
     ----------
@@ -72,7 +72,7 @@ def difference_quotient(f: Callable, x: float, h: float) -> Callable:
 
 
 def partial_difference_quotient(f: Callable, v: np.ndarray, i: int, h: float) -> np.ndarray:
-    """Calculate the partial difference quotient of `f`
+    """Calculate the partial difference quotient of `f`.
 
     Parameters
     ----------
@@ -95,7 +95,7 @@ def partial_difference_quotient(f: Callable, v: np.ndarray, i: int, h: float) ->
 
 
 def estimate_gradient(f: Callable, v: np.ndarray, h: float = 1e-4) -> List[np.ndarray]:
-    """Calculate the gradient of `f` at `v`
+    """Calculate the gradient of `f` at `v`.
 
     Parameters
     ----------
@@ -647,7 +647,7 @@ def cal_average(y: np.ndarray, alpha: float = 1):
 
 
 class DataScaler:
-    """Numpy array `scaler` and `rescaler`"""
+    """Numpy array `scaler` and `rescaler`."""
 
     __slots__ = ["dataset_", "_n", "data_scaled", "values", "inv_fitting"]
 
@@ -740,7 +740,7 @@ class DataScaler:
 
 
 def generate_series(n: int, n_steps: int, incline: bool = True):
-    """Generates `n` series of length `n_steps`"""
+    """Generate `n` series of length `n_steps`."""
     freq1, freq2, offsets1, offsets2 = np.random.rand(4, n, 1)
 
     if incline:
@@ -792,7 +792,7 @@ class DataFrameEncoder:
     ]
 
     def __init__(self, data: pd.DataFrame) -> None:
-        """Set the columns of the `DataFrame`"""
+        """Set the columns of the `DataFrame`."""
         self._df = data.copy()
         self._names = data.columns
         self._encode_columns = []
@@ -819,7 +819,7 @@ class DataFrameEncoder:
         print("Configuration successfully uploaded")
 
     def train(self, path_to_save: str, **kwargs) -> None:
-        """Trains the encoders and decoders using the `DataFrame`"""
+        """Trains the encoders and decoders using the `DataFrame`."""
         save_mode = kwargs["save_mode"] if "save_mode" in kwargs else True
         dictionary_name = (
             kwargs["dictionary_name"] if "dictionary_name" in kwargs else "labelencoder_dictionary"
@@ -879,7 +879,7 @@ class DataFrameEncoder:
             return self._df
 
     def decode(self) -> pd.DataFrame:
-        """Decode the `int` type columns of the `DataFrame`"""
+        """Decode the `int` type columns of the `DataFrame`."""
         j = 0
         df_decoded = self._df.copy()
         if len(self.median_list) == len(self._encode_columns):
@@ -905,7 +905,7 @@ class DataFrameEncoder:
             print(f"{warning_type}: {msg}")
 
     def get_dictionaries(self) -> Tuple[List[dict], List[dict]]:
-        """Allow to return the `list` of dictionaries for `encoding` and `decoding`"""
+        """Allow to return the `list` of dictionaries for `encoding` and `decoding`."""
         try:
             return self.encoding_list, self.decoding_list
         except ValueError as e:

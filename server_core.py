@@ -2581,7 +2581,7 @@ class JobQueue:
             return self._jobs.get(job_id)
 
     def recent(self, limit: int = 20) -> List[PlaygroundJob]:
-        """The ``limit`` most recent jobs, newest first."""
+        """Return the jobs, newest first."""
         with self._lock:
             self._prune()
             jobs = sorted(self._jobs.values(), key=lambda job: job.created_at, reverse=True)
