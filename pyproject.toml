@@ -7,3 +7,6 @@ line-length = 100
 recursive = true
 wrap-summaries = 100
 wrap-descriptions = 100
+
+[tool.ruff.lint]
+ignore = ["D205"]

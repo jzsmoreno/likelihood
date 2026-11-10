@@ -1,7 +1,6 @@
 """Process pydocstyle violations from errores_d401.txt.
 
 Supported rules:
-    D205: Require a blank line between summary and description.
     D209: Put closing triple quotes on a separate line.
     D400: Require a period at the end of the summary.
     D401: Require the first line to use imperative mood.
@@ -30,7 +29,7 @@ from pathlib import Path
 
 ERRORS_FILE = Path("errores_d401.txt")
 
-SUPPORTED_RULES = {"D205", "D209", "D400", "D401", "D105"}
+SUPPORTED_RULES = {"D209", "D400", "D401", "D105"}
 
 
 MANUAL_VERBS = {
@@ -433,24 +432,6 @@ def transform_docstring_token(token_text, rule, replacement=None):
                 lines[i] = stripped + "." + content[len(content.rstrip()) :] + line[len(content) :]
 
             break
-
-    elif rule == "D205":
-        summary_index = next(
-            (i for i, line in enumerate(lines) if line.strip()),
-            None,
-        )
-
-        if summary_index is None:
-            return None
-
-        description_index = summary_index + 1
-
-        if description_index >= len(lines):
-            return None
-
-        # Separate summary and description.
-        if lines[description_index].strip():
-            lines.insert(description_index, newline)
 
     elif rule == "D209":
         if not body.endswith(("\n", "\r")):
