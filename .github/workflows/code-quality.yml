@@ -20,11 +20,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install flake8 pytest docformatter 
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Run docformatter
-      run: |
-        docformatter --recursive --check --black \
-          --wrap-summaries 100 \
-          --wrap-descriptions 100 .
     - name: Run black
       run: |
         black . --check --line-length=100

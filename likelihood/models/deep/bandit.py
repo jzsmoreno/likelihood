@@ -22,8 +22,11 @@ class MultiBanditNet(nn.Module):
         Width of the hidden layers in every sub-network.
     num_layers : int, default 1
         Number of hidden layers in the action networks.
-    activation : nn.Module, default ``nn.SELU()``
-        Activation function applied between the layers.
+    activation : str or nn.Module, default ``nn.SELU()``
+        Activation function applied between the linear layers. One of
+        ``"relu"``, ``"relu6"``, ``"rrelu"``, ``"selu"``,
+        ``"leaky_relu"``, ``"sigmoid"``, ``"tanh"``, ``"hardswish"``,
+        ``"gelu"``, ``"elu"``, ``"softplus"``, ``"softmax"`` or ``"identity"``.
     dropout_rate : float, default 0.3
         Dropout probability applied to the action networks when greater than
         zero; the option and value networks are not dropped.
@@ -36,7 +39,7 @@ class MultiBanditNet(nn.Module):
         num_actions_per_option: int | List[int],
         num_neurons: int = 128,
         num_layers: int = 1,
-        activation: nn.Module = nn.SELU(),
+        activation: str | nn.Module = nn.SELU(),
         dropout_rate: float = 0.3,
     ) -> None:
         super(MultiBanditNet, self).__init__()
@@ -45,7 +48,9 @@ class MultiBanditNet(nn.Module):
         self.num_actions_per_option = num_actions_per_option
         self.num_neurons = num_neurons
         self.num_layers = num_layers
-        self.activation = activation
+        self.activation = (
+            self._activation_module(activation) if isinstance(activation, str) else activation
+        )
         self.dropout_rate = max(0.0, dropout_rate)
 
         def build_action_network(num_actions: int) -> nn.Sequential:
@@ -103,6 +108,34 @@ class MultiBanditNet(nn.Module):
         self.num_actions = [net[-1].out_features for net in self.action_networks]
         self.equal_action_sizes = len(set(self.num_actions)) == 1
         self.max_num_actions = max(self.num_actions)
+
+    @classmethod
+    def _activation_module(cls, activation: str) -> nn.Module:
+        """Instantiate the activation module from its name.
+
+        The catalog exposes ``activation`` as a plain string (``"relu"``, ``"selu"``, ``"sigmoid"``,
+        ``"tanh"``, ``"leaky_relu"``); this maps the name to the matching :class:`torch.nn.Module`
+        subclass used inside the network.
+        """
+        name = str(activation).lower()
+        activations = {
+            "relu": nn.ReLU(),
+            "relu6": nn.ReLU6(),
+            "rrelu": nn.RReLU(),
+            "selu": nn.SELU(),
+            "leaky_relu": nn.LeakyReLU(),
+            "sigmoid": nn.Sigmoid(),
+            "tanh": nn.Tanh(),
+            "hardswish": nn.Hardswish(),
+            "gelu": nn.GELU(),
+            "elu": nn.ELU(),
+            "softplus": nn.Softplus(),
+            "softmax": nn.Softmax(dim=-1),
+            "identity": nn.Identity(),
+        }
+        if name not in activations:
+            raise ValueError(f"Unsupported activation: {activation!r}")
+        return activations[name]
 
     def apply_initialization(self, method: str = "xavier_uniform") -> None:
         """Apply a specific initialization method to all linear layers in the network.
