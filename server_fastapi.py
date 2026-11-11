@@ -27,6 +27,7 @@ The routes are the same as the previous standard-library implementation::
     GET    /api/models/<id>/versions  git commits that touched the source of a model
     GET    /api/search                ``?q=`` search with facets (autocomplete friendly)
     GET    /api/playground/<model_id> playground specification of one model
+    GET    /api/models/<id>/load       saved-model loaders and path policy
     GET    /api/playground/jobs       recent asynchronous playground jobs
     GET    /api/playground/jobs/<id>  state and results of one job
     GET    /api/models/<id>/invoke    methods that may be called on one model
@@ -36,6 +37,7 @@ The routes are the same as the previous standard-library implementation::
     POST   /api/playground            ``{"model_id": ..., "parameters": {...}}``
     POST   /api/playground/jobs       one run or a list of runs -> ``202`` and a ``job_id``
     POST   /api/models/<id>/invoke    ``{"method": ..., "arguments": {...}}``
+    POST   /api/models/<id>/load      load a saved model from ``{"path": ...}``
     POST   /api/models/<id>/sample    dummy arguments for one method
     POST   /api/models/<id>/sessions  build the model once and keep it alive
     POST   /api/sessions/<id>/invoke  call a method on the live instance
@@ -238,6 +240,20 @@ class SampleRequest(_AliasedBody):
     method: str = Field(default="", description="Nombre del método a muestrear.")
     parameters: Optional[Dict[str, Any]] = Field(
         default=None, description="Argumentos del constructor del modelo."
+    )
+
+
+class LoadRequest(_AliasedBody):
+    """Body of ``POST /api/models/<id>/load``."""
+
+    loader: Optional[str] = Field(
+        default=None, description="Nombre del método de carga (``load``, ``load_model``...)."
+    )
+    path: Optional[str] = Field(
+        default=None, description="Ruta del modelo guardado, relativa al repositorio."
+    )
+    parameters: Optional[Dict[str, Any]] = Field(
+        default=None, description="Argumentos del constructor cuando el loader los necesita."
     )
 
 
@@ -1018,7 +1034,46 @@ def build_router() -> APIRouter:
     ) -> Response:
         """Return the methods a client may call on ``model_id``."""
         model = model_or_404(settings, model_id)
-        return json_response(200, {"success": True, **core.invoke_spec(model)})
+        spec = core.invoke_spec(model)
+        spec["enabled"] = bool(settings.invoke_enabled)
+        spec["sessions_enabled"] = bool(settings.sessions_enabled)
+        return json_response(200, {"success": True, **spec})
+
+    @router.get("/api/models/{model_id}/load", tags=["load"])
+    def load_spec_endpoint(
+        model_id: str, settings: ServerSettings = Depends(get_settings)
+    ) -> Response:
+        """Return the loaders and path policy available for ``model_id``."""
+        model = model_or_404(settings, model_id)
+        spec = core.load_spec(model)
+        spec["enabled"] = bool(settings.invoke_enabled)
+        return json_response(200, {"success": True, **spec})
+
+    @router.post("/api/models/{model_id}/load", tags=["load"])
+    def load_saved_model(
+        model_id: str, body: LoadRequest, settings: ServerSettings = Depends(get_settings)
+    ) -> Response:
+        """Load a saved model from a file path and describe the live instance."""
+        require_invoke(settings)
+        model = model_or_404(settings, model_id)
+        load = core.prepare_load(model, body.payload())
+        acquire_invoke_slot(settings)
+        try:
+            result = core.run_load(model, load)
+        except core.PlaygroundError as exc:
+            exc.extra.setdefault("model_id", model["id"])
+            raise
+        finally:
+            settings.invoke_slots.release()
+        payload: Dict[str, Any] = {
+            "success": True,
+            "model_id": model["id"],
+            "loader": load["name"],
+            "path": load["path"],
+            "parameters": load.get("parameters") or {},
+        }
+        payload.update(result)
+        return json_response(200, payload)
 
     # -- playground ---------------------------------------------------------
 
@@ -1170,13 +1225,25 @@ def build_router() -> APIRouter:
     def invoke(
         model_id: str, body: InvokeRequest, settings: ServerSettings = Depends(get_settings)
     ) -> Response:
-        """Build the model and call one of its methods in a child process."""
+        """Build (or load) the model and call one of its methods in a child process.
+
+        The optional ``path``/``loader`` fields make the call operate on a saved
+        instance instead of a freshly constructed one.
+        """
         require_invoke(settings)
         model = model_or_404(settings, model_id)
-        method, arguments, parameters = core.prepare_invocation(model, body.payload())
+        data = body.payload()
+        load = None
+        if any(key in data for key in ("path", "file", "filepath", "load")):
+            load = core.prepare_load(model, data)
+        method, arguments, parameters = core.prepare_invocation(
+            model, data, with_parameters=load is None
+        )
+        if load is not None:
+            parameters = load.get("parameters") or {}
         acquire_invoke_slot(settings)
         try:
-            result = core.run_invoke(model, method, parameters, arguments)
+            result = core.run_invoke(model, method, parameters, arguments, load=load)
         except core.PlaygroundError as exc:
             exc.extra.setdefault("model_id", model["id"])
             raise
@@ -1189,6 +1256,8 @@ def build_router() -> APIRouter:
             "arguments": arguments,
             "parameters": parameters,
             "session_id": None,
+            "source": "path" if load else "constructor",
+            "load": ({"loader": load.get("name"), "path": load.get("path")} if load else None),
         }
         payload.update(result)
         return json_response(200, payload)
@@ -1240,21 +1309,28 @@ def build_router() -> APIRouter:
     def session_create(
         model_id: str, body: SessionRequest, settings: ServerSettings = Depends(get_settings)
     ) -> Response:
-        """Build the model once and keep the live instance in a child process."""
+        """Build the model once (or load it from a path) and keep it alive in a child process."""
         require_sessions(settings)
         model = model_or_404(settings, model_id)
         data = body.payload()
-        raw_parameters = data.get("parameters", data.get("params", {}))
-        if raw_parameters is None:
-            raw_parameters = {}
-        if not isinstance(raw_parameters, dict):
-            raise core.ValidationError("El campo 'parameters' debe ser un objeto")
-        parameters = core.coerce_model_parameters(model, raw_parameters)
-        session = settings.sessions.create(model, parameters)
+        load = None
+        if any(key in data for key in ("path", "file", "filepath", "load")):
+            load = core.prepare_load(model, data)
+            parameters = load.get("parameters") or {}
+        else:
+            raw_parameters = data.get("parameters", data.get("params", {}))
+            if raw_parameters is None:
+                raw_parameters = {}
+            if not isinstance(raw_parameters, dict):
+                raise core.ValidationError("El campo 'parameters' debe ser un objeto")
+            parameters = core.coerce_model_parameters(model, raw_parameters)
+        session = settings.sessions.create(model, parameters, load=load)
         location = f"/api/sessions/{session.id}"
         payload: Dict[str, Any] = {
             "success": True,
             "parameters": parameters,
+            "source": "path" if load else "constructor",
+            "load": ({"loader": load.get("name"), "path": load.get("path")} if load else None),
             "invoke_url": f"{location}/invoke",
         }
         payload.update(session.to_dict())
@@ -1280,7 +1356,8 @@ def build_router() -> APIRouter:
         When the body carries ``parameters`` that differ from the values that built the live
         instance, the worker is rebuilt with the new constructor arguments and the response returns
         the id of the new session.  Reusing an instance with stale constructor values
-        (``input_shape_parm``, ``n_states``...) is never allowed.
+        (``input_shape_parm``, ``n_states``...) is never allowed.  A session created from a saved
+        model (``path``/``loader``) is never rebuilt: the loaded state wins.
         """
         require_sessions(settings)
         session = settings.sessions.get(session_id.strip())
@@ -1290,7 +1367,9 @@ def build_router() -> APIRouter:
         method, arguments, _ = core.prepare_invocation(session.model, data, with_parameters=False)
         rebuilt = False
         raw_parameters = data.get("parameters", data.get("params"))
-        if raw_parameters is not None:
+        # A session loaded from a path owns its state: rebuilding it from the
+        # constructor would silently discard the trained weights that were loaded.
+        if session.load is None and raw_parameters is not None:
             if not isinstance(raw_parameters, dict):
                 raise core.ValidationError("El campo 'parameters' debe ser un objeto")
             parameters = core.coerce_model_parameters(session.model, raw_parameters)
@@ -1303,6 +1382,7 @@ def build_router() -> APIRouter:
             "model_id": session.model["id"],
             "session_id": session.id,
             "parameters": session.parameters,
+            "source": "path" if session.load else "constructor",
             "rebuilt": rebuilt,
             "method": method["name"],
             "arguments": arguments,
@@ -1476,6 +1556,8 @@ def build_router() -> APIRouter:
             back_url="/",
             host=host,
             related=related_models(settings.catalog, model, limit=4),
+            invoke_enabled=settings.invoke_enabled,
+            sessions_enabled=settings.sessions_enabled,
         )
         return bytes_response(
             200,

@@ -35,13 +35,7 @@ from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Sequence, Tuple
 from urllib.parse import quote, unquote
 
-from model_catalog import (
-    DEFAULT_PACKAGE_DIR,
-    REPO_ROOT,
-    build_catalog,
-    category_meta,
-    guess_widget,
-)
+from model_catalog import DEFAULT_PACKAGE_DIR, REPO_ROOT, build_catalog, category_meta, guess_widget
 
 LOGGER = logging.getLogger("likelihood.server")
 ASSETS_DIR = REPO_ROOT / "models"
@@ -179,6 +173,11 @@ MAX_SESSIONS = max(1, int(os.environ.get("LM_MAX_SESSIONS") or 4))
 SESSION_TTL = float(os.environ.get("LM_SESSION_TTL") or 900)
 #: Seconds a call on a session may take (``LM_SESSION_TIMEOUT``).
 SESSION_TIMEOUT = float(os.environ.get("LM_SESSION_TIMEOUT") or INVOKE_TIMEOUT)
+#: Root directory used to resolve relative model paths (``LM_LOAD_ROOT``).
+LOAD_ROOT = Path(os.environ.get("LM_LOAD_ROOT") or REPO_ROOT).expanduser().resolve()
+#: Reject paths outside :data:`LOAD_ROOT` (``LM_LOAD_RESTRICT``; enabled by default
+#: when ``LM_LOAD_ROOT`` is explicitly configured).
+LOAD_RESTRICT = _env_flag("LM_LOAD_RESTRICT", "LM_LOAD_ROOT" in os.environ)
 #: Marker used to separate the playground result from anything the model prints.
 _PLAYGROUND_MARKER = "__LIKELIHOOD_PLAYGROUND__"
 
@@ -473,6 +472,7 @@ def model_brief(model: Dict[str, Any]) -> Dict[str, Any]:
         "parameter_count": len(model["parameters"]),
         "method_count": len(model["methods"]),
         "line_count": model["line_count"],
+        "loadable": bool(model.get("loaders")),
     }
 
 
@@ -490,6 +490,8 @@ def model_payload(model: Dict[str, Any], include_source: bool = True) -> Dict[st
     payload["playground"] = playground_spec(model)
     payload["invoke_url"] = f"/api/models/{model['id']}/invoke"
     payload["sessions_url"] = f"/api/models/{model['id']}/sessions"
+    payload["load_url"] = f"/api/models/{model['id']}/load"
+    payload["load"] = load_spec(model)
     payload["invokable_methods"] = [method["name"] for method in invokable_methods(model)]
     return payload
 
@@ -920,6 +922,135 @@ def playground_spec(model: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def load_spec(model: Dict[str, Any]) -> Dict[str, Any]:
+    """Everything the browser needs in order to load a saved model from a path.
+
+    Only models whose source declares a ``load``/``load_model`` style method have
+    entries in ``loaders``; the UI hides the section for the rest.
+    """
+    loaders = list(model.get("loaders") or [])
+    default = loaders[0]["name"] if loaders else None
+    return {
+        "model_id": model["id"],
+        "model_name": model["name"],
+        "import_statement": model["import_statement"],
+        "endpoint": f"/api/models/{model['id']}/load",
+        "sessions_url": f"/api/models/{model['id']}/sessions",
+        "enabled": bool(INVOKE_ENABLED),
+        "loadable": bool(loaders),
+        "loaders": loaders,
+        "default_loader": default,
+        "root": str(LOAD_ROOT),
+        "restrict_to_root": bool(LOAD_RESTRICT),
+        "load_error": "" if loaders else "Este modelo no declara un método load()",
+    }
+
+
+def resolve_loader(model: Dict[str, Any], name: str = "") -> Dict[str, Any]:
+    """Return the loader named ``name`` (or the preferred one) of ``model``."""
+    loaders = list(model.get("loaders") or [])
+    if not loaders:
+        raise ValidationError(
+            f'El modelo "{model["id"]}" no declara un método load() compatible',
+            model_id=model["id"],
+        )
+    cleaned = (name or "").strip()
+    if not cleaned:
+        return loaders[0]
+    for loader in loaders:
+        if loader["name"] == cleaned:
+            return loader
+    available = ", ".join(loader["name"] for loader in loaders)
+    raise ValidationError(
+        f'Loader desconocido: "{cleaned}". Disponibles: {available}',
+        loaders=[loader["name"] for loader in loaders],
+    )
+
+
+def _load_candidates(path: Path) -> List[Path]:
+    """Path spellings a loader may expect (``model`` / ``model.pkl``)."""
+    candidates = [path]
+    if path.suffix.lower() != ".pkl":
+        candidates.append(Path(str(path) + ".pkl"))
+    else:
+        candidates.append(path.with_suffix(""))
+    return candidates
+
+
+def normalize_load_path(value: Any) -> str:
+    """Resolve and validate a user supplied model path.
+
+    Relative paths are interpreted from the repository root.  The path may point
+    to a file, a ``.pkl`` file or a directory (Keras checkpoints); loaders that
+    append the extension are handled by the child process.  When
+    ``LM_LOAD_ROOT`` is configured the resolved path must stay inside it.
+    """
+    text = str(value or "").strip()
+    if not text:
+        raise ValidationError("El campo 'path' es obligatorio")
+    candidate = Path(text).expanduser()
+    if not candidate.is_absolute():
+        candidate = REPO_ROOT / candidate
+    try:
+        resolved = candidate.resolve()
+    except (OSError, ValueError) as exc:
+        raise ValidationError(f"Ruta de modelo inválida: {text}") from exc
+    if LOAD_RESTRICT and not resolved.is_relative_to(LOAD_ROOT):
+        raise ValidationError(
+            f'La ruta "{text}" queda fuera de {LOAD_ROOT}',
+            path=text,
+            root=str(LOAD_ROOT),
+        )
+    if not any(candidate_path.exists() for candidate_path in _load_candidates(resolved)):
+        raise ValidationError(
+            f'No existe el modelo "{text}" (se probó también con la extensión .pkl)',
+            path=text,
+        )
+    return str(resolved)
+
+
+def prepare_load(
+    model: Dict[str, Any], data: Dict[str, Any], with_parameters: bool = True
+) -> Dict[str, Any]:
+    """Validate a load payload and return the loader, the path and the constructor values.
+
+    The returned mapping is JSON friendly and can be embedded in the payload of
+    the child interpreter (``run_load``, ``run_invoke`` and ``start_session``).
+    """
+    raw = data.get("load") if isinstance(data.get("load"), dict) else {}
+    name = str(
+        data.get("loader") or data.get("loader_name") or raw.get("name") or raw.get("loader") or ""
+    ).strip()
+    loader = resolve_loader(model, name)
+    path_value = (
+        data.get("path")
+        or data.get("file")
+        or data.get("filepath")
+        or raw.get("path")
+        or raw.get("file")
+    )
+    path = normalize_load_path(path_value)
+    parameters: Dict[str, Any] = {}
+    if with_parameters:
+        raw_parameters = data.get("parameters", data.get("params", {}))
+        if raw_parameters is None:
+            raw_parameters = {}
+        if not isinstance(raw_parameters, dict):
+            raise ValidationError("El campo 'parameters' debe ser un objeto")
+        if loader["requires_instance"]:
+            parameters = coerce_model_parameters(model, raw_parameters, require_all=True)
+        elif raw_parameters:
+            parameters = coerce_model_parameters(model, raw_parameters, require_all=False)
+    return {
+        "name": loader["name"],
+        "path": path,
+        "path_parameter": loader["path_parameter"],
+        "requires_instance": bool(loader["requires_instance"]),
+        "module": loader.get("module"),
+        "parameters": parameters,
+    }
+
+
 def constructor_samples(model: Dict[str, Any]) -> Dict[str, Any]:
     """Return constructor values used as the context of the generated samples.
 
@@ -1226,6 +1357,46 @@ def _build():
     return target(**_convert_all(payload.get("parameters")))
 
 
+def _load_paths(path):
+    # Different loaders append/remove ``.pkl`` on their own, so both spellings
+    # are tried before giving up.
+    import pathlib
+
+    candidate = pathlib.Path(str(path)).expanduser()
+    yield str(candidate)
+    if candidate.suffix.lower() != ".pkl":
+        yield str(candidate) + ".pkl"
+    else:
+        yield str(candidate.with_suffix(""))
+
+
+def _load_instance(spec):
+    spec = spec or {}
+    module = importlib.import_module(spec.get("module") or payload["module"])
+    target = getattr(module, payload["name"])
+    name = spec.get("name") or "load"
+    path_parameter = spec.get("path_parameter") or "path"
+    instance = _build() if spec.get("requires_instance") else None
+    holder = instance if instance is not None else target
+    loader = getattr(holder, name)
+    found = False
+    for candidate in _load_paths(spec.get("path") or ""):
+        if not os.path.exists(candidate):
+            continue
+        found = True
+        result = loader(**{path_parameter: candidate})
+        if result is not None:
+            instance = result
+        break
+    if not found:
+        raise FileNotFoundError(str(spec.get("path") or ""))
+    if instance is None:
+        raise TypeError(
+            "El método %s no devolvió una instancia del modelo" % name
+        )
+    return instance
+
+
 def _input_shape(value):
     # Shape hint ``(None, n_features)`` derived from the JSON value of an input.
     if not isinstance(value, (list, tuple)) or not value:
@@ -1301,11 +1472,33 @@ _emit(_describe(_build()))
 """
 
 
+#: Loads a saved model from a path and describes it (``POST /api/models/<id>/load``).
+_LOAD_BOOTSTRAP = _SANDBOX_PRELUDE + r"""
+try:
+    instance = _load_instance(payload.get("load"))
+except BaseException as exc:
+    import traceback as _traceback
+
+    _emit(
+        {
+            "ok": False,
+            "error": "%s: %s" % (type(exc).__name__, exc),
+            "traceback": _traceback.format_exc()[-4000:],
+        }
+    )
+    sys.exit(3)
+
+result = _describe(instance)
+result["ok"] = True
+_emit(result)
+"""
+
+
 #: Same isolation, but it also calls one method of the freshly built instance, so
 #: every ``POST /api/models/<id>/invoke`` request starts from a clean object.
 _INVOKE_BOOTSTRAP = _SANDBOX_PRELUDE + r"""
 try:
-    instance = _build()
+    instance = _load_instance(payload["load"]) if payload.get("load") else _build()
     arguments = _convert_all(payload.get("arguments"), argument_types)
     _prepare(instance, payload["method"], arguments)
     method = getattr(instance, payload["method"])
@@ -1337,7 +1530,7 @@ _emit(result)
 #: by ``predict`` keeps the state of the instance.
 _SESSION_BOOTSTRAP = _SANDBOX_PRELUDE + r"""
 try:
-    instance = _build()
+    instance = _load_instance(payload["load"]) if payload.get("load") else _build()
 except BaseException as exc:
     import traceback as _traceback
 
@@ -1483,6 +1676,10 @@ class PlaygroundError(APIError):
 
 class InvocationError(PlaygroundError):
     """A model method call failed (``422``), timed out (``504``) or died (``503``)."""
+
+
+class LoadError(PlaygroundError):
+    """A saved model could not be loaded from its path (``422``/``504``/``503``)."""
 
 
 def _last_error_line(stderr: str) -> str:
@@ -1638,6 +1835,81 @@ def run_playground(
     return result
 
 
+def run_load(
+    model: Dict[str, Any],
+    load: Dict[str, Any],
+    timeout: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Load a saved ``model`` from ``load["path"]`` in a throw-away child interpreter.
+
+    Raises
+    ------
+    LoadError
+        When the file does not exist, the loader is not compatible or the child
+        process fails/times out.
+    """
+    timeout = INVOKE_TIMEOUT if timeout is None else timeout
+    payload = json.dumps(
+        {
+            "module": model["module"],
+            "name": model["name"],
+            "parameters": load.get("parameters") or {},
+            "load": {
+                key: load[key]
+                for key in ("name", "path", "path_parameter", "requires_instance", "module")
+                if key in load
+            },
+            **sandbox_payload(model, constructor_types(model)),
+        }
+    )
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-c", _LOAD_BOOTSTRAP],
+            input=payload,
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=child_environment(),
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise LoadError(f"La carga superó el límite de {timeout:g} segundos", status=504) from exc
+    elapsed = time.monotonic() - started
+
+    stdout = completed.stdout or ""
+    stderr = (completed.stderr or "").strip()
+    result_line = ""
+    for line in stdout.splitlines():
+        payload_line = _marker_payload(line)
+        if payload_line is not None:
+            result_line = payload_line
+    if not result_line:
+        raise LoadError(
+            _last_error_line(stderr) or "No se pudo cargar el modelo",
+            detail=stderr[-4000:],
+        )
+    try:
+        result = json.loads(result_line)
+    except json.JSONDecodeError as exc:
+        raise LoadError(
+            "El ejecutable devolvió una respuesta inválida", detail=stdout[-2000:]
+        ) from exc
+    if not result.get("ok"):
+        raise LoadError(
+            result.get("error") or "No se pudo cargar el modelo",
+            detail=(result.get("traceback") or stderr)[-4000:],
+        )
+    result.pop("ok", None)
+    result["loader"] = load.get("name")
+    result["path"] = load.get("path")
+    result["elapsed"] = round(elapsed, 3)
+    result["stdout"] = stdout.split(_PLAYGROUND_MARKER)[0][-4000:].strip()
+    result["stderr"] = stderr[-4000:]
+    return result
+
+
 def constructor_types(model: Dict[str, Any]) -> Dict[str, str]:
     """``{parameter: python type}`` of the constructor, for the child converter."""
     return {
@@ -1665,6 +1937,11 @@ def method_fields(
         if parameter.get("variadic"):
             # ``*args`` / ``**kwargs`` cannot be expressed as a JSON object.
             continue
+        sample = _sample_value(parameter, parameters)
+        if sample is None and parameter.get("required"):
+            sample = dummy_json_value(
+                parameter.get("name") or "", parameter.get("type") or "", parameters
+            )
         fields.append(
             {
                 "name": parameter["name"],
@@ -1672,11 +1949,22 @@ def method_fields(
                 "kind": parameter.get("widget") or guess_widget(parameter.get("type") or ""),
                 "required": bool(parameter.get("required")),
                 "default": _default_value(parameter),
-                "sample": _sample_value(parameter, parameters),
+                "sample": sample,
+                "jsonable": bool(parameter_is_jsonable(parameter)),
                 "description": parameter.get("description") or "",
             }
         )
     return fields
+
+
+def method_is_jsonable(method: Dict[str, Any]) -> bool:
+    """Whether every required argument of ``method`` can be sent as JSON."""
+    for parameter in method.get("parameters") or []:
+        if parameter.get("variadic") or not parameter.get("required"):
+            continue
+        if not parameter_is_jsonable(parameter):
+            return False
+    return True
 
 
 def method_allowed(name: str, method: Dict[str, Any]) -> bool:
@@ -1706,11 +1994,16 @@ def method_allowed(name: str, method: Dict[str, Any]) -> bool:
 
 
 def invokable_methods(model: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Methods of ``model`` that the API is allowed to call."""
+    """Methods of ``model`` that the API is allowed to call.
+
+    Methods whose required arguments cannot be expressed as JSON (a live
+    ``AutoClassifier`` instance, a ``torch.Tensor``...) are omitted: showing them
+    in the UI would only lead to a call that can never be made.
+    """
     return [
         method
         for method in model.get("methods") or []
-        if method_allowed(method.get("name") or "", method)
+        if method_allowed(method.get("name") or "", method) and method_is_jsonable(method)
     ]
 
 
@@ -1923,24 +2216,30 @@ def run_invoke(
     parameters: Dict[str, Any],
     arguments: Dict[str, Any],
     timeout: Optional[float] = None,
+    load: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Build ``model`` and call ``method`` in a throw-away child interpreter.
+    """Build (or load) ``model`` and call ``method`` in a throw-away child interpreter.
 
     No state survives the call: two requests always start from a fresh object,
     which is what makes the endpoint safe to expose next to the catalog.
     """
     timeout = INVOKE_TIMEOUT if timeout is None else timeout
-    payload = json.dumps(
-        {
-            "module": model["module"],
-            "name": model["name"],
-            "parameters": parameters,
-            "method": method["name"],
-            "arguments": arguments,
-            **sandbox_payload(model, constructor_types(model)),
-            "argument_types": {field["name"]: field["type"] for field in method_fields(method)},
+    payload_data: Dict[str, Any] = {
+        "module": model["module"],
+        "name": model["name"],
+        "parameters": parameters,
+        "method": method["name"],
+        "arguments": arguments,
+        **sandbox_payload(model, constructor_types(model)),
+        "argument_types": {field["name"]: field["type"] for field in method_fields(method)},
+    }
+    if load:
+        payload_data["load"] = {
+            key: load[key]
+            for key in ("name", "path", "path_parameter", "requires_instance", "module")
+            if key in load
         }
-    )
+    payload = json.dumps(payload_data)
     started = time.monotonic()
     try:
         completed = subprocess.run(
@@ -2021,11 +2320,13 @@ class ModelSession:
         parameters: Dict[str, Any],
         process: "subprocess.Popen[str]",
         timeout: float,
+        load: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.id = session_id
         self.model = model
         self.parameters = dict(parameters or {})
         self.parameters_signature = parameters_signature(self.parameters)
+        self.load = dict(load or {}) or None
         self.process = process
         self.timeout = timeout
         self.created_at = time.time()
@@ -2220,6 +2521,15 @@ class ModelSession:
             "repr": self.info.get("repr") or "",
             "attributes": self.info.get("attributes") or [],
             "parameters": self.parameters,
+            "source": "path" if self.load else "constructor",
+            "load": (
+                {
+                    "loader": self.load.get("name"),
+                    "path": self.load.get("path"),
+                }
+                if self.load
+                else None
+            ),
             "created_at": self.created_at,
             "last_used": self.last_used,
             "idle_seconds": round(time.time() - self.last_used, 3),
@@ -2234,23 +2544,31 @@ class ModelSession:
 
 
 def start_session(
-    model: Dict[str, Any], parameters: Dict[str, Any], timeout: float
+    model: Dict[str, Any],
+    parameters: Dict[str, Any],
+    timeout: float,
+    load: Optional[Dict[str, Any]] = None,
 ) -> ModelSession:
-    """Spawn a worker, build the model inside it and wait until it is ready."""
+    """Spawn a worker, build (or load) the model inside it and wait until it is ready."""
     session_id = uuid.uuid4().hex[:12]
     try:
         process = _spawn(_SESSION_BOOTSTRAP)
     except OSError as exc:  # pragma: no cover - python disappeared
         raise InvocationError(f"No se pudo iniciar la sesión: {exc}", status=503) from exc
-    session = ModelSession(session_id, model, parameters, process, timeout)
-    payload = json.dumps(
-        {
-            "module": model["module"],
-            "name": model["name"],
-            "parameters": parameters,
-            **sandbox_payload(model, constructor_types(model)),
+    session = ModelSession(session_id, model, parameters, process, timeout, load=load)
+    payload_data: Dict[str, Any] = {
+        "module": model["module"],
+        "name": model["name"],
+        "parameters": parameters,
+        **sandbox_payload(model, constructor_types(model)),
+    }
+    if load:
+        payload_data["load"] = {
+            key: load[key]
+            for key in ("name", "path", "path_parameter", "requires_instance", "module")
+            if key in load
         }
-    )
+    payload = json.dumps(payload_data)
     try:
         stream = process.stdin
         if stream is None:  # pragma: no cover - defensive
@@ -2280,7 +2598,12 @@ class SessionStore:
         self._sessions: Dict[str, ModelSession] = {}
         self.created = 0
 
-    def create(self, model: Dict[str, Any], parameters: Dict[str, Any]) -> ModelSession:
+    def create(
+        self,
+        model: Dict[str, Any],
+        parameters: Dict[str, Any],
+        load: Optional[Dict[str, Any]] = None,
+    ) -> ModelSession:
         """Start a new session, evicting the least recently used one if needed."""
         with self._lock:
             self._prune()
@@ -2292,7 +2615,7 @@ class SessionStore:
         if evicted is not None:
             LOGGER.info("Sesión %s desalojada (máximo %d)", evicted.id, self._maximum)
             evicted.close()
-        session = start_session(model, parameters, self._timeout)
+        session = start_session(model, parameters, self._timeout, load=load)
         with self._lock:
             self._sessions[session.id] = session
         return session
@@ -2832,6 +3155,8 @@ def render_preview(
     back_url: str = "/",
     host: str = "",
     related: Optional[Sequence[Dict[str, Any]]] = None,
+    invoke_enabled: Optional[bool] = None,
+    sessions_enabled: Optional[bool] = None,
 ) -> str:
     """Render the HTML preview of ``model`` from ``template``.
 
@@ -2840,6 +3165,14 @@ def render_preview(
     inline f-strings.
     """
     label, icon = category_meta(model["category"])
+    invoke_payload = invoke_spec(model)
+    if invoke_enabled is not None:
+        invoke_payload["enabled"] = bool(invoke_enabled)
+    if sessions_enabled is not None:
+        invoke_payload["sessions_enabled"] = bool(sessions_enabled)
+    load_payload = load_spec(model)
+    if invoke_enabled is not None:
+        load_payload["enabled"] = bool(invoke_enabled)
     values = {
         "MODEL_ID": _escape(model["id"]),
         "MODEL_TITLE": _escape(model["title"]),
@@ -2866,7 +3199,8 @@ def render_preview(
         "SOURCE_DOWNLOAD_URL": _escape(f"/api/models/{model['id']}/source?download=1"),
         "PLAYGROUND_URL": _escape("/api/playground"),
         "MODEL_PLAYGROUND_JSON": _script_json(playground_spec(model)),
-        "MODEL_INVOKE_JSON": _script_json(invoke_spec(model)),
+        "MODEL_INVOKE_JSON": _script_json(invoke_payload),
+        "MODEL_LOAD_JSON": _script_json(load_payload),
         "HOST_URL": _escape(host),
     }
     rendered = template

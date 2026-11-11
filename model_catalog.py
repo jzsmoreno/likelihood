@@ -517,6 +517,12 @@ def _parameter_name(name: str) -> str:
 
 _SIDE_EFFECT_METHODS = ("save", "load", "plot", "write", "download", "delete", "reset", "remove")
 
+#: Method names that deserialize a model from disk.  ``load_predict`` or
+#: ``load_config`` are deliberately excluded: they do not return a model.
+_LOADER_NAMES = frozenset({"load", "load_model", "load_from", "load_from_path"})
+_LOADER_PREFIXES = ("load_from", "from_file", "from_path")
+_LOAD_PATH_NAMES = ("path", "filepath", "filename", "file", "directory", "folder", "location")
+
 
 def _is_literal(value: str) -> bool:
     """Check whether ``value`` is a scalar literal that can be inlined in a call."""
@@ -547,6 +553,122 @@ def _call_safe_methods(model: Dict[str, Any], limit: int = 2) -> List[str]:
         if len(calls) >= limit:
             break
     return calls
+
+
+def _is_loader_name(name: str) -> bool:
+    """Check whether ``name`` is the public name of a model loader."""
+    lowered = (name or "").lower()
+    return lowered in _LOADER_NAMES or lowered.startswith(_LOADER_PREFIXES)
+
+
+def _load_path_parameter(method: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Return the parameter of ``method`` that receives the model path.
+
+    Model loaders are written by hand and their first argument is not always
+    called ``path`` (``name``, ``filename`` or ``filepath`` are common), so the
+    name and the annotation are both considered.  ``*args``/``**kwargs`` cannot
+    be filled from JSON and are ignored.
+    """
+    fallback: Optional[Dict[str, Any]] = None
+    for parameter in method.get("parameters") or []:
+        if parameter.get("variadic"):
+            continue
+        if parameter.get("kind") not in ("positional", "keyword_only"):
+            continue
+        name = str(parameter.get("name") or "").lower()
+        type_hint = str(parameter.get("type") or "").lower()
+        if any(token in name for token in _LOAD_PATH_NAMES) or "path" in type_hint:
+            return parameter
+        if fallback is None and (name == "name" or type_hint in ("str", "path")):
+            fallback = parameter
+    return fallback
+
+
+def _loader_default(parameter: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Literal default path recorded by the catalog, when it is a string."""
+    if not parameter:
+        return None
+    text = parameter.get("default")
+    if not text:
+        return None
+    try:
+        value = ast.literal_eval(text)
+    except (ValueError, SyntaxError, TypeError):
+        return None
+    return value if isinstance(value, str) else None
+
+
+def _model_loaders(model: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Describe the methods that can load a saved model from a path.
+
+    A static/class loader (``HMM.load_model``) rebuilds the instance on its own;
+    an instance loader (``Arima.load_model``) needs a constructor first.  Both
+    cases are returned so the HTTP layer can decide whether constructor
+    arguments are required.
+    """
+    loaders: List[Dict[str, Any]] = []
+    for method in model.get("methods") or []:
+        name = method.get("name") or ""
+        if not _is_loader_name(name):
+            continue
+        if method.get("kind") == "property":
+            continue
+        if method.get("inherited") and not method.get("parameters"):
+            continue
+        path_parameter = _load_path_parameter(method)
+        if path_parameter is None:
+            continue
+        loaders.append(
+            {
+                "name": name,
+                "signature": method.get("signature") or name,
+                "kind": method.get("kind") or "method",
+                "description": method.get("description") or "",
+                "path_parameter": path_parameter["name"],
+                "path_type": path_parameter.get("type") or "str",
+                "default_path": _loader_default(path_parameter),
+                "requires_instance": method.get("kind") == "method",
+            }
+        )
+    loaders.sort(
+        key=lambda loader: (
+            0 if loader["name"] == "load" else 1,
+            loader["requires_instance"],
+            loader["name"],
+        )
+    )
+    return loaders
+
+
+def _compat_loaders(model: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Loaders declared by the private implementation of ``model``.
+
+    Some packages keep a modern implementation in ``_module.py`` and a legacy one
+    in ``module.py`` (the deep models pick one at import time depending on the
+    TensorFlow version).  The catalog introspects the public module, but the
+    private one may be the only one with ``save``/``load``; merging its loaders
+    lets the UI load a saved model without changing the public surface.
+    """
+    path = REPO_ROOT / str(model.get("path") or "")
+    if not path.is_file():
+        return []
+    private = path.with_name("_" + path.name)
+    if private == path or not private.is_file():
+        return []
+    try:
+        tree = ast.parse(private.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):  # pragma: no cover - unreadable legacy module
+        return []
+    for node in _candidate_classes(tree):
+        if node.name != model["name"]:
+            continue
+        methods = _method_index(node, ast.get_docstring(node) or "")
+        loaders = _model_loaders({"methods": methods})
+        module_name = ".".join(private.relative_to(REPO_ROOT).with_suffix("").parts)
+        for loader in loaders:
+            loader["module"] = module_name
+        return loaders
+    return []
 
 
 def _example_code(model: Dict[str, Any]) -> str:
@@ -635,6 +757,7 @@ def _to_model(record: Dict[str, Any]) -> Dict[str, Any]:
     ]
     model["safe_calls"] = _call_safe_methods(model)
     model["example"] = _example_code(model)
+    model["loaders"] = _model_loaders(model) or _compat_loaders(model)
     model["tags"] = _tags(model)
     model["line_count"] = model["source"].count("\n") + 1
     for private in ("_node", "docstring"):

@@ -81,7 +81,9 @@ route and JSON shape is preserved.
 | `GET` | `/api/playground/jobs/<job_id>` | State and results of one job |
 | `DELETE` | `/api/playground/jobs/<job_id>` | Cancel a queued job or forget a finished one |
 | `GET` | `/api/models/<id>/invoke` | Methods that may be called on a model (with their arguments) |
-| `POST` | `/api/models/<id>/invoke` | `{"method": ..., "arguments": {...}}` builds the model and calls it |
+| `POST` | `/api/models/<id>/invoke` | `{"method": ..., "arguments": {...}}` builds the model and calls it (add `path`/`loader` to call a saved instance) |
+| `GET` | `/api/models/<id>/load` | Loaders (`load`, `load_model`...) and path policy of a model |
+| `POST` | `/api/models/<id>/load` | `{"path": ..., "loader": ...}` loads a saved model and returns its type and attributes |
 | `POST` | `/api/models/<id>/sample` | `{"method": ..., "parameters": {...}}` returns dummy JSON arguments |
 | `POST` | `/api/models/<id>/sessions` | Build the model once and keep it alive for several calls |
 | `GET` | `/api/sessions` | Open model sessions |
@@ -316,11 +318,36 @@ si cambian (por ejemplo `input_shape_parm`), el servidor reconstruye el modelo,
 devuelve `rebuilt: true` y un `session_id` nuevo, de modo que nunca se atiende
 una llamada con una instancia construida con parámetros obsoletos.
 
-En la pestaña *Invocar método*, **🚀 Desplegar como endpoint** crea la sesión con
-los parámetros del constructor y muestra la URL
-`POST /api/sessions/<id>/invoke` junto con un `curl` listo para copiar, de modo
-que la instancia queda publicada entre llamadas (`fit` → `predict`) hasta que
-expire por inactividad.
+#### Cargar un modelo guardado
+
+Los modelos que exponen `load(...)` o `load_model(...)` (por ejemplo `HMM`,
+`Arima`, `FourierRegression`, `SimulationEngine`, `EnsembleClassifier` y
+`AutoClassifier`) pueden cargarse desde una ruta. La pestaña **Laboratorio**
+muestra la sección
+*📂 Cargar un modelo guardado*: elige el loader, escribe la ruta y pulsa
+**Verificar** para construir la instancia, o **Cargar y usar** para dejarla viva
+en una sesión y llamar a sus métodos desde *Invocar método*.
+
+```bash
+# inspeccionar los loaders disponibles
+curl -s http://127.0.0.1:8000/api/models/HMM/load | python3 -m json.tool
+
+# verificar que el archivo se puede cargar
+curl -s -X POST http://127.0.0.1:8000/api/models/HMM/load \
+  -H 'Content-Type: application/json' \
+  -d '{"path": "./hmm.pkl", "loader": "load_model"}' | python3 -m json.tool
+
+# abrir una sesión sobre la instancia cargada
+curl -s -X POST http://127.0.0.1:8000/api/models/HMM/sessions \
+  -H 'Content-Type: application/json' \
+  -d '{"path": "./hmm.pkl", "loader": "load_model"}'
+```
+
+Las rutas relativas se resuelven desde la raíz del repositorio; los loaders que
+añaden `.pkl` por su cuenta funcionan tanto con `modelo` como con `modelo.pkl`.
+`LM_LOAD_ROOT` cambia la raíz y `LM_LOAD_RESTRICT=1` rechaza cualquier ruta que
+quede fuera de ella. Cargar un `pickle` ejecuta código: usa únicamente archivos
+de confianza.
 
 > **Security note:** the playground imports the package and builds real model
 > objects. The server binds to `127.0.0.1` by default; keep it that way unless
@@ -363,6 +390,8 @@ expire por inactividad.
 | `LM_MAX_SESSIONS` | `4` | Live model instances kept in memory |
 | `LM_SESSION_TTL` | `900` | Seconds an idle session stays alive |
 | `LM_SESSION_TIMEOUT` | `LM_INVOKE_TIMEOUT` | Maximum seconds per call on a session |
+| `LM_LOAD_ROOT` | repository root | Base directory for relative model paths (also restricts loads to that tree) |
+| `LM_LOAD_RESTRICT` | `1` when `LM_LOAD_ROOT` is set | Reject paths outside `LM_LOAD_ROOT` |
 
 The same options are available as flags: `--token`, `--cors-origin` (repeatable),
 `--rate-limit`, `--no-playground` and `--no-invoke` (read-only catalog), plus

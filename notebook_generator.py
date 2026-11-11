@@ -206,14 +206,6 @@ def _methods_cell(model: Dict[str, Any]) -> Dict[str, Any]:
     return _markdown("## 📋 Métodos disponibles\n\n" + _method_table(model["methods"]) + "\n")
 
 
-def _source_cell(model: Dict[str, Any]) -> Dict[str, Any]:
-    """Collapsible block with the exact source of the class."""
-    source = "## 🧾 Código fuente\n\n"
-    source += f"<details>\n<summary><code>{model['path']}</code></summary>\n\n"
-    source += "```python\n" + model["source"].rstrip() + "\n```\n\n</details>\n"
-    return _markdown(source, tags=["source"])
-
-
 def _is_safe_literal(text: Optional[str]) -> bool:
     """Check whether ``text`` is a literal (tuple, number, quoted string, ``None``)."""
     if not text:
@@ -440,7 +432,6 @@ def build_notebook(
     cells.append(_code(model["example"], tags=["example"]))
     cells.append(_interactive_markdown(model))
     cells.append(_code(_interactive_source(model), tags=["interactive"]))
-    cells.append(_source_cell(model))
     return notebook
 
 

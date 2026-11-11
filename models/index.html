@@ -42,13 +42,16 @@
   [hidden] { display: none !important; }
   body {
     margin: 0;
-    padding: 24px 16px 48px;
+    padding: 28px 16px 56px;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: radial-gradient(circle at 10% 0%, #eef2ff 0%, #f7f8fc 38%, #e9edf7 100%);
     background-attachment: fixed;
     color: var(--ink);
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: radial-gradient(circle at 10% 0%, #1c2233 0%, #121620 55%, #0b0e15 100%); }
   }
   body.no-scroll { overflow: hidden; }
   .wrap { max-width: 1280px; margin: 0 auto; }
@@ -372,7 +375,7 @@
   <header class="hero">
     <div>
       <h1><span class="logo" aria-hidden="true">🔬</span> Catálogo de Modelos · Likelihood</h1>
-      <p>Todos los modelos disponibles, descubiertos por introspección del paquete <code>likelihood</code>.</p>
+      <p>Explora, filtra y abre la ficha de cualquier modelo del paquete <code>likelihood</code>.</p>
     </div>
     <div class="stats" id="stats" aria-live="polite">
       <div class="stat"><b>—</b><span>modelos</span></div>
@@ -385,8 +388,7 @@
       <div class="search-field">
         <label class="sr-only" for="search">Buscar modelos</label>
         <input type="search" id="search" placeholder="🔍 Buscar modelo, método, parámetro…"
-               autocomplete="off" spellcheck="false" aria-describedby="search-hint"
-               list="search-suggestions">
+               autocomplete="off" spellcheck="false" list="search-suggestions">
         <datalist id="search-suggestions"></datalist>
         <button type="button" id="clear-search" hidden aria-label="Borrar la búsqueda">&times;</button>
       </div>
@@ -402,10 +404,6 @@
         <button type="button" id="sort-dir" aria-label="Invertir el orden" title="Invertir el orden">↓</button>
       </div>
     </div>
-    <p class="hint" id="search-hint">
-      Pulsa <kbd>/</kbd> o <kbd>⌘K</kbd> para buscar · <kbd>Esc</kbd> para cerrar la ficha ·
-      haz clic en una etiqueta para filtrar por ella.
-    </p>
     <div class="filters" id="filters" role="group" aria-label="Filtrar por categoría">
       <button class="chip active" type="button" data-category="" aria-pressed="true">
         Todos<span class="chip-count">—</span>
@@ -435,13 +433,7 @@
   </noscript>
 
   <footer class="credits">
-    <p>📊 Librería Likelihood · catálogo generado por introspección · <span id="year"></span></p>
-    <p class="credits-links">
-      <a href="/api/models">API</a> ·
-      <a href="/api/openapi.json">OpenAPI</a> ·
-      <a href="/docs">Documentación interactiva</a> ·
-      <a href="/api/health">Estado del servidor</a>
-    </p>
+    <p>Librería Likelihood · catálogo generado por introspección</p>
   </footer>
 </div>
 
@@ -631,17 +623,9 @@
     }
 
     function renderStats() {
-      var parameters = 0;
-      var methods = 0;
-      each(state.models, function (model) {
-        parameters += model.parameter_count || 0;
-        methods += model.method_count || 0;
-      });
       dom.stats.innerHTML =
         stat(state.total, 'modelos') +
-        stat(state.categories.length, 'categorías') +
-        stat(parameters, 'parámetros') +
-        stat(methods, 'métodos');
+        stat(state.categories.length, 'categorías');
     }
 
     /* ------------------------------------------------------------------ */
@@ -900,10 +884,6 @@
       return html + esc(text.slice(cursor));
     }
 
-    function importStatement(model) {
-      return model.import_statement || ('from ' + model.module + ' import ' + model.id);
-    }
-
     function cardHtml(model) {
       var terms = state.terms || [];
       var description = String(model.short_description || '');
@@ -925,7 +905,6 @@
         '<footer>' +
           '<span>' + esc(model.parameter_count || 0) + ' parámetros · ' +
             esc(model.method_count || 0) + ' métodos</span>' +
-          '<span class="module" title="' + esc(model.module) + '">' + esc(model.module) + '</span>' +
         '</footer>' +
         '<div class="card-actions">' +
           '<button class="btn btn-secondary btn-small" type="button" data-action="open">📖 Ficha</button>' +
@@ -933,8 +912,6 @@
             ' rel="noopener" title="Abrir la vista previa completa">🌐 Vista previa</a>' +
           '<a class="btn btn-ghost btn-small" href="/api/notebook/' + id + '" download' +
             ' title="Descargar el notebook del modelo">⬇️ Notebook</a>' +
-          '<button class="btn btn-ghost btn-small" type="button" data-action="import"' +
-            ' title="Copiar la sentencia de importación">🔗 Import</button>' +
         '</div>' +
       '</article>';
     }
@@ -1056,31 +1033,6 @@
       }).join('');
     }
 
-    function relatedHtml(related) {
-      if (!related || !related.length) return '';
-      return '<h3>Modelos relacionados</h3><div class="related">' + related.map(function (entry) {
-        return '<button class="btn btn-secondary btn-small" type="button" data-related="' +
-          esc(entry.id) + '" title="' + esc(entry.short_description || entry.title) + '">' +
-          esc(entry.icon || '📦') + ' ' + esc(entry.title || entry.id) + '</button>';
-      }).join('') + '</div>';
-    }
-
-    /* La sección es opcional: si /related falla, la ficha se queda como está. */
-    function loadRelated(id, requestId) {
-      var container = dom.modalBody.querySelector('#modal-related');
-      if (!container) return;
-      window.fetch(API + '/models/' + encodeURIComponent(id) + '/related?limit=4')
-        .then(function (response) {
-          if (!response.ok) throw new Error('HTTP ' + response.status);
-          return response.json();
-        })
-        .then(function (data) {
-          if (requestId !== state.requestId) return;
-          container.innerHTML = relatedHtml(data && data.related);
-        })
-        .catch(function () { /* sin recomendaciones */ });
-    }
-
     function renderModal(model) {
       state.current = model;
       modalHeading(model);
@@ -1088,26 +1040,18 @@
       var html = '<h3>Descripción</h3><div class="prose">' +
         esc(model.full_description || model.short_description || '') + '</div>';
       html += '<h3>Firma</h3><div class="sig" id="modal-signature">' + esc(model.signature || '') + '</div>';
-      html += '<p class="meta-line">Importación: <code>' + esc(model.import_statement || '') + '</code><br>' +
-        'Módulo: <code>' + esc(model.module || '') + '</code> · Fuente: <code>' +
-        esc((model.path || '') + ':' + (model.lineno || '')) + '</code> · ' +
-        esc(model.line_count || 0) + ' líneas</p>';
+      html += '<p class="meta-line">Importación: <code>' + esc(model.import_statement || '') + '</code></p>';
       html += '<h3>Parámetros</h3>' + parametersHtml(model);
       html += attributesHtml(model);
       html += '<h3>Métodos</h3><ul class="methods">' + methodsHtml(model) + '</ul>';
       html += '<h3>Ejemplo</h3><pre id="modal-example">' + esc(model.example || '# —') + '</pre>';
-      html += '<div id="modal-related"></div>';
       html += '<div class="modal-actions">' +
-        '<a class="btn btn-primary" href="/preview/' + esc(id) + '" target="_blank" rel="noopener">🌐 Vista previa y playground</a>' +
+        '<a class="btn btn-primary" href="/preview/' + esc(id) + '" target="_blank" rel="noopener">🌐 Vista previa y laboratorio</a>' +
         '<a class="btn btn-secondary" href="/api/notebook/' + esc(id) + '" download>⬇️ Notebook</a>' +
-        '<a class="btn btn-secondary" href="/api/models/' + esc(id) + '/source?download=1" download>⬇️ Código fuente</a>' +
-        '<a class="btn btn-secondary" href="/api/models/' + esc(id) + '" target="_blank" rel="noopener">🔌 JSON de la API</a>' +
         '<button class="btn btn-success" type="button" data-copy="#modal-example" data-toast="Ejemplo copiado">📋 Copiar ejemplo</button>' +
-        '<button class="btn btn-secondary" type="button" data-copy="#modal-signature" data-toast="Firma copiada">📋 Copiar firma</button>' +
       '</div>';
       dom.modalBody.innerHTML = html;
       bindCopyButtons(dom.modalBody);
-      loadRelated(model.id, state.requestId);
     }
 
     function closeModal(options) {
@@ -1255,12 +1199,6 @@
       applyFilters();
     }
 
-    function copyImport(id) {
-      var model = findModel(id);
-      if (!model) return;
-      copyText(importStatement(model), 'Importación copiada');
-    }
-
     function onGridClick(event) {
       var target = event.target;
       if (!target || !target.closest) return;
@@ -1280,10 +1218,6 @@
       var action = closest(target, '[data-action]');
       var name = action ? action.getAttribute('data-action') : '';
 
-      if (name === 'import') {
-        copyImport(id);
-        return;
-      }
       /* Enlaces y botones propios (notebook, vista previa) se comportan solos. */
       if (control && name !== 'open') return;
 
@@ -1388,7 +1322,6 @@
       dom.modalBody = byId('modal-body');
       dom.modalClose = byId('modal-close');
       dom.toast = byId('toast');
-      byId('year').textContent = String(new Date().getFullYear());
       bindEvents();
       loadCatalog();
     }

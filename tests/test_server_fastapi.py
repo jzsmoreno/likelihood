@@ -12,6 +12,7 @@ Run with::
 
 from __future__ import annotations
 
+import pickle
 import sys
 import time
 from pathlib import Path
@@ -51,6 +52,14 @@ class Calculator:
     def history(self) -> list:
         """Devuelve una lista (para comprobar la serialización)."""
         return [1, 2, 3]
+
+    @staticmethod
+    def load(filename: str = "./calculator") -> "Calculator":
+        """Carga una calculadora serializada con pickle."""
+        import pickle
+
+        with open(filename, "rb") as handle:
+            return pickle.load(handle)
 '''
 
 
@@ -116,6 +125,18 @@ def calculator_entry() -> Dict[str, Any]:
         "example": "",
         "safe_calls": [],
         "bases": [],
+        "loaders": [
+            {
+                "name": "load",
+                "signature": "load(filename: str = './calculator') -> 'Calculator'",
+                "kind": "static",
+                "description": "Carga una calculadora serializada con pickle.",
+                "path_parameter": "filename",
+                "path_type": "str",
+                "default_path": "./calculator",
+                "requires_instance": False,
+            }
+        ],
         "kind": "class",
         "path": "lm_invoke_probe.py",
         "lineno": 1,
@@ -807,6 +828,84 @@ def test_sample_endpoint(client, calculator):
     data = response.json()
     assert data["method"] == "add"
     assert "amount" in data["arguments"]
+
+
+def test_load_spec_and_saved_model(client, calculator, tmp_path):
+    spec = client.get("/api/models/Calculator/load")
+    assert spec.status_code == 200
+    body = spec.json()
+    assert body["loadable"] is True
+    assert body["loaders"][0]["name"] == "load"
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        import lm_invoke_probe
+
+        model_path = tmp_path / "saved_calculator.pkl"
+        with model_path.open("wb") as handle:
+            pickle.dump(lm_invoke_probe.Calculator(value=10), handle)
+    finally:
+        sys.path.remove(str(tmp_path))
+
+    loaded = client.post(
+        "/api/models/Calculator/load",
+        json={"path": str(model_path), "loader": "load"},
+    )
+    assert loaded.status_code == 200
+    assert loaded.json()["type"] == "Calculator"
+
+    invoked = client.post(
+        "/api/models/Calculator/invoke",
+        json={
+            "method": "add",
+            "arguments": {"amount": 5},
+            "path": str(model_path),
+            "loader": "load",
+        },
+    )
+    assert invoked.status_code == 200
+    assert invoked.json()["result"] == 15
+    assert invoked.json()["source"] == "path"
+
+
+def test_load_session_keeps_the_saved_instance(client, calculator, tmp_path, session_store):
+    sys.path.insert(0, str(tmp_path))
+    try:
+        import lm_invoke_probe
+
+        model_path = tmp_path / "session_calculator.pkl"
+        with model_path.open("wb") as handle:
+            pickle.dump(lm_invoke_probe.Calculator(value=7), handle)
+    finally:
+        sys.path.remove(str(tmp_path))
+
+    created = client.post(
+        "/api/models/Calculator/sessions",
+        json={"path": str(model_path), "loader": "load"},
+    )
+    assert created.status_code == 201
+    body = created.json()
+    assert body["source"] == "path"
+    session_id = body["session_id"]
+
+    # ``parameters`` is sent on purpose: a loaded session must never be rebuilt
+    # from the constructor (that would discard the saved state).
+    invoked = client.post(
+        f"/api/sessions/{session_id}/invoke",
+        json={"method": "add", "arguments": {"amount": 3}, "parameters": {"value": 999}},
+    )
+    assert invoked.status_code == 200
+    assert invoked.json()["result"] == 10
+    assert invoked.json()["source"] == "path"
+
+
+def test_load_rejects_unknown_loader(client, calculator, tmp_path):
+    response = client.post(
+        "/api/models/Calculator/load",
+        json={"path": str(tmp_path / "missing.pkl"), "loader": "nope"},
+    )
+    assert response.status_code == 400
+    assert response.json()["success"] is False
 
 
 def test_invoke_can_be_disabled(client, settings, calculator, monkeypatch):

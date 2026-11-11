@@ -92,6 +92,24 @@ def test_invoke_spec_is_json_ready_for_every_model():
                 assert "type" in field and "sample" in field
 
 
+def test_generated_notebook_does_not_append_the_source():
+    import notebook_generator
+
+    notebook = notebook_generator.build_notebook(core.CATALOG[0])
+    tags = [cell.get("metadata", {}).get("tags", []) for cell in notebook["cells"]]
+    assert not any("source" in cell_tags for cell_tags in tags)
+    assert notebook["cells"][-1]["cell_type"] == "code"
+
+
+def test_auto_classifier_exposes_the_modern_loader():
+    model = next(item for item in core.CATALOG if item["id"] == "AutoClassifier")
+    loader = core.resolve_loader(model, "load")
+    assert loader["requires_instance"] is False
+    assert loader["path_parameter"] == "filepath"
+    assert loader.get("module", "").endswith("_autoencoders")
+    assert core.load_spec(model)["loadable"] is True
+
+
 def test_dummy_json_value_shapes_payloads_from_the_constructor():
     matrix = core.dummy_json_value("X", "np.ndarray", {"window": 4, "n_features": 3})
     assert len(matrix) == 4

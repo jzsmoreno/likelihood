@@ -38,6 +38,8 @@
     SOURCE_DOWNLOAD_URL         código fuente como descarga .py
     PLAYGROUND_URL              endpoint que construye el modelo
     MODEL_PLAYGROUND_JSON       especificación del playground para el navegador
+    MODEL_INVOKE_JSON           especificación de invocación para el navegador
+    MODEL_LOAD_JSON             loaders y política de rutas para cargar modelos
 
   (HOST_URL también está disponible: origen absoluto de la petición.)
 -->
@@ -70,9 +72,9 @@
   html { scroll-behavior: smooth; }
   body {
     margin: 0;
-    padding: 24px 16px 48px;
+    padding: 28px 16px 56px;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: radial-gradient(circle at 10% 0%, #eef2ff 0%, #f7f8fc 38%, #e9edf7 100%);
     background-attachment: fixed;
     color: var(--ink);
     min-height: 100vh;
@@ -262,6 +264,38 @@
   details.playground-snippet summary { cursor: pointer; font-size: .8rem; font-weight: 600; color: var(--accent); }
   details.playground-snippet pre { margin-top: 10px; }
 
+  /* ---------- Carga desde archivo ---------- */
+  details.load-panel {
+    background: var(--surface-alt); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 14px; margin: 4px 0 16px;
+  }
+  details.load-panel > summary {
+    cursor: pointer; font-weight: 700; font-size: .86rem; color: var(--accent);
+  }
+  details.load-panel[open] > summary { margin-bottom: 12px; }
+  .load-grid {
+    display: grid; grid-template-columns: max-content minmax(180px, 1fr) max-content; gap: 10px;
+    align-items: center;
+  }
+  .load-grid label { font-size: .78rem; font-weight: 700; color: var(--muted); }
+  .load-grid select, .load-grid input {
+    font: inherit; font-size: .84rem; padding: 8px 10px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  }
+  .load-grid select:focus, .load-grid input:focus { border-color: var(--accent); outline: none; }
+  .load-hint { margin: 10px 0 0; font-size: .76rem; color: var(--muted); line-height: 1.55; }
+  .load-hint code { background: var(--surface-chip); border-radius: 5px; padding: 1px 5px; }
+
+  /* ---------- Código fuente colapsable ---------- */
+  details.source-block {
+    margin-top: 26px; border-top: 2px solid var(--line); padding-top: 12px;
+  }
+  details.source-block > summary {
+    cursor: pointer; font-size: 1.1rem; font-weight: 700; color: var(--accent);
+    padding: 6px 0;
+  }
+  details.source-block[open] > summary { margin-bottom: 10px; }
+
   /* ---------- Pestañas del laboratorio (playground / invocar) ---------- */
   .lab-tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin: 4px 0 16px; }
   .lab-tab {
@@ -290,10 +324,6 @@
   .invoke-session label { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ink); }
   .invoke-session input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
   .invoke-session .session-badge { font-family: ui-monospace, Consolas, monospace; font-size: .74rem; }
-  .invoke-deploy { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
-  .invoke-endpoint { margin-top: 14px; }
-  .invoke-endpoint pre { white-space: pre-wrap; word-break: break-all; }
-  .invoke-endpoint .endpoint-url { font-weight: 700; color: var(--accent); }
 
   footer.credits { text-align: center; color: rgba(255,255,255,.85); font-size: .82rem; padding-top: 8px; }
   .back-top {
@@ -348,6 +378,8 @@
     .card { padding: 18px; }
     nav.toc { border-radius: 16px; }
     .actions .btn { flex: 1 1 100%; justify-content: center; }
+    .load-grid { grid-template-columns: 1fr; }
+    .load-grid label { margin-top: 4px; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -362,7 +394,7 @@
     .topbar, .card { box-shadow: none; margin-bottom: 12px; border-radius: 0; padding: 0; }
     nav.toc, .actions, .back-top, .toast, .skip, .code-head .btn { display: none !important; }
     .playground-actions, .playground-output, details.playground-snippet { display: none !important; }
-    .lab-tabs, .invoke-session, .invoke-deploy { display: none !important; }
+    .lab-tabs, .invoke-session { display: none !important; }
     pre, .prose, .sig, .param-card, .methods li { background: #fff !important; color: #000 !important; border-color: #999; }
     .related-card { box-shadow: none !important; transform: none !important; }
     .related-desc { -webkit-line-clamp: unset; display: block; }
@@ -384,11 +416,7 @@
     </div>
     <div class="topbar-side">
       <span class="badge {{CATEGORY_CLASS}}">{{MODEL_CATEGORY}}</span>
-      <span class="model-id">{{MODEL_ID}}</span>
-      <span class="topbar-actions">
-        <button class="btn btn-secondary btn-small" type="button" data-copy-url data-toast="Enlace copiado">🔗 Copiar enlace</button>
-        <a class="btn btn-secondary btn-small" href="{{BACK_URL}}">← Volver al catálogo</a>
-      </span>
+      <a class="btn btn-secondary btn-small" href="{{BACK_URL}}">← Volver al catálogo</a>
     </div>
   </header>
 
@@ -396,14 +424,11 @@
     <span class="toc-label">Ir a</span>
     <a href="#descripcion">Descripción</a>
     <a href="#firma">Firma</a>
-    <a href="#etiquetas">Etiquetas</a>
     <a href="#parametros">Parámetros</a>
-    <a href="#playground">Playground</a>
+    <a href="#playground">Laboratorio</a>
     <a href="#playground" data-lab-tab-link="invoke">Invocar método</a>
-    <a href="#metodos">Métodos</a>
     <a href="#ejemplo">Ejemplo</a>
     <a href="#codigo">Código fuente</a>
-    <a href="#relacionados" id="toc-relacionados">Relacionados</a>
   </nav>
 
   <main class="card" id="main">
@@ -414,11 +439,7 @@
     <div class="sig" id="signature">{{MODEL_SIGNATURE}}</div>
     <aside class="meta">
       <p>Importación: <code id="import">{{MODEL_IMPORT}}</code></p>
-      <p>Módulo: <code>{{MODEL_MODULE}}</code> · Fuente: <code>{{MODEL_FILE}}</code></p>
-      <p>Identificador: <code>{{MODEL_ID}}</code></p>
     </aside>
-
-    <h2 id="etiquetas">Etiquetas</h2>
     <div class="tags">{{MODEL_TAGS}}</div>
 
     <h2 id="parametros">Parámetros</h2>
@@ -427,6 +448,29 @@
     <section id="atributos">{{MODEL_ATTRIBUTES_SECTION}}</section>
 
     <h2 id="playground">Laboratorio</h2>
+    <details class="load-panel" id="load-panel" hidden>
+      <summary>📂 Cargar un modelo guardado</summary>
+      <div class="load-grid">
+        <label for="load-loader">Método de carga</label>
+        <select id="load-loader"></select>
+        <label for="load-path">Ruta</label>
+        <input type="text" id="load-path" placeholder="./modelo.pkl o ./modelo" autocomplete="off" spellcheck="false">
+        <button class="btn btn-secondary btn-small" type="button" id="load-verify">Verificar</button>
+        <button class="btn btn-primary btn-small" type="button" id="load-session">Cargar y usar</button>
+      </div>
+      <p class="load-hint" id="load-hint"></p>
+      <p class="playground-status" id="load-status" role="status" aria-live="polite"></p>
+      <div class="playground-output" id="load-result" hidden>
+        <div class="code-head">
+          <span id="load-result-title">Modelo cargado</span>
+          <button class="btn btn-ghost btn-small" type="button" data-copy="#load-output" data-toast="Resultado copiado">📋 Copiar</button>
+        </div>
+        <pre id="load-output"></pre>
+        <p class="playground-detail" id="load-detail" hidden></p>
+      </div>
+      <script type="application/json" id="load-data">{{MODEL_LOAD_JSON}}</script>
+    </details>
+
     <div class="lab-tabs" role="tablist" aria-label="Herramientas del modelo">
       <button class="lab-tab" type="button" role="tab" id="tab-playground"
               aria-controls="panel-playground" aria-selected="true" tabindex="0"
@@ -497,22 +541,6 @@
         <button class="btn btn-secondary" type="button" id="reset-invoke">↺ Restablecer argumentos</button>
         <span class="playground-status" id="invoke-status" role="status" aria-live="polite"></span>
       </div>
-      <div class="invoke-deploy">
-        <button class="btn btn-secondary" type="button" id="deploy-invoke">🚀 Desplegar como endpoint</button>
-        <span class="invoke-signature" id="invoke-deploy-note">Construye la instancia una vez y deja un endpoint para llamarla varias veces.</span>
-      </div>
-      <div class="playground-output invoke-endpoint" id="invoke-endpoint" hidden>
-        <div class="code-head">
-          <span>Endpoint persistente</span>
-          <span>
-            <button class="btn btn-ghost btn-small" type="button" data-copy="#invoke-endpoint-url" data-toast="URL copiada">📋 Copiar URL</button>
-            <button class="btn btn-ghost btn-small" type="button" data-copy="#invoke-endpoint-curl" data-toast="curl copiado">📋 Copiar curl</button>
-          </span>
-        </div>
-        <pre id="invoke-endpoint-url" class="endpoint-url"></pre>
-        <pre id="invoke-endpoint-curl"></pre>
-        <p class="playground-detail" id="invoke-endpoint-detail"></p>
-      </div>
       <div class="playground-output" id="invoke-result" hidden>
         <div class="code-head">
           <span id="invoke-result-title">Resultado de la llamada</span>
@@ -542,32 +570,26 @@
     </div>
     <pre id="example">{{MODEL_EXAMPLE}}</pre>
 
-    <h2 id="codigo">Código fuente</h2>
-    <div class="code-head">
-      <span>Código introspectado del paquete</span>
-      <span>
-        <button class="btn btn-ghost btn-small" type="button" id="toggle-source" hidden>↕ Ver todo</button>
-        <button class="btn btn-ghost btn-small" type="button" data-copy="#source" data-toast="Código fuente copiado">📋 Copiar código</button>
-      </span>
-    </div>
-    <pre id="source" class="clamped">{{MODEL_SOURCE}}</pre>
-
     {{MODEL_RELATED}}
+
+    <details class="source-block" id="codigo">
+      <summary>Código fuente</summary>
+      <div class="code-head">
+        <span>Código introspectado del paquete</span>
+        <button class="btn btn-ghost btn-small" type="button" data-copy="#source" data-toast="Código fuente copiado">📋 Copiar código</button>
+      </div>
+      <pre id="source">{{MODEL_SOURCE}}</pre>
+    </details>
 
     <div class="actions">
       <a class="btn btn-primary" href="{{NOTEBOOK_URL}}" download>⬇️ Descargar notebook</a>
       <a class="btn btn-secondary" href="{{SOURCE_DOWNLOAD_URL}}" download>⬇️ Descargar código fuente</a>
-      <a class="btn btn-secondary" href="{{API_URL}}" target="_blank" rel="noopener">🔌 Ver JSON de la API</a>
-      <button class="btn btn-secondary" type="button" data-copy="#signature" data-toast="Firma copiada">📋 Copiar firma</button>
-      <button class="btn btn-secondary" type="button" data-copy="#import" data-toast="Importación copiada">📋 Copiar importación</button>
-      <button class="btn btn-secondary" type="button" data-copy-url data-toast="Enlace copiado">🔗 Copiar enlace</button>
-      <button class="btn btn-secondary" type="button" id="print-page">🖨️ Imprimir</button>
       <a class="btn btn-secondary" href="{{BACK_URL}}">← Volver al catálogo</a>
     </div>
   </main>
 
   <footer class="credits">
-    <p>📊 Librería Likelihood · vista previa generada por introspección · <span id="year"></span></p>
+    <p>Librería Likelihood · vista previa generada por introspección</p>
   </footer>
 </div>
 
@@ -580,11 +602,7 @@
   (function () {
     var dom = {
       toast: document.getElementById('toast'),
-      source: document.getElementById('source'),
-      toggle: document.getElementById('toggle-source'),
-      backTop: document.getElementById('back-top'),
-      year: document.getElementById('year'),
-      print: document.getElementById('print-page')
+      backTop: document.getElementById('back-top')
     };
 
     function toast(message) {
@@ -636,10 +654,6 @@
     /* Un único listener para todos los botones de copia. */
     document.addEventListener('click', function (event) {
       if (!event.target.closest) return;
-      if (event.target.closest('[data-copy-url]')) {
-        copyText(window.location.href, 'Enlace copiado');
-        return;
-      }
       var button = event.target.closest('[data-copy]');
       if (!button) return;
       var target = document.querySelector(button.getAttribute('data-copy'));
@@ -649,24 +663,6 @@
       }
       copyText(target.textContent, button.getAttribute('data-toast') || 'Copiado');
     });
-
-    /* El código fuente se muestra recortado y se puede desplegar. */
-    if (dom.source && dom.toggle) {
-      if (dom.source.scrollHeight > 480) {
-        dom.toggle.hidden = false;
-        dom.toggle.addEventListener('click', function () {
-          var clamped = dom.source.classList.toggle('clamped');
-          dom.toggle.textContent = clamped ? '↕ Ver todo' : '↕ Contraer';
-          if (!clamped) dom.source.scrollIntoView({ block: 'start' });
-        });
-      } else {
-        dom.source.classList.remove('clamped');
-      }
-    }
-
-    if (dom.print) {
-      dom.print.addEventListener('click', function () { window.print(); });
-    }
 
     if (dom.backTop) {
       window.addEventListener('scroll', function () {
@@ -986,6 +982,221 @@
     }
 
     /* ------------------------------------------------------------------ */
+    /* Carga de un modelo guardado                                         */
+    /* ------------------------------------------------------------------ */
+
+    var loadDom = {
+      panel: document.getElementById('load-panel'),
+      select: document.getElementById('load-loader'),
+      path: document.getElementById('load-path'),
+      verify: document.getElementById('load-verify'),
+      use: document.getElementById('load-session'),
+      hint: document.getElementById('load-hint'),
+      status: document.getElementById('load-status'),
+      result: document.getElementById('load-result'),
+      title: document.getElementById('load-result-title'),
+      output: document.getElementById('load-output'),
+      detail: document.getElementById('load-detail')
+    };
+
+    var loadData = null;
+    try {
+      var loadNode = document.getElementById('load-data');
+      if (loadNode && loadNode.textContent.trim()) {
+        loadData = JSON.parse(loadNode.textContent);
+      }
+    } catch (error) {
+      loadData = null;
+    }
+
+    function setLoadStatus(message, kind) {
+      if (!loadDom.status) return;
+      loadDom.status.textContent = message;
+      loadDom.status.className = 'playground-status' + (kind ? ' ' + kind : '');
+    }
+
+    function showLoadResult(text, detail, ok) {
+      if (!loadDom.result) return;
+      loadDom.result.hidden = false;
+      loadDom.title.textContent = ok ? 'Modelo cargado' : 'No se pudo cargar';
+      loadDom.output.textContent = text;
+      loadDom.detail.hidden = !detail;
+      loadDom.detail.textContent = detail || '';
+    }
+
+    function currentLoader() {
+      if (!loadData || !loadDom.select) return null;
+      var loaders = loadData.loaders || [];
+      for (var i = 0; i < loaders.length; i += 1) {
+        if (loaders[i].name === loadDom.select.value) return loaders[i];
+      }
+      return loaders.length ? loaders[0] : null;
+    }
+
+    function loadConstructorValues() {
+      var fromInvoke = collectFields(playgroundData, 'ic');
+      if (fromInvoke.invalid.length || fromInvoke.missing.length) return collectParameters();
+      return fromInvoke;
+    }
+
+    function loadPayload(loader) {
+      var values = {};
+      if (loader && loader.requires_instance) {
+        var constructor = loadConstructorValues();
+        if (constructor.invalid.length) {
+          setLoadStatus('Revisa el constructor: ' + constructor.invalid.join('; '), 'error');
+          return null;
+        }
+        if (constructor.missing.length) {
+          setLoadStatus(
+            'Este loader necesita el constructor: faltan ' + constructor.missing.join(', '),
+            'error'
+          );
+          return null;
+        }
+        values = constructor.values;
+      }
+      var path = loadDom.path ? loadDom.path.value.trim() : '';
+      if (!path) {
+        setLoadStatus('Escribe la ruta del modelo guardado', 'error');
+        return null;
+      }
+      return { loader: loader ? loader.name : '', path: path, parameters: values };
+    }
+
+
+    function verifyLoadedModel() {
+      if (!loadData || !loadData.loadable || loadData.enabled === false) return;
+      var loader = currentLoader();
+      var payload = loadPayload(loader);
+      if (!payload) return;
+      if (loadDom.verify) loadDom.verify.disabled = true;
+      if (loadDom.use) loadDom.use.disabled = true;
+      setLoadStatus('Cargando el modelo…', '');
+      postJson(loadData.endpoint, payload)
+        .then(function (response) {
+          var data = response.data;
+          if (!response.ok || data.success === false) {
+            setLoadStatus('Error: ' + describeInvokeError(data), 'error');
+            showLoadResult(data.error || 'Error desconocido', data.detail || '', false);
+            return;
+          }
+          var lines = [
+            'tipo   : ' + (data.type || '—'),
+            'loader : ' + (data.loader || payload.loader || '—'),
+            'ruta   : ' + (data.path || payload.path || '—')
+          ];
+          if (data.attributes && data.attributes.length) {
+            lines.push('atributos: ' + data.attributes.join(', '));
+          }
+          var elapsed = typeof data.elapsed === 'number' ? ' en ' + data.elapsed + ' s' : '';
+          setLoadStatus('Modelo verificado' + elapsed, 'ok');
+          showLoadResult(lines.join('\n'), data.stderr || '', true);
+        })
+        .catch(function (error) {
+          setLoadStatus('Error de red: ' + error.message, 'error');
+          showLoadResult(String(error.message || error), '', false);
+        })
+        .then(function () {
+          if (loadDom.verify) loadDom.verify.disabled = false;
+          if (loadDom.use) loadDom.use.disabled = false;
+        });
+    }
+
+    function loadAsSession() {
+      if (!loadData || !loadData.loadable || loadData.enabled === false || !invokeData) return;
+      var loader = currentLoader();
+      var payload = loadPayload(loader);
+      if (!payload) return;
+      if (loadDom.verify) loadDom.verify.disabled = true;
+      if (loadDom.use) loadDom.use.disabled = true;
+      setLoadStatus('Abriendo una instancia con el modelo guardado…', '');
+      var start = invokeSession.id ? closeSession(false) : Promise.resolve();
+      start.then(function () {
+        return postJson(invokeData.sessions_url, payload);
+      }).then(function (response) {
+        var data = response.data;
+        if (!response.ok || data.success === false) {
+          throw new Error(describeInvokeError(data));
+        }
+        invokeSession.id = data.session_id;
+        invokeSession.calls = 0;
+        invokeSession.signature = null;
+        invokeSession.loaded = true;
+        invokeSession.loader = payload.loader;
+        invokeSession.path = data.load ? data.load.path : payload.path;
+        if (invokeDom.run) invokeDom.run.disabled = false;
+        if (invokeDom.sample) invokeDom.sample.disabled = false;
+        if (invokeDom.select) invokeDom.select.disabled = false;
+        if (invokeDom.useSession) invokeDom.useSession.checked = true;
+        renderSessionInfo();
+        renderInvokeConstructor();
+        renderInvokeMethod();
+        setLoadStatus('Instancia cargada y lista para invocar', 'ok');
+        setInvokeStatus(
+          'Instancia cargada desde ' + (data.load ? data.load.path : payload.path),
+          'ok'
+        );
+        selectLabTab('invoke', true);
+      }).catch(function (error) {
+        setLoadStatus('Error: ' + error.message, 'error');
+      }).then(function () {
+        if (loadDom.verify) loadDom.verify.disabled = false;
+        if (loadDom.use) loadDom.use.disabled = false;
+      });
+    }
+
+    function renderLoad() {
+      if (!loadDom.panel || !loadData) return;
+      var loaders = loadData.loaders || [];
+      if (loadData.enabled === false || !loadData.loadable || !loaders.length) {
+        loadDom.panel.hidden = true;
+        return;
+      }
+      loadDom.panel.hidden = false;
+      if (loadDom.select) {
+        loadDom.select.innerHTML = loaders.map(function (loader) {
+          var suffix = loader.requires_instance ? ' · instancia' : '';
+          return '<option value="' + escapeHtml(loader.name) + '">' +
+            escapeHtml(loader.name + '()' + suffix) + '</option>';
+        }).join('');
+      }
+      if (loadDom.hint) {
+        var policy = loadData.restrict_to_root
+          ? 'Solo se permiten rutas dentro de ' + loadData.root + '.'
+          : 'Rutas relativas a ' + loadData.root + '.';
+        loadDom.hint.innerHTML = escapeHtml(policy) +
+          ' Se aceptan archivos <code>.pkl</code> y directorios de checkpoints. ' +
+          'Carga únicamente archivos de confianza.';
+      }
+      if (loadDom.path && !loadDom.path.value) {
+        try {
+          loadDom.path.value = window.sessionStorage.getItem('lm-load-path') || '';
+        } catch (error) {
+          loadDom.path.value = '';
+        }
+      }
+      if (loadDom.path) {
+        loadDom.path.addEventListener('change', function () {
+          try {
+            window.sessionStorage.setItem('lm-load-path', loadDom.path.value);
+          } catch (error) {
+            /* el almacenamiento es opcional */
+          }
+        });
+      }
+      if (loadDom.verify) loadDom.verify.addEventListener('click', verifyLoadedModel);
+      if (loadDom.use) {
+        var sessionsAvailable = !invokeData || invokeData.sessions_enabled !== false;
+        loadDom.use.disabled = !sessionsAvailable;
+        loadDom.use.title = sessionsAvailable
+          ? 'Carga el modelo en una instancia persistente'
+          : 'Las sesiones están deshabilitadas en este servidor';
+        loadDom.use.addEventListener('click', loadAsSession);
+      }
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Pestañas del laboratorio                                            */
     /* ------------------------------------------------------------------ */
 
@@ -1120,12 +1331,6 @@
       run: document.getElementById('run-invoke'),
       sample: document.getElementById('sample-invoke'),
       reset: document.getElementById('reset-invoke'),
-      deploy: document.getElementById('deploy-invoke'),
-      deployNote: document.getElementById('invoke-deploy-note'),
-      endpoint: document.getElementById('invoke-endpoint'),
-      endpointUrl: document.getElementById('invoke-endpoint-url'),
-      endpointCurl: document.getElementById('invoke-endpoint-curl'),
-      endpointDetail: document.getElementById('invoke-endpoint-detail'),
       status: document.getElementById('invoke-status'),
       result: document.getElementById('invoke-result'),
       title: document.getElementById('invoke-result-title'),
@@ -1144,7 +1349,7 @@
       invokeData = null;
     }
 
-    var invokeSession = { id: null, calls: 0, signature: null };
+    var invokeSession = { id: null, calls: 0, signature: null, loaded: false };
 
     function currentInvokeMethod() {
       if (!invokeData || !invokeDom.select) return null;
@@ -1174,7 +1379,8 @@
       if (invokeDom.sessionInfo) {
         invokeDom.sessionInfo.textContent = invokeSession.id
           ? 'sesión ' + invokeSession.id + ' · ' + invokeSession.calls +
-            (invokeSession.calls === 1 ? ' llamada' : ' llamadas')
+            (invokeSession.calls === 1 ? ' llamada' : ' llamadas') +
+            (invokeSession.loaded ? ' · cargada' : '')
           : 'sin sesión';
       }
       if (invokeDom.closeSession) invokeDom.closeSession.hidden = !invokeSession.id;
@@ -1197,6 +1403,17 @@
 
     function renderInvokeConstructor(forceDefaults) {
       if (playgroundData && playgroundData.buildable === false) {
+        if (invokeSession.loaded) {
+          if (invokeDom.constructorFields) {
+            invokeDom.constructorFields.innerHTML =
+              '<p class="empty">Instancia cargada desde un archivo; el constructor no se usa.</p>';
+          }
+          if (invokeDom.constructorNote) {
+            invokeDom.constructorNote.textContent =
+              'Métodos disponibles sobre la instancia cargada.';
+          }
+          return;
+        }
         if (invokeDom.constructorFields) {
           invokeDom.constructorFields.innerHTML =
             '<p class="empty">No se puede construir desde el catálogo: ' +
@@ -1222,9 +1439,11 @@
       );
       restoreFields(fields, 'ic', previous);
       if (invokeDom.constructorNote) {
-        invokeDom.constructorNote.textContent = invokeSession.id
-          ? 'La instancia se reconstruye automáticamente si cambias estos valores.'
-          : 'La primera llamada construye la clase con estos valores.';
+        invokeDom.constructorNote.textContent = invokeSession.loaded
+          ? 'Instancia cargada desde un archivo: los parámetros del constructor no se aplican.'
+          : (invokeSession.id
+              ? 'La instancia se reconstruye automáticamente si cambias estos valores.'
+              : 'La primera llamada construye la clase con estos valores.');
       }
     }
 
@@ -1243,13 +1462,19 @@
       var importStatement = invokeData.import_statement || source.import_statement || '';
       var modelName = invokeData.model_name || source.model_name || invokeData.model_id;
       var lines = [importStatement, ''];
-      lines.push('model = ' + modelName + '(' + constructorArguments.join(', ') + ')');
+      if (invokeSession.loaded) {
+        lines.push(
+          'model = ' + modelName + '.' + (invokeSession.loader || 'load') +
+          '(' + pyLiteral(invokeSession.path || '') + ')'
+        );
+      } else {
+        lines.push('model = ' + modelName + '(' + constructorArguments.join(', ') + ')');
+      }
       if (method) {
         lines.push('result = model.' + method.name + '(' + argumentsList.join(', ') + ')');
         lines.push('print(result)');
       }
       invokeDom.code.textContent = lines.join('\n');
-      renderEndpoint();
     }
 
     function renderInvoke() {
@@ -1260,7 +1485,6 @@
         }
         if (invokeDom.run) invokeDom.run.disabled = true;
         if (invokeDom.sample) invokeDom.sample.disabled = true;
-        if (invokeDom.deploy) invokeDom.deploy.disabled = true;
         return;
       }
       if (invokeDom.select) {
@@ -1276,12 +1500,8 @@
       if (invokeDom.sample) {
         invokeDom.sample.disabled = !(invokeData.methods || []).length;
       }
-      if (invokeDom.deploy) {
-        invokeDom.deploy.disabled = !invokeData.sessions_enabled;
-      }
       renderInvokeConstructor();
       renderSessionInfo();
-      renderEndpoint();
       if (invokeData.enabled === false) {
         if (invokeDom.fields) {
           invokeDom.fields.innerHTML =
@@ -1290,7 +1510,6 @@
         }
         if (invokeDom.run) invokeDom.run.disabled = true;
         if (invokeDom.sample) invokeDom.sample.disabled = true;
-        if (invokeDom.deploy) invokeDom.deploy.disabled = true;
         setInvokeStatus('Deshabilitada en el servidor', 'error');
         return;
       }
@@ -1303,7 +1522,6 @@
         }
         if (invokeDom.run) invokeDom.run.disabled = true;
         if (invokeDom.sample) invokeDom.sample.disabled = true;
-        if (invokeDom.deploy) invokeDom.deploy.disabled = true;
         if (invokeDom.select) invokeDom.select.disabled = true;
         setInvokeStatus('Requiere objetos Python', 'error');
         return;
@@ -1352,6 +1570,9 @@
         invokeSession.id = response.data.session_id;
         invokeSession.calls = 0;
         invokeSession.signature = constructorSignature(parameters);
+        invokeSession.loaded = false;
+        invokeSession.loader = null;
+        invokeSession.path = null;
         renderSessionInfo();
         renderInvokeConstructor();
         return invokeSession.id;
@@ -1363,9 +1584,11 @@
       invokeSession.id = null;
       invokeSession.calls = 0;
       invokeSession.signature = null;
+      invokeSession.loaded = false;
+      invokeSession.loader = null;
+      invokeSession.path = null;
       renderSessionInfo();
       renderInvokeConstructor();
-      renderEndpoint();
       if (!sessionId) return Promise.resolve();
       var template = invokeData.session_url_template || '/api/sessions/{session_id}';
       return window.fetch(template.replace('{session_id}', sessionId), {
@@ -1410,15 +1633,16 @@
     /* Pide al servidor datos dummy coherentes con el constructor elegido. */
     function fillSampleArguments() {
       var method = currentInvokeMethod();
-      if (!invokeData || invokeData.buildable === false || !method) {
-        if (invokeData && invokeData.buildable === false) {
+      var loaded = invokeSession.id && invokeSession.loaded;
+      if (!invokeData || (invokeData.buildable === false && !loaded) || !method) {
+        if (invokeData && invokeData.buildable === false && !loaded) {
           setInvokeStatus('Requiere objetos Python', 'error');
         } else {
           setInvokeStatus('No hay ningún método que invocar', 'error');
         }
         return;
       }
-      var parameters = validatedConstructor();
+      var parameters = loaded ? {} : validatedConstructor();
       if (!parameters) return;
       var endpoint = invokeData.sample_endpoint ||
         '/api/models/' + invokeData.model_id + '/sample';
@@ -1448,74 +1672,10 @@
         });
     }
 
-    function endpointTemplate() {
-      return invokeData.session_invoke_url_template || '/api/sessions/{session_id}/invoke';
-    }
-
-    /* Muestra la URL y el curl del endpoint de la sesión abierta. */
-    function renderEndpoint() {
-      if (!invokeDom.endpoint || !invokeData) return;
-      if (!invokeSession.id) {
-        invokeDom.endpoint.hidden = true;
-        if (invokeDom.deploy) invokeDom.deploy.textContent = '🚀 Desplegar como endpoint';
-        if (invokeDom.deployNote) {
-          invokeDom.deployNote.textContent =
-            'Construye la instancia una vez y deja un endpoint para llamarla varias veces.';
-        }
-        return;
-      }
-      var url = window.location.origin +
-        endpointTemplate().replace('{session_id}', invokeSession.id);
-      var method = currentInvokeMethod();
-      var payload = {
-        method: method ? method.name : '...',
-        arguments: method ? collectFields(method, 'iv').values : {}
-      };
-      invokeDom.endpoint.hidden = false;
-      invokeDom.endpointUrl.textContent = url;
-      invokeDom.endpointCurl.textContent = [
-        'curl -s -X POST "' + url + '" \\',
-        "  -H 'Content-Type: application/json' \\",
-        "  -d '" + JSON.stringify(payload) + "'"
-      ].join('\n');
-      var ttl = invokeData.session_ttl_seconds;
-      invokeDom.endpointDetail.textContent =
-        (ttl ? 'La sesión se cierra sola tras ' + ttl + ' s de inactividad. ' : '') +
-        'Máximo de sesiones simultáneas: ' + (invokeData.max_sessions || '—') + '.';
-      if (invokeDom.deploy) invokeDom.deploy.textContent = '🚀 Reconstruir endpoint';
-      if (invokeDom.deployNote) {
-        invokeDom.deployNote.textContent =
-          'Sesión ' + invokeSession.id + ' activa: cada llamada reutiliza la instancia. ' +
-          'Reconstruir aplica los parámetros actuales.';
-      }
-    }
-
-    /* Construye la instancia una vez y publica su endpoint de invocación. */
-    function deployEndpoint() {
-      if (!invokeData || invokeData.buildable === false) return;
-      var parameters = validatedConstructor();
-      if (!parameters) return;
-      if (invokeDom.deploy) invokeDom.deploy.disabled = true;
-      setInvokeStatus(
-        invokeSession.id ? 'Reconstruyendo la instancia…' : 'Desplegando endpoint…',
-        ''
-      );
-      var promise = invokeSession.id
-        ? closeSession(false).then(function () { return openSession(parameters); })
-        : openSession(parameters);
-      promise.then(function () {
-        if (invokeDom.useSession) invokeDom.useSession.checked = true;
-        renderEndpoint();
-        setInvokeStatus('Endpoint listo', 'ok');
-      }).catch(function (error) {
-        setInvokeStatus('Error: ' + error.message, 'error');
-      }).then(function () {
-        if (invokeDom.deploy) invokeDom.deploy.disabled = false;
-      });
-    }
-
     function runInvoke() {
-      if (!invokeData || invokeData.buildable === false) return;
+      if (!invokeData) return;
+      var loaded = invokeSession.id && invokeSession.loaded;
+      if (invokeData.buildable === false && !loaded) return;
       var method = currentInvokeMethod();
       if (!method) {
         setInvokeStatus('No hay ningún método que invocar', 'error');
@@ -1530,17 +1690,20 @@
         setInvokeStatus('Faltan argumentos: ' + argumentsValues.missing.join(', '), 'error');
         return;
       }
-      var constructorValues = collectFields(playgroundData, 'ic');
-      if (constructorValues.invalid.length) {
-        setInvokeStatus('Revisa el constructor: ' + constructorValues.invalid.join('; '), 'error');
-        return;
-      }
-      if (constructorValues.missing.length) {
-        setInvokeStatus(
-          'Faltan parámetros del constructor: ' + constructorValues.missing.join(', '),
-          'error'
-        );
-        return;
+      var constructorValues = { values: {} };
+      if (!loaded) {
+        constructorValues = collectFields(playgroundData, 'ic');
+        if (constructorValues.invalid.length) {
+          setInvokeStatus('Revisa el constructor: ' + constructorValues.invalid.join('; '), 'error');
+          return;
+        }
+        if (constructorValues.missing.length) {
+          setInvokeStatus(
+            'Faltan parámetros del constructor: ' + constructorValues.missing.join(', '),
+            'error'
+          );
+          return;
+        }
       }
       var useSession = invokeDom.useSession && invokeDom.useSession.checked;
       if (invokeDom.run) invokeDom.run.disabled = true;
@@ -1548,7 +1711,9 @@
       var request;
       if (useSession) {
         var signature = constructorSignature(constructorValues.values);
-        var sessionPromise = invokeSession.id && invokeSession.signature === signature
+        var reuse = invokeSession.id &&
+          (invokeSession.loaded || invokeSession.signature === signature);
+        var sessionPromise = reuse
           ? Promise.resolve(invokeSession.id)
           : closeSession(false).then(function () {
               return openSession(constructorValues.values);
@@ -1556,18 +1721,22 @@
         request = sessionPromise.then(function (sessionId) {
           var template = invokeData.session_invoke_url_template
             || '/api/sessions/{session_id}/invoke';
-          return postJson(template.replace('{session_id}', sessionId), {
-            method: method.name,
-            arguments: argumentsValues.values,
-            parameters: constructorValues.values
-          });
+          var payload = { method: method.name, arguments: argumentsValues.values };
+          if (!invokeSession.loaded) payload.parameters = constructorValues.values;
+          return postJson(template.replace('{session_id}', sessionId), payload);
         });
       } else {
-        request = postJson(invokeData.endpoint, {
+        var directPayload = {
           method: method.name,
           arguments: argumentsValues.values,
           parameters: constructorValues.values
-        });
+        };
+        if (invokeSession.loaded) {
+          directPayload.parameters = {};
+          directPayload.path = invokeSession.path;
+          directPayload.loader = invokeSession.loader;
+        }
+        request = postJson(invokeData.endpoint, directPayload);
       }
       request.then(function (response) {
         var data = response.data;
@@ -1589,7 +1758,6 @@
             : invokeSession.calls + 1;
           renderSessionInfo();
           renderInvokeConstructor();
-          renderEndpoint();
         }
         var lines = [
           'método : ' + (data.method || method.name),
@@ -1616,6 +1784,18 @@
 
     /* Arranque de la pestaña: sin esto el <select> queda vacío y los botones
        no responden, porque nada llama a renderInvoke() ni registra eventos. */
+    /* Abrir el bloque de código al navegar a #codigo desde el índice. */
+    var sourceBlock = document.getElementById('codigo');
+    if (sourceBlock) {
+      var openSource = function () { sourceBlock.open = true; };
+      if (window.location.hash === '#codigo') openSource();
+      document.addEventListener('click', function (event) {
+        var link = event.target.closest ? event.target.closest('a[href="#codigo"]') : null;
+        if (link) openSource();
+      });
+    }
+
+    renderLoad();
     renderInvoke();
     if (invokeDom.select) {
       invokeDom.select.addEventListener('change', renderInvokeMethod);
@@ -1625,9 +1805,6 @@
     }
     if (invokeDom.sample) {
       invokeDom.sample.addEventListener('click', fillSampleArguments);
-    }
-    if (invokeDom.deploy) {
-      invokeDom.deploy.addEventListener('click', deployEndpoint);
     }
     if (invokeDom.reset) {
       invokeDom.reset.addEventListener('click', function () {
