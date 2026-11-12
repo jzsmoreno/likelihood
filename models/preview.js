@@ -630,8 +630,16 @@
     if (playgroundData && playgroundDom.form) {
       renderPlayground();
       playgroundDom.form.addEventListener('submit', runPlayground);
-      playgroundDom.form.addEventListener('input', updateSnippet);
-      playgroundDom.form.addEventListener('change', updateSnippet);
+      /* Every edit is mirrored into the invoke constructor and refreshes the
+         dummy inputs, so the examples never describe stale values. */
+      var onPlaygroundEdit = function () {
+        mirrorConstructorFields('pg', 'ic');
+        updateSnippet();
+        updateInvokeSnippet();
+        refreshInvokeSamples('pg');
+      };
+      playgroundDom.form.addEventListener('input', onPlaygroundEdit);
+      playgroundDom.form.addEventListener('change', onPlaygroundEdit);
       if (playgroundDom.reset) {
         playgroundDom.reset.addEventListener('click', function () {
           renderPlayground();
@@ -1071,7 +1079,10 @@
     });
   }
 
-  /* Ask the server for dummy inputs shaped by ``parameters``. */
+  /* Ask the server for dummy inputs shaped by ``parameters``.  Only the newest
+     response is applied, so a slow request never overwrites fresher examples. */
+  var sampleRequestSeq = 0;
+
   function requestSamples(parameters, done) {
     var method = currentInvokeMethod();
     if (!invokeData || !method) {
@@ -1079,8 +1090,14 @@
       return;
     }
     var endpoint = invokeData.sample_endpoint || '/api/models/' + invokeData.model_id + '/sample';
+    sampleRequestSeq += 1;
+    var seq = sampleRequestSeq;
     postJson(endpoint, { method: method.name, parameters: parameters || {} })
       .then(function (response) {
+        if (seq !== sampleRequestSeq) {
+          if (done) done(false);
+          return;
+        }
         if (!response.ok || response.data.success === false) {
           if (done) done(false);
           return;
@@ -1094,9 +1111,57 @@
       });
   }
 
+  /* Examples are only valid for the constructor values they were built with, so
+     editing them regenerates the dummy inputs (never the other way around). */
+  var SAMPLE_REFRESH_DELAY = 300;
+  var sampleRefreshTimer = 0;
+
+  function cancelSampleRefresh() {
+    if (!sampleRefreshTimer) return;
+    window.clearTimeout(sampleRefreshTimer);
+    sampleRefreshTimer = 0;
+  }
+
+  /* Values of one constructor form, or ``null`` while the user is still typing. */
+  function constructorValues(prefix) {
+    var collected = collectFields(playgroundData, prefix);
+    if (collected.invalid.length || collected.missing.length) return null;
+    return collected.values;
+  }
+
+  function refreshInvokeSamples(prefix) {
+    cancelSampleRefresh();
+    if (!invokeData || !currentInvokeMethod()) return;
+    var values = constructorValues(prefix || 'ic');
+    if (values === null) return;
+    sampleRefreshTimer = window.setTimeout(function () {
+      sampleRefreshTimer = 0;
+      requestSamples(values, null);
+    }, SAMPLE_REFRESH_DELAY);
+  }
+
+  /* Both constructor forms describe the same model: editing one mirrors the other
+     so the examples, the snippet and the request always agree. */
+  function copyControl(from, to) {
+    if (!from || !to) return;
+    if (from.getAttribute('data-kind') === 'bool') {
+      to.checked = from.checked;
+      return;
+    }
+    to.value = from.value;
+  }
+
+  function mirrorConstructorFields(source, target) {
+    if (!playgroundData) return;
+    (playgroundData.fields || []).forEach(function (field, index) {
+      copyControl(byId(source + '-' + index), byId(target + '-' + index));
+    });
+  }
+
   /* Refresh the playground, the invoke form and the example inputs. */
   function synchronizeWithParameters(parameters, silent) {
     var values = parameters && Object.keys(parameters).length ? parameters : defaultParameters();
+    cancelSampleRefresh();
     applyParameters(values);
     if (!invokeData) return;
     renderInvokeMethod();
@@ -1116,6 +1181,7 @@
 
   /* Forget the saved model and put every control back to its catalogue default. */
   function resetModelConfiguration() {
+    cancelSampleRefresh();
     forgetContext();
     if (loadDom.path) loadDom.path.value = '';
     if (loadDom.select && loadData) {
@@ -1803,15 +1869,33 @@
 
   function bindInvoke() {
     renderInvoke();
-    if (invokeDom.select) invokeDom.select.addEventListener('change', renderInvokeMethod);
+    if (invokeDom.select) {
+      invokeDom.select.addEventListener('change', function () {
+        renderInvokeMethod();
+        refreshInvokeSamples('ic');
+      });
+    }
     if (invokeDom.run) invokeDom.run.addEventListener('click', runInvoke);
     if (invokeDom.sample) invokeDom.sample.addEventListener('click', fillSampleArguments);
+    if (invokeDom.constructorFields) {
+      /* Editing the constructor here follows the Playground and rebuilds the
+         examples with the new values. */
+      var onConstructorEdit = function () {
+        mirrorConstructorFields('ic', 'pg');
+        updateSnippet();
+        updateInvokeSnippet();
+        refreshInvokeSamples('ic');
+      };
+      invokeDom.constructorFields.addEventListener('input', onConstructorEdit);
+      invokeDom.constructorFields.addEventListener('change', onConstructorEdit);
+    }
     if (invokeDom.reset) {
       invokeDom.reset.addEventListener('click', function () {
         renderInvokeMethod();
         renderInvokeConstructor(true);
         if (invokeDom.result) invokeDom.result.hidden = true;
         setInvokeStatus('Argumentos restablecidos', '');
+        refreshInvokeSamples('ic');
       });
     }
     if (invokeDom.useSession) {

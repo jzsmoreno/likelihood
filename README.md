@@ -62,6 +62,27 @@ The interface follows one design system inspired by the Databricks platform:
 The catalog is re-introspected when a model source changes (`LM_CATALOG_TTL`), so
 editing `likelihood/models` is reflected without restarting the server.
 
+### Playground defaults and example inputs
+
+The Playground shows each constructor parameter with the value the model really
+uses: the default recorded in the source, the catalogue sample when the parameter
+is required and has no default, and an empty field when it is optional and has no
+default. The **Datos de ejemplo** button (`POST /api/models/<id>/sample`) returns
+exactly the same values for the arguments of the selected method, so an example
+never replaces a configured default:
+
+- a declared default is sent untouched, `0`, `False`, `""` and `[]` included;
+- an optional argument without a default is left out, so the method keeps its own
+  default instead of receiving an invented value;
+- only a required argument without a default is generated, shaped by the
+  constructor values (`input_shape_parm`, `n_features`, `n_states`,
+  `n_observations`…).
+
+The page keeps the two constructor forms (Playground and the invoke tab) in sync
+and regenerates the examples while you edit them: the suggested inputs always
+match the values used by the next request, and loading a saved model or picking
+another method rebuilds them with the new defaults.
+
 ### Saving and loading models
 
 Models that declare a `load`/`load_model` method are shown as *Cargables* in the

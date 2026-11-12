@@ -144,6 +144,89 @@ def test_dummy_json_value_shapes_payloads_from_the_constructor():
     assert shape and all(isinstance(item, int) for item in shape)
 
 
+def test_dummy_json_value_reads_the_input_shape_parameter():
+    """``input_shape_parm`` is the name several models use for their feature count."""
+    matrix = core.dummy_json_value("X", "np.ndarray", {"input_shape_parm": 4})
+    assert matrix and all(len(row) == 4 for row in matrix)
+
+
+def _displayed(field):
+    """Value the Playground renders for ``field`` (models/preview.js:fieldControl)."""
+    value = field["default"]
+    if value is None and field["required"]:
+        value = field["sample"]
+    return value
+
+
+def _parameter(name, type_hint, default, required=False, sample="9"):
+    return {
+        "name": name,
+        "type": type_hint,
+        "default": default,
+        "required": required,
+        "kind": "positional" if required else "keyword_only",
+        "variadic": False,
+        "description": "",
+        "widget": core.guess_widget(type_hint),
+        "sample": sample,
+    }
+
+
+@pytest.mark.parametrize(
+    "type_hint,default,expected",
+    [
+        ("int", "4", 4),
+        ("int", "0", 0),
+        ("float", "2.5", 2.5),
+        ("bool", "False", False),
+        ("bool", "True", True),
+        ("str", "''", ""),
+        ("list", "[]", []),
+        ("dict", "{}", {}),
+    ],
+)
+def test_declared_defaults_are_never_overridden(type_hint, default, expected):
+    """Neither the hardcoded name samples nor the recorded sample win over a default."""
+    parameter = _parameter("n_states", type_hint, default)
+    field = core.playground_fields({"parameters": [parameter]})[0]
+    assert field["default"] == expected
+    assert field["sample"] == expected
+
+
+def test_optional_parameters_without_a_default_are_left_empty():
+    """The Playground shows nothing, so no invented value is suggested."""
+    parameter = _parameter("dropout", "float", None, sample="0.1")
+    field = core.playground_fields({"parameters": [parameter]})[0]
+    assert field["default"] is None
+    assert field["sample"] is None
+    method = {
+        "name": "train",
+        "signature": "train(dropout: float = 0.1)",
+        "parameters": [parameter],
+        "kind": "method",
+        "inherited": False,
+    }
+    assert core.sample_arguments({"parameters": [parameter]}, method) == {}
+
+
+def test_catalog_examples_mirror_the_playground_defaults():
+    """Every dummy argument equals the value shown for the same parameter."""
+    for model in core.CATALOG:
+        context = core.constructor_samples(model)
+        playground = {field["name"]: _displayed(field) for field in core.playground_fields(model)}
+        for method in core.invokable_methods(model):
+            arguments = core.sample_arguments(model, method, context)
+            for field in core.method_fields(method, context):
+                expected = _displayed(field)
+                name = field["name"]
+                if expected is None:
+                    assert name not in arguments, (model["id"], method["name"], name)
+                else:
+                    assert arguments[name] == expected, (model["id"], method["name"], name)
+                if name in playground:
+                    assert playground[name] == expected, (model["id"], method["name"], name)
+
+
 def test_resolve_asset_blocks_traversal():
     assert core.resolve_asset("/") is not None
     assert core.resolve_asset("/../server_core.py") is None

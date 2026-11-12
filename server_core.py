@@ -556,8 +556,15 @@ def _literal_for_kind(parameter: Dict[str, Any], text: Optional[str], fallback: 
 
 
 def _default_value(parameter: Dict[str, Any]) -> Any:
-    """JSON friendly version of the recorded default of ``parameter``."""
-    return _literal_for_kind(parameter, parameter.get("default"), fallback=True)
+    """JSON friendly version of the recorded default of ``parameter``.
+
+    String-like parameters keep bare words (``softmax``, ``nn.SELU()``) because the
+    Playground edits them as text.  ``raw`` parameters are edited as JSON, so a source
+    expression (``np.array([])``) is not a usable default and is ignored: the field
+    falls back to the generated sample, exactly like the dummy inputs do.
+    """
+    kind = parameter.get("widget") or guess_widget(parameter.get("type") or "")
+    return _literal_for_kind(parameter, parameter.get("default"), fallback=kind != "raw")
 
 
 #: Argument names that usually carry a matrix (``samples × features``).
@@ -645,6 +652,8 @@ WIDTH_PARAMETERS = (
     "n_variables",
     "embedding_dim",
     "hidden_dim",
+    # ``*_shape_parm`` is how several models name their number of input features.
+    "input_shape_parm",
 )
 #: Argument names that carry a shape tuple such as ``(None, 4)``.
 SHAPE_ARGUMENTS = frozenset({"shape", "input_shape", "output_shape", "dims", "dimensions"})
@@ -816,18 +825,26 @@ def dummy_json_value(name: str, type_hint: str, parameters: Optional[Dict[str, A
 
 
 def _sample_value(parameter: Dict[str, Any], parameters: Optional[Dict[str, Any]] = None) -> Any:
-    """JSON friendly sample of ``parameter``, generated when it is needed.
+    """Value suggested for ``parameter``, mirroring what the Playground shows.
 
-    The catalog records Python source expressions (``np.array([])``, ``[]``), which are not JSON
-    values, and the parameters of a method do not record a sample at all.  The value prefers the
-    default (what the model really uses), then a name aware scalar, then the catalog sample, and
-    finally a small payload shaped from the constructor ``parameters``.
+    The Playground displays the declared default, then the catalog sample for a required
+    parameter and nothing at all for an optional one; the dummy inputs of the invoke tab
+    follow the same rules, so an example never replaces a configured default:
+
+    * a declared default is returned untouched (``0``, ``False``, ``""`` and ``[]`` too),
+    * an optional parameter without a default gets ``None`` (the method keeps its own
+      default, exactly like an empty field in the Playground),
+    * a required parameter without a default keeps the name aware sample so the call can
+      be tried without writing JSON by hand.
     """
-    default = _default_value(parameter)
-    if default not in (None, [], {}, (), ""):
-        return default
+    if parameter.get("default") is not None:
+        return _default_value(parameter)
     name = parameter.get("name") or ""
     kind = parameter.get("widget") or guess_widget(parameter.get("type") or "")
+    if not parameter.get("required"):
+        # Nothing is shown in the Playground: sending a made up value would silently
+        # override the default of the model.
+        return None
     if kind in ("int", "float") and name in SCALAR_SAMPLE_VALUES:
         return SCALAR_SAMPLE_VALUES[name]
     literal = _literal_for_kind(parameter, parameter.get("sample"), fallback=False)
@@ -2153,8 +2170,11 @@ def sample_arguments(
 ) -> Dict[str, Any]:
     """JSON placeholders for every argument of ``method``.
 
-    ``parameters`` shape the payload exactly like the constructor that will be used when the method
-    is invoked (states, window, features...).
+    The values follow the Playground: an argument with a declared default keeps it (``0``,
+    ``False`` and ``""`` included), an optional argument without a default is omitted so
+    the method uses its own, and only a required one is generated.  ``parameters`` shape
+    that generation exactly like the constructor that will build the model (states,
+    window, features...).
     """
     context = constructor_samples(model) if parameters is None else parameters
     return {
