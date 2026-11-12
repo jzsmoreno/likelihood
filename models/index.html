@@ -3,1336 +3,249 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#4f5bd5">
 <meta name="description" content="Catálogo interactivo de los modelos de la librería Likelihood: búsqueda, filtros por categoría, firmas, parámetros, métodos y ejemplos listos para copiar.">
+<meta name="theme-color" content="#ff3621">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<title>Catálogo de Modelos · Likelihood</title>
+<link rel="stylesheet" href="/app.css">
+<title>Catálogo de modelos · Likelihood</title>
 <!--
-  Interfaz del catálogo. Todos los datos provienen de la API del servidor
-  (server.py), que los obtiene por introspección del paquete likelihood.
-  No hay listas de modelos escritas a mano en este archivo.
+  Catalog workspace.
 
-  Endpoints utilizados:
-    GET /api/models             -> { total, categories, models:[modelBrief] }
-    GET /api/models/<model_id>  -> { success, model }
-    GET /api/search?q=&limit=   -> sugerencias para el autocompletado
-    GET /preview/<model_id>     -> vista previa renderizada por el servidor
-    GET /api/notebook/<id>      -> descarga del notebook
-    GET /api/models/<id>/source -> código fuente del modelo
+  Every value rendered here comes from the API, which introspects the
+  ``likelihood`` package with ``model_catalog.py``. There is no hand written
+  model list in this file.
 
-  El estado de la vista (categoría, búsqueda, orden y modelo abierto) se
-  refleja en la URL para que los enlaces se puedan compartir.
+  Endpoints used:
+    GET /api/models              -> {total, categories, models:[modelBrief]}
+    GET /api/models/<id>         -> {success, model}     (details drawer)
+    GET /api/search?q=&limit=    -> autocomplete suggestions
+    GET /api/health              -> service status and feature flags
+    GET /preview/<id>            -> server rendered model page
+    GET /api/notebook/<id>       -> generated notebook
+    GET /api/models/<id>/source  -> model source code
+
+  The view state (category, tag, search, order, view mode and open model) is
+  mirrored in the URL so a filtered catalog can be shared.
 -->
-<style>
-  :root {
-    --ink: #1f2430;
-    --muted: #6b7280;
-    --accent: #4f5bd5;
-    --accent-2: #764ba2;
-    --accent-soft: #eef0fd;
-    --line: #e6e8f0;
-    --ok: #2f855a;
-    --danger: #c53030;
-    --radius: 18px;
-    --shadow-sm: 0 8px 24px rgba(15, 23, 42, .14);
-    --shadow-lg: 0 16px 36px rgba(15, 23, 42, .22);
-  }
-  * { box-sizing: border-box; }
-  [hidden] { display: none !important; }
-  body {
-    margin: 0;
-    padding: 28px 16px 56px;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: radial-gradient(circle at 10% 0%, #eef2ff 0%, #f7f8fc 38%, #e9edf7 100%);
-    background-attachment: fixed;
-    color: var(--ink);
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-  }
-  @media (prefers-color-scheme: dark) {
-    body { background: radial-gradient(circle at 10% 0%, #1c2233 0%, #121620 55%, #0b0e15 100%); }
-  }
-  body.no-scroll { overflow: hidden; }
-  .wrap { max-width: 1280px; margin: 0 auto; }
-  .skip {
-    position: absolute; left: -9999px; top: 0; z-index: 60;
-    background: #fff; color: var(--accent); padding: 10px 16px;
-    border-radius: 0 0 12px 0; font-weight: 600; text-decoration: none;
-  }
-  .skip:focus { left: 0; }
-  mark { background: #ffe58a; color: inherit; border-radius: 3px; padding: 0 1px; }
-  .sr-only {
-    position: absolute; width: 1px; height: 1px; margin: -1px;
-    padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
-  }
-  a:focus-visible, button:focus-visible, select:focus-visible,
-  input:focus-visible, [tabindex]:focus-visible {
-    outline: 3px solid var(--accent); outline-offset: 2px;
-  }
-  .modal header :focus-visible { outline-color: #fff; }
-
-  /* ---------- Cabecera ---------- */
-  header.hero {
-    background: #fff; border-radius: var(--radius); padding: 22px 26px;
-    box-shadow: 0 12px 32px rgba(15, 23, 42, .18); margin-bottom: 16px;
-    display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between;
-  }
-  header.hero h1 { margin: 0 0 4px; font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
-  header.hero h1 .logo { font-size: 1.5rem; line-height: 1; }
-  header.hero p { margin: 0; color: var(--muted); font-size: .92rem; }
-  header.hero code {
-    background: var(--accent-soft); color: var(--accent);
-    border-radius: 6px; padding: 2px 6px; font-size: .85em;
-  }
-  .stats { display: flex; gap: 10px; flex-wrap: wrap; }
-  .stat {
-    background: var(--accent-soft); border-radius: 12px; padding: 8px 14px;
-    text-align: center; min-width: 84px;
-  }
-  .stat b { display: block; font-size: 1.2rem; color: var(--accent); }
-  .stat span { font-size: .65rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
-
-  /* ---------- Controles ---------- */
-  .controls {
-    background: #fff; border-radius: var(--radius); padding: 18px 20px; margin-bottom: 18px;
-    box-shadow: var(--shadow-sm);
-  }
-  .search-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-  .search-field { position: relative; flex: 1 1 320px; display: flex; align-items: center; }
-  input[type=search] {
-    width: 100%; padding: 11px 46px 11px 16px; font-size: .95rem; color: inherit;
-    border: 2px solid var(--line); border-radius: 999px; outline: none; background: #fbfbfe;
-  }
-  input[type=search]:focus { border-color: var(--accent); background: #fff; }
-  #clear-search {
-    position: absolute; right: 8px; width: 30px; height: 30px; border-radius: 50%;
-    border: 0; background: #eceef6; color: #4b5162; font-size: 1rem; line-height: 1; cursor: pointer;
-  }
-  #clear-search:hover { background: var(--accent); color: #fff; }
-  .select-wrap { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--muted); }
-  select {
-    font: inherit; font-size: .82rem; padding: 9px 12px;
-    border: 2px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink);
-  }
-  select:focus { border-color: var(--accent); outline: none; }
-  #sort-dir {
-    border: 2px solid var(--line); border-radius: 50%; width: 36px; height: 36px;
-    padding: 0; font-size: .95rem; line-height: 1; background: #fff; color: var(--accent);
-    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
-  }
-  #sort-dir:hover { border-color: var(--accent); }
-  .hint { margin: 10px 0 0; font-size: .74rem; color: var(--muted); }
-  kbd {
-    background: #f0f1f6; border: 1px solid var(--line); border-bottom-width: 2px;
-    border-radius: 5px; padding: 1px 5px; font-family: ui-monospace, Consolas, monospace; font-size: .72rem;
-  }
-  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-  .chip {
-    display: inline-flex; align-items: center; gap: 7px;
-    border: 2px solid var(--line); background: #fff; color: var(--ink);
-    border-radius: 999px; padding: 7px 15px; font-size: .8rem; font-weight: 600;
-    cursor: pointer; transition: transform .18s ease, border-color .18s ease, background .18s ease;
-  }
-  .chip:hover { border-color: var(--accent); transform: translateY(-1px); }
-  .chip.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border-color: transparent; }
-  .chip-count {
-    background: rgba(79, 91, 213, .12); color: var(--accent);
-    border-radius: 999px; padding: 1px 7px; font-size: .68rem;
-  }
-  .chip.active .chip-count { background: rgba(255, 255, 255, .28); color: #fff; }
-  .result-bar {
-    display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
-    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);
-    font-size: .78rem; color: var(--muted);
-  }
-  .result-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .active-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-  .filter-pill {
-    display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
-    border: 1px solid var(--accent); color: var(--accent); background: var(--accent-soft);
-    border-radius: 999px; padding: 4px 11px; font: inherit; font-size: .74rem; font-weight: 600;
-  }
-  .filter-pill:hover { background: var(--accent); color: #fff; }
-  .filter-pill span[aria-hidden] { font-size: .95rem; line-height: 1; }
-
-  /* La barra de filtros acompaña el desplazamiento en pantallas grandes. */
-  @media (min-width: 900px) {
-    .controls { position: sticky; top: 10px; z-index: 25; }
-  }
-
-  /* ---------- Rejilla y tarjetas ---------- */
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
-  .card {
-    background: #fff; border-radius: 16px; padding: 22px; cursor: pointer;
-    box-shadow: var(--shadow-sm); border: 2px solid transparent;
-    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-    display: flex; flex-direction: column; gap: 10px;
-  }
-  .card:hover, .card:focus-visible {
-    transform: translateY(-4px); box-shadow: var(--shadow-lg);
-    border-color: var(--accent); outline: none;
-  }
-  .badge {
-    align-self: flex-start; padding: 4px 12px; border-radius: 999px;
-    font-size: .66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
-    background: var(--accent-soft); color: var(--accent);
-  }
-  .category-regression { background: linear-gradient(135deg,#84fab0,#8fd3f4); color:#0a5c49; }
-  .category-deep { background: linear-gradient(135deg,#a18cd1,#fbc2eb); color:#6a4a8c; }
-  .category-simulation { background: linear-gradient(135deg,#ffecd2,#fcb69f); color:#9a5c38; }
-  .category-hmm { background: linear-gradient(135deg,#ff6b6b,#ff8787); color:#8b0000; }
-  .category-ensemble { background: linear-gradient(135deg,#ffd900,#ffea00); color:#856400; }
-  .category-environments { background: linear-gradient(135deg,#a8edea,#fed6e3); color:#0f6f73; }
-  .card h2 { margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 9px; }
-  .card h2 .icon { font-size: 1.35rem; line-height: 1; }
-  .card h2 a {
-    color: inherit; text-decoration: none; border-radius: 6px;
-  }
-  .card h2 a:hover { color: var(--accent); text-decoration: underline; }
-  .card p.desc { margin: 0; color: var(--muted); font-size: .87rem; line-height: 1.6; flex: 1; }
-  .tags { display: flex; flex-wrap: wrap; gap: 5px; }
-  .tag {
-    background: #f0f1f6; color: #5b6274; border-radius: 999px; padding: 3px 9px;
-    font-size: .64rem; font-weight: 600;
-  }
-  button.tag {
-    border: 1px solid transparent; cursor: pointer; font-family: inherit; line-height: 1.5;
-    transition: background .15s ease, color .15s ease, border-color .15s ease;
-  }
-  button.tag:hover { background: var(--accent); color: #fff; }
-  button.tag.is-active { background: var(--accent); color: #fff; border-color: var(--accent-2); }
-  .card footer {
-    display: flex; justify-content: space-between; align-items: center; gap: 8px;
-    border-top: 1px solid var(--line); padding-top: 10px; font-size: .72rem; color: var(--muted);
-  }
-  .card footer .module {
-    font-family: ui-monospace, Consolas, monospace; font-size: .68rem;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%;
-  }
-  .card-actions {
-    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px;
-    opacity: .92; transition: opacity .15s ease;
-  }
-  .card:hover .card-actions, .card:focus-within .card-actions { opacity: 1; }
-  .btn-ghost { background: transparent; color: var(--accent); border-color: var(--line); }
-  .btn-ghost:hover { border-color: var(--accent); }
-
-  /* ---------- Estados ---------- */
-  .notice {
-    grid-column: 1 / -1; background: #fff; border-radius: var(--radius); padding: 24px;
-    box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
-  }
-  .notice b { font-size: 1rem; }
-  .notice span { color: var(--muted); font-size: .86rem; }
-  .notice.error { border-left: 6px solid var(--danger); }
-  .loader { padding: 26px; text-align: center; color: var(--muted); font-size: .86rem; }
-  .empty { color: var(--muted); font-style: italic; font-size: .85rem; margin: 0; }
-  .skeleton { height: 150px; border-radius: 16px; background: rgba(255,255,255,.55); animation: pulse 1.4s ease-in-out infinite; }
-  @keyframes pulse { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
-  footer.credits { text-align: center; color: rgba(255,255,255,.85); font-size: .82rem; padding-top: 22px; }
-  footer.credits a { color: #fff; }
-
-  /* ---------- Modal ---------- */
-  .modal-backdrop {
-    position: fixed; inset: 0; background: rgba(15, 23, 42, .62);
-    display: none; align-items: center; justify-content: center; padding: 20px; z-index: 40;
-  }
-  .modal-backdrop.open { display: flex; }
-  .modal {
-    background: #fff; border-radius: var(--radius); width: min(1080px, 100%); max-height: 92vh;
-    overflow: auto; box-shadow: 0 24px 60px rgba(0, 0, 0, .35);
-  }
-  .modal header {
-    position: sticky; top: 0; z-index: 2; background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    color: #fff; padding: 18px 24px; display: flex; gap: 14px; justify-content: space-between; align-items: flex-start;
-  }
-  .modal header h2 { margin: 0 0 4px; font-size: 1.3rem; display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
-  .modal header h2 .badge { align-self: center; }
-  .modal header h2 .icon { line-height: 1; }
-  .modal header p { margin: 0; color: rgba(255, 255, 255, .88); font-size: .85rem; }
-  .modal .close {
-    background: rgba(255,255,255,.22); border: 2px solid rgba(255,255,255,.5); color: #fff;
-    border-radius: 999px; width: 36px; height: 36px; font-size: 1rem; cursor: pointer; flex: 0 0 auto;
-  }
-  .modal .close:hover { background: #fff; color: var(--accent); }
-  .modal .body { padding: 24px; }
-  .modal h3 {
-    font-size: 1rem; color: var(--accent); margin: 24px 0 10px;
-    padding-bottom: 7px; border-bottom: 2px solid var(--line);
-  }
-  .modal h3:first-child { margin-top: 0; }
-  .prose {
-    background: #f7f8fc; border-left: 4px solid var(--accent); border-radius: 10px;
-    padding: 14px 16px; line-height: 1.7; font-size: .88rem; color: #3d4453; white-space: pre-wrap;
-  }
-  .sig {
-    background: #f2f4fb; border-radius: 10px; padding: 12px 14px; overflow-x: auto;
-    font-family: ui-monospace, Consolas, monospace; font-size: .8rem;
-  }
-  .grid-small { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-  .param-card { background: #f6f8fd; border-left: 3px solid var(--accent); border-radius: 10px; padding: 11px 13px; }
-  .param-name { font-family: ui-monospace, Consolas, monospace; font-weight: 700; font-size: .82rem; }
-  .param-type { font-size: .7rem; color: #8b90a0; font-style: italic; margin: 3px 0 5px; }
-  .param-desc { font-size: .78rem; color: #4b5162; line-height: 1.45; }
-  .methods { list-style: none; margin: 0; padding: 0; }
-  .methods li { background: #f6f9ff; border-left: 3px solid #48bb78; border-radius: 9px; padding: 9px 12px; margin-bottom: 6px; }
-  .method-name { font-family: ui-monospace, Consolas, monospace; font-weight: 700; font-size: .8rem; }
-  .method-origin { margin-left: 8px; font-size: .63rem; text-transform: uppercase; letter-spacing: .06em; color: #8b90a0; }
-  .method-desc { display: block; margin-top: 4px; font-size: .78rem; color: #4b5162; }
-  pre {
-    background: #1b1f2a; color: #d7dae0; border-radius: 12px; padding: 16px; overflow-x: auto;
-    font-size: .8rem; line-height: 1.6; margin: 0; font-family: ui-monospace, Consolas, monospace;
-  }
-  .meta-line { font-size: .78rem; color: var(--muted); margin: 10px 0 0; line-height: 1.7; }
-  .meta-line code { background: #f0f1f6; border-radius: 6px; padding: 2px 6px; }
-  .modal-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; padding-top: 18px; border-top: 2px solid var(--line); }
-  .btn {
-    border: 2px solid transparent; border-radius: 999px; padding: 9px 18px; font-weight: 600;
-    font-size: .8rem; cursor: pointer; text-decoration: none; display: inline-flex; gap: 8px; align-items: center;
-    background: #fff; color: var(--ink);
-    transition: transform .15s ease, box-shadow .15s ease;
-  }
-  .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,23,42,.2); }
-  .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
-  .btn-secondary { background: #fff; color: var(--accent); border-color: var(--accent); }
-  .btn-success { background: linear-gradient(135deg, #48bb78, var(--ok)); color: #fff; }
-  .btn-small { padding: 6px 13px; font-size: .74rem; }
-  .related { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-
-  /* ---------- Aviso flotante ---------- */
-  .toast {
-    position: fixed; top: 18px; right: 18px; z-index: 60; background: var(--ink); color: #fff;
-    border-radius: 10px; padding: 11px 18px; font-size: .82rem;
-    opacity: 0; transform: translateX(20px); transition: opacity .25s ease, transform .25s ease;
-    pointer-events: none; max-width: min(360px, 80vw);
-  }
-  .toast.show { opacity: 1; transform: translateX(0); }
-
-  /* ---------- Tema oscuro ---------- */
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --ink: #e6e8f0;
-      --muted: #9aa3b5;
-      --accent: #8ab4f8;
-      --accent-2: #c4a7f7;
-      --accent-soft: #262c40;
-      --line: #2d3446;
-      --ok: #68d391;
-      --danger: #fc8181;
-      --shadow-sm: 0 8px 24px rgba(0, 0, 0, .5);
-      --shadow-lg: 0 16px 36px rgba(0, 0, 0, .6);
+<script>
+  /* Apply the stored colour theme before the first paint (avoids a flash). */
+  (function () {
+    try {
+      var stored = window.localStorage.getItem('lm-theme');
+      if (stored === 'light' || stored === 'dark') {
+        document.documentElement.setAttribute('data-theme', stored);
+      }
+    } catch (error) {
+      /* storage is optional */
     }
-    body { background: linear-gradient(135deg, #1b2138 0%, #2a1e3c 100%); }
-    header.hero, .controls, .card, .notice, .modal { background: #161a24; }
-    .btn, .btn-secondary, .chip, select, input[type=search] { background: #161a24; color: var(--ink); }
-    .btn-ghost { background: transparent; }
-    #sort-dir { background: #161a24; }
-    mark { background: #7a6620; color: #fff; }
-    button.tag:hover, button.tag.is-active { background: var(--accent); color: #101420; }
-    .filter-pill { background: var(--accent-soft); color: var(--accent); }
-    .filter-pill:hover { background: var(--accent); color: #101420; }
-    input[type=search] { background: #101420; }
-    input[type=search]:focus { background: #101420; }
-    #clear-search { background: #2a3143; color: #c2cad9; }
-    kbd, .tag, .meta-line code { background: #2a3143; color: #c2cad9; }
-    .prose { background: #1c2130; color: #c9d1e0; }
-    .sig, .param-card { background: #232a3b; }
-    .methods li { background: #1c2130; }
-    .param-desc, .method-desc { color: #b6bfd0; }
-    .param-type, .method-origin { color: #9aa3b5; }
-    .skeleton { background: rgba(255, 255, 255, .12); }
-    .toast { background: #0c0f16; }
-    .modal .close:hover { background: #fff; color: #1f2430; }
-    .btn-primary, .btn-success { color: #fff; }
-  }
-
-  /* ---------- Adaptación a pantallas pequeñas ---------- */
-  @media (max-width: 720px) {
-    body { padding: 14px 8px 36px; }
-    header.hero { flex-direction: column; align-items: flex-start; }
-    .stats { width: 100%; }
-    .stat { flex: 1 1 70px; min-width: 70px; }
-    .select-wrap { width: 100%; justify-content: space-between; }
-    select { flex: 1 1 auto; }
-    .grid { grid-template-columns: 1fr; }
-    .card-actions .btn { flex: 1 1 auto; justify-content: center; }
-    .modal-backdrop { padding: 0; }
-    .modal { border-radius: 0; max-height: 100vh; min-height: 100vh; }
-    .modal header { flex-direction: row; align-items: flex-start; }
-    .modal .body { padding: 18px; }
-    .modal-actions .btn { flex: 1 1 100%; justify-content: center; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation: none !important; transition: none !important; }
-    .card:hover, .chip:hover, .btn:hover { transform: none; }
-  }
-</style>
+  })();
+</script>
 </head>
 <body>
-<a class="skip" href="#grid">Saltar a los modelos</a>
-<div class="wrap">
-  <header class="hero">
-    <div>
-      <h1><span class="logo" aria-hidden="true">🔬</span> Catálogo de Modelos · Likelihood</h1>
-      <p>Explora, filtra y abre la ficha de cualquier modelo del paquete <code>likelihood</code>.</p>
-    </div>
-    <div class="stats" id="stats" aria-live="polite">
-      <div class="stat"><b>—</b><span>modelos</span></div>
-      <div class="stat"><b>—</b><span>categorías</span></div>
-    </div>
-  </header>
+<a class="skip-link" href="#catalog">Saltar al catálogo</a>
 
-  <section class="controls" aria-label="Búsqueda y filtros">
-    <div class="search-row">
-      <div class="search-field">
-        <label class="sr-only" for="search">Buscar modelos</label>
-        <input type="search" id="search" placeholder="🔍 Buscar modelo, método, parámetro…"
-               autocomplete="off" spellcheck="false" list="search-suggestions">
-        <datalist id="search-suggestions"></datalist>
-        <button type="button" id="clear-search" hidden aria-label="Borrar la búsqueda">&times;</button>
-      </div>
-      <div class="select-wrap">
-        <label for="sort">Ordenar por</label>
-        <select id="sort">
-          <option value="catalog">Orden del catálogo</option>
-          <option value="title">Nombre</option>
-          <option value="category">Categoría</option>
-          <option value="parameters">Número de parámetros</option>
-          <option value="methods">Número de métodos</option>
-        </select>
-        <button type="button" id="sort-dir" aria-label="Invertir el orden" title="Invertir el orden">↓</button>
-      </div>
-    </div>
-    <div class="filters" id="filters" role="group" aria-label="Filtrar por categoría">
-      <button class="chip active" type="button" data-category="" aria-pressed="true">
-        Todos<span class="chip-count">—</span>
-      </button>
-    </div>
-    <div class="active-filters" id="active-filters" hidden></div>
-    <div class="result-bar" id="result-bar" hidden>
-      <span id="result-count" role="status" aria-live="polite"></span>
-      <span class="result-actions">
-        <button class="btn btn-secondary btn-small" type="button" id="reset-filters" hidden>↺ Restablecer filtros</button>
-      </span>
-    </div>
-  </section>
-
-  <div class="grid" id="grid" tabindex="-1" aria-busy="true" aria-label="Modelos del catálogo">
-    <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
-    <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+<header class="db-topbar">
+  <button class="icon-btn" id="sidebar-toggle" type="button" aria-label="Mostrar u ocultar la navegación"
+          aria-expanded="true" aria-controls="sidebar" title="Mostrar u ocultar la navegación">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path d="M2 4h12M2 8h12M2 12h12" stroke-linecap="round"/>
+    </svg>
+  </button>
+  <a class="db-brand" href="/">
+    <span class="db-brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path d="M6.2 1.6h3.6v1.1h-.8v2.7l3 5.1a2 2 0 0 1-1.8 3H5.8a2 2 0 0 1-1.8-3l3-5.1V2.7h-.8zM5.1 9.2h5.8l1.1 1.9a.9.9 0 0 1-.8 1.4H4.8a.9.9 0 0 1-.8-1.4z" opacity=".95"/>
+      </svg>
+    </span>
+    <span>Likelihood</span>
+    <span class="db-brand-suffix">/ Modelos</span>
+  </a>
+  <span class="topbar-divider" aria-hidden="true"></span>
+  <nav class="db-crumbs" aria-label="Ruta de navegación">
+    <a href="/">Catálogo</a>
+    <span class="sep hide-xs" aria-hidden="true">/</span>
+    <span class="current hide-xs" id="crumb-current">Modelos</span>
+  </nav>
+  <div class="topbar-actions">
+    <span class="status-pill" id="server-status" title="Estado del servicio">
+      <span class="dot dot--off" aria-hidden="true"></span>
+      <span id="server-status-text">Comprobando…</span>
+    </span>
+    <a class="topbar-link" href="/docs" title="Documentación interactiva de la API">API</a>
+    <button class="icon-btn" id="theme-toggle" type="button" aria-label="Cambiar el tema de color" title="Cambiar el tema de color">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+        <circle cx="8" cy="8" r="3.2"/>
+        <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1" stroke-linecap="round"/>
+      </svg>
+    </button>
   </div>
+</header>
 
-  <noscript>
-    <div class="notice">
-      <b>Este catálogo necesita JavaScript.</b>
-      <span>Puedes abrir la lista completa de modelos en
-        <a href="/api/models">/api/models</a> o visitar
-        <a href="/preview/Arima">/preview/&lt;modelo&gt;</a> directamente.</span>
+<div class="db-shell">
+  <aside class="db-sidebar" id="sidebar" aria-label="Navegación del catálogo">
+    <div class="db-sidebar-nav">
+      <div class="side-section">
+        <div class="side-title">Catálogo</div>
+        <a class="side-link is-active" href="#" data-nav="all" aria-current="page">
+          <span class="side-icon" aria-hidden="true">▦</span>
+          <span class="side-label">Todos los modelos</span>
+          <span class="side-count" id="count-all">—</span>
+        </a>
+        <div id="side-categories"></div>
+      </div>
+      <div class="side-section">
+        <div class="side-title">Atributos</div>
+        <a class="side-link" href="#" data-attribute="loadable">
+          <span class="side-icon" aria-hidden="true">⇩</span>
+          <span class="side-label">Cargables desde archivo</span>
+          <span class="side-count" id="count-loadable">—</span>
+        </a>
+        <a class="side-link" href="#" data-attribute="methods">
+          <span class="side-icon" aria-hidden="true">ƒ</span>
+          <span class="side-label">Con métodos públicos</span>
+          <span class="side-count" id="count-methods">—</span>
+        </a>
+        <a class="side-link" href="#" data-attribute="parameterless">
+          <span class="side-icon" aria-hidden="true">∅</span>
+          <span class="side-label">Sin parámetros</span>
+          <span class="side-count" id="count-parameterless">—</span>
+        </a>
+      </div>
+      <div class="side-section">
+        <div class="side-title">Recursos</div>
+        <a class="side-link" href="/docs" target="_blank" rel="noopener">
+          <span class="side-icon" aria-hidden="true">↗</span>
+          <span class="side-label">Documentación de la API</span>
+        </a>
+        <a class="side-link" href="/api/openapi.json" target="_blank" rel="noopener">
+          <span class="side-icon" aria-hidden="true">{ }</span>
+          <span class="side-label">Especificación OpenAPI</span>
+        </a>
+        <a class="side-link" href="/api/health" target="_blank" rel="noopener">
+          <span class="side-icon" aria-hidden="true">♥</span>
+          <span class="side-label">Estado del servicio</span>
+        </a>
+        <a class="side-link" href="/api/metrics" target="_blank" rel="noopener">
+          <span class="side-icon" aria-hidden="true">Σ</span>
+          <span class="side-label">Métricas Prometheus</span>
+        </a>
+      </div>
     </div>
-  </noscript>
+    <div class="side-footer">
+      <strong>Catálogo por introspección</strong>
+      <span id="side-version">likelihood</span> · <code>/api/models</code>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay" hidden></div>
 
-  <footer class="credits">
-    <p>Librería Likelihood · catálogo generado por introspección</p>
-  </footer>
+  <main class="db-main" id="main">
+    <div class="db-main-inner">
+      <div class="page-header">
+        <div class="page-header-main">
+          <div class="page-eyebrow">Catálogo</div>
+          <h1 class="page-title"><span class="page-icon" aria-hidden="true">🔬</span> Modelos</h1>
+          <p class="page-subtitle">
+            Explora los modelos del paquete <code>likelihood</code>: firma, parámetros, métodos y
+            notebook listos para ejecutar. Todo se genera por introspección del código fuente.
+          </p>
+        </div>
+        <div class="page-actions">
+          <div class="segmented" role="group" aria-label="Vista de resultados">
+            <button type="button" id="view-table" data-view="table" aria-pressed="true">Tabla</button>
+            <button type="button" id="view-cards" data-view="cards" aria-pressed="false">Tarjetas</button>
+          </div>
+          <a class="btn btn-secondary" href="/api/models" target="_blank" rel="noopener">Ver JSON</a>
+        </div>
+      </div>
+
+      <section class="kpi-grid" id="stats" aria-label="Resumen del catálogo"></section>
+
+      <section class="panel" id="catalog" aria-label="Resultados del catálogo">
+        <div class="toolbar">
+          <div class="search-field">
+            <span class="search-icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+                <circle cx="7" cy="7" r="4.4"/>
+                <path d="M10.3 10.3 14 14" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <label class="sr-only" for="search">Buscar modelos</label>
+            <input type="search" id="search" placeholder="Buscar modelo, método, parámetro…"
+                   autocomplete="off" spellcheck="false" list="search-suggestions">
+            <datalist id="search-suggestions"></datalist>
+            <button class="search-clear" id="clear-search" type="button" hidden aria-label="Borrar la búsqueda">&times;</button>
+          </div>
+          <div class="toolbar-group">
+            <span class="toolbar-label">Categoría</span>
+            <select class="select" id="category-select" aria-label="Filtrar por categoría">
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <div class="toolbar-group">
+            <span class="toolbar-label">Ordenar</span>
+            <select class="select" id="sort" aria-label="Ordenar los modelos">
+              <option value="catalog">Orden del catálogo</option>
+              <option value="title">Nombre</option>
+              <option value="category">Categoría</option>
+              <option value="parameters">Número de parámetros</option>
+              <option value="methods">Número de métodos</option>
+            </select>
+            <button class="btn btn-secondary btn-icon" id="sort-dir" type="button"
+                    aria-label="Invertir el orden" title="Invertir el orden">↑</button>
+          </div>
+          <span class="spacer"></span>
+          <button class="btn btn-ghost btn-sm" id="reset-filters" type="button" hidden>Restablecer</button>
+        </div>
+        <div class="filter-chips" id="active-filters" hidden></div>
+        <div id="results" aria-busy="true" aria-live="polite"></div>
+        <div class="panel-footer" id="result-bar" hidden>
+          <span id="result-count"></span>
+          <span class="result-note" id="result-hint"></span>
+        </div>
+      </section>
+
+      <noscript>
+        <div class="panel">
+          <div class="notice">
+            <strong>Este catálogo necesita JavaScript.</strong>
+            <span>Puedes consultar la lista completa en <a href="/api/models">/api/models</a>
+              o abrir una ficha directamente en <a href="/preview/Arima">/preview/&lt;modelo&gt;</a>.</span>
+          </div>
+        </div>
+      </noscript>
+
+      <footer class="site-footer">
+        <span>Librería Likelihood · catálogo generado por introspección</span>
+        <span><a href="/docs">API</a> · <a href="/api/health">Estado</a></span>
+      </footer>
+    </div>
+  </main>
 </div>
 
-<div class="modal-backdrop" id="modal-backdrop">
-  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-sub">
-    <header>
-      <div>
-        <h2 id="modal-title"></h2>
-        <p id="modal-sub"></p>
+<div class="drawer-backdrop" id="drawer-backdrop">
+  <aside class="drawer" id="drawer" role="dialog" aria-modal="true"
+         aria-labelledby="drawer-title" aria-describedby="drawer-subtitle" tabindex="-1">
+    <header class="drawer-header">
+      <div class="drawer-heading">
+        <div class="drawer-eyebrow" id="drawer-eyebrow">Modelo</div>
+        <h2 class="drawer-title" id="drawer-title"></h2>
+        <p class="drawer-subtitle" id="drawer-subtitle"></p>
       </div>
-      <button class="close" id="modal-close" type="button" aria-label="Cerrar la ficha del modelo">&times;</button>
+      <button class="icon-btn" id="drawer-close" type="button" aria-label="Cerrar la ficha">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke-linecap="round"/>
+        </svg>
+      </button>
     </header>
-    <div class="body" id="modal-body"></div>
-  </div>
+    <div class="drawer-body" id="drawer-body"></div>
+    <footer class="drawer-footer" id="drawer-footer"></footer>
+  </aside>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script>
-  'use strict';
-
-  (function () {
-    var API = '/api';
-    var SEARCH_DELAY = 140;
-
-    /* Dirección natural de cada criterio de orden. El botón ↕ la invierte. */
-    var SORTS = {
-      catalog: { dir: 'asc' },
-      title: { dir: 'asc' },
-      category: { dir: 'asc' },
-      parameters: { dir: 'desc' },
-      methods: { dir: 'desc' }
-    };
-
-    var state = {
-      models: [],        // catálogo resumido (model_brief)
-      categories: [],    // índice de categorías
-      total: 0,          // modelos totales del catálogo
-      category: '',      // filtro de categoría activo
-      tag: '',           // etiqueta activa (se elige desde una tarjeta)
-      query: '',         // búsqueda activa
-      terms: [],         // términos normalizados de la búsqueda (para resaltar)
-      sort: 'catalog',   // criterio de orden
-      dir: 'asc',        // dirección aplicada al criterio
-      current: null,     // modelo abierto en el modal
-      requestId: 0,      // descarta respuestas de peticiones antiguas
-      trigger: null      // elemento que abrió el modal (para devolver el foco)
-    };
-
-    var dom = {};
-    var searchTimer = 0;
-    var suggestTimer = 0;
-    var backdropPressed = false;
-
-    /* ------------------------------------------------------------------ */
-    /* Utilidades                                                          */
-    /* ------------------------------------------------------------------ */
-
-    function byId(id) {
-      return document.getElementById(id);
-    }
-
-    function each(list, callback) {
-      Array.prototype.forEach.call(list || [], callback);
-    }
-
-    function closest(element, selector) {
-      while (element && element.nodeType === 1) {
-        if (element.matches && element.matches(selector)) return element;
-        element = element.parentNode;
-      }
-      return null;
-    }
-
-    function isTyping(element) {
-      if (!element || element === document.body) return false;
-      var tag = element.tagName;
-      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || element.isContentEditable === true;
-    }
-
-    function esc(value) {
-      var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;' };
-      return String(value === null || value === undefined ? '' : value)
-        .replace(/[&<>"']/g, function (ch) { return map[ch]; });
-    }
-
-    function toast(message) {
-      dom.toast.textContent = message;
-      dom.toast.classList.add('show');
-      window.clearTimeout(toast.timer);
-      toast.timer = window.setTimeout(function () {
-        dom.toast.classList.remove('show');
-      }, 2400);
-    }
-    toast.timer = 0;
-
-    function legacyCopy(value, onDone, onFail) {
-      var area = document.createElement('textarea');
-      area.value = value;
-      area.setAttribute('readonly', 'readonly');
-      area.setAttribute('aria-hidden', 'true');
-      area.style.position = 'fixed';
-      area.style.top = '-1000px';
-      document.body.appendChild(area);
-      var copied = false;
-      try {
-        area.select();
-        copied = document.execCommand('copy');
-      } catch (error) {
-        copied = false;
-      }
-      document.body.removeChild(area);
-      if (copied) { onDone(); } else { onFail(); }
-    }
-
-    function copyText(value, okMessage, failMessage) {
-      var text = String(value === null || value === undefined ? '' : value);
-      if (!text.trim()) {
-        toast(failMessage || 'No hay nada que copiar');
-        return;
-      }
-      var done = function () { toast(okMessage || 'Copiado'); };
-      var failed = function () { toast(failMessage || 'No se pudo copiar'); };
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(done, function () {
-          legacyCopy(text, done, failed);
-        });
-        return;
-      }
-      legacyCopy(text, done, failed);
-    }
-
-    function bindCopyButtons(root) {
-      each(root.querySelectorAll('[data-copy]'), function (button) {
-        button.addEventListener('click', function () {
-          var target = document.querySelector(button.getAttribute('data-copy'));
-          if (!target) {
-            toast('No se encontró el contenido a copiar');
-            return;
-          }
-          copyText(target.textContent, button.getAttribute('data-toast') || 'Copiado');
-        });
-      });
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* Catálogo                                                            */
-    /* ------------------------------------------------------------------ */
-
-    function loadCatalog() {
-      dom.grid.setAttribute('aria-busy', 'true');
-      window.fetch(API + '/models')
-        .then(function (response) {
-          if (!response.ok) throw new Error('HTTP ' + response.status);
-          return response.json();
-        })
-        .then(function (data) {
-          if (!data || !data.models) throw new Error('Respuesta inesperada de la API');
-          state.models = data.models;
-          state.categories = data.categories || [];
-          state.total = typeof data.total === 'number' ? data.total : state.models.length;
-          renderStats();
-          renderFilters();
-          restoreFromUrl();
-        })
-        .catch(function (error) {
-          renderError(error);
-        })
-        .then(function () {
-          dom.grid.removeAttribute('aria-busy');
-        });
-    }
-
-    function renderError(error) {
-      var detail = error && error.message ? error.message : 'Error desconocido';
-      dom.grid.innerHTML =
-        '<div class="notice error"><b>No se pudo cargar el catálogo.</b>' +
-        '<span>' + esc(detail) + '</span>' +
-        '<button class="btn btn-secondary btn-small" type="button" id="retry">↻ Reintentar</button></div>';
-      dom.resultBar.hidden = true;
-      var retry = byId('retry');
-      if (retry) retry.addEventListener('click', loadCatalog);
-    }
-
-    function stat(value, label) {
-      return '<div class="stat"><b>' + esc(value) + '</b><span>' + esc(label) + '</span></div>';
-    }
-
-    function renderStats() {
-      dom.stats.innerHTML =
-        stat(state.total, 'modelos') +
-        stat(state.categories.length, 'categorías');
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* Filtros                                                             */
-    /* ------------------------------------------------------------------ */
-
-    function chipHtml(id, label, count) {
-      var active = state.category === id;
-      return '<button class="chip' + (active ? ' active' : '') + '" type="button" data-category="' +
-        esc(id) + '" aria-pressed="' + (active ? 'true' : 'false') + '">' +
-        esc(label) + '<span class="chip-count">' + esc(count) + '</span></button>';
-    }
-
-    function renderFilters() {
-      var html = chipHtml('', 'Todos', state.models.length);
-      each(state.categories, function (category) {
-        html += chipHtml(category.id, (category.icon ? category.icon + ' ' : '') + category.label, category.count);
-      });
-      dom.filters.innerHTML = html;
-    }
-
-    function syncChips() {
-      each(dom.filters.querySelectorAll('[data-category]'), function (chip) {
-        var active = chip.getAttribute('data-category') === state.category;
-        if (active) {
-          chip.classList.add('active');
-        } else {
-          chip.classList.remove('active');
-        }
-        chip.setAttribute('aria-pressed', active ? 'true' : 'false');
-      });
-    }
-
-    function matches(model, terms) {
-      if (state.category && model.category !== state.category) return false;
-      if (state.tag && !hasTag(model, state.tag)) return false;
-      if (!terms.length) return true;
-      var haystack = searchHaystack(model);
-      for (var i = 0; i < terms.length; i += 1) {
-        if (haystack.indexOf(terms[i]) === -1) return false;
-      }
-      return true;
-    }
-
-    function hasTag(model, tag) {
-      var wanted = String(tag || '').toLowerCase();
-      if (!wanted) return true;
-      return (model.tags || []).some(function (item) {
-        return String(item).toLowerCase() === wanted;
-      });
-    }
-
-    function searchHaystack(model) {
-      return [
-        model.id, model.title, model.category, model.category_label, model.module,
-        model.signature, model.import_statement || '', model.short_description || '',
-        (model.tags || []).join(' ')
-      ].join(' ').toLowerCase();
-    }
-
-    /* Relevancia: el identificador y el título pesan más que la descripción. */
-    function scoreModel(model, terms, needle) {
-      var score = 0;
-      var id = String(model.id || '').toLowerCase();
-      var title = String(model.title || '').toLowerCase();
-      var description = String(model.short_description || '').toLowerCase();
-      var signature = String(model.signature || '').toLowerCase();
-      if (id === needle) score += 120;
-      if (title === needle) score += 100;
-      if (id.indexOf(needle) === 0) score += 60;
-      else if (id.indexOf(needle) > 0) score += 25;
-      if (title.indexOf(needle) === 0) score += 50;
-      else if (title.indexOf(needle) > 0) score += 20;
-      each(model.tags || [], function (tag) {
-        var lowered = String(tag).toLowerCase();
-        for (var i = 0; i < terms.length; i += 1) {
-          if (lowered === terms[i]) score += 30;
-          else if (lowered.indexOf(terms[i]) === 0) score += 12;
-        }
-      });
-      for (var i = 0; i < terms.length; i += 1) {
-        if (description.indexOf(terms[i]) !== -1) score += 6;
-        if (signature.indexOf(terms[i]) !== -1) score += 4;
-      }
-      return score;
-    }
-
-    function naturalDir(key) {
-      return SORTS[key] ? SORTS[key].dir : 'asc';
-    }
-
-    function compareModels(a, b) {
-      var primary = 0;
-      if (state.sort === 'title') {
-        primary = a.title.localeCompare(b.title, 'es');
-      } else if (state.sort === 'category') {
-        primary = String(a.category_label || '').localeCompare(String(b.category_label || ''), 'es');
-      } else if (state.sort === 'parameters') {
-        primary = (a.parameter_count || 0) - (b.parameter_count || 0);
-      } else if (state.sort === 'methods') {
-        primary = (a.method_count || 0) - (b.method_count || 0);
-      }
-      if (primary !== 0) return state.dir === 'desc' ? -primary : primary;
-      return a.title.localeCompare(b.title, 'es');
-    }
-
-    function sortModels(list) {
-      var sorted = list.slice();
-      if (state.sort === 'catalog') {
-        return state.dir === 'desc' ? sorted.reverse() : sorted;
-      }
-      return sorted.sort(compareModels);
-    }
-
-    function visibleModels() {
-      var needle = state.query.trim().toLowerCase();
-      var terms = needle ? needle.split(/\s+/) : [];
-      state.terms = terms;
-      var filtered = state.models.filter(function (model) {
-        return matches(model, terms);
-      });
-      if (!terms.length) return sortModels(filtered);
-      var scored = filtered.map(function (model) {
-        return { model: model, score: scoreModel(model, terms, needle) };
-      });
-      scored.sort(function (a, b) {
-        return (b.score - a.score) || compareModels(a.model, b.model);
-      });
-      return scored.map(function (entry) { return entry.model; });
-    }
-
-    function applyFilters() {
-      var list = visibleModels();
-      renderCards(list);
-      renderResultBar(list.length);
-      renderSortDirection();
-      syncUrl(false);
-    }
-
-    function renderSortDirection() {
-      if (!dom.sortDir) return;
-      var descending = state.dir === 'desc';
-      var numeric = state.sort === 'parameters' || state.sort === 'methods';
-      var hint = descending
-        ? (numeric ? 'de menos a más' : 'de la Z a la A')
-        : (numeric ? 'de más a menos' : 'de la A a la Z');
-      if (state.sort === 'catalog') {
-        hint = descending ? 'del último al primero' : 'del primero al último';
-      }
-      dom.sortDir.textContent = descending ? '↓' : '↑';
-      dom.sortDir.title = 'Invertir el orden (' + hint + ')';
-      dom.sortDir.setAttribute('aria-label', 'Invertir el orden, ahora ' + hint);
-    }
-
-    function filterPill(kind, label) {
-      return '<button type="button" class="filter-pill" data-clear="' + kind +
-        '" title="Quitar este filtro">' + esc(label) +
-        '<span aria-hidden="true">×</span><span class="sr-only">Quitar el filtro</span></button>';
-    }
-
-    function categoryLabel(id) {
-      for (var i = 0; i < state.categories.length; i += 1) {
-        if (state.categories[i].id === id) {
-          return (state.categories[i].icon ? state.categories[i].icon + ' ' : '') +
-            state.categories[i].label;
-        }
-      }
-      return id;
-    }
-
-    function renderResultBar(count) {
-      var noun = count === 1 ? 'modelo' : 'modelos';
-      var text = count === state.total
-        ? 'Mostrando los ' + count + ' ' + noun + ' del catálogo'
-        : 'Mostrando ' + count + ' de ' + state.total + ' ' + noun;
-      dom.resultCount.textContent = text;
-      dom.resultBar.hidden = false;
-
-      var pills = [];
-      if (state.category) {
-        pills.push(filterPill('category', 'Categoría: ' + categoryLabel(state.category)));
-      }
-      if (state.tag) pills.push(filterPill('tag', 'Etiqueta: ' + state.tag));
-      if (state.query) pills.push(filterPill('query', 'Búsqueda: ' + state.query));
-      dom.activeFilters.innerHTML = pills.join('');
-      dom.activeFilters.hidden = !pills.length;
-      dom.reset.hidden = !(state.category || state.tag || state.query);
-    }
-
-    function setTag(tag) {
-      var value = String(tag || '').trim();
-      /* Volver a pulsar la etiqueta activa la quita. */
-      state.tag = state.tag.toLowerCase() === value.toLowerCase() ? '' : value;
-      applyFilters();
-    }
-
-    function resetFilters() {
-      state.category = '';
-      state.tag = '';
-      state.query = '';
-      dom.search.value = '';
-      dom.clear.hidden = true;
-      syncChips();
-      applyFilters();
-      dom.search.focus();
-      toast('Filtros restablecidos');
-    }
-
-    function clearFilter(kind) {
-      if (kind === 'category') {
-        state.category = '';
-        syncChips();
-      } else if (kind === 'tag') {
-        state.tag = '';
-      } else if (kind === 'query') {
-        state.query = '';
-        dom.search.value = '';
-        dom.clear.hidden = true;
-      }
-      applyFilters();
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* Tarjetas                                                            */
-    /* ------------------------------------------------------------------ */
-
-    function escapeRegExp(value) {
-      return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    /* Resalta los términos buscados escapando cada trozo por separado, de modo
-       que el marcado nunca rompa una entidad HTML (``&amp;``) ni inyecte código. */
-    function highlight(value, terms) {
-      var text = String(value === null || value === undefined ? '' : value);
-      var wanted = [];
-      each(terms || [], function (term) {
-        if (term && term.length > 1 && wanted.indexOf(term) === -1) wanted.push(term);
-      });
-      if (!wanted.length) return esc(text);
-      var pattern = wanted.slice(0, 6).map(escapeRegExp).join('|');
-      var matcher;
-      try {
-        matcher = new RegExp('(' + pattern + ')', 'gi');
-      } catch (error) {
-        return esc(text);
-      }
-      var html = '';
-      var cursor = 0;
-      var match = matcher.exec(text);
-      while (match) {
-        html += esc(text.slice(cursor, match.index)) + '<mark>' + esc(match[0]) + '</mark>';
-        cursor = match.index + match[0].length;
-        if (!match[0].length) matcher.lastIndex += 1;
-        match = matcher.exec(text);
-      }
-      return html + esc(text.slice(cursor));
-    }
-
-    function cardHtml(model) {
-      var terms = state.terms || [];
-      var description = String(model.short_description || '');
-      if (description.length > 170) description = description.slice(0, 170) + '…';
-      var tags = (model.tags || []).slice(0, 8).map(function (tag) {
-        var active = state.tag && String(tag).toLowerCase() === state.tag.toLowerCase();
-        return '<button type="button" class="tag' + (active ? ' is-active' : '') +
-          '" data-tag="' + esc(tag) + '" aria-pressed="' + (active ? 'true' : 'false') +
-          '" title="Filtrar por la etiqueta ' + esc(tag) + '">' + highlight(tag, terms) + '</button>';
-      }).join('');
-      var id = encodeURIComponent(model.id);
-      return '<article class="card" data-id="' + esc(model.id) + '">' +
-        '<span class="badge category-' + esc(model.category) + '">' + esc(model.category_label) + '</span>' +
-        '<h2><span class="icon" aria-hidden="true">' + esc(model.icon) + '</span>' +
-          '<a class="card-link" href="/preview/' + id + '" data-action="open">' +
-          highlight(model.title, terms) + '</a></h2>' +
-        '<p class="desc">' + highlight(description, terms) + '</p>' +
-        '<div class="tags">' + tags + '</div>' +
-        '<footer>' +
-          '<span>' + esc(model.parameter_count || 0) + ' parámetros · ' +
-            esc(model.method_count || 0) + ' métodos</span>' +
-        '</footer>' +
-        '<div class="card-actions">' +
-          '<button class="btn btn-secondary btn-small" type="button" data-action="open">📖 Ficha</button>' +
-          '<a class="btn btn-ghost btn-small" href="/preview/' + id + '" target="_blank"' +
-            ' rel="noopener" title="Abrir la vista previa completa">🌐 Vista previa</a>' +
-          '<a class="btn btn-ghost btn-small" href="/api/notebook/' + id + '" download' +
-            ' title="Descargar el notebook del modelo">⬇️ Notebook</a>' +
-        '</div>' +
-      '</article>';
-    }
-
-    function renderCards(list) {
-      if (!list.length) {
-        var detail = state.query
-          ? 'Ningún modelo coincide con «' + state.query + '»' +
-            (state.tag ? ' y la etiqueta «' + state.tag + '»' : '') + '.'
-          : 'No hay modelos en esta combinación de filtros.';
-        dom.grid.innerHTML =
-          '<div class="notice"><b>Sin resultados</b>' +
-          '<span>' + esc(detail) + '</span>' +
-          '<span>Prueba con menos palabras, otra categoría o quita las etiquetas activas.</span>' +
-          '<button class="btn btn-secondary btn-small" type="button" data-action="reset">↺ Restablecer filtros</button></div>';
-        return;
-      }
-      var html = '';
-      each(list, function (model) { html += cardHtml(model); });
-      dom.grid.innerHTML = html;
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* Ficha del modelo (modal)                                            */
-    /* ------------------------------------------------------------------ */
-
-    function findModel(id) {
-      for (var i = 0; i < state.models.length; i += 1) {
-        if (state.models[i].id === id) return state.models[i];
-      }
-      return null;
-    }
-
-    function modalHeading(model) {
-      dom.modalTitle.innerHTML =
-        '<span class="badge category-' + esc(model.category || '') + '">' +
-          esc(model.category_label || '') + '</span>' +
-        '<span class="icon" aria-hidden="true">' + esc(model.icon || '') + '</span>' +
-        esc(model.title || model.id || '');
-      dom.modalSub.textContent = model.short_description || '';
-    }
-
-    function openModalShell(model) {
-      modalHeading(model);
-      dom.modalBody.innerHTML = '<div class="loader">Cargando la ficha del modelo…</div>';
-      dom.backdrop.classList.add('open');
-      document.body.classList.add('no-scroll');
-      dom.modalClose.focus();
-    }
-
-    function openModel(id, options) {
-      var settings = options || {};
-      var summary = findModel(id);
-      if (!summary) {
-        toast('Modelo no encontrado: ' + id);
-        return;
-      }
-      state.current = summary;
-      state.trigger = settings.trigger || null;
-      openModalShell(summary);
-      if (settings.push !== false) syncUrl(true);
-
-      var requestId = (state.requestId += 1);
-      window.fetch(API + '/models/' + encodeURIComponent(id))
-        .then(function (response) {
-          if (!response.ok) throw new Error('HTTP ' + response.status);
-          return response.json();
-        })
-        .then(function (data) {
-          if (requestId !== state.requestId) return;
-          if (!data || !data.success || !data.model) throw new Error('Modelo no disponible');
-          renderModal(data.model);
-        })
-        .catch(function (error) {
-          if (requestId !== state.requestId) return;
-          dom.modalBody.innerHTML =
-            '<div class="notice error"><b>No se pudo cargar la ficha.</b>' +
-            '<span>' + esc(error && error.message ? error.message : 'Error desconocido') + '</span></div>';
-        });
-    }
-
-    function parametersHtml(model) {
-      var parameters = model.parameters || [];
-      if (!parameters.length) return '<p class="empty">Este modelo no declara parámetros de entrada.</p>';
-      return '<div class="grid-small">' + parameters.map(function (parameter) {
-        var fallback = (parameter.default === null || parameter.default === undefined)
-          ? 'requerido' : parameter.default;
-        return '<div class="param-card">' +
-          '<div class="param-name">' + esc(parameter.name) + '</div>' +
-          '<div class="param-type">' + esc(parameter.type) + ' · ' + esc(fallback) + '</div>' +
-          '<div class="param-desc">' + esc(parameter.description || '—') + '</div>' +
-        '</div>';
-      }).join('') + '</div>';
-    }
-
-    function attributesHtml(model) {
-      var attributes = model.attributes || [];
-      if (!attributes.length) return '';
-      return '<h3>Atributos</h3><div class="grid-small">' + attributes.map(function (attribute) {
-        return '<div class="param-card">' +
-          '<div class="param-name">' + esc(attribute.name) + '</div>' +
-          '<div class="param-type">' + esc(attribute.type || '—') + '</div>' +
-          '<div class="param-desc">' + esc(attribute.description || '—') + '</div>' +
-        '</div>';
-      }).join('') + '</div>';
-    }
-
-    function methodsHtml(model) {
-      var methods = model.methods || [];
-      if (!methods.length) return '<li class="empty">Este modelo no expone métodos públicos.</li>';
-      return methods.map(function (method) {
-        var signature = method.signature || method.name || '';
-        return '<li>' +
-          '<span class="method-name" title="' + esc(signature) + '">' +
-            esc(signature.split(' -> ')[0]) + '</span>' +
-          '<span class="method-origin">' + (method.inherited ? 'heredado' : 'propio') + '</span>' +
-          '<span class="method-desc">' + esc(method.description || '—') + '</span>' +
-        '</li>';
-      }).join('');
-    }
-
-    function renderModal(model) {
-      state.current = model;
-      modalHeading(model);
-      var id = encodeURIComponent(model.id);
-      var html = '<h3>Descripción</h3><div class="prose">' +
-        esc(model.full_description || model.short_description || '') + '</div>';
-      html += '<h3>Firma</h3><div class="sig" id="modal-signature">' + esc(model.signature || '') + '</div>';
-      html += '<p class="meta-line">Importación: <code>' + esc(model.import_statement || '') + '</code></p>';
-      html += '<h3>Parámetros</h3>' + parametersHtml(model);
-      html += attributesHtml(model);
-      html += '<h3>Métodos</h3><ul class="methods">' + methodsHtml(model) + '</ul>';
-      html += '<h3>Ejemplo</h3><pre id="modal-example">' + esc(model.example || '# —') + '</pre>';
-      html += '<div class="modal-actions">' +
-        '<a class="btn btn-primary" href="/preview/' + esc(id) + '" target="_blank" rel="noopener">🌐 Vista previa y laboratorio</a>' +
-        '<a class="btn btn-secondary" href="/api/notebook/' + esc(id) + '" download>⬇️ Notebook</a>' +
-        '<button class="btn btn-success" type="button" data-copy="#modal-example" data-toast="Ejemplo copiado">📋 Copiar ejemplo</button>' +
-      '</div>';
-      dom.modalBody.innerHTML = html;
-      bindCopyButtons(dom.modalBody);
-    }
-
-    function closeModal(options) {
-      var settings = options || {};
-      if (!dom.backdrop.classList.contains('open')) return;
-      state.requestId += 1;          // ignora respuestas pendientes
-      dom.backdrop.classList.remove('open');
-      document.body.classList.remove('no-scroll');
-      state.current = null;
-      if (settings.push !== false) syncUrl(true);
-      if (state.trigger && document.contains(state.trigger)) state.trigger.focus();
-      state.trigger = null;
-    }
-
-    function onModalKeydown(event) {
-      if (event.key === 'Escape' || event.key === 'Esc') {
-        event.preventDefault();
-        closeModal();
-        return;
-      }
-      if (event.key !== 'Tab') return;
-      var focusable = dom.modal.querySelectorAll(
-        'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      if (!focusable.length) return;
-      var first = focusable[0];
-      var last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* Estado en la URL                                                    */
-    /* ------------------------------------------------------------------ */
-
-    function readQuery() {
-      var result = { category: '', tag: '', q: '', sort: 'catalog', dir: '', model: '' };
-      var raw = window.location.search.replace(/^\?/, '');
-      if (!raw) return result;
-      each(raw.split('&'), function (pair) {
-        if (!pair) return;
-        var index = pair.indexOf('=');
-        var key = decodeURIComponent(index === -1 ? pair : pair.slice(0, index));
-        var value = index === -1 ? '' : decodeURIComponent(pair.slice(index + 1).replace(/\+/g, ' '));
-        if (key === 'category') result.category = value;
-        else if (key === 'tag' || key === 'tags') result.tag = value;
-        else if (key === 'q') result.q = value;
-        else if (key === 'sort') result.sort = value;
-        else if (key === 'dir' || key === 'order') result.dir = value;
-        else if (key === 'model') result.model = value;
-      });
-      return result;
-    }
-
-    function syncUrl(push) {
-      if (!window.history || !window.history.pushState) return;
-      var params = [];
-      if (state.category) params.push('category=' + encodeURIComponent(state.category));
-      if (state.tag) params.push('tag=' + encodeURIComponent(state.tag));
-      if (state.query) params.push('q=' + encodeURIComponent(state.query));
-      if (state.sort !== 'catalog') params.push('sort=' + encodeURIComponent(state.sort));
-      if (state.dir !== naturalDir(state.sort)) params.push('dir=' + state.dir);
-      if (state.current) params.push('model=' + encodeURIComponent(state.current.id));
-      var url = window.location.pathname + (params.length ? '?' + params.join('&') : '');
-      if (push) {
-        window.history.pushState({ catalog: true }, '', url);
-      } else {
-        window.history.replaceState({ catalog: true }, '', url);
-      }
-    }
-
-    function applyQuery(query) {
-      state.category = query.category || '';
-      state.tag = query.tag || '';
-      state.query = query.q || '';
-      state.sort = SORTS[query.sort] ? query.sort : 'catalog';
-      state.dir = query.dir === 'asc' || query.dir === 'desc' ? query.dir : naturalDir(state.sort);
-      state.current = query.model ? findModel(query.model) : null;
-      dom.search.value = state.query;
-      dom.clear.hidden = !state.query;
-      dom.sort.value = state.sort;
-      syncChips();
-      applyFilters();
-      if (state.current) {
-        openModel(state.current.id, { push: false });
-      } else if (dom.backdrop.classList.contains('open')) {
-        closeModal({ push: false });
-      }
-    }
-
-    function restoreFromUrl() {
-      applyQuery(readQuery());
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* Eventos                                                             */
-    /* ------------------------------------------------------------------ */
-
-    function onSearchInput() {
-      window.clearTimeout(searchTimer);
-      var value = dom.search.value.trim();
-      dom.clear.hidden = !value;
-      loadSuggestions(value);
-      searchTimer = window.setTimeout(function () {
-        if (value === state.query) return;
-        state.query = value;
-        applyFilters();
-      }, SEARCH_DELAY);
-    }
-
-    /* Autocompletado progresivo: si falla, la búsqueda local sigue funcionando. */
-    function loadSuggestions(value) {
-      window.clearTimeout(suggestTimer);
-      if (!dom.suggestions) return;
-      if (value.length < 2) {
-        dom.suggestions.innerHTML = '';
-        return;
-      }
-      suggestTimer = window.setTimeout(function () {
-        window.fetch(API + '/search?q=' + encodeURIComponent(value) + '&limit=6')
-          .then(function (response) {
-            return response.ok ? response.json() : null;
-          })
-          .then(function (data) {
-            if (!data || !data.suggestions) return;
-            dom.suggestions.innerHTML = data.suggestions.map(function (item) {
-              return '<option value="' + esc(item.title) + '" label="' +
-                esc(item.title + ' · ' + item.category_label) + '"></option>';
-            }).join('');
-          })
-          .catch(function () { /* el autocompletado es opcional */ });
-      }, 250);
-    }
-
-    function onFilterClick(event) {
-      var chip = closest(event.target, '[data-category]');
-      if (!chip) return;
-      state.category = chip.getAttribute('data-category') || '';
-      syncChips();
-      applyFilters();
-    }
-
-    function onGridClick(event) {
-      var target = event.target;
-      if (!target || !target.closest) return;
-      if (closest(target, '[data-action="reset"]')) {
-        resetFilters();
-        return;
-      }
-      var tagButton = closest(target, '[data-tag]');
-      if (tagButton) {
-        setTag(tagButton.getAttribute('data-tag'));
-        return;
-      }
-      var card = closest(target, '.card');
-      if (!card) return;
-      var id = card.getAttribute('data-id');
-      var control = closest(target, 'a, button');
-      var action = closest(target, '[data-action]');
-      var name = action ? action.getAttribute('data-action') : '';
-
-      /* Enlaces y botones propios (notebook, vista previa) se comportan solos. */
-      if (control && name !== 'open') return;
-
-      if (control && action && action.tagName === 'A') {
-        /* Ctrl/⌘/clic central siguen abriendo la vista previa en otra pestaña. */
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
-          return;
-        }
-        event.preventDefault();
-      }
-      openModel(id, { trigger: card.querySelector('.card-link') });
-    }
-
-    function onActiveFilterClick(event) {
-      var button = closest(event.target, '[data-clear]');
-      if (!button) return;
-      clearFilter(button.getAttribute('data-clear'));
-    }
-
-    function onDocumentKeydown(event) {
-      if (dom.backdrop.classList.contains('open')) {
-        onModalKeydown(event);
-        return;
-      }
-      if ((event.key === 'k' || event.key === 'K') && (event.metaKey || event.ctrlKey)) {
-        event.preventDefault();
-        dom.search.focus();
-        dom.search.select();
-        return;
-      }
-      if (event.key === 'Escape' || event.key === 'Esc') {
-        if (dom.search.value) {
-          dom.search.value = '';
-          dom.clear.hidden = true;
-          onSearchInput();
-        }
-        return;
-      }
-      if (event.key === '/' && !isTyping(event.target)) {
-        event.preventDefault();
-        dom.search.focus();
-        dom.search.select();
-      }
-    }
-
-    function bindEvents() {
-      dom.search.addEventListener('input', onSearchInput);
-      dom.clear.addEventListener('click', function () {
-        dom.search.value = '';
-        dom.clear.hidden = true;
-        onSearchInput();
-        dom.search.focus();
-      });
-      dom.filters.addEventListener('click', onFilterClick);
-      dom.activeFilters.addEventListener('click', onActiveFilterClick);
-      dom.grid.addEventListener('click', onGridClick);
-      dom.sort.addEventListener('change', function () {
-        state.sort = SORTS[dom.sort.value] ? dom.sort.value : 'catalog';
-        state.dir = naturalDir(state.sort);
-        applyFilters();
-      });
-      if (dom.sortDir) {
-        dom.sortDir.addEventListener('click', function () {
-          state.dir = state.dir === 'asc' ? 'desc' : 'asc';
-          applyFilters();
-        });
-      }
-      dom.reset.addEventListener('click', resetFilters);
-      dom.modalClose.addEventListener('click', function () { closeModal(); });
-      dom.modalBody.addEventListener('click', function (event) {
-        var button = closest(event.target, '[data-related]');
-        if (button) openModel(button.getAttribute('data-related'), { trigger: null });
-      });
-      dom.backdrop.addEventListener('mousedown', function (event) {
-        backdropPressed = event.target === dom.backdrop;
-      });
-      dom.backdrop.addEventListener('click', function (event) {
-        if (event.target === dom.backdrop && backdropPressed) closeModal();
-        backdropPressed = false;
-      });
-      document.addEventListener('keydown', onDocumentKeydown);
-      window.addEventListener('popstate', restoreFromUrl);
-    }
-
-    function init() {
-      dom.grid = byId('grid');
-      dom.filters = byId('filters');
-      dom.search = byId('search');
-      dom.suggestions = byId('search-suggestions');
-      dom.clear = byId('clear-search');
-      dom.sort = byId('sort');
-      dom.sortDir = byId('sort-dir');
-      dom.stats = byId('stats');
-      dom.resultBar = byId('result-bar');
-      dom.resultCount = byId('result-count');
-      dom.activeFilters = byId('active-filters');
-      dom.reset = byId('reset-filters');
-      dom.backdrop = byId('modal-backdrop');
-      dom.modal = byId('modal');
-      dom.modalTitle = byId('modal-title');
-      dom.modalSub = byId('modal-sub');
-      dom.modalBody = byId('modal-body');
-      dom.modalClose = byId('modal-close');
-      dom.toast = byId('toast');
-      bindEvents();
-      loadCatalog();
-    }
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', init);
-    } else {
-      init();
-    }
-  })();
-</script>
+<script src="/catalog.js" defer></script>
 </body>
 </html>
+
 

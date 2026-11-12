@@ -1,0 +1,1342 @@
+'use strict';
+
+/*
+ * Model detail page behaviour: playground, method invocation, saved-model
+ * loading, tabs, section navigation and the copy/theme helpers.
+ *
+ * The playground, invoke and load specifications are embedded by the server as
+ * JSON (<script type="application/json">), so this file never needs to know
+ * anything about the model beyond those payloads.
+ */
+(function () {
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function each(list, callback) {
+    Array.prototype.forEach.call(list || [], callback);
+  }
+
+  function closest(element, selector) {
+    while (element && element.nodeType === 1) {
+      if (element.matches && element.matches(selector)) return element;
+      element = element.parentNode;
+    }
+    return null;
+  }
+
+  function esc(value) {
+    var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;' };
+    return String(value === null || value === undefined ? '' : value)
+      .replace(/[&<>"']/g, function (ch) { return map[ch]; });
+  }
+
+  function parseJsonScript(id) {
+    var node = byId(id);
+    if (!node) return null;
+    try {
+      var text = node.textContent.trim();
+      return text ? JSON.parse(text) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  var toastNode = byId('toast');
+
+  function toast(message, isError) {
+    if (!toastNode) return;
+    toastNode.textContent = message;
+    toastNode.classList.toggle('is-error', Boolean(isError));
+    toastNode.classList.add('is-visible');
+    window.clearTimeout(toast.timer);
+    toast.timer = window.setTimeout(function () {
+      toastNode.classList.remove('is-visible');
+    }, 2600);
+  }
+  toast.timer = 0;
+
+  function legacyCopy(value, onDone, onFail) {
+    var area = document.createElement('textarea');
+    area.value = value;
+    area.setAttribute('readonly', 'readonly');
+    area.setAttribute('aria-hidden', 'true');
+    area.style.position = 'fixed';
+    area.style.top = '-1000px';
+    document.body.appendChild(area);
+    var copied = false;
+    try {
+      area.select();
+      copied = document.execCommand('copy');
+    } catch (error) {
+      copied = false;
+    }
+    document.body.removeChild(area);
+    if (copied) { onDone(); } else { onFail(); }
+  }
+
+  function copyText(value, okMessage) {
+    var text = String(value === null || value === undefined ? '' : value);
+    if (!text.trim()) {
+      toast('No hay nada que copiar', true);
+      return;
+    }
+    var done = function () { toast(okMessage || 'Copiado'); };
+    var failed = function () { toast('No se pudo copiar el contenido', true); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () {
+        legacyCopy(text, done, failed);
+      });
+      return;
+    }
+    legacyCopy(text, done, failed);
+  }
+
+  /* One delegated listener serves every copy button on the page. */
+  document.addEventListener('click', function (event) {
+    if (!event.target.closest) return;
+    var button = event.target.closest('[data-copy]');
+    if (!button) return;
+    var target = document.querySelector(button.getAttribute('data-copy'));
+    if (!target) {
+      toast('No se encontró el contenido a copiar', true);
+      return;
+    }
+    copyText(target.textContent, button.getAttribute('data-toast') || 'Copiado');
+  });
+
+  /* Status line helper (playground / invoke / load). */
+  function setStatus(node, message, kind) {
+    if (!node) return;
+    node.textContent = message || '';
+    node.className = 'status-note' + (kind ? ' ' + kind : '');
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Shell: sidebar, theme, section navigation                           */
+  /* ------------------------------------------------------------------ */
+
+  function isMobileLayout() {
+    return window.matchMedia('(max-width: 900px)').matches;
+  }
+
+  function syncSidebarToggle() {
+    var toggle = byId('sidebar-toggle');
+    var overlay = byId('sidebar-overlay');
+    var mobile = isMobileLayout();
+    var expanded = mobile
+      ? document.body.classList.contains('sidebar-open')
+      : !document.body.classList.contains('sidebar-collapsed');
+    if (toggle) toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    if (overlay) {
+      overlay.hidden = !(mobile && document.body.classList.contains('sidebar-open'));
+    }
+  }
+
+  function closeMobileSidebar() {
+    document.body.classList.remove('sidebar-open');
+    syncSidebarToggle();
+  }
+
+  function bindSidebar() {
+    var toggle = byId('sidebar-toggle');
+    var overlay = byId('sidebar-overlay');
+    if (toggle) {
+      toggle.addEventListener('click', function () {
+        if (isMobileLayout()) {
+          document.body.classList.toggle('sidebar-open');
+        } else {
+          document.body.classList.toggle('sidebar-collapsed');
+        }
+        syncSidebarToggle();
+      });
+    }
+    if (overlay) overlay.addEventListener('click', closeMobileSidebar);
+    each(document.querySelectorAll('#toc a'), function (link) {
+      link.addEventListener('click', function () {
+        if (isMobileLayout()) closeMobileSidebar();
+      });
+    });
+    window.addEventListener('resize', function () {
+      if (!isMobileLayout()) closeMobileSidebar();
+      syncSidebarToggle();
+    });
+    syncSidebarToggle();
+  }
+
+  function currentTheme() {
+    var explicit = document.documentElement.getAttribute('data-theme');
+    if (explicit === 'light' || explicit === 'dark') return explicit;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  function bindTheme() {
+    var toggle = byId('theme-toggle');
+    if (!toggle) return;
+    toggle.addEventListener('click', function () {
+      var next = currentTheme() === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try {
+        window.localStorage.setItem('lm-theme', next);
+      } catch (error) {
+        /* storage is optional */
+      }
+      toast(next === 'dark' ? 'Tema oscuro activado' : 'Tema claro activado');
+    });
+  }
+
+  /* Hide the sections the server rendered empty (no attributes, no related). */
+  function hideEmptySections() {
+    var attributes = byId('atributos');
+    var attributesLink = byId('toc-atributos');
+    if (attributes && !attributes.querySelector('.param-card')) {
+      attributes.hidden = true;
+      if (attributesLink) attributesLink.hidden = true;
+    }
+    if (!byId('relacionados')) {
+      var wrap = byId('relacionados-wrap');
+      var relatedLink = byId('toc-relacionados');
+      if (wrap) wrap.hidden = true;
+      if (relatedLink) relatedLink.hidden = true;
+    }
+  }
+
+  function bindToc() {
+    var toc = byId('toc');
+    if (!toc) return;
+    var sourceDetails = byId('source-details');
+    each(toc.querySelectorAll('a[data-section="codigo"]'), function (link) {
+      link.addEventListener('click', function () {
+        if (sourceDetails) sourceDetails.open = true;
+      });
+    });
+    if (sourceDetails && window.location.hash === '#codigo') sourceDetails.open = true;
+
+    var links = Array.prototype.slice.call(toc.querySelectorAll('a[data-section]'));
+    var entries = links.map(function (link) {
+      return { link: link, section: byId(link.getAttribute('data-section')) };
+    }).filter(function (entry) {
+      return entry.section && !entry.section.hidden && !entry.link.hidden;
+    });
+    if (!entries.length) return;
+
+    var active = null;
+    var scheduled = false;
+
+    function paint() {
+      scheduled = false;
+      var best = entries[0];
+      entries.forEach(function (entry) {
+        if (entry.section.getBoundingClientRect().top <= 160) best = entry;
+      });
+      if (best === active) return;
+      active = best;
+      entries.forEach(function (entry) {
+        var selected = entry === best;
+        entry.link.classList.toggle('is-active', selected);
+        if (selected) {
+          entry.link.setAttribute('aria-current', 'true');
+        } else {
+          entry.link.removeAttribute('aria-current');
+        }
+      });
+    }
+
+    function schedule() {
+      if (scheduled) return;
+      scheduled = true;
+      if (window.requestAnimationFrame) window.requestAnimationFrame(paint);
+      else window.setTimeout(paint, 16);
+    }
+
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    paint();
+  }
+
+  function bindBackTop() {
+    var button = byId('back-top');
+    if (!button) return;
+    window.addEventListener('scroll', function () {
+      button.hidden = window.pageYOffset < 400;
+    }, { passive: true });
+    button.addEventListener('click', function () {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  function bindPrint() {
+    var details = byId('source-details');
+    if (!details) return;
+    window.addEventListener('beforeprint', function () { details.open = true; });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Lab tabs and shared form helpers                                    */
+  /* ------------------------------------------------------------------ */
+
+  var labTabs = Array.prototype.slice.call(document.querySelectorAll('[data-lab-tab]'));
+
+  function selectLabTab(name, scroll) {
+    var active = name === 'invoke' ? 'invoke' : 'playground';
+    labTabs.forEach(function (tab) {
+      var selected = tab.getAttribute('data-lab-tab') === active;
+      tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+      tab.setAttribute('tabindex', selected ? '0' : '-1');
+    });
+    var panels = {
+      playground: byId('panel-playground'),
+      invoke: byId('panel-invoke')
+    };
+    Object.keys(panels).forEach(function (key) {
+      if (panels[key]) panels[key].hidden = key !== active;
+    });
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', active === 'invoke' ? '#invocar' : '#playground');
+    }
+    if (scroll) {
+      var heading = byId('laboratorio');
+      if (heading) heading.scrollIntoView({ block: 'start' });
+    }
+  }
+
+  function bindLabTabs() {
+    labTabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        selectLabTab(tab.getAttribute('data-lab-tab'), false);
+      });
+      tab.addEventListener('keydown', function (event) {
+        if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+        event.preventDefault();
+        var index = labTabs.indexOf(tab);
+        var offset = event.key === 'ArrowRight' ? 1 : labTabs.length - 1;
+        var next = labTabs[(index + offset) % labTabs.length];
+        if (!next) return;
+        next.focus();
+        selectLabTab(next.getAttribute('data-lab-tab'), false);
+      });
+    });
+    if (window.location.hash === '#invocar') selectLabTab('invoke', false);
+  }
+
+  /* Readable summary of the constructor parameters that need Python objects. */
+  function unsupportedSummary(list) {
+    return (list || []).map(function (item) {
+      return "'" + item.name + "' (" + item.type + ': ' + item.reason + ')';
+    }).join(', ');
+  }
+
+  function fieldControl(field, index, prefix) {
+    var id = prefix + '-' + index;
+    var kind = field.kind;
+    var value = field.default;
+    if ((value === null || value === undefined) && field.required) value = field.sample;
+    var placeholder = field.required ? 'obligatorio' : 'opcional';
+    if (kind === 'bool') {
+      return '<label class="field-check" for="' + id + '">' +
+        '<input type="checkbox" id="' + id + '" data-kind="bool"' +
+        (value === true ? ' checked' : '') + '> activar</label>';
+    }
+    if (kind === 'int' || kind === 'float') {
+      return '<input type="number" id="' + id + '" data-kind="' + kind + '" step="' +
+        (kind === 'int' ? '1' : 'any') + '" value="' +
+        esc(value === null || value === undefined ? '' : String(value)) +
+        '" placeholder="' + placeholder + '">';
+    }
+    if (kind === 'raw') {
+      return '<textarea id="' + id + '" data-kind="raw" spellcheck="false"' +
+        ' placeholder="JSON: [1, 2, 3]">' +
+        esc(value === null || value === undefined ? '' : JSON.stringify(value)) +
+        '</textarea>';
+    }
+    return '<input type="text" id="' + id + '" data-kind="' + kind + '" value="' +
+      esc(value === null || value === undefined ? '' : String(value)) +
+      '" placeholder="' + placeholder + '">';
+  }
+
+  function renderFields(container, fields, prefix, emptyMessage) {
+    if (!container) return;
+    if (!fields.length) {
+      container.innerHTML = '<p class="empty">' + esc(emptyMessage) + '</p>';
+      return;
+    }
+    container.innerHTML = fields.map(function (field, index) {
+      return '<div class="form-field">' +
+        '<label for="' + prefix + '-' + index + '">' + esc(field.name) +
+        (field.required ? ' *' : '') + '</label>' +
+        '<span class="field-type">' + esc(field.type) + '</span>' +
+        fieldControl(field, index, prefix) + '</div>';
+    }).join('');
+  }
+
+  function readControl(control) {
+    var kind = control.getAttribute('data-kind');
+    if (kind === 'bool') return control.checked;
+    var text = control.value;
+    if (kind === 'raw') {
+      if (!text.trim()) return null;
+      return JSON.parse(text);
+    }
+    if (kind === 'int' || kind === 'float') {
+      if (!text.trim()) return null;
+      var number = Number(text);
+      if (!isFinite(number)) throw new Error('se esperaba un número');
+      return kind === 'int' ? Math.trunc(number) : number;
+    }
+    return text === '' ? null : text;
+  }
+
+  function collectFields(spec, prefix) {
+    var values = {};
+    var missing = [];
+    var invalid = [];
+    ((spec && spec.fields) || []).forEach(function (field, index) {
+      var control = byId(prefix + '-' + index);
+      if (!control) return;
+      var value;
+      try {
+        value = readControl(control);
+      } catch (error) {
+        invalid.push(field.name + ': ' + error.message);
+        return;
+      }
+      if (value === null) {
+        if (field.required) missing.push(field.name);
+        return;
+      }
+      values[field.name] = value;
+    });
+    return { values: values, missing: missing, invalid: invalid };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Payloads and helpers shared by the three tools                      */
+  /* ------------------------------------------------------------------ */
+
+  var playgroundData = parseJsonScript('playground-data');
+  var invokeData = parseJsonScript('invoke-data');
+  var loadData = parseJsonScript('load-data');
+
+  /* Keep the raw control state so re-rendering a form never discards input. */
+  function snapshotFields(fields, prefix) {
+    var snapshot = {};
+    (fields || []).forEach(function (field, index) {
+      var control = byId(prefix + '-' + index);
+      if (!control) return;
+      snapshot[field.name] = control.getAttribute('data-kind') === 'bool'
+        ? { bool: true, checked: control.checked }
+        : { bool: false, value: control.value };
+    });
+    return snapshot;
+  }
+
+  function restoreFields(fields, prefix, snapshot) {
+    if (!snapshot) return;
+    (fields || []).forEach(function (field, index) {
+      var saved = snapshot[field.name];
+      if (!saved) return;
+      var control = byId(prefix + '-' + index);
+      if (!control) return;
+      if (saved.bool) {
+        control.checked = saved.checked;
+      } else {
+        control.value = saved.value;
+      }
+    });
+  }
+
+  /* Stable signature of the constructor: key order must not force a rebuild. */
+  function canonicalValue(value) {
+    if (Object.prototype.toString.call(value) === '[object Array]') {
+      return value.map(canonicalValue);
+    }
+    if (value && typeof value === 'object') {
+      var sorted = {};
+      Object.keys(value).sort().forEach(function (key) {
+        sorted[key] = canonicalValue(value[key]);
+      });
+      return sorted;
+    }
+    return value;
+  }
+
+  function constructorSignature(values) {
+    return JSON.stringify(canonicalValue(values || {}));
+  }
+
+  function pyLiteral(value) {
+    if (value === null || value === undefined) return 'None';
+    if (typeof value === 'boolean') return value ? 'True' : 'False';
+    if (typeof value === 'number') return String(value);
+    if (typeof value === 'string') return JSON.stringify(value);
+    if (Object.prototype.toString.call(value) === '[object Array]') {
+      return '[' + value.map(pyLiteral).join(', ') + ']';
+    }
+    if (typeof value === 'object') {
+      return '{' + Object.keys(value).map(function (key) {
+        return JSON.stringify(key) + ': ' + pyLiteral(value[key]);
+      }).join(', ') + '}';
+    }
+    return JSON.stringify(value);
+  }
+
+  function postJson(url, payload) {
+    return window.fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (response) {
+      return response.json().catch(function () { return null; }).then(function (data) {
+        return { ok: response.ok, status: response.status, data: data || {} };
+      });
+    });
+  }
+
+  function describeInvokeError(data) {
+    var message = data.error || 'no se pudo completar la operación';
+    if (data.unknown && data.unknown.length) {
+      message += ' (argumentos desconocidos: ' + data.unknown.join(', ') + ')';
+    }
+    if (data.missing && data.missing.length) {
+      message += ' (faltan: ' + data.missing.join(', ') + ')';
+    }
+    return message;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Playground                                                          */
+  /* ------------------------------------------------------------------ */
+
+  var playgroundDom = {
+    form: byId('playground-form'),
+    fields: byId('playground-fields'),
+    run: byId('run-playground'),
+    reset: byId('reset-playground'),
+    status: byId('playground-status'),
+    result: byId('playground-result'),
+    title: byId('playground-result-title'),
+    output: byId('playground-output'),
+    detail: byId('playground-detail'),
+    code: byId('playground-code')
+  };
+
+  function collectParameters() {
+    return collectFields(playgroundData, 'pg');
+  }
+
+  function updateSnippet() {
+    if (!playgroundData || !playgroundDom.code) return;
+    var collected = collectParameters();
+    var callArguments = Object.keys(collected.values).map(function (name) {
+      return name + '=' + pyLiteral(collected.values[name]);
+    });
+    playgroundDom.code.textContent = (playgroundData.import_statement || '') +
+      '\n\nmodel = ' + playgroundData.model_name + '(' + callArguments.join(', ') + ')';
+  }
+
+  function renderPlayground() {
+    if (!playgroundData || !playgroundDom.fields) return;
+    if (playgroundData.buildable === false) {
+      playgroundDom.fields.innerHTML =
+        '<p class="empty">No se puede construir desde el catálogo: ' +
+        esc(unsupportedSummary(playgroundData.unsupported)) +
+        '. Usa el ejemplo de Python.</p>';
+      if (playgroundDom.run) playgroundDom.run.disabled = true;
+      if (playgroundDom.reset) playgroundDom.reset.disabled = true;
+      updateSnippet();
+      return;
+    }
+    renderFields(
+      playgroundDom.fields,
+      playgroundData.fields || [],
+      'pg',
+      'Este modelo no declara parámetros configurables.'
+    );
+    updateSnippet();
+  }
+
+  function showPlaygroundResult(text, detail, ok) {
+    if (!playgroundDom.result) return;
+    playgroundDom.result.hidden = false;
+    if (playgroundDom.title) {
+      playgroundDom.title.textContent = ok ? 'Resultado de la ejecución' : 'No se pudo ejecutar';
+    }
+    playgroundDom.output.textContent = text;
+    playgroundDom.detail.hidden = !detail;
+    playgroundDom.detail.textContent = detail || '';
+  }
+
+  function runPlayground(event) {
+    event.preventDefault();
+    if (!playgroundData || playgroundData.buildable === false) return;
+    var collected = collectParameters();
+    if (collected.invalid.length) {
+      setStatus(playgroundDom.status, 'Revisa: ' + collected.invalid.join('; '), 'is-error');
+      return;
+    }
+    if (collected.missing.length) {
+      setStatus(
+        playgroundDom.status,
+        'Faltan parámetros obligatorios: ' + collected.missing.join(', '),
+        'is-error'
+      );
+      return;
+    }
+    playgroundDom.run.disabled = true;
+    setStatus(playgroundDom.status, 'Ejecutando…', 'is-busy');
+    window.fetch(playgroundData.endpoint || '/api/playground', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model_id: playgroundData.model_id,
+        parameters: collected.values
+      })
+    }).then(function (response) {
+      return response.json().catch(function () { return null; }).then(function (data) {
+        return { ok: response.ok, data: data || {} };
+      });
+    }).then(function (response) {
+      var data = response.data;
+      if (!response.ok || data.success === false) {
+        setStatus(
+          playgroundDom.status,
+          'Error: ' + (data.error || 'no se pudo ejecutar el modelo'),
+          'is-error'
+        );
+        showPlaygroundResult(data.error || 'Error desconocido', data.detail || '', false);
+        return;
+      }
+      var lines = [
+        'tipo   : ' + (data.type || '—'),
+        'módulo : ' + (data.module || '—'),
+        'repr   : ' + (data.repr || '—')
+      ];
+      if (data.attributes && data.attributes.length) {
+        lines.push('atributos: ' + data.attributes.join(', '));
+      }
+      if (data.stdout) lines.push('', 'salida:', data.stdout);
+      var elapsed = typeof data.elapsed === 'number' ? ' en ' + data.elapsed + ' s' : '';
+      setStatus(playgroundDom.status, 'Modelo construido' + elapsed, 'is-ok');
+      showPlaygroundResult(lines.join('\n'), data.stderr || '', true);
+    }).catch(function (error) {
+      setStatus(playgroundDom.status, 'Error de red: ' + error.message, 'is-error');
+      showPlaygroundResult(String(error.message || error), '', false);
+    }).then(function () {
+      playgroundDom.run.disabled = false;
+    });
+  }
+
+  function bindPlayground() {
+    if (playgroundData && playgroundDom.form) {
+      renderPlayground();
+      playgroundDom.form.addEventListener('submit', runPlayground);
+      playgroundDom.form.addEventListener('input', updateSnippet);
+      playgroundDom.form.addEventListener('change', updateSnippet);
+      if (playgroundDom.reset) {
+        playgroundDom.reset.addEventListener('click', function () {
+          renderPlayground();
+          playgroundDom.result.hidden = true;
+          setStatus(playgroundDom.status, 'Valores restablecidos', '');
+        });
+      }
+      return;
+    }
+    if (playgroundDom.fields) {
+      playgroundDom.fields.innerHTML =
+        '<p class="empty">El playground no está disponible: falta la especificación del modelo.</p>';
+    }
+    if (playgroundDom.run) playgroundDom.run.disabled = true;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Load a saved model                                                  */
+  /* ------------------------------------------------------------------ */
+
+  var loadDom = {
+    panel: byId('load-panel'),
+    select: byId('load-loader'),
+    path: byId('load-path'),
+    verify: byId('load-verify'),
+    use: byId('load-session'),
+    hint: byId('load-hint'),
+    status: byId('load-status'),
+    result: byId('load-result'),
+    title: byId('load-result-title'),
+    output: byId('load-output'),
+    detail: byId('load-detail')
+  };
+
+  function setLoadStatus(message, kind) {
+    setStatus(loadDom.status, message, kind);
+  }
+
+  function showLoadResult(text, detail, ok) {
+    if (!loadDom.result) return;
+    loadDom.result.hidden = false;
+    if (loadDom.title) loadDom.title.textContent = ok ? 'Modelo cargado' : 'No se pudo cargar';
+    loadDom.output.textContent = text;
+    loadDom.detail.hidden = !detail;
+    loadDom.detail.textContent = detail || '';
+  }
+
+  function currentLoader() {
+    if (!loadData || !loadDom.select) return null;
+    var loaders = loadData.loaders || [];
+    for (var index = 0; index < loaders.length; index += 1) {
+      if (loaders[index].name === loadDom.select.value) return loaders[index];
+    }
+    return loaders.length ? loaders[0] : null;
+  }
+
+  function loadConstructorValues() {
+    var fromInvoke = collectFields(playgroundData, 'ic');
+    if (fromInvoke.invalid.length || fromInvoke.missing.length) return collectParameters();
+    return fromInvoke;
+  }
+
+  function loadPayload(loader) {
+    var values = {};
+    if (loader && loader.requires_instance) {
+      var constructor = loadConstructorValues();
+      if (constructor.invalid.length) {
+        setLoadStatus('Revisa el constructor: ' + constructor.invalid.join('; '), 'is-error');
+        return null;
+      }
+      if (constructor.missing.length) {
+        setLoadStatus(
+          'Este loader necesita el constructor: faltan ' + constructor.missing.join(', '),
+          'is-error'
+        );
+        return null;
+      }
+      values = constructor.values;
+    }
+    var path = loadDom.path ? loadDom.path.value.trim() : '';
+    if (!path) {
+      setLoadStatus('Escribe la ruta del modelo guardado', 'is-error');
+      return null;
+    }
+    return { loader: loader ? loader.name : '', path: path, parameters: values };
+  }
+
+  function verifyLoadedModel() {
+    if (!loadData || !loadData.loadable || loadData.enabled === false) return;
+    var loader = currentLoader();
+    var payload = loadPayload(loader);
+    if (!payload) return;
+    if (loadDom.verify) loadDom.verify.disabled = true;
+    if (loadDom.use) loadDom.use.disabled = true;
+    setLoadStatus('Cargando el modelo…', 'is-busy');
+    postJson(loadData.endpoint, payload)
+      .then(function (response) {
+        var data = response.data;
+        if (!response.ok || data.success === false) {
+          setLoadStatus('Error: ' + describeInvokeError(data), 'is-error');
+          showLoadResult(data.error || 'Error desconocido', data.detail || '', false);
+          return;
+        }
+        var lines = [
+          'tipo   : ' + (data.type || '—'),
+          'loader : ' + (data.loader || payload.loader || '—'),
+          'ruta   : ' + (data.path || payload.path || '—')
+        ];
+        if (data.attributes && data.attributes.length) {
+          lines.push('atributos: ' + data.attributes.join(', '));
+        }
+        var elapsed = typeof data.elapsed === 'number' ? ' en ' + data.elapsed + ' s' : '';
+        setLoadStatus('Modelo verificado' + elapsed, 'is-ok');
+        showLoadResult(lines.join('\n'), data.stderr || '', true);
+      })
+      .catch(function (error) {
+        setLoadStatus('Error de red: ' + error.message, 'is-error');
+        showLoadResult(String(error.message || error), '', false);
+      })
+      .then(function () {
+        if (loadDom.verify) loadDom.verify.disabled = false;
+        if (loadDom.use) loadDom.use.disabled = false;
+      });
+  }
+
+  function loadAsSession() {
+    if (!loadData || !loadData.loadable || loadData.enabled === false || !invokeData) return;
+    var loader = currentLoader();
+    var payload = loadPayload(loader);
+    if (!payload) return;
+    if (loadDom.verify) loadDom.verify.disabled = true;
+    if (loadDom.use) loadDom.use.disabled = true;
+    setLoadStatus('Abriendo una instancia con el modelo guardado…', 'is-busy');
+    var start = invokeSession.id ? closeSession(false) : Promise.resolve();
+    start.then(function () {
+      return postJson(invokeData.sessions_url, payload);
+    }).then(function (response) {
+      var data = response.data;
+      if (!response.ok || data.success === false) {
+        throw new Error(describeInvokeError(data));
+      }
+      invokeSession.id = data.session_id;
+      invokeSession.calls = 0;
+      invokeSession.signature = null;
+      invokeSession.loaded = true;
+      invokeSession.loader = payload.loader;
+      invokeSession.path = data.load ? data.load.path : payload.path;
+      if (invokeDom.run) invokeDom.run.disabled = false;
+      if (invokeDom.sample) invokeDom.sample.disabled = false;
+      if (invokeDom.select) invokeDom.select.disabled = false;
+      if (invokeDom.useSession) invokeDom.useSession.checked = true;
+      renderSessionInfo();
+      renderInvokeConstructor();
+      renderInvokeMethod();
+      setLoadStatus('Instancia cargada y lista para invocar', 'is-ok');
+      setInvokeStatus(
+        'Instancia cargada desde ' + (data.load ? data.load.path : payload.path),
+        'is-ok'
+      );
+      selectLabTab('invoke', true);
+    }).catch(function (error) {
+      setLoadStatus('Error: ' + error.message, 'is-error');
+    }).then(function () {
+      if (loadDom.verify) loadDom.verify.disabled = false;
+      if (loadDom.use) loadDom.use.disabled = false;
+    });
+  }
+
+  function renderLoad() {
+    if (!loadDom.panel || !loadData) return;
+    var loaders = loadData.loaders || [];
+    if (loadData.enabled === false || !loadData.loadable || !loaders.length) {
+      loadDom.panel.hidden = true;
+      return;
+    }
+    loadDom.panel.hidden = false;
+    if (loadDom.select) {
+      loadDom.select.innerHTML = loaders.map(function (loader) {
+        var suffix = loader.requires_instance ? ' · instancia' : '';
+        return '<option value="' + esc(loader.name) + '">' +
+          esc(loader.name + '()' + suffix) + '</option>';
+      }).join('');
+    }
+    if (loadDom.hint) {
+      var policy = loadData.restrict_to_root
+        ? 'Solo se permiten rutas dentro de ' + loadData.root + '.'
+        : 'Rutas relativas a ' + loadData.root + '.';
+      loadDom.hint.innerHTML = esc(policy) +
+        ' Se aceptan archivos <code>.pkl</code> y directorios de checkpoints.' +
+        ' Carga únicamente archivos de confianza.';
+    }
+    if (loadDom.path && !loadDom.path.value) {
+      try {
+        loadDom.path.value = window.sessionStorage.getItem('lm-load-path') || '';
+      } catch (error) {
+        loadDom.path.value = '';
+      }
+    }
+    if (loadDom.path) {
+      loadDom.path.addEventListener('change', function () {
+        try {
+          window.sessionStorage.setItem('lm-load-path', loadDom.path.value);
+        } catch (error) {
+          /* the storage is optional */
+        }
+      });
+    }
+    if (loadDom.verify) loadDom.verify.addEventListener('click', verifyLoadedModel);
+    if (loadDom.use) {
+      var sessionsAvailable = !invokeData || invokeData.sessions_enabled !== false;
+      loadDom.use.disabled = !sessionsAvailable;
+      loadDom.use.title = sessionsAvailable
+        ? 'Carga el modelo en una instancia persistente'
+        : 'Las sesiones están deshabilitadas en este servidor';
+      loadDom.use.addEventListener('click', loadAsSession);
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Method invocation                                                   */
+  /* ------------------------------------------------------------------ */
+
+  var invokeDom = {
+    panel: byId('panel-invoke'),
+    select: byId('invoke-method'),
+    signature: byId('invoke-signature'),
+    fields: byId('invoke-fields'),
+    constructorFields: byId('invoke-constructor-fields'),
+    constructorNote: byId('invoke-constructor-note'),
+    useSession: byId('invoke-use-session'),
+    sessionInfo: byId('invoke-session-info'),
+    closeSession: byId('invoke-close-session'),
+    run: byId('run-invoke'),
+    sample: byId('sample-invoke'),
+    reset: byId('reset-invoke'),
+    status: byId('invoke-status'),
+    result: byId('invoke-result'),
+    title: byId('invoke-result-title'),
+    output: byId('invoke-output'),
+    detail: byId('invoke-detail'),
+    code: byId('invoke-code')
+  };
+
+  var invokeSession = { id: null, calls: 0, signature: null, loaded: false, loader: null, path: null };
+
+  function setInvokeStatus(message, kind) {
+    setStatus(invokeDom.status, message, kind);
+  }
+
+  function showInvokeResult(text, detail, ok) {
+    if (!invokeDom.result) return;
+    invokeDom.result.hidden = false;
+    if (invokeDom.title) {
+      invokeDom.title.textContent = ok ? 'Resultado de la llamada' : 'No se pudo invocar';
+    }
+    invokeDom.output.textContent = text;
+    invokeDom.detail.hidden = !detail;
+    invokeDom.detail.textContent = detail || '';
+  }
+
+  function currentInvokeMethod() {
+    if (!invokeData || !invokeDom.select) return null;
+    var methods = invokeData.methods || [];
+    for (var index = 0; index < methods.length; index += 1) {
+      if (methods[index].name === invokeDom.select.value) return methods[index];
+    }
+    return methods.length ? methods[0] : null;
+  }
+
+  function renderSessionInfo() {
+    if (invokeDom.sessionInfo) {
+      invokeDom.sessionInfo.textContent = invokeSession.id
+        ? 'sesión ' + invokeSession.id + ' · ' + invokeSession.calls +
+          (invokeSession.calls === 1 ? ' llamada' : ' llamadas') +
+          (invokeSession.loaded ? ' · cargada' : '')
+        : 'sin sesión';
+    }
+    if (invokeDom.closeSession) invokeDom.closeSession.hidden = !invokeSession.id;
+  }
+
+  function renderInvokeMethod() {
+    if (!invokeData) return;
+    var method = currentInvokeMethod();
+    renderFields(
+      invokeDom.fields,
+      (method && method.fields) || [],
+      'iv',
+      'Este método no recibe argumentos.'
+    );
+    if (invokeDom.signature) invokeDom.signature.textContent = method ? method.signature : '';
+    updateInvokeSnippet();
+  }
+
+  function renderInvokeConstructor(forceDefaults) {
+    if (playgroundData && playgroundData.buildable === false) {
+      if (invokeSession.loaded) {
+        if (invokeDom.constructorFields) {
+          invokeDom.constructorFields.innerHTML =
+            '<p class="empty">Instancia cargada desde un archivo; el constructor no se usa.</p>';
+        }
+        if (invokeDom.constructorNote) {
+          invokeDom.constructorNote.textContent =
+            'Métodos disponibles sobre la instancia cargada.';
+        }
+        return;
+      }
+      if (invokeDom.constructorFields) {
+        invokeDom.constructorFields.innerHTML =
+          '<p class="empty">No se puede construir desde el catálogo: ' +
+          esc(unsupportedSummary(playgroundData.unsupported)) +
+          '. Usa el ejemplo de Python.</p>';
+      }
+      if (invokeDom.constructorNote) {
+        invokeDom.constructorNote.textContent =
+          'Este modelo necesita objetos Python que la API no puede recibir como JSON.';
+      }
+      return;
+    }
+    var fields = (playgroundData && playgroundData.fields) || [];
+    /* Opening or closing a session must not reset the form: it has to keep
+       showing the values of the live instance so the signature is accurate. */
+    var previous = forceDefaults ? null : snapshotFields(fields, 'ic');
+    renderFields(
+      invokeDom.constructorFields,
+      fields,
+      'ic',
+      'El constructor no declara parámetros: el modelo se crea sin argumentos.'
+    );
+    restoreFields(fields, 'ic', previous);
+    if (invokeDom.constructorNote) {
+      invokeDom.constructorNote.textContent = invokeSession.loaded
+        ? 'Instancia cargada desde un archivo: los parámetros del constructor no se aplican.'
+        : (invokeSession.id
+          ? 'La instancia se reconstruye automáticamente si cambias estos valores.'
+          : 'La primera llamada construye la clase con estos valores.');
+    }
+  }
+
+  function updateInvokeSnippet() {
+    if (!invokeData || !invokeDom.code) return;
+    var method = currentInvokeMethod();
+    var constructor = collectFields(playgroundData, 'ic');
+    var callArguments = method ? collectFields(method, 'iv') : { values: {} };
+    var constructorArguments = Object.keys(constructor.values).map(function (name) {
+      return name + '=' + pyLiteral(constructor.values[name]);
+    });
+    var argumentsList = Object.keys(callArguments.values).map(function (name) {
+      return name + '=' + pyLiteral(callArguments.values[name]);
+    });
+    var source = playgroundData || {};
+    var importStatement = invokeData.import_statement || source.import_statement || '';
+    var modelName = invokeData.model_name || source.model_name || invokeData.model_id;
+    var lines = [importStatement, ''];
+    if (invokeSession.loaded) {
+      lines.push(
+        'model = ' + modelName + '.' + (invokeSession.loader || 'load') +
+        '(' + pyLiteral(invokeSession.path || '') + ')'
+      );
+    } else {
+      lines.push('model = ' + modelName + '(' + constructorArguments.join(', ') + ')');
+    }
+    if (method) {
+      lines.push('result = model.' + method.name + '(' + argumentsList.join(', ') + ')');
+      lines.push('print(result)');
+    }
+    invokeDom.code.textContent = lines.join('\n');
+  }
+
+  function renderInvoke() {
+    if (!invokeData) {
+      if (invokeDom.fields) {
+        invokeDom.fields.innerHTML =
+          '<p class="empty">La invocación no está disponible: falta la especificación del modelo.</p>';
+      }
+      if (invokeDom.run) invokeDom.run.disabled = true;
+      if (invokeDom.sample) invokeDom.sample.disabled = true;
+      return;
+    }
+    if (invokeDom.select) {
+      invokeDom.select.innerHTML = (invokeData.methods || []).map(function (method) {
+        return '<option value="' + esc(method.name) + '">' + esc(method.name) + '</option>';
+      }).join('');
+      invokeDom.select.disabled = !(invokeData.methods || []).length;
+    }
+    if (invokeDom.useSession) {
+      invokeDom.useSession.disabled = !invokeData.sessions_enabled;
+      if (!invokeData.sessions_enabled) invokeDom.useSession.checked = false;
+    }
+    if (invokeDom.sample) {
+      invokeDom.sample.disabled = !(invokeData.methods || []).length;
+    }
+    renderInvokeConstructor();
+    renderSessionInfo();
+    if (invokeData.enabled === false) {
+      if (invokeDom.fields) {
+        invokeDom.fields.innerHTML =
+          '<p class="empty">La invocación de métodos está deshabilitada en este servidor ' +
+          '(LM_INVOKE=0).</p>';
+      }
+      if (invokeDom.run) invokeDom.run.disabled = true;
+      if (invokeDom.sample) invokeDom.sample.disabled = true;
+      setInvokeStatus('Deshabilitada en el servidor', 'is-error');
+      return;
+    }
+    if (!(invokeData.methods || []).length) {
+      if (invokeDom.fields) {
+        invokeDom.fields.innerHTML =
+          '<p class="empty">Este modelo no expone métodos invocables con la política actual.</p>';
+      }
+      if (invokeDom.run) invokeDom.run.disabled = true;
+      setInvokeStatus('Sin métodos invocables', '');
+      return;
+    }
+    if (invokeData.buildable === false && !invokeSession.loaded) {
+      if (invokeDom.fields) {
+        invokeDom.fields.innerHTML =
+          '<p class="empty">No se puede construir desde el catálogo: ' +
+          esc(unsupportedSummary(invokeData.unsupported)) +
+          '. Usa el ejemplo de Python.</p>';
+      }
+      if (invokeDom.run) invokeDom.run.disabled = true;
+      if (invokeDom.sample) invokeDom.sample.disabled = true;
+      if (invokeDom.select) invokeDom.select.disabled = true;
+      setInvokeStatus('Requiere objetos Python', 'is-error');
+      return;
+    }
+    if (invokeDom.run) invokeDom.run.disabled = false;
+    renderInvokeMethod();
+  }
+
+  function openSession(parameters) {
+    return postJson(invokeData.sessions_url, { parameters: parameters }).then(function (response) {
+      if (!response.ok || response.data.success === false) {
+        throw new Error(describeInvokeError(response.data));
+      }
+      invokeSession.id = response.data.session_id;
+      invokeSession.calls = 0;
+      invokeSession.signature = constructorSignature(parameters);
+      invokeSession.loaded = false;
+      invokeSession.loader = null;
+      invokeSession.path = null;
+      renderSessionInfo();
+      renderInvokeConstructor();
+      return invokeSession.id;
+    });
+  }
+
+  function closeSession(notify) {
+    var sessionId = invokeSession.id;
+    invokeSession.id = null;
+    invokeSession.calls = 0;
+    invokeSession.signature = null;
+    invokeSession.loaded = false;
+    invokeSession.loader = null;
+    invokeSession.path = null;
+    renderSessionInfo();
+    renderInvokeConstructor();
+    if (!sessionId) return Promise.resolve();
+    var template = invokeData.session_url_template || '/api/sessions/{session_id}';
+    return window.fetch(template.replace('{session_id}', sessionId), {
+      method: 'DELETE'
+    }).then(function () {
+      if (notify) setInvokeStatus('Sesión cerrada', 'is-ok');
+    }).catch(function () {
+      /* the session expires on its own on the server */
+    });
+  }
+
+  /* Fill one form control with a JSON value. */
+  function fillField(control, value) {
+    var kind = control.getAttribute('data-kind');
+    if (kind === 'bool') {
+      control.checked = value === true;
+      return;
+    }
+    if (kind === 'raw') {
+      control.value = JSON.stringify(value);
+      return;
+    }
+    control.value = value === null || value === undefined ? '' : String(value);
+  }
+
+  function validatedConstructor() {
+    var constructor = collectFields(playgroundData, 'ic');
+    if (constructor.invalid.length) {
+      setInvokeStatus('Revisa el constructor: ' + constructor.invalid.join('; '), 'is-error');
+      return null;
+    }
+    if (constructor.missing.length) {
+      setInvokeStatus(
+        'Faltan parámetros del constructor: ' + constructor.missing.join(', '),
+        'is-error'
+      );
+      return null;
+    }
+    return constructor.values;
+  }
+
+  /* Ask the server for sample arguments coherent with the chosen constructor. */
+  function fillSampleArguments() {
+    var method = currentInvokeMethod();
+    var loaded = invokeSession.id && invokeSession.loaded;
+    if (!invokeData || (invokeData.buildable === false && !loaded) || !method) {
+      if (invokeData && invokeData.buildable === false && !loaded) {
+        setInvokeStatus('Requiere objetos Python', 'is-error');
+      } else {
+        setInvokeStatus('No hay ningún método que invocar', 'is-error');
+      }
+      return;
+    }
+    var parameters = loaded ? {} : validatedConstructor();
+    if (!parameters) return;
+    var endpoint = invokeData.sample_endpoint || '/api/models/' + invokeData.model_id + '/sample';
+    if (invokeDom.sample) invokeDom.sample.disabled = true;
+    setInvokeStatus('Generando datos de ejemplo…', 'is-busy');
+    postJson(endpoint, { method: method.name, parameters: parameters })
+      .then(function (response) {
+        var data = response.data;
+        if (!response.ok || data.success === false) {
+          setInvokeStatus('Error: ' + describeInvokeError(data), 'is-error');
+          return;
+        }
+        var samples = data.arguments || {};
+        (method.fields || []).forEach(function (field, index) {
+          if (!Object.prototype.hasOwnProperty.call(samples, field.name)) return;
+          var control = byId('iv-' + index);
+          if (control) fillField(control, samples[field.name]);
+        });
+        updateInvokeSnippet();
+        setInvokeStatus('Datos de ejemplo generados', 'is-ok');
+      })
+      .catch(function (error) {
+        setInvokeStatus('Error de red: ' + error.message, 'is-error');
+      })
+      .then(function () {
+        if (invokeDom.sample) invokeDom.sample.disabled = false;
+      });
+  }
+
+  function runInvoke() {
+    if (!invokeData) return;
+    var loaded = invokeSession.id && invokeSession.loaded;
+    if (invokeData.buildable === false && !loaded) return;
+    var method = currentInvokeMethod();
+    if (!method) {
+      setInvokeStatus('No hay ningún método que invocar', 'is-error');
+      return;
+    }
+    var argumentsValues = collectFields(method, 'iv');
+    if (argumentsValues.invalid.length) {
+      setInvokeStatus('Revisa: ' + argumentsValues.invalid.join('; '), 'is-error');
+      return;
+    }
+    if (argumentsValues.missing.length) {
+      setInvokeStatus('Faltan argumentos: ' + argumentsValues.missing.join(', '), 'is-error');
+      return;
+    }
+    var constructorValues = { values: {} };
+    if (!loaded) {
+      constructorValues = collectFields(playgroundData, 'ic');
+      if (constructorValues.invalid.length) {
+        setInvokeStatus('Revisa el constructor: ' + constructorValues.invalid.join('; '), 'is-error');
+        return;
+      }
+      if (constructorValues.missing.length) {
+        setInvokeStatus(
+          'Faltan parámetros del constructor: ' + constructorValues.missing.join(', '),
+          'is-error'
+        );
+        return;
+      }
+    }
+    var useSession = invokeDom.useSession && invokeDom.useSession.checked;
+    var signature = constructorSignature(constructorValues.values);
+    if (invokeDom.run) invokeDom.run.disabled = true;
+    setInvokeStatus('Invocando…', 'is-busy');
+    var request;
+    if (useSession) {
+      var reuse = invokeSession.id &&
+        (invokeSession.loaded || invokeSession.signature === signature);
+      var sessionPromise = reuse
+        ? Promise.resolve(invokeSession.id)
+        : closeSession(false).then(function () {
+          return openSession(constructorValues.values);
+        });
+      request = sessionPromise.then(function (sessionId) {
+        var template = invokeData.session_invoke_url_template ||
+          '/api/sessions/{session_id}/invoke';
+        var payload = { method: method.name, arguments: argumentsValues.values };
+        if (!invokeSession.loaded) payload.parameters = constructorValues.values;
+        return postJson(template.replace('{session_id}', sessionId), payload);
+      });
+    } else {
+      var directPayload = {
+        method: method.name,
+        arguments: argumentsValues.values,
+        parameters: constructorValues.values
+      };
+      if (invokeSession.loaded) {
+        directPayload.parameters = {};
+        directPayload.path = invokeSession.path;
+        directPayload.loader = invokeSession.loader;
+      }
+      request = postJson(invokeData.endpoint, directPayload);
+    }
+    request.then(function (response) {
+      var data = response.data;
+      if (!response.ok || data.success === false) {
+        if (response.status === 404 && useSession && invokeSession.id) {
+          invokeSession.id = null;
+          invokeSession.calls = 0;
+          renderSessionInfo();
+        }
+        setInvokeStatus('Error: ' + describeInvokeError(data), 'is-error');
+        showInvokeResult(data.error || 'Error desconocido', data.detail || '', false);
+        return;
+      }
+      if (useSession) {
+        invokeSession.id = data.session_id || invokeSession.id;
+        invokeSession.signature = signature;
+        invokeSession.calls = typeof data.calls === 'number'
+          ? data.calls
+          : invokeSession.calls + 1;
+        renderSessionInfo();
+        renderInvokeConstructor();
+      }
+      var lines = [
+        'método : ' + (data.method || method.name),
+        'tipo   : ' + (data.result_type || '—'),
+        'repr   : ' + (data.result_repr || '—')
+      ];
+      if (data.result !== undefined && data.result !== null) {
+        lines.push('', 'resultado:', JSON.stringify(data.result, null, 2));
+      }
+      if (data.stdout) lines.push('', 'salida:', data.stdout);
+      var elapsed = typeof data.elapsed === 'number' ? ' en ' + data.elapsed + ' s' : '';
+      setInvokeStatus(
+        'Llamada completada' + elapsed + (data.rebuilt ? ' (instancia reconstruida)' : ''),
+        'is-ok'
+      );
+      showInvokeResult(lines.join('\n'), data.stderr || '', true);
+    }).catch(function (error) {
+      setInvokeStatus('Error: ' + error.message, 'is-error');
+      showInvokeResult(String(error.message || error), '', false);
+    }).then(function () {
+      if (invokeDom.run) invokeDom.run.disabled = false;
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Bootstrap                                                           */
+  /* ------------------------------------------------------------------ */
+
+  function bindInvoke() {
+    renderInvoke();
+    if (invokeDom.select) invokeDom.select.addEventListener('change', renderInvokeMethod);
+    if (invokeDom.run) invokeDom.run.addEventListener('click', runInvoke);
+    if (invokeDom.sample) invokeDom.sample.addEventListener('click', fillSampleArguments);
+    if (invokeDom.reset) {
+      invokeDom.reset.addEventListener('click', function () {
+        renderInvokeMethod();
+        renderInvokeConstructor(true);
+        if (invokeDom.result) invokeDom.result.hidden = true;
+        setInvokeStatus('Argumentos restablecidos', '');
+      });
+    }
+    if (invokeDom.useSession) {
+      invokeDom.useSession.addEventListener('change', function () {
+        if (!invokeDom.useSession.checked && invokeSession.id) closeSession(false);
+      });
+    }
+    if (invokeDom.closeSession) {
+      invokeDom.closeSession.addEventListener('click', function () {
+        closeSession(true);
+      });
+    }
+  }
+
+  function init() {
+    hideEmptySections();
+    bindSidebar();
+    bindTheme();
+    bindToc();
+    bindBackTop();
+    bindPrint();
+    bindLabTabs();
+    bindPlayground();
+    renderLoad();
+    bindInvoke();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+
+
+
+
+
+
+
+
+
+
+

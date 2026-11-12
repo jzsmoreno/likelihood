@@ -49,6 +49,16 @@ The browser UI is available at `/` and `/preview/<model_id>`. `/docs` is the
 FastAPI Swagger UI and `/api/openapi.json` the generated OpenAPI document. Assets
 live in `models/` and are served with `ETag` and `Cache-Control` headers.
 
+The interface follows one design system inspired by the Databricks platform:
+
+| File | Purpose |
+| --- | --- |
+| `models/app.css` | Shared design tokens and components (top bar, sidebar, panels, tables, badges, buttons, forms, drawer, dark theme, responsive rules). |
+| `models/index.html` | Catalog workspace: collapsible navigation, KPI tiles, table and card views, filters and a model details drawer. |
+| `models/catalog.js` | Catalog behaviour (search, facets, ordering, URL state, drawer). |
+| `models/preview.html`, `models/preview.css` | Model page rendered by the server from the introspection catalog. |
+| `models/preview.js` | Playground, method invocation and saved-model loading on the model page. |
+
 The catalog is re-introspected when a model source changes (`LM_CATALOG_TTL`), so
 editing `likelihood/models` is reflected without restarting the server.
 

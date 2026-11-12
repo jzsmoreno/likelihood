@@ -442,6 +442,52 @@ def test_index_page(client):
     assert response.headers["Content-Type"].startswith("text/html")
 
 
+def test_catalog_page_uses_the_shared_design_system(client):
+    """The catalog is an app shell (top bar, sidebar, drawer) driven by catalog.js."""
+    response = client.get("/")
+    assert response.status_code == 200
+    html = response.text
+    assert 'href="/app.css"' in html
+    assert 'src="/catalog.js"' in html
+    assert 'id="sidebar"' in html
+    assert 'id="drawer"' in html
+    assert 'id="results"' in html
+    assert 'id="view-table"' in html
+    assert "api/models" in html
+
+
+def test_preview_page_uses_the_shared_design_system(client):
+    """The preview keeps the server rendered sections and adds its own script."""
+    response = client.get("/preview/" + first_model_id())
+    assert response.status_code == 200
+    html = response.text
+    assert 'href="/app.css"' in html
+    assert 'href="/preview.css"' in html
+    assert 'src="/preview.js"' in html
+    assert 'id="sidebar"' in html
+    assert 'id="toc"' in html
+    assert 'id="parametros"' in html
+    assert 'id="laboratorio"' in html
+
+
+@pytest.mark.parametrize(
+    ("path", "prefix"),
+    [
+        ("/app.css", "text/css"),
+        ("/preview.css", "text/css"),
+        ("/catalog.js", "text/javascript"),
+        ("/preview.js", "text/javascript"),
+    ],
+)
+def test_design_system_assets_are_served(client, path, prefix):
+    response = client.get(path)
+    assert response.status_code == 200
+    assert response.headers["Content-Type"].startswith(prefix)
+    assert response.text.strip()
+    assert response.headers["ETag"]
+    assert response.headers["Cache-Control"]
+
+
 def test_favicon(client):
     response = client.get("/favicon.svg")
     assert response.status_code == 200

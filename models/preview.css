@@ -1,0 +1,131 @@
+/* ==========================================================================
+   Model detail page additions (loaded after app.css)
+   ========================================================================== */
+
+.preview-tags {
+  margin-top: 10px;
+}
+
+.preview-tags .tag {
+  height: 21px;
+  font-size: 10.5px;
+}
+
+/* The attributes section is rendered by server_core.attributes_section_html(). */
+#atributos .panel-body > h2:first-child {
+  margin-top: 0;
+}
+
+#atributos .panel-body .grid {
+  margin-top: 2px;
+}
+
+/* Progressive enhancement: an empty section disappears even without JavaScript
+   (preview.js also hides it, which covers older browsers). */
+#atributos:has(.panel-body:empty),
+#relacionados-wrap:has(.panel-body:empty) {
+  display: none;
+}
+
+/* Collapsible source code panel */
+.source-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 18px;
+  color: var(--db-ink);
+  font-size: 14px;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.source-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.source-details > summary::before {
+  content: "\25B8";
+  color: var(--db-faint);
+  font-size: 10px;
+  transition: transform .13s ease;
+}
+
+.source-details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.source-details[open] > summary {
+  border-bottom: 1px solid var(--db-line-soft);
+}
+
+.source-details > summary:hover {
+  color: var(--db-blue);
+}
+
+.source-details > summary::after {
+  content: "código introspectado";
+  margin-left: auto;
+  color: var(--db-faint);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Result blocks */
+#playground-result,
+#invoke-result,
+#load-result {
+  margin-top: 16px;
+}
+
+.code-output {
+  min-height: 46px;
+}
+
+.status-note:empty {
+  display: none;
+}
+
+/* Footer actions */
+.preview-footer-actions {
+  margin-top: 20px;
+}
+
+.preview-footer-actions .btn {
+  flex: 0 0 auto;
+}
+
+/* Floating back-to-top control */
+.back-top {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 70;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--db-line);
+  border-radius: 50%;
+  background: var(--db-surface);
+  color: var(--db-ink);
+  box-shadow: var(--db-shadow-md);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background .14s ease, border-color .14s ease;
+}
+
+.back-top:hover {
+  border-color: var(--db-line-strong);
+  background: var(--db-surface-hover);
+}
+
+@media (max-width: 640px) {
+  .back-top { right: 14px; bottom: 14px; }
+  .preview-footer-actions .btn { flex: 1 1 100%; }
+}
+
+@media print {
+  .source-details > summary { display: none; }
+  .source-details > .panel-body { display: block !important; }
+  .preview-footer-actions,
+  .back-top { display: none !important; }
+}

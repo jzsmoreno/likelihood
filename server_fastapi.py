@@ -298,16 +298,32 @@ def bytes_response(
 
 
 def html_error(status: int, title: str, message: str) -> Response:
-    """HTML error page for the browser facing endpoints."""
+    """HTML error page for the browser facing endpoints.
+
+    It reuses the catalogue design system so a missing model or asset still looks
+    like the rest of the platform instead of a bare browser message.
+    """
     document = (
         "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'>"
+        "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
         f"<title>{core._escape(title)}</title>"
-        "<style>body{font-family:system-ui,sans-serif;background:#1f2937;color:#f9fafb;"
-        "display:flex;align-items:center;justify-content:center;height:100vh;margin:0}"
-        "div{text-align:center;max-width:32rem;padding:2rem}h1{font-size:3rem;margin:0 0 .5rem}"
-        "p{color:#9ca3af;line-height:1.6}a{color:#8ab4f8}</style></head><body><div>"
-        f"<h1>{status}</h1><p>{core._escape(message)}</p>"
-        "<p><a href='/'>← Volver al catálogo de modelos</a></p></div></body></html>"
+        "<link rel='icon' href='/favicon.svg' type='image/svg+xml'>"
+        "<link rel='stylesheet' href='/app.css'>"
+        "<style>"
+        ".error-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}"
+        ".error-card{width:100%;max-width:34rem;padding:26px 28px}"
+        ".error-code{font-size:40px;font-weight:600;line-height:1;letter-spacing:-.03em;color:var(--db-lava)}"
+        ".error-card .page-title{margin-top:12px;font-size:20px}"
+        ".error-card .page-subtitle{margin-top:6px}"
+        ".error-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}"
+        "</style></head><body><main class='error-wrap'><section class='panel error-card'>"
+        f"<div class='error-code'>{status}</div>"
+        f"<h1 class='page-title'>{core._escape(title)}</h1>"
+        f"<p class='page-subtitle'>{core._escape(message)}</p>"
+        "<div class='error-actions'>"
+        "<a class='btn btn-primary' href='/'>Volver al catálogo</a>"
+        "<a class='btn btn-secondary' href='/docs'>Documentación de la API</a>"
+        "</div></section></main></body></html>"
     )
     return bytes_response(
         status,

@@ -3,1830 +3,405 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#4f5bd5">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta name="description" content="{{MODEL_SHORT_DESCRIPTION}}">
-<title>Preview: {{MODEL_TITLE}}</title>
+<meta name="theme-color" content="#ff3621">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/preview.css">
+<title>{{MODEL_TITLE}} · Likelihood</title>
 <!--
-  Plantilla del preview renderizado por server.py.
+  Model detail page. server_core.render_preview() replaces every uppercase
+  placeholder below and strips the tokens it does not know, so this file must
+  not contain any other double brace sequence.
 
-  Marcadores disponibles (server.render_preview los sustituye por str.replace y
-  elimina cualquier marcador que quede sin reemplazar):
-
-    MODEL_ID                    identificador del modelo
-    MODEL_TITLE                 nombre legible
-    MODEL_ICON                  emoji de la categoría
-    MODEL_CATEGORY              etiqueta de la categoría
-    CATEGORY_CLASS              "category-<id>" para el badge
-    MODEL_SHORT_DESCRIPTION     primer párrafo de la docstring
-    MODEL_DESCRIPTION           docstring completa (saltos de línea como <br>)
-    MODEL_TAGS                  <span> con las etiquetas
-    MODEL_PARAMETERS            tarjetas de los parámetros del constructor
-    MODEL_ATTRIBUTES_SECTION    sección completa "Atributos" o cadena vacía
-    MODEL_METHODS               <li> con los métodos públicos
-    MODEL_SOURCE                código fuente de la clase
-    MODEL_EXAMPLE               ejemplo de uso generado
-    MODEL_IMPORT                sentencia de importación
-    MODEL_MODULE                módulo de importación
-    MODEL_FILE                  ruta del archivo y línea
-    MODEL_SIGNATURE             firma del constructor
-    BACK_URL                    enlace de vuelta al catálogo
-    NOTEBOOK_URL                descarga del notebook
-    API_URL                     JSON del modelo en la API
-    SOURCE_URL                  código fuente en texto plano
-    SOURCE_DOWNLOAD_URL         código fuente como descarga .py
-    PLAYGROUND_URL              endpoint que construye el modelo
-    MODEL_PLAYGROUND_JSON       especificación del playground para el navegador
-    MODEL_INVOKE_JSON           especificación de invocación para el navegador
-    MODEL_LOAD_JSON             loaders y política de rutas para cargar modelos
-
-  (HOST_URL también está disponible: origen absoluto de la petición.)
+  Available tokens include MODEL_ID, MODEL_TITLE, MODEL_ICON, MODEL_CATEGORY,
+  CATEGORY_CLASS, MODEL_DESCRIPTION, MODEL_TAGS, MODEL_PARAMETERS,
+  MODEL_ATTRIBUTES_SECTION, MODEL_METHODS, MODEL_RELATED, MODEL_SOURCE,
+  MODEL_EXAMPLE, MODEL_IMPORT, MODEL_MODULE, MODEL_FILE, MODEL_SIGNATURE,
+  BACK_URL, NOTEBOOK_URL, API_URL, SOURCE_URL, SOURCE_DOWNLOAD_URL and the
+  JSON specs MODEL_PLAYGROUND_JSON / MODEL_INVOKE_JSON / MODEL_LOAD_JSON.
 -->
-<style>
-  :root {
-    --ink: #1f2430;
-    --muted: #6b7280;
-    --accent: #4f5bd5;
-    --accent-2: #764ba2;
-    --accent-soft: #eef0fd;
-    --line: #e6e8f0;
-    --card: #ffffff;
-    --code-bg: #1b1f2a;
-    --code-ink: #d7dae0;
-    --ok: #2f855a;
-    --danger: #c53030;
-    --surface-alt: #f7f8fc;
-    --surface-soft: #f2f4fb;
-    --surface-chip: #f0f1f6;
-    --surface-param: #f6f8fd;
-    --surface-method: #f6f9ff;
-    --body-ink: #3d4453;
-    --soft-ink: #4b5162;
-    --tag-ink: #5b6274;
-    --radius: 18px;
-    --shadow: 0 12px 32px rgba(15, 23, 42, .18);
-  }
-  * { box-sizing: border-box; }
-  [hidden] { display: none !important; }
-  html { scroll-behavior: smooth; }
-  body {
-    margin: 0;
-    padding: 28px 16px 56px;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: radial-gradient(circle at 10% 0%, #eef2ff 0%, #f7f8fc 38%, #e9edf7 100%);
-    background-attachment: fixed;
-    color: var(--ink);
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-  }
-  .wrap { max-width: 1180px; margin: 0 auto; }
-  .sr-only {
-    position: absolute; width: 1px; height: 1px; margin: -1px;
-    padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
-  }
-  a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
-    outline: 3px solid var(--accent); outline-offset: 2px;
-  }
-  .skip {
-    position: absolute; left: -9999px; top: 0; z-index: 50;
-    background: var(--card); color: var(--accent); padding: 10px 16px; border-radius: 0 0 12px 0;
-    font-weight: 600; text-decoration: none;
-  }
-  .skip:focus { left: 0; }
-
-  /* ---------- Barra superior ---------- */
-  .topbar {
-    display: flex; flex-wrap: wrap; gap: 16px;
-    align-items: center; justify-content: space-between;
-    background: var(--card); border-radius: 16px; padding: 20px 26px;
-    box-shadow: var(--shadow); margin-bottom: 18px;
-  }
-  .topbar h1 { margin: 0 0 6px; font-size: 1.6rem; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .topbar h1 .icon { line-height: 1; }
-  .topbar p { margin: 0; color: var(--muted); max-width: 60ch; line-height: 1.6; }
-  .topbar-side { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
-  .topbar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-  .model-id {
-    font-family: ui-monospace, Consolas, monospace; font-size: .72rem; color: var(--muted);
-    background: var(--surface-soft); border-radius: 999px; padding: 4px 10px;
-  }
-
-  /* ---------- Tarjetas y secciones ---------- */
-  .card {
-    background: var(--card); border-radius: var(--radius); padding: 28px;
-    box-shadow: var(--shadow); margin-bottom: 18px;
-  }
-  .badge {
-    display: inline-block; padding: 5px 14px; border-radius: 999px;
-    font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
-    background: var(--accent-soft); color: var(--accent);
-  }
-  .category-regression { background: linear-gradient(135deg,#84fab0,#8fd3f4); color:#0a5c49; }
-  .category-deep { background: linear-gradient(135deg,#a18cd1,#fbc2eb); color:#6a4a8c; }
-  .category-simulation { background: linear-gradient(135deg,#ffecd2,#fcb69f); color:#9a5c38; }
-  .category-hmm { background: linear-gradient(135deg,#ff6b6b,#ff8787); color:#8b0000; }
-  .category-ensemble { background: linear-gradient(135deg,#ffd900,#ffea00); color:#856400; }
-  .category-environments { background: linear-gradient(135deg,#a8edea,#fed6e3); color:#0f6f73; }
-  h2 {
-    font-size: 1.1rem; margin: 26px 0 12px; padding-bottom: 8px;
-    border-bottom: 2px solid var(--line); color: var(--accent);
-  }
-  h2:first-of-type { margin-top: 0; }
-  .prose {
-    background: var(--surface-alt); border-left: 4px solid var(--accent); border-radius: 10px;
-    padding: 16px 18px; line-height: 1.75; color: var(--body-ink);
-  }
-  .sig {
-    background: var(--surface-soft); border-radius: 10px; padding: 14px 16px; overflow-x: auto;
-    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: .85rem;
-  }
-  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
-  .tag {
-    background: var(--surface-chip); color: var(--tag-ink); border-radius: 999px;
-    padding: 4px 11px; font-size: .68rem; font-weight: 600;
-    text-decoration: none; border: 1px solid transparent;
-    transition: background .15s ease, color .15s ease, border-color .15s ease;
-  }
-  a.tag:hover, a.tag:focus-visible { background: var(--accent); color: #fff; }
-
-  /* ---------- Modelos relacionados ---------- */
-  .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
-  .related-card {
-    display: flex; gap: 12px; align-items: flex-start; text-decoration: none;
-    background: var(--surface-param); border: 1px solid var(--line); border-left: 3px solid var(--accent);
-    border-radius: 12px; padding: 12px 14px; color: inherit;
-    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
-  }
-  .related-card:hover, .related-card:focus-visible {
-    transform: translateY(-2px); box-shadow: 0 10px 24px rgba(15, 23, 42, .16);
-    border-color: var(--accent); outline: none;
-  }
-  .related-icon { font-size: 1.35rem; line-height: 1.2; }
-  .related-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-  .related-title { font-weight: 700; font-size: .86rem; color: var(--accent); }
-  .related-desc { font-size: .76rem; color: var(--soft-ink); line-height: 1.45;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .related-hint { font-size: .68rem; color: var(--muted); font-style: italic; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
-  .param-card { background: var(--surface-param); border-left: 3px solid var(--accent); border-radius: 10px; padding: 12px 14px; }
-  .param-name { font-family: ui-monospace, Consolas, monospace; font-weight: 700; font-size: .85rem; word-break: break-all; }
-  .param-type { font-size: .72rem; color: var(--muted); font-style: italic; margin: 3px 0 6px; word-break: break-word; }
-  .param-desc { font-size: .8rem; color: var(--soft-ink); line-height: 1.5; }
-  .methods { list-style: none; margin: 0; padding: 0; }
-  .methods li { background: var(--surface-method); border-left: 3px solid #48bb78; border-radius: 9px; padding: 10px 13px; margin-bottom: 7px; }
-  .method-name { font-family: ui-monospace, Consolas, monospace; font-weight: 700; font-size: .82rem; word-break: break-all; }
-  .method-origin { margin-left: 8px; font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-  .method-desc { display: block; margin-top: 4px; font-size: .8rem; color: var(--soft-ink); line-height: 1.5; }
-  .empty { color: var(--muted); font-style: italic; font-size: .85rem; }
-  aside.meta { font-size: .78rem; color: var(--muted); margin-top: 12px; line-height: 1.8; }
-  aside.meta p { margin: 0; }
-  aside.meta code { background: var(--surface-chip); border-radius: 6px; padding: 2px 6px; }
-
-  /* ---------- Bloques de código ---------- */
-  .code-head {
-    display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
-    margin-bottom: 8px;
-  }
-  .code-head span { font-size: .74rem; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; font-weight: 700; }
-  pre {
-    background: var(--code-bg); color: var(--code-ink); border-radius: 12px;
-    padding: 18px; overflow-x: auto; font-size: .82rem; line-height: 1.6; margin: 0;
-    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-  }
-  pre.clamped { max-height: 460px; overflow-y: hidden; position: relative; }
-  pre.clamped::after {
-    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 90px;
-    background: linear-gradient(to bottom, rgba(27, 31, 42, 0), var(--code-bg));
-    pointer-events: none;
-  }
-
-  /* ---------- Navegación interna ---------- */
-  nav.toc {
-    background: var(--card); border-radius: 999px; box-shadow: var(--shadow);
-    padding: 12px 18px; margin-bottom: 18px;
-    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-  }
-  nav.toc span.toc-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 700; }
-  nav.toc a {
-    color: var(--accent); text-decoration: none; font-size: .78rem; font-weight: 600;
-    background: var(--accent-soft); border-radius: 999px; padding: 5px 12px;
-    transition: background .15s ease, color .15s ease;
-  }
-  nav.toc a:hover { background: var(--accent); color: #fff; }
-  nav.toc a.active { background: var(--accent); color: #fff; }
-  @media (min-width: 900px) {
-    /* La barra de secciones acompaña la lectura del documento. */
-    nav.toc { position: sticky; top: 10px; z-index: 20; }
-  }
-
-  /* ---------- Acciones y botones ---------- */
-  .actions {
-    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px;
-    padding-top: 20px; border-top: 2px solid var(--line);
-  }
-  .btn {
-    border: 2px solid transparent; border-radius: 999px; padding: 10px 20px;
-    font-weight: 600; font-size: .82rem; cursor: pointer; text-decoration: none;
-    display: inline-flex; align-items: center; gap: 8px; background: var(--card); color: var(--ink);
-    transition: transform .15s ease, box-shadow .15s ease;
-  }
-  .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,23,42,.2); }
-  .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
-  .btn-secondary { background: var(--card); color: var(--accent); border-color: var(--accent); }
-  .btn-success { background: linear-gradient(135deg, #48bb78, var(--ok)); color: #fff; }
-  .btn-small { padding: 6px 13px; font-size: .74rem; }
-  .btn-ghost { background: var(--card); color: var(--accent); border-color: var(--line); }
-  .btn[disabled] { opacity: .6; cursor: progress; transform: none; box-shadow: none; }
-
-  /* ---------- Playground ---------- */
-  .playground-hint { margin: 0 0 14px; font-size: .82rem; color: var(--muted); line-height: 1.6; }
-  .playground-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-  .playground-field { background: var(--surface-param); border-left: 3px solid var(--accent); border-radius: 10px; padding: 11px 13px; }
-  .playground-field label { display: block; font-family: ui-monospace, Consolas, monospace; font-weight: 700; font-size: .8rem; word-break: break-all; }
-  .playground-field .field-type { display: block; font-size: .68rem; color: var(--muted); font-style: italic; margin: 2px 0 7px; }
-  .playground-field input[type=text], .playground-field input[type=number], .playground-field textarea {
-    width: 100%; font: inherit; font-size: .82rem; padding: 7px 10px; color: var(--ink);
-    background: var(--card); border: 2px solid var(--line); border-radius: 8px;
-  }
-  .playground-field textarea { min-height: 62px; resize: vertical; font-family: ui-monospace, Consolas, monospace; }
-  .playground-field input:focus, .playground-field textarea:focus { border-color: var(--accent); outline: none; }
-  .playground-field .field-check { display: flex; align-items: center; gap: 8px; font-family: inherit; font-weight: 600; }
-  .playground-field .field-check input { width: 18px; height: 18px; accent-color: var(--accent); }
-  .playground-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
-  .playground-status { font-size: .8rem; color: var(--muted); }
-  .playground-status.error { color: var(--danger); font-weight: 600; }
-  .playground-status.ok { color: var(--ok); font-weight: 600; }
-  .playground-output { margin-top: 14px; }
-  .playground-output pre { max-height: 420px; overflow: auto; }
-  .playground-detail { font-size: .76rem; color: var(--muted); margin-top: 8px; white-space: pre-wrap; word-break: break-word; }
-  details.playground-snippet { margin-top: 14px; }
-  details.playground-snippet summary { cursor: pointer; font-size: .8rem; font-weight: 600; color: var(--accent); }
-  details.playground-snippet pre { margin-top: 10px; }
-
-  /* ---------- Carga desde archivo ---------- */
-  details.load-panel {
-    background: var(--surface-alt); border: 1px solid var(--line); border-radius: 12px;
-    padding: 12px 14px; margin: 4px 0 16px;
-  }
-  details.load-panel > summary {
-    cursor: pointer; font-weight: 700; font-size: .86rem; color: var(--accent);
-  }
-  details.load-panel[open] > summary { margin-bottom: 12px; }
-  .load-grid {
-    display: grid; grid-template-columns: max-content minmax(180px, 1fr) max-content; gap: 10px;
-    align-items: center;
-  }
-  .load-grid label { font-size: .78rem; font-weight: 700; color: var(--muted); }
-  .load-grid select, .load-grid input {
-    font: inherit; font-size: .84rem; padding: 8px 10px; border-radius: 9px;
-    border: 1px solid var(--line); background: var(--card); color: var(--ink);
-  }
-  .load-grid select:focus, .load-grid input:focus { border-color: var(--accent); outline: none; }
-  .load-hint { margin: 10px 0 0; font-size: .76rem; color: var(--muted); line-height: 1.55; }
-  .load-hint code { background: var(--surface-chip); border-radius: 5px; padding: 1px 5px; }
-
-  /* ---------- Código fuente colapsable ---------- */
-  details.source-block {
-    margin-top: 26px; border-top: 2px solid var(--line); padding-top: 12px;
-  }
-  details.source-block > summary {
-    cursor: pointer; font-size: 1.1rem; font-weight: 700; color: var(--accent);
-    padding: 6px 0;
-  }
-  details.source-block[open] > summary { margin-bottom: 10px; }
-
-  /* ---------- Pestañas del laboratorio (playground / invocar) ---------- */
-  .lab-tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin: 4px 0 16px; }
-  .lab-tab {
-    appearance: none; border: 1px solid transparent; border-bottom: none; background: transparent;
-    padding: 9px 16px; border-radius: 10px 10px 0 0; cursor: pointer; font: inherit;
-    font-size: .86rem; font-weight: 600; color: var(--muted); position: relative; top: 1px;
-  }
-  .lab-tab:hover { color: var(--ink); background: var(--surface-param); }
-  .lab-tab[aria-selected="true"] {
-    color: var(--accent); background: var(--card); border-color: var(--line);
-    border-bottom: 1px solid var(--card);
-  }
-  .lab-panel[hidden] { display: none; }
-  .invoke-method { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
-  .invoke-method label { font-size: .8rem; font-weight: 700; }
-  .invoke-method select {
-    font: inherit; font-size: .85rem; padding: 8px 10px; border-radius: 9px;
-    border: 1px solid var(--line); background: var(--card); color: var(--ink); min-width: 220px;
-  }
-  .invoke-method select:focus { border-color: var(--accent); outline: none; }
-  .invoke-signature { font-family: ui-monospace, Consolas, monospace; font-size: .78rem; color: var(--muted); word-break: break-word; }
-  details.invoke-constructor { margin: 14px 0; }
-  details.invoke-constructor summary { cursor: pointer; font-size: .82rem; font-weight: 600; color: var(--accent); }
-  details.invoke-constructor .playground-fields { margin-top: 10px; }
-  .invoke-session { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 14px; font-size: .8rem; color: var(--muted); }
-  .invoke-session label { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ink); }
-  .invoke-session input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
-  .invoke-session .session-badge { font-family: ui-monospace, Consolas, monospace; font-size: .74rem; }
-
-  footer.credits { text-align: center; color: rgba(255,255,255,.85); font-size: .82rem; padding-top: 8px; }
-  .back-top {
-    position: fixed; right: 18px; bottom: 18px; z-index: 30;
-    border: 0; border-radius: 999px; width: 46px; height: 46px; font-size: 1.1rem; cursor: pointer;
-    background: var(--card); color: var(--accent); box-shadow: 0 10px 24px rgba(15, 23, 42, .3);
-  }
-  .toast {
-    position: fixed; top: 18px; right: 18px; z-index: 50;
-    background: var(--ink); color: #fff; border-radius: 10px; padding: 11px 18px;
-    font-size: .82rem; opacity: 0; transform: translateX(20px);
-    transition: opacity .25s ease, transform .25s ease;
-    pointer-events: none; max-width: min(360px, 80vw);
-  }
-  .toast.show { opacity: 1; transform: translateX(0); }
-
-  /* ---------- Tema oscuro ---------- */
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --ink: #e6e8f0;
-      --muted: #9aa3b5;
-      --accent: #8ab4f8;
-      --accent-2: #c4a7f7;
-      --accent-soft: #262c40;
-      --line: #2d3446;
-      --card: #161a24;
-      --code-bg: #0d1017;
-      --code-ink: #d7dae0;
-      --ok: #68d391;
-      --danger: #fc8181;
-      --surface-alt: #1c2130;
-      --surface-soft: #232a3b;
-      --surface-chip: #2a3143;
-      --surface-param: #1c2130;
-      --surface-method: #1c2130;
-      --body-ink: #c9d1e0;
-      --soft-ink: #b6bfd0;
-      --tag-ink: #c2cad9;
-      --shadow: 0 12px 32px rgba(0, 0, 0, .55);
+<script>
+  /* Apply the stored colour theme before the first paint (avoids a flash). */
+  (function () {
+    try {
+      var stored = window.localStorage.getItem('lm-theme');
+      if (stored === 'light' || stored === 'dark') {
+        document.documentElement.setAttribute('data-theme', stored);
+      }
+    } catch (error) {
+      /* storage is optional */
     }
-    body { background: linear-gradient(135deg, #1b2138 0%, #2a1e3c 100%); }
-    .toast { background: #0c0f16; }
-    pre.clamped::after {
-      background: linear-gradient(to bottom, rgba(13, 16, 23, 0), var(--code-bg));
-    }
-  }
-
-  /* ---------- Adaptación a pantallas pequeñas ---------- */
-  @media (max-width: 720px) {
-    body { padding: 14px 8px 36px; }
-    .topbar { flex-direction: column; align-items: flex-start; padding: 18px; }
-    .card { padding: 18px; }
-    nav.toc { border-radius: 16px; }
-    .actions .btn { flex: 1 1 100%; justify-content: center; }
-    .load-grid { grid-template-columns: 1fr; }
-    .load-grid label { margin-top: 4px; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation: none !important; transition: none !important; }
-    html { scroll-behavior: auto; }
-    .btn:hover { transform: none; }
-  }
-
-  /* ---------- Impresión ---------- */
-  @media print {
-    body { background: none; padding: 0; color: #000; }
-    .wrap { max-width: none; }
-    .topbar, .card { box-shadow: none; margin-bottom: 12px; border-radius: 0; padding: 0; }
-    nav.toc, .actions, .back-top, .toast, .skip, .code-head .btn { display: none !important; }
-    .playground-actions, .playground-output, details.playground-snippet { display: none !important; }
-    .lab-tabs, .invoke-session { display: none !important; }
-    pre, .prose, .sig, .param-card, .methods li { background: #fff !important; color: #000 !important; border-color: #999; }
-    .related-card { box-shadow: none !important; transform: none !important; }
-    .related-desc { -webkit-line-clamp: unset; display: block; }
-    pre { border: 1px solid #ccc; white-space: pre-wrap; }
-    pre.clamped { max-height: none; }
-    pre.clamped::after { display: none; }
-    h2 { color: #000; }
-    a { color: #000; text-decoration: none; }
-  }
-</style>
+  })();
+</script>
 </head>
 <body>
-<a class="skip" href="#main">Saltar al contenido</a>
-<div class="wrap">
-  <header class="topbar">
-    <div>
-      <h1><span class="icon" aria-hidden="true">{{MODEL_ICON}}</span> {{MODEL_TITLE}}</h1>
-      <p>{{MODEL_SHORT_DESCRIPTION}}</p>
-    </div>
-    <div class="topbar-side">
-      <span class="badge {{CATEGORY_CLASS}}">{{MODEL_CATEGORY}}</span>
-      <a class="btn btn-secondary btn-small" href="{{BACK_URL}}">← Volver al catálogo</a>
-    </div>
-  </header>
+<a class="skip-link" href="#main">Saltar al contenido</a>
 
-  <nav class="toc" aria-label="Secciones del modelo" id="toc">
-    <span class="toc-label">Ir a</span>
-    <a href="#descripcion">Descripción</a>
-    <a href="#firma">Firma</a>
-    <a href="#parametros">Parámetros</a>
-    <a href="#playground">Laboratorio</a>
-    <a href="#playground" data-lab-tab-link="invoke">Invocar método</a>
-    <a href="#ejemplo">Ejemplo</a>
-    <a href="#codigo">Código fuente</a>
+<header class="db-topbar">
+  <button class="icon-btn" id="sidebar-toggle" type="button" aria-label="Mostrar u ocultar la navegación"
+          aria-expanded="true" aria-controls="sidebar" title="Mostrar u ocultar la navegación">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path d="M2 4h12M2 8h12M2 12h12" stroke-linecap="round"/>
+    </svg>
+  </button>
+  <a class="db-brand" href="{{BACK_URL}}">
+    <span class="db-brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path d="M6.2 1.6h3.6v1.1h-.8v2.7l3 5.1a2 2 0 0 1-1.8 3H5.8a2 2 0 0 1-1.8-3l3-5.1V2.7h-.8zM5.1 9.2h5.8l1.1 1.9a.9.9 0 0 1-.8 1.4H4.8a.9.9 0 0 1-.8-1.4z" opacity=".95"/>
+      </svg>
+    </span>
+    <span>Likelihood</span>
+    <span class="db-brand-suffix">/ Catálogo</span>
+  </a>
+  <span class="topbar-divider" aria-hidden="true"></span>
+  <nav class="db-crumbs" aria-label="Ruta de navegación">
+    <a href="{{BACK_URL}}">Catálogo</a>
+    <span class="sep" aria-hidden="true">/</span>
+    <span class="hide-xs">{{MODEL_CATEGORY}}</span>
+    <span class="sep hide-xs" aria-hidden="true">/</span>
+    <span class="current" title="{{MODEL_TITLE}}">{{MODEL_TITLE}}</span>
   </nav>
+  <div class="topbar-actions">
+    <a class="topbar-link" href="{{API_URL}}" target="_blank" rel="noopener" title="Ver el JSON del modelo">JSON</a>
+    <button class="icon-btn" id="theme-toggle" type="button" aria-label="Cambiar el tema de color" title="Cambiar el tema de color">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+        <circle cx="8" cy="8" r="3.2"/>
+        <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+</header>
 
-  <main class="card" id="main">
-    <h2 id="descripcion">Descripción</h2>
-    <div class="prose">{{MODEL_DESCRIPTION}}</div>
-
-    <h2 id="firma">Firma</h2>
-    <div class="sig" id="signature">{{MODEL_SIGNATURE}}</div>
-    <aside class="meta">
-      <p>Importación: <code id="import">{{MODEL_IMPORT}}</code></p>
-    </aside>
-    <div class="tags">{{MODEL_TAGS}}</div>
-
-    <h2 id="parametros">Parámetros</h2>
-    <div class="grid">{{MODEL_PARAMETERS}}</div>
-
-    <section id="atributos">{{MODEL_ATTRIBUTES_SECTION}}</section>
-
-    <h2 id="playground">Laboratorio</h2>
-    <details class="load-panel" id="load-panel" hidden>
-      <summary>📂 Cargar un modelo guardado</summary>
-      <div class="load-grid">
-        <label for="load-loader">Método de carga</label>
-        <select id="load-loader"></select>
-        <label for="load-path">Ruta</label>
-        <input type="text" id="load-path" placeholder="./modelo.pkl o ./modelo" autocomplete="off" spellcheck="false">
-        <button class="btn btn-secondary btn-small" type="button" id="load-verify">Verificar</button>
-        <button class="btn btn-primary btn-small" type="button" id="load-session">Cargar y usar</button>
+<div class="db-shell">
+  <aside class="db-sidebar" id="sidebar" aria-label="Secciones del modelo">
+    <div class="db-sidebar-nav">
+      <div class="side-section">
+        <div class="side-title">En esta página</div>
+        <nav id="toc" aria-label="Secciones del modelo">
+          <a class="side-link" href="#descripcion" data-section="descripcion">
+            <span class="side-icon" aria-hidden="true">¶</span>
+            <span class="side-label">Descripción</span>
+          </a>
+          <a class="side-link" href="#firma" data-section="firma">
+            <span class="side-icon" aria-hidden="true">ƒ</span>
+            <span class="side-label">Firma</span>
+          </a>
+          <a class="side-link" href="#parametros" data-section="parametros">
+            <span class="side-icon" aria-hidden="true">≡</span>
+            <span class="side-label">Parámetros</span>
+          </a>
+          <a class="side-link" href="#atributos" data-section="atributos" id="toc-atributos">
+            <span class="side-icon" aria-hidden="true">◫</span>
+            <span class="side-label">Atributos</span>
+          </a>
+          <a class="side-link" href="#laboratorio" data-section="laboratorio">
+            <span class="side-icon" aria-hidden="true">▷</span>
+            <span class="side-label">Laboratorio</span>
+          </a>
+          <a class="side-link" href="#metodos" data-section="metodos">
+            <span class="side-icon" aria-hidden="true">λ</span>
+            <span class="side-label">Métodos</span>
+          </a>
+          <a class="side-link" href="#ejemplo" data-section="ejemplo">
+            <span class="side-icon" aria-hidden="true">{ }</span>
+            <span class="side-label">Ejemplo</span>
+          </a>
+          <a class="side-link" href="#relacionados-wrap" data-section="relacionados-wrap" id="toc-relacionados">
+            <span class="side-icon" aria-hidden="true">⇄</span>
+            <span class="side-label">Relacionados</span>
+          </a>
+          <a class="side-link" href="#codigo" data-section="codigo">
+            <span class="side-icon" aria-hidden="true">⌗</span>
+            <span class="side-label">Código fuente</span>
+          </a>
+        </nav>
       </div>
-      <p class="load-hint" id="load-hint"></p>
-      <p class="playground-status" id="load-status" role="status" aria-live="polite"></p>
-      <div class="playground-output" id="load-result" hidden>
-        <div class="code-head">
-          <span id="load-result-title">Modelo cargado</span>
-          <button class="btn btn-ghost btn-small" type="button" data-copy="#load-output" data-toast="Resultado copiado">📋 Copiar</button>
-        </div>
-        <pre id="load-output"></pre>
-        <p class="playground-detail" id="load-detail" hidden></p>
+      <div class="side-section">
+        <div class="side-title">Acciones</div>
+        <a class="side-link" href="{{NOTEBOOK_URL}}" download>
+          <span class="side-icon" aria-hidden="true">↓</span>
+          <span class="side-label">Descargar notebook</span>
+        </a>
+        <a class="side-link" href="{{SOURCE_DOWNLOAD_URL}}" download>
+          <span class="side-icon" aria-hidden="true">↓</span>
+          <span class="side-label">Descargar código fuente</span>
+        </a>
+        <a class="side-link" href="{{API_URL}}" target="_blank" rel="noopener">
+          <span class="side-icon" aria-hidden="true">{ }</span>
+          <span class="side-label">JSON del modelo</span>
+        </a>
+        <a class="side-link" href="{{BACK_URL}}">
+          <span class="side-icon" aria-hidden="true">←</span>
+          <span class="side-label">Volver al catálogo</span>
+        </a>
       </div>
-      <script type="application/json" id="load-data">{{MODEL_LOAD_JSON}}</script>
-    </details>
-
-    <div class="lab-tabs" role="tablist" aria-label="Herramientas del modelo">
-      <button class="lab-tab" type="button" role="tab" id="tab-playground"
-              aria-controls="panel-playground" aria-selected="true" tabindex="0"
-              data-lab-tab="playground">▶️ Playground</button>
-      <button class="lab-tab" type="button" role="tab" id="tab-invoke"
-              aria-controls="panel-invoke" aria-selected="false" tabindex="-1"
-              data-lab-tab="invoke">⚡ Invocar método</button>
     </div>
-
-    <div class="lab-panel" id="panel-playground" role="tabpanel" aria-labelledby="tab-playground">
-      <p class="playground-hint">
-        Ajusta los hiperparámetros y ejecuta el constructor en el servidor para comprobar que el
-        modelo se crea con esa configuración. Solo se envían valores JSON: no se evalúa código.
-      </p>
-      <form id="playground-form" novalidate>
-        <div class="playground-fields" id="playground-fields"></div>
-        <div class="playground-actions">
-          <button class="btn btn-primary" type="submit" id="run-playground">▶️ Ejecutar modelo</button>
-          <button class="btn btn-secondary" type="button" id="reset-playground">↺ Restablecer valores</button>
-          <span class="playground-status" id="playground-status" role="status" aria-live="polite"></span>
-        </div>
-      </form>
-      <div class="playground-output" id="playground-result" hidden>
-        <div class="code-head">
-          <span id="playground-result-title">Resultado de la ejecución</span>
-          <button class="btn btn-ghost btn-small" type="button" data-copy="#playground-output" data-toast="Resultado copiado">📋 Copiar resultado</button>
-        </div>
-        <pre id="playground-output"></pre>
-        <p class="playground-detail" id="playground-detail" hidden></p>
-      </div>
-      <details class="playground-snippet">
-        <summary>Código equivalente en Python</summary>
-        <div class="code-head">
-          <span>Constructor con los valores del formulario</span>
-          <button class="btn btn-ghost btn-small" type="button" data-copy="#playground-code" data-toast="Código copiado">📋 Copiar código</button>
-        </div>
-        <pre id="playground-code"></pre>
-      </details>
-      <script type="application/json" id="playground-data">{{MODEL_PLAYGROUND_JSON}}</script>
+    <div class="side-footer">
+      <strong>{{MODEL_MODULE}}</strong>
+      <code>{{MODEL_FILE}}</code>
     </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay" hidden></div>
 
-    <div class="lab-panel" id="panel-invoke" role="tabpanel" aria-labelledby="tab-invoke" hidden>
-      <p class="playground-hint">
-        Llama a un método del modelo con argumentos JSON validados contra su firma real. La
-        primera llamada construye la clase y la mantiene viva; las siguientes reutilizan la
-        misma instancia (por ejemplo <code>fit</code> y después <code>predict</code>). Desmarca
-        <b>Instancia persistente</b> para reconstruir el modelo en cada llamada.
-      </p>
-      <div class="invoke-method">
-        <label for="invoke-method">Método</label>
-        <select id="invoke-method"></select>
-        <span class="invoke-signature" id="invoke-signature"></span>
-      </div>
-      <div class="playground-fields" id="invoke-fields"></div>
-      <details class="invoke-constructor">
-        <summary>Parámetros del constructor</summary>
-        <div class="playground-fields" id="invoke-constructor-fields"></div>
-        <p class="invoke-signature" id="invoke-constructor-note"></p>
-      </details>
-      <div class="invoke-session">
-        <label><input type="checkbox" id="invoke-use-session" checked> Instancia persistente</label>
-        <span class="session-badge" id="invoke-session-info">sin sesión</span>
-        <button class="btn btn-secondary btn-small" type="button" id="invoke-close-session" hidden>Cerrar sesión</button>
-      </div>
-      <div class="playground-actions">
-        <button class="btn btn-primary" type="button" id="run-invoke">⚡ Invocar método</button>
-        <button class="btn btn-secondary" type="button" id="sample-invoke">🧪 Datos de ejemplo</button>
-        <button class="btn btn-secondary" type="button" id="reset-invoke">↺ Restablecer argumentos</button>
-        <span class="playground-status" id="invoke-status" role="status" aria-live="polite"></span>
-      </div>
-      <div class="playground-output" id="invoke-result" hidden>
-        <div class="code-head">
-          <span id="invoke-result-title">Resultado de la llamada</span>
-          <button class="btn btn-ghost btn-small" type="button" data-copy="#invoke-output" data-toast="Resultado copiado">📋 Copiar resultado</button>
+  <main class="db-main" id="main">
+    <div class="db-main-inner">
+      <div class="page-header">
+        <div class="page-header-main">
+          <div class="page-eyebrow">
+            <span class="badge {{CATEGORY_CLASS}}">{{MODEL_CATEGORY}}</span>
+            <span class="mono">{{MODEL_ID}}</span>
+          </div>
+          <h1 class="page-title">
+            <span class="page-icon" aria-hidden="true">{{MODEL_ICON}}</span>
+            {{MODEL_TITLE}}
+          </h1>
+          <p class="page-subtitle">{{MODEL_SHORT_DESCRIPTION}}</p>
+          <div class="tag-row preview-tags">{{MODEL_TAGS}}</div>
         </div>
-        <pre id="invoke-output"></pre>
-        <p class="playground-detail" id="invoke-detail" hidden></p>
-      </div>
-      <details class="playground-snippet invoke-snippet">
-        <summary>Código equivalente en Python</summary>
-        <div class="code-head">
-          <span>Construcción y llamada al método</span>
-          <button class="btn btn-ghost btn-small" type="button" data-copy="#invoke-code" data-toast="Código copiado">📋 Copiar código</button>
+        <div class="page-actions">
+          <a class="btn btn-primary" href="{{NOTEBOOK_URL}}" download>Descargar notebook</a>
+          <a class="btn btn-secondary" href="{{SOURCE_DOWNLOAD_URL}}" download>Código fuente</a>
+          <a class="btn btn-ghost" href="{{BACK_URL}}">Volver</a>
         </div>
-        <pre id="invoke-code"></pre>
-      </details>
-      <script type="application/json" id="invoke-data">{{MODEL_INVOKE_JSON}}</script>
-    </div>
-
-    <h2 id="metodos">Métodos</h2>
-    <ul class="methods">{{MODEL_METHODS}}</ul>
-
-    <h2 id="ejemplo">Ejemplo de uso</h2>
-    <div class="code-head">
-      <span>Copiar y pegar en un notebook</span>
-      <button class="btn btn-ghost btn-small" type="button" data-copy="#example" data-toast="Ejemplo copiado">📋 Copiar ejemplo</button>
-    </div>
-    <pre id="example">{{MODEL_EXAMPLE}}</pre>
-
-    {{MODEL_RELATED}}
-
-    <details class="source-block" id="codigo">
-      <summary>Código fuente</summary>
-      <div class="code-head">
-        <span>Código introspectado del paquete</span>
-        <button class="btn btn-ghost btn-small" type="button" data-copy="#source" data-toast="Código fuente copiado">📋 Copiar código</button>
       </div>
-      <pre id="source">{{MODEL_SOURCE}}</pre>
-    </details>
 
-    <div class="actions">
-      <a class="btn btn-primary" href="{{NOTEBOOK_URL}}" download>⬇️ Descargar notebook</a>
-      <a class="btn btn-secondary" href="{{SOURCE_DOWNLOAD_URL}}" download>⬇️ Descargar código fuente</a>
-      <a class="btn btn-secondary" href="{{BACK_URL}}">← Volver al catálogo</a>
+      <section class="panel" id="descripcion">
+        <div class="panel-header">
+          <h2>Descripción</h2>
+          <span class="panel-sub">Docstring del modelo</span>
+        </div>
+        <div class="panel-body">
+          <div class="prose">{{MODEL_DESCRIPTION}}</div>
+        </div>
+      </section>
+
+      <section class="panel" id="firma">
+        <div class="panel-header">
+          <h2>Firma</h2>
+          <div class="panel-actions">
+            <button class="btn btn-ghost btn-sm" type="button" data-copy="#signature"
+                    data-toast="Firma copiada">Copiar firma</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="sig" id="signature">{{MODEL_SIGNATURE}}</div>
+          <p class="meta-line">
+            Importación: <code id="import">{{MODEL_IMPORT}}</code>
+          </p>
+        </div>
+      </section>
+
+      <section class="panel" id="parametros">
+        <div class="panel-header">
+          <h2>Parámetros del constructor</h2>
+          <span class="panel-sub">Argumentos que acepta la clase</span>
+        </div>
+        <div class="panel-body">
+          <div class="grid">{{MODEL_PARAMETERS}}</div>
+        </div>
+      </section>
+
+      <section class="panel" id="atributos">
+        <div class="panel-body">{{MODEL_ATTRIBUTES_SECTION}}</div>
+      </section>
+
+      <section class="panel" id="laboratorio">
+        <div class="panel-header">
+          <h2>Laboratorio</h2>
+          <span class="panel-sub">Construye el modelo e invoca sus métodos en procesos aislados</span>
+        </div>
+        <div class="panel-body">
+          <details class="load-panel" id="load-panel" hidden>
+            <summary>Cargar un modelo guardado</summary>
+            <div class="load-body">
+              <div class="load-grid">
+                <label for="load-loader">Método de carga</label>
+                <select id="load-loader"></select>
+                <label for="load-path">Ruta</label>
+                <input type="text" id="load-path" placeholder="./modelo.pkl o ./modelo"
+                       autocomplete="off" spellcheck="false">
+              </div>
+              <div class="load-actions">
+                <button class="btn btn-secondary btn-sm" type="button" id="load-verify">Verificar</button>
+                <button class="btn btn-primary btn-sm" type="button" id="load-session">Cargar y usar</button>
+              </div>
+              <p class="load-hint" id="load-hint"></p>
+              <p class="status-note" id="load-status" role="status" aria-live="polite"></p>
+              <div id="load-result" hidden>
+                <div class="code-head">
+                  <span class="code-label" id="load-result-title">Modelo cargado</span>
+                  <button class="btn btn-ghost btn-xs" type="button" data-copy="#load-output"
+                          data-toast="Resultado copiado">Copiar</button>
+                </div>
+                <pre class="code code-output" id="load-output"></pre>
+                <p class="meta-line" id="load-detail" hidden></p>
+              </div>
+            </div>
+            <script type="application/json" id="load-data">{{MODEL_LOAD_JSON}}</script>
+          </details>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Herramientas del modelo">
+          <button class="tab" type="button" role="tab" id="tab-playground"
+                  aria-controls="panel-playground" aria-selected="true" tabindex="0"
+                  data-lab-tab="playground">Playground</button>
+          <button class="tab" type="button" role="tab" id="tab-invoke"
+                  aria-controls="panel-invoke" aria-selected="false" tabindex="-1"
+                  data-lab-tab="invoke">Invocar método</button>
+        </div>
+
+        <div class="tab-panel" id="panel-playground" role="tabpanel" aria-labelledby="tab-playground">
+          <p class="form-note">
+            Ajusta los hiperparámetros y ejecuta el constructor en el servidor para comprobar que el
+            modelo se crea con esa configuración. Solo se envían valores JSON: no se evalúa código.
+          </p>
+          <form id="playground-form" novalidate>
+            <div class="form-grid" id="playground-fields"></div>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit" id="run-playground">Ejecutar modelo</button>
+              <button class="btn btn-secondary" type="button" id="reset-playground">Restablecer</button>
+              <span class="status-note" id="playground-status" role="status" aria-live="polite"></span>
+            </div>
+          </form>
+          <div id="playground-result" hidden>
+            <div class="code-head">
+              <span class="code-label" id="playground-result-title">Resultado de la ejecución</span>
+              <button class="btn btn-ghost btn-xs" type="button" data-copy="#playground-output"
+                      data-toast="Resultado copiado">Copiar resultado</button>
+            </div>
+            <pre class="code code-output" id="playground-output"></pre>
+            <p class="meta-line" id="playground-detail" hidden></p>
+          </div>
+          <details class="load-panel">
+            <summary>Código equivalente en Python</summary>
+            <div class="load-body">
+              <div class="code-head">
+                <span class="code-label">Constructor con los valores del formulario</span>
+                <button class="btn btn-ghost btn-xs" type="button" data-copy="#playground-code"
+                        data-toast="Código copiado">Copiar código</button>
+              </div>
+              <pre class="code" id="playground-code"></pre>
+            </div>
+          </details>
+          <script type="application/json" id="playground-data">{{MODEL_PLAYGROUND_JSON}}</script>
+        </div>
+
+        <div class="tab-panel" id="panel-invoke" role="tabpanel" aria-labelledby="tab-invoke" hidden>
+          <p class="form-note">
+            Llama a un método con argumentos JSON validados contra su firma real. Con
+            <b>instancia persistente</b> la primera llamada construye la clase y las siguientes
+            reutilizan la misma instancia (por ejemplo <code>fit</code> y después
+            <code>predict</code>).
+          </p>
+          <div class="inline-controls">
+            <label for="invoke-method">Método</label>
+            <select class="select" id="invoke-method"></select>
+            <span class="signature" id="invoke-signature"></span>
+          </div>
+          <div class="form-grid" id="invoke-fields"></div>
+          <details class="load-panel">
+            <summary>Parámetros del constructor</summary>
+            <div class="load-body">
+              <div class="form-grid" id="invoke-constructor-fields"></div>
+              <p class="meta-line" id="invoke-constructor-note"></p>
+            </div>
+          </details>
+          <div class="session-bar">
+            <label><input type="checkbox" id="invoke-use-session" checked> Instancia persistente</label>
+            <span class="session-id" id="invoke-session-info">sin sesión</span>
+            <button class="btn btn-secondary btn-sm" type="button" id="invoke-close-session" hidden>Cerrar sesión</button>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="button" id="run-invoke">Invocar método</button>
+            <button class="btn btn-secondary" type="button" id="sample-invoke">Datos de ejemplo</button>
+            <button class="btn btn-secondary" type="button" id="reset-invoke">Restablecer</button>
+            <span class="status-note" id="invoke-status" role="status" aria-live="polite"></span>
+          </div>
+          <div id="invoke-result" hidden>
+            <div class="code-head">
+              <span class="code-label" id="invoke-result-title">Resultado de la llamada</span>
+              <button class="btn btn-ghost btn-xs" type="button" data-copy="#invoke-output"
+                      data-toast="Resultado copiado">Copiar resultado</button>
+            </div>
+            <pre class="code code-output" id="invoke-output"></pre>
+            <p class="meta-line" id="invoke-detail" hidden></p>
+          </div>
+          <details class="load-panel">
+            <summary>Código equivalente en Python</summary>
+            <div class="load-body">
+              <div class="code-head">
+                <span class="code-label">Construcción y llamada al método</span>
+                <button class="btn btn-ghost btn-xs" type="button" data-copy="#invoke-code"
+                        data-toast="Código copiado">Copiar código</button>
+              </div>
+              <pre class="code" id="invoke-code"></pre>
+            </div>
+          </details>
+          <script type="application/json" id="invoke-data">{{MODEL_INVOKE_JSON}}</script>
+        </div>
+      </section>
+
+      <section class="panel" id="metodos">
+        <div class="panel-header">
+          <h2>Métodos públicos</h2>
+          <span class="panel-sub">API expuesta por el modelo</span>
+        </div>
+        <div class="panel-body">
+          <ul class="methods">{{MODEL_METHODS}}</ul>
+        </div>
+      </section>
+
+      <section class="panel" id="ejemplo">
+        <div class="panel-header">
+          <h2>Ejemplo de uso</h2>
+          <div class="panel-actions">
+            <button class="btn btn-ghost btn-sm" type="button" data-copy="#example"
+                    data-toast="Ejemplo copiado">Copiar ejemplo</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <pre class="code" id="example">{{MODEL_EXAMPLE}}</pre>
+        </div>
+      </section>
+
+      <section class="panel" id="relacionados-wrap">
+        <div class="panel-body">{{MODEL_RELATED}}</div>
+      </section>
+
+      <section class="panel" id="codigo">
+        <details class="source-details" id="source-details">
+          <summary>Código fuente</summary>
+          <div class="panel-body">
+            <div class="code-head">
+              <span class="code-label">Código introspectado del paquete</span>
+              <button class="btn btn-ghost btn-xs" type="button" data-copy="#source"
+                      data-toast="Código fuente copiado">Copiar código</button>
+            </div>
+            <pre class="code" id="source">{{MODEL_SOURCE}}</pre>
+          </div>
+        </details>
+      </section>
+
+      <div class="page-actions preview-footer-actions">
+        <a class="btn btn-primary" href="{{NOTEBOOK_URL}}" download>Descargar notebook</a>
+        <a class="btn btn-secondary" href="{{SOURCE_DOWNLOAD_URL}}" download>Descargar código fuente</a>
+        <a class="btn btn-secondary" href="{{BACK_URL}}">Volver al catálogo</a>
+      </div>
+
+      <footer class="site-footer">
+        <span>Librería Likelihood · vista previa generada por introspección</span>
+        <span class="mono">{{MODEL_FILE}}</span>
+      </footer>
     </div>
   </main>
-
-  <footer class="credits">
-    <p>Librería Likelihood · vista previa generada por introspección</p>
-  </footer>
 </div>
 
 <button class="back-top" type="button" id="back-top" aria-label="Volver arriba" hidden>↑</button>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script>
-  'use strict';
-
-  (function () {
-    var dom = {
-      toast: document.getElementById('toast'),
-      backTop: document.getElementById('back-top')
-    };
-
-    function toast(message) {
-      dom.toast.textContent = message;
-      dom.toast.classList.add('show');
-      window.clearTimeout(toast.timer);
-      toast.timer = window.setTimeout(function () {
-        dom.toast.classList.remove('show');
-      }, 2400);
-    }
-    toast.timer = 0;
-
-    function legacyCopy(value, onDone, onFail) {
-      var area = document.createElement('textarea');
-      area.value = value;
-      area.setAttribute('readonly', 'readonly');
-      area.setAttribute('aria-hidden', 'true');
-      area.style.position = 'fixed';
-      area.style.top = '-1000px';
-      document.body.appendChild(area);
-      var copied = false;
-      try {
-        area.select();
-        copied = document.execCommand('copy');
-      } catch (error) {
-        copied = false;
-      }
-      document.body.removeChild(area);
-      if (copied) { onDone(); } else { onFail(); }
-    }
-
-    function copyText(value, okMessage) {
-      var text = String(value === null || value === undefined ? '' : value);
-      if (!text.trim()) {
-        toast('No hay nada que copiar');
-        return;
-      }
-      var done = function () { toast(okMessage); };
-      var failed = function () { toast('No se pudo copiar el contenido'); };
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(done, function () {
-          legacyCopy(text, done, failed);
-        });
-        return;
-      }
-      legacyCopy(text, done, failed);
-    }
-
-    /* Un único listener para todos los botones de copia. */
-    document.addEventListener('click', function (event) {
-      if (!event.target.closest) return;
-      var button = event.target.closest('[data-copy]');
-      if (!button) return;
-      var target = document.querySelector(button.getAttribute('data-copy'));
-      if (!target) {
-        toast('No se encontró el contenido a copiar');
-        return;
-      }
-      copyText(target.textContent, button.getAttribute('data-toast') || 'Copiado');
-    });
-
-    if (dom.backTop) {
-      window.addEventListener('scroll', function () {
-        dom.backTop.hidden = window.pageYOffset < 400;
-      }, { passive: true });
-      dom.backTop.addEventListener('click', function () {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* Playground                                                          */
-    /* ------------------------------------------------------------------ */
-
-    var playgroundDom = {
-      form: document.getElementById('playground-form'),
-      fields: document.getElementById('playground-fields'),
-      run: document.getElementById('run-playground'),
-      reset: document.getElementById('reset-playground'),
-      status: document.getElementById('playground-status'),
-      result: document.getElementById('playground-result'),
-      title: document.getElementById('playground-result-title'),
-      output: document.getElementById('playground-output'),
-      detail: document.getElementById('playground-detail'),
-      code: document.getElementById('playground-code')
-    };
-
-    var playgroundData = null;
-    try {
-      var specNode = document.getElementById('playground-data');
-      if (specNode && specNode.textContent.trim()) {
-        playgroundData = JSON.parse(specNode.textContent);
-      }
-    } catch (error) {
-      playgroundData = null;
-    }
-
-    function escapeHtml(value) {
-      return String(value === null || value === undefined ? '' : value)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    /* Resumen legible de los parámetros que necesitan objetos Python. */
-    function unsupportedSummary(list) {
-      return (list || []).map(function (item) {
-        return "'" + item.name + "' (" + item.type + ': ' + item.reason + ')';
-      }).join(', ');
-    }
-
-    function fieldControl(field, index, prefix) {
-      var id = (prefix || 'pg') + '-' + index;
-      var kind = field.kind;
-      var value = field.default;
-      if ((value === null || value === undefined) && field.required) {
-        value = field.sample;
-      }
-      var placeholder = field.required ? 'obligatorio' : 'opcional';
-      if (kind === 'bool') {
-        return '<label class="field-check" for="' + id + '">' +
-          '<input type="checkbox" id="' + id + '" data-kind="bool"' +
-          (value === true ? ' checked' : '') + '> activar</label>';
-      }
-      if (kind === 'int' || kind === 'float') {
-        return '<input type="number" id="' + id + '" data-kind="' + kind + '" step="' +
-          (kind === 'int' ? '1' : 'any') + '" value="' +
-          escapeHtml(value === null || value === undefined ? '' : String(value)) +
-          '" placeholder="' + placeholder + '">';
-      }
-      if (kind === 'raw') {
-        return '<textarea id="' + id + '" data-kind="raw" spellcheck="false" placeholder="JSON: [1, 2, 3]">' +
-          escapeHtml(value === null || value === undefined ? '' : JSON.stringify(value)) +
-          '</textarea>';
-      }
-      return '<input type="text" id="' + id + '" data-kind="' + kind + '" value="' +
-        escapeHtml(value === null || value === undefined ? '' : String(value)) +
-        '" placeholder="' + placeholder + '">';
-    }
-
-    function renderFields(container, fields, prefix, emptyMessage) {
-      if (!container) return;
-      if (!fields.length) {
-        container.innerHTML = '<p class="empty">' + escapeHtml(emptyMessage) + '</p>';
-        return;
-      }
-      container.innerHTML = fields.map(function (field, index) {
-        return '<div class="playground-field">' +
-          '<label for="' + prefix + '-' + index + '">' + escapeHtml(field.name) +
-            (field.required ? ' *' : '') + '</label>' +
-          '<span class="field-type">' + escapeHtml(field.type) + '</span>' +
-          fieldControl(field, index, prefix) + '</div>';
-      }).join('');
-    }
-
-    function renderPlayground() {
-      if (!playgroundData || !playgroundDom.fields) return;
-      if (playgroundData.buildable === false) {
-        playgroundDom.fields.innerHTML =
-          '<p class="empty">No se puede construir desde el catálogo: ' +
-          escapeHtml(unsupportedSummary(playgroundData.unsupported)) +
-          '. Usa el ejemplo de Python.</p>';
-        if (playgroundDom.run) playgroundDom.run.disabled = true;
-        if (playgroundDom.reset) playgroundDom.reset.disabled = true;
-        updateSnippet();
-        return;
-      }
-      renderFields(
-        playgroundDom.fields,
-        playgroundData.fields || [],
-        'pg',
-        'Este modelo no declara parámetros configurables.'
-      );
-      updateSnippet();
-    }
-
-    function readControl(control) {
-      var kind = control.getAttribute('data-kind');
-      if (kind === 'bool') return control.checked;
-      var text = control.value;
-      if (kind === 'raw') {
-        if (!text.trim()) return null;
-        return JSON.parse(text);
-      }
-      if (kind === 'int' || kind === 'float') {
-        if (!text.trim()) return null;
-        var number = Number(text);
-        if (!isFinite(number)) throw new Error('se esperaba un número');
-        return kind === 'int' ? Math.trunc(number) : number;
-      }
-      return text === '' ? null : text;
-    }
-
-    function collectFields(spec, prefix) {
-      var values = {};
-      var missing = [];
-      var invalid = [];
-      ((spec && spec.fields) || []).forEach(function (field, index) {
-        var control = document.getElementById(prefix + '-' + index);
-        if (!control) return;
-        var value;
-        try {
-          value = readControl(control);
-        } catch (error) {
-          invalid.push(field.name + ': ' + error.message);
-          return;
-        }
-        if (value === null) {
-          if (field.required) missing.push(field.name);
-          return;
-        }
-        values[field.name] = value;
-      });
-      return { values: values, missing: missing, invalid: invalid };
-    }
-
-    /* Guarda el estado crudo de los controles para poder repintar el formulario
-       sin perder lo que escribió el usuario. */
-    function snapshotFields(fields, prefix) {
-      var snapshot = {};
-      (fields || []).forEach(function (field, index) {
-        var control = document.getElementById(prefix + '-' + index);
-        if (!control) return;
-        snapshot[field.name] = control.getAttribute('data-kind') === 'bool'
-          ? { bool: true, checked: control.checked }
-          : { bool: false, value: control.value };
-      });
-      return snapshot;
-    }
-
-    function restoreFields(fields, prefix, snapshot) {
-      if (!snapshot) return;
-      (fields || []).forEach(function (field, index) {
-        var saved = snapshot[field.name];
-        if (!saved) return;
-        var control = document.getElementById(prefix + '-' + index);
-        if (!control) return;
-        if (saved.bool) {
-          control.checked = saved.checked;
-        } else {
-          control.value = saved.value;
-        }
-      });
-    }
-
-    /* Firma estable del constructor: el orden de las claves no debe decidir si
-       hay que reconstruir la instancia. */
-    function canonicalValue(value) {
-      if (Object.prototype.toString.call(value) === '[object Array]') {
-        return value.map(canonicalValue);
-      }
-      if (value && typeof value === 'object') {
-        var sorted = {};
-        Object.keys(value).sort().forEach(function (key) {
-          sorted[key] = canonicalValue(value[key]);
-        });
-        return sorted;
-      }
-      return value;
-    }
-
-    function constructorSignature(values) {
-      return JSON.stringify(canonicalValue(values || {}));
-    }
-
-    function collectParameters() {
-      return collectFields(playgroundData, 'pg');
-    }
-
-    function pyLiteral(value) {
-      if (value === null || value === undefined) return 'None';
-      if (typeof value === 'boolean') return value ? 'True' : 'False';
-      if (typeof value === 'number') return String(value);
-      if (typeof value === 'string') return JSON.stringify(value);
-      if (Object.prototype.toString.call(value) === '[object Array]') {
-        return '[' + value.map(pyLiteral).join(', ') + ']';
-      }
-      if (typeof value === 'object') {
-        return '{' + Object.keys(value).map(function (key) {
-          return JSON.stringify(key) + ': ' + pyLiteral(value[key]);
-        }).join(', ') + '}';
-      }
-      return JSON.stringify(value);
-    }
-
-    function updateSnippet() {
-      if (!playgroundData || !playgroundDom.code) return;
-      var collected = collectParameters();
-      var callArguments = Object.keys(collected.values).map(function (name) {
-        return name + '=' + pyLiteral(collected.values[name]);
-      });
-      playgroundDom.code.textContent = (playgroundData.import_statement || '') +
-        '\n\nmodel = ' + playgroundData.model_name + '(' + callArguments.join(', ') + ')';
-    }
-
-    function setStatus(message, kind) {
-      if (!playgroundDom.status) return;
-      playgroundDom.status.textContent = message;
-      playgroundDom.status.className = 'playground-status' + (kind ? ' ' + kind : '');
-    }
-
-    function showResult(text, detail, ok) {
-      if (!playgroundDom.result) return;
-      playgroundDom.result.hidden = false;
-      playgroundDom.title.textContent = ok ? 'Resultado de la ejecución' : 'No se pudo ejecutar';
-      playgroundDom.output.textContent = text;
-      playgroundDom.detail.hidden = !detail;
-      playgroundDom.detail.textContent = detail || '';
-    }
-
-    function runPlayground(event) {
-      event.preventDefault();
-      if (!playgroundData || playgroundData.buildable === false) return;
-      var collected = collectParameters();
-      if (collected.invalid.length) {
-        setStatus('Revisa: ' + collected.invalid.join('; '), 'error');
-        return;
-      }
-      if (collected.missing.length) {
-        setStatus('Faltan parámetros obligatorios: ' + collected.missing.join(', '), 'error');
-        return;
-      }
-      playgroundDom.run.disabled = true;
-      setStatus('Ejecutando…', '');
-      window.fetch(playgroundData.endpoint || '/api/playground', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model_id: playgroundData.model_id, parameters: collected.values })
-      }).then(function (response) {
-        return response.json().catch(function () { return null; }).then(function (data) {
-          return { ok: response.ok, data: data || {} };
-        });
-      }).then(function (response) {
-        var data = response.data;
-        if (!response.ok || data.success === false) {
-          setStatus('Error: ' + (data.error || 'no se pudo ejecutar el modelo'), 'error');
-          showResult(data.error || 'Error desconocido', data.detail || '', false);
-          return;
-        }
-        var lines = [
-          'tipo   : ' + (data.type || '—'),
-          'módulo : ' + (data.module || '—'),
-          'repr   : ' + (data.repr || '—')
-        ];
-        if (data.attributes && data.attributes.length) {
-          lines.push('atributos: ' + data.attributes.join(', '));
-        }
-        if (data.stdout) {
-          lines.push('', 'salida:', data.stdout);
-        }
-        var elapsed = typeof data.elapsed === 'number' ? ' en ' + data.elapsed + ' s' : '';
-        setStatus('Modelo construido' + elapsed, 'ok');
-        showResult(lines.join('\n'), data.stderr || '', true);
-      }).catch(function (error) {
-        setStatus('Error de red: ' + error.message, 'error');
-        showResult(String(error.message || error), '', false);
-      }).then(function () {
-        playgroundDom.run.disabled = false;
-      });
-    }
-
-    if (playgroundData && playgroundDom.form) {
-      renderPlayground();
-      playgroundDom.form.addEventListener('submit', runPlayground);
-      playgroundDom.form.addEventListener('input', updateSnippet);
-      playgroundDom.form.addEventListener('change', updateSnippet);
-      if (playgroundDom.reset) {
-        playgroundDom.reset.addEventListener('click', function () {
-          renderPlayground();
-          playgroundDom.result.hidden = true;
-          setStatus('Valores restablecidos', '');
-        });
-      }
-    } else if (playgroundDom.fields) {
-      playgroundDom.fields.innerHTML =
-        '<p class="empty">El playground no está disponible: falta la especificación del modelo.</p>';
-      if (playgroundDom.run) playgroundDom.run.disabled = true;
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* Carga de un modelo guardado                                         */
-    /* ------------------------------------------------------------------ */
-
-    var loadDom = {
-      panel: document.getElementById('load-panel'),
-      select: document.getElementById('load-loader'),
-      path: document.getElementById('load-path'),
-      verify: document.getElementById('load-verify'),
-      use: document.getElementById('load-session'),
-      hint: document.getElementById('load-hint'),
-      status: document.getElementById('load-status'),
-      result: document.getElementById('load-result'),
-      title: document.getElementById('load-result-title'),
-      output: document.getElementById('load-output'),
-      detail: document.getElementById('load-detail')
-    };
-
-    var loadData = null;
-    try {
-      var loadNode = document.getElementById('load-data');
-      if (loadNode && loadNode.textContent.trim()) {
-        loadData = JSON.parse(loadNode.textContent);
-      }
-    } catch (error) {
-      loadData = null;
-    }
-
-    function setLoadStatus(message, kind) {
-      if (!loadDom.status) return;
-      loadDom.status.textContent = message;
-      loadDom.status.className = 'playground-status' + (kind ? ' ' + kind : '');
-    }
-
-    function showLoadResult(text, detail, ok) {
-      if (!loadDom.result) return;
-      loadDom.result.hidden = false;
-      loadDom.title.textContent = ok ? 'Modelo cargado' : 'No se pudo cargar';
-      loadDom.output.textContent = text;
-      loadDom.detail.hidden = !detail;
-      loadDom.detail.textContent = detail || '';
-    }
-
-    function currentLoader() {
-      if (!loadData || !loadDom.select) return null;
-      var loaders = loadData.loaders || [];
-      for (var i = 0; i < loaders.length; i += 1) {
-        if (loaders[i].name === loadDom.select.value) return loaders[i];
-      }
-      return loaders.length ? loaders[0] : null;
-    }
-
-    function loadConstructorValues() {
-      var fromInvoke = collectFields(playgroundData, 'ic');
-      if (fromInvoke.invalid.length || fromInvoke.missing.length) return collectParameters();
-      return fromInvoke;
-    }
-
-    function loadPayload(loader) {
-      var values = {};
-      if (loader && loader.requires_instance) {
-        var constructor = loadConstructorValues();
-        if (constructor.invalid.length) {
-          setLoadStatus('Revisa el constructor: ' + constructor.invalid.join('; '), 'error');
-          return null;
-        }
-        if (constructor.missing.length) {
-          setLoadStatus(
-            'Este loader necesita el constructor: faltan ' + constructor.missing.join(', '),
-            'error'
-          );
-          return null;
-        }
-        values = constructor.values;
-      }
-      var path = loadDom.path ? loadDom.path.value.trim() : '';
-      if (!path) {
-        setLoadStatus('Escribe la ruta del modelo guardado', 'error');
-        return null;
-      }
-      return { loader: loader ? loader.name : '', path: path, parameters: values };
-    }
-
-
-    function verifyLoadedModel() {
-      if (!loadData || !loadData.loadable || loadData.enabled === false) return;
-      var loader = currentLoader();
-      var payload = loadPayload(loader);
-      if (!payload) return;
-      if (loadDom.verify) loadDom.verify.disabled = true;
-      if (loadDom.use) loadDom.use.disabled = true;
-      setLoadStatus('Cargando el modelo…', '');
-      postJson(loadData.endpoint, payload)
-        .then(function (response) {
-          var data = response.data;
-          if (!response.ok || data.success === false) {
-            setLoadStatus('Error: ' + describeInvokeError(data), 'error');
-            showLoadResult(data.error || 'Error desconocido', data.detail || '', false);
-            return;
-          }
-          var lines = [
-            'tipo   : ' + (data.type || '—'),
-            'loader : ' + (data.loader || payload.loader || '—'),
-            'ruta   : ' + (data.path || payload.path || '—')
-          ];
-          if (data.attributes && data.attributes.length) {
-            lines.push('atributos: ' + data.attributes.join(', '));
-          }
-          var elapsed = typeof data.elapsed === 'number' ? ' en ' + data.elapsed + ' s' : '';
-          setLoadStatus('Modelo verificado' + elapsed, 'ok');
-          showLoadResult(lines.join('\n'), data.stderr || '', true);
-        })
-        .catch(function (error) {
-          setLoadStatus('Error de red: ' + error.message, 'error');
-          showLoadResult(String(error.message || error), '', false);
-        })
-        .then(function () {
-          if (loadDom.verify) loadDom.verify.disabled = false;
-          if (loadDom.use) loadDom.use.disabled = false;
-        });
-    }
-
-    function loadAsSession() {
-      if (!loadData || !loadData.loadable || loadData.enabled === false || !invokeData) return;
-      var loader = currentLoader();
-      var payload = loadPayload(loader);
-      if (!payload) return;
-      if (loadDom.verify) loadDom.verify.disabled = true;
-      if (loadDom.use) loadDom.use.disabled = true;
-      setLoadStatus('Abriendo una instancia con el modelo guardado…', '');
-      var start = invokeSession.id ? closeSession(false) : Promise.resolve();
-      start.then(function () {
-        return postJson(invokeData.sessions_url, payload);
-      }).then(function (response) {
-        var data = response.data;
-        if (!response.ok || data.success === false) {
-          throw new Error(describeInvokeError(data));
-        }
-        invokeSession.id = data.session_id;
-        invokeSession.calls = 0;
-        invokeSession.signature = null;
-        invokeSession.loaded = true;
-        invokeSession.loader = payload.loader;
-        invokeSession.path = data.load ? data.load.path : payload.path;
-        if (invokeDom.run) invokeDom.run.disabled = false;
-        if (invokeDom.sample) invokeDom.sample.disabled = false;
-        if (invokeDom.select) invokeDom.select.disabled = false;
-        if (invokeDom.useSession) invokeDom.useSession.checked = true;
-        renderSessionInfo();
-        renderInvokeConstructor();
-        renderInvokeMethod();
-        setLoadStatus('Instancia cargada y lista para invocar', 'ok');
-        setInvokeStatus(
-          'Instancia cargada desde ' + (data.load ? data.load.path : payload.path),
-          'ok'
-        );
-        selectLabTab('invoke', true);
-      }).catch(function (error) {
-        setLoadStatus('Error: ' + error.message, 'error');
-      }).then(function () {
-        if (loadDom.verify) loadDom.verify.disabled = false;
-        if (loadDom.use) loadDom.use.disabled = false;
-      });
-    }
-
-    function renderLoad() {
-      if (!loadDom.panel || !loadData) return;
-      var loaders = loadData.loaders || [];
-      if (loadData.enabled === false || !loadData.loadable || !loaders.length) {
-        loadDom.panel.hidden = true;
-        return;
-      }
-      loadDom.panel.hidden = false;
-      if (loadDom.select) {
-        loadDom.select.innerHTML = loaders.map(function (loader) {
-          var suffix = loader.requires_instance ? ' · instancia' : '';
-          return '<option value="' + escapeHtml(loader.name) + '">' +
-            escapeHtml(loader.name + '()' + suffix) + '</option>';
-        }).join('');
-      }
-      if (loadDom.hint) {
-        var policy = loadData.restrict_to_root
-          ? 'Solo se permiten rutas dentro de ' + loadData.root + '.'
-          : 'Rutas relativas a ' + loadData.root + '.';
-        loadDom.hint.innerHTML = escapeHtml(policy) +
-          ' Se aceptan archivos <code>.pkl</code> y directorios de checkpoints. ' +
-          'Carga únicamente archivos de confianza.';
-      }
-      if (loadDom.path && !loadDom.path.value) {
-        try {
-          loadDom.path.value = window.sessionStorage.getItem('lm-load-path') || '';
-        } catch (error) {
-          loadDom.path.value = '';
-        }
-      }
-      if (loadDom.path) {
-        loadDom.path.addEventListener('change', function () {
-          try {
-            window.sessionStorage.setItem('lm-load-path', loadDom.path.value);
-          } catch (error) {
-            /* el almacenamiento es opcional */
-          }
-        });
-      }
-      if (loadDom.verify) loadDom.verify.addEventListener('click', verifyLoadedModel);
-      if (loadDom.use) {
-        var sessionsAvailable = !invokeData || invokeData.sessions_enabled !== false;
-        loadDom.use.disabled = !sessionsAvailable;
-        loadDom.use.title = sessionsAvailable
-          ? 'Carga el modelo en una instancia persistente'
-          : 'Las sesiones están deshabilitadas en este servidor';
-        loadDom.use.addEventListener('click', loadAsSession);
-      }
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* Pestañas del laboratorio                                            */
-    /* ------------------------------------------------------------------ */
-
-    var labTabs = Array.prototype.slice.call(document.querySelectorAll('[data-lab-tab]'));
-
-    function selectLabTab(name, scroll) {
-      var active = name === 'invoke' ? 'invoke' : 'playground';
-      labTabs.forEach(function (tab) {
-        var selected = tab.getAttribute('data-lab-tab') === active;
-        tab.setAttribute('aria-selected', selected ? 'true' : 'false');
-        tab.setAttribute('tabindex', selected ? '0' : '-1');
-      });
-      var panels = {
-        playground: document.getElementById('panel-playground'),
-        invoke: document.getElementById('panel-invoke')
-      };
-      ['playground', 'invoke'].forEach(function (key) {
-        if (panels[key]) panels[key].hidden = key !== active;
-      });
-      /* El hash refleja la pestaña abierta: el enlace se puede compartir. */
-      if (window.history && window.history.replaceState) {
-        window.history.replaceState(
-          null, '', active === 'invoke' ? '#invocar' : '#playground'
-        );
-      }
-      if (scroll) {
-        var heading = document.getElementById('playground');
-        if (heading) heading.scrollIntoView({ block: 'start' });
-      }
-    }
-
-    labTabs.forEach(function (tab) {
-      tab.addEventListener('click', function () {
-        selectLabTab(tab.getAttribute('data-lab-tab'), false);
-      });
-      tab.addEventListener('keydown', function (event) {
-        if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-        event.preventDefault();
-        var index = labTabs.indexOf(tab);
-        var offset = event.key === 'ArrowRight' ? 1 : labTabs.length - 1;
-        var next = labTabs[(index + offset) % labTabs.length];
-        if (!next) return;
-        next.focus();
-        selectLabTab(next.getAttribute('data-lab-tab'), false);
-      });
-    });
-
-    /* Los enlaces del índice #playground y #invocar abren su pestaña. */
-    document.addEventListener('click', function (event) {
-      var link = event.target.closest ? event.target.closest('a[href^="#"]') : null;
-      if (!link) return;
-      var target = link.getAttribute('data-lab-tab-link');
-      if (!target && link.getAttribute('href') !== '#playground') return;
-      event.preventDefault();
-      selectLabTab(target || 'playground', true);
-    });
-
-    /* ------------------------------------------------------------------ */
-    /* Índice pegajoso con sección activa                                  */
-    /* ------------------------------------------------------------------ */
-
-    (function initToc() {
-      var toc = document.getElementById('toc');
-      if (!toc) return;
-      var related = document.getElementById('relacionados');
-      var relatedLink = document.getElementById('toc-relacionados');
-      if (relatedLink && !related) relatedLink.hidden = true;
-      if (!related && relatedLink) relatedLink.parentNode.removeChild(relatedLink);
-
-      var links = Array.prototype.slice.call(
-        toc.querySelectorAll('a[href^="#"]:not([data-lab-tab-link])')
-      );
-      var sections = links.map(function (link) {
-        return { link: link, section: document.getElementById(link.getAttribute('href').slice(1)) };
-      }).filter(function (entry) { return entry.section; });
-      if (!sections.length) return;
-
-      var active = null;
-      var scheduled = false;
-
-      function paint() {
-        scheduled = false;
-        var best = sections[0];
-        sections.forEach(function (entry) {
-          if (entry.section.getBoundingClientRect().top <= 140) best = entry;
-        });
-        if (best === active) return;
-        active = best;
-        sections.forEach(function (entry) {
-          var selected = entry === best;
-          if (selected) {
-            entry.link.classList.add('active');
-            entry.link.setAttribute('aria-current', 'true');
-          } else {
-            entry.link.classList.remove('active');
-            entry.link.removeAttribute('aria-current');
-          }
-        });
-      }
-
-      function schedule() {
-        if (scheduled) return;
-        scheduled = true;
-        if (window.requestAnimationFrame) window.requestAnimationFrame(paint);
-        else window.setTimeout(paint, 16);
-      }
-
-      window.addEventListener('scroll', schedule, { passive: true });
-      window.addEventListener('resize', schedule);
-      paint();
-    })();
-
-    /* Un enlace directo a la pestaña de invocación la deja abierta. */
-    if (window.location.hash === '#invocar') {
-      selectLabTab('invoke', false);
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* Invocación de métodos                                               */
-    /* ------------------------------------------------------------------ */
-
-    var invokeDom = {
-      panel: document.getElementById('panel-invoke'),
-      select: document.getElementById('invoke-method'),
-      signature: document.getElementById('invoke-signature'),
-      fields: document.getElementById('invoke-fields'),
-      constructorFields: document.getElementById('invoke-constructor-fields'),
-      constructorNote: document.getElementById('invoke-constructor-note'),
-      useSession: document.getElementById('invoke-use-session'),
-      sessionInfo: document.getElementById('invoke-session-info'),
-      closeSession: document.getElementById('invoke-close-session'),
-      run: document.getElementById('run-invoke'),
-      sample: document.getElementById('sample-invoke'),
-      reset: document.getElementById('reset-invoke'),
-      status: document.getElementById('invoke-status'),
-      result: document.getElementById('invoke-result'),
-      title: document.getElementById('invoke-result-title'),
-      output: document.getElementById('invoke-output'),
-      detail: document.getElementById('invoke-detail'),
-      code: document.getElementById('invoke-code')
-    };
-
-    var invokeData = null;
-    try {
-      var invokeNode = document.getElementById('invoke-data');
-      if (invokeNode && invokeNode.textContent.trim()) {
-        invokeData = JSON.parse(invokeNode.textContent);
-      }
-    } catch (error) {
-      invokeData = null;
-    }
-
-    var invokeSession = { id: null, calls: 0, signature: null, loaded: false };
-
-    function currentInvokeMethod() {
-      if (!invokeData || !invokeDom.select) return null;
-      var methods = invokeData.methods || [];
-      for (var i = 0; i < methods.length; i += 1) {
-        if (methods[i].name === invokeDom.select.value) return methods[i];
-      }
-      return methods.length ? methods[0] : null;
-    }
-
-    function setInvokeStatus(message, kind) {
-      if (!invokeDom.status) return;
-      invokeDom.status.textContent = message;
-      invokeDom.status.className = 'playground-status' + (kind ? ' ' + kind : '');
-    }
-
-    function showInvokeResult(text, detail, ok) {
-      if (!invokeDom.result) return;
-      invokeDom.result.hidden = false;
-      invokeDom.title.textContent = ok ? 'Resultado de la llamada' : 'No se pudo invocar';
-      invokeDom.output.textContent = text;
-      invokeDom.detail.hidden = !detail;
-      invokeDom.detail.textContent = detail || '';
-    }
-
-    function renderSessionInfo() {
-      if (invokeDom.sessionInfo) {
-        invokeDom.sessionInfo.textContent = invokeSession.id
-          ? 'sesión ' + invokeSession.id + ' · ' + invokeSession.calls +
-            (invokeSession.calls === 1 ? ' llamada' : ' llamadas') +
-            (invokeSession.loaded ? ' · cargada' : '')
-          : 'sin sesión';
-      }
-      if (invokeDom.closeSession) invokeDom.closeSession.hidden = !invokeSession.id;
-    }
-
-    function renderInvokeMethod() {
-      if (!invokeData) return;
-      var method = currentInvokeMethod();
-      renderFields(
-        invokeDom.fields,
-        (method && method.fields) || [],
-        'iv',
-        'Este método no recibe argumentos.'
-      );
-      if (invokeDom.signature) {
-        invokeDom.signature.textContent = method ? method.signature : '';
-      }
-      updateInvokeSnippet();
-    }
-
-    function renderInvokeConstructor(forceDefaults) {
-      if (playgroundData && playgroundData.buildable === false) {
-        if (invokeSession.loaded) {
-          if (invokeDom.constructorFields) {
-            invokeDom.constructorFields.innerHTML =
-              '<p class="empty">Instancia cargada desde un archivo; el constructor no se usa.</p>';
-          }
-          if (invokeDom.constructorNote) {
-            invokeDom.constructorNote.textContent =
-              'Métodos disponibles sobre la instancia cargada.';
-          }
-          return;
-        }
-        if (invokeDom.constructorFields) {
-          invokeDom.constructorFields.innerHTML =
-            '<p class="empty">No se puede construir desde el catálogo: ' +
-            escapeHtml(unsupportedSummary(playgroundData.unsupported)) +
-            '. Usa el ejemplo de Python.</p>';
-        }
-        if (invokeDom.constructorNote) {
-          invokeDom.constructorNote.textContent =
-            'Este modelo necesita objetos Python que la API no puede recibir como JSON.';
-        }
-        return;
-      }
-      var fields = (playgroundData && playgroundData.fields) || [];
-      // Abrir o cerrar una sesión no debe devolver los campos a los valores por
-      // defecto: el formulario tiene que seguir mostrando los parámetros de la
-      // instancia viva para que la firma marque correctamente los cambios.
-      var previous = forceDefaults ? null : snapshotFields(fields, 'ic');
-      renderFields(
-        invokeDom.constructorFields,
-        fields,
-        'ic',
-        'El constructor no declara parámetros: el modelo se crea sin argumentos.'
-      );
-      restoreFields(fields, 'ic', previous);
-      if (invokeDom.constructorNote) {
-        invokeDom.constructorNote.textContent = invokeSession.loaded
-          ? 'Instancia cargada desde un archivo: los parámetros del constructor no se aplican.'
-          : (invokeSession.id
-              ? 'La instancia se reconstruye automáticamente si cambias estos valores.'
-              : 'La primera llamada construye la clase con estos valores.');
-      }
-    }
-
-    function updateInvokeSnippet() {
-      if (!invokeData || !invokeDom.code) return;
-      var method = currentInvokeMethod();
-      var constructor = collectFields(playgroundData, 'ic');
-      var callArguments = method ? collectFields(method, 'iv') : { values: {} };
-      var constructorArguments = Object.keys(constructor.values).map(function (name) {
-        return name + '=' + pyLiteral(constructor.values[name]);
-      });
-      var argumentsList = Object.keys(callArguments.values).map(function (name) {
-        return name + '=' + pyLiteral(callArguments.values[name]);
-      });
-      var source = playgroundData || {};
-      var importStatement = invokeData.import_statement || source.import_statement || '';
-      var modelName = invokeData.model_name || source.model_name || invokeData.model_id;
-      var lines = [importStatement, ''];
-      if (invokeSession.loaded) {
-        lines.push(
-          'model = ' + modelName + '.' + (invokeSession.loader || 'load') +
-          '(' + pyLiteral(invokeSession.path || '') + ')'
-        );
-      } else {
-        lines.push('model = ' + modelName + '(' + constructorArguments.join(', ') + ')');
-      }
-      if (method) {
-        lines.push('result = model.' + method.name + '(' + argumentsList.join(', ') + ')');
-        lines.push('print(result)');
-      }
-      invokeDom.code.textContent = lines.join('\n');
-    }
-
-    function renderInvoke() {
-      if (!invokeData) {
-        if (invokeDom.fields) {
-          invokeDom.fields.innerHTML =
-            '<p class="empty">La invocación no está disponible: falta la especificación del modelo.</p>';
-        }
-        if (invokeDom.run) invokeDom.run.disabled = true;
-        if (invokeDom.sample) invokeDom.sample.disabled = true;
-        return;
-      }
-      if (invokeDom.select) {
-        invokeDom.select.innerHTML = (invokeData.methods || []).map(function (method) {
-          return '<option value="' + escapeHtml(method.name) + '">' + escapeHtml(method.name) + '</option>';
-        }).join('');
-        invokeDom.select.disabled = !(invokeData.methods || []).length;
-      }
-      if (invokeDom.useSession) {
-        invokeDom.useSession.disabled = !invokeData.sessions_enabled;
-        if (!invokeData.sessions_enabled) invokeDom.useSession.checked = false;
-      }
-      if (invokeDom.sample) {
-        invokeDom.sample.disabled = !(invokeData.methods || []).length;
-      }
-      renderInvokeConstructor();
-      renderSessionInfo();
-      if (invokeData.enabled === false) {
-        if (invokeDom.fields) {
-          invokeDom.fields.innerHTML =
-            '<p class="empty">La invocación de métodos está deshabilitada en este servidor ' +
-            '(LM_INVOKE=0).</p>';
-        }
-        if (invokeDom.run) invokeDom.run.disabled = true;
-        if (invokeDom.sample) invokeDom.sample.disabled = true;
-        setInvokeStatus('Deshabilitada en el servidor', 'error');
-        return;
-      }
-      if (invokeData.buildable === false) {
-        if (invokeDom.fields) {
-          invokeDom.fields.innerHTML =
-            '<p class="empty">No se puede construir desde el catálogo: ' +
-            escapeHtml(unsupportedSummary(invokeData.unsupported)) +
-            '. Usa el ejemplo de Python.</p>';
-        }
-        if (invokeDom.run) invokeDom.run.disabled = true;
-        if (invokeDom.sample) invokeDom.sample.disabled = true;
-        if (invokeDom.select) invokeDom.select.disabled = true;
-        setInvokeStatus('Requiere objetos Python', 'error');
-        return;
-      }
-      if (!(invokeData.methods || []).length) {
-        if (invokeDom.fields) {
-          invokeDom.fields.innerHTML =
-            '<p class="empty">Este modelo no expone métodos invocables con la política actual.</p>';
-        }
-        if (invokeDom.run) invokeDom.run.disabled = true;
-        setInvokeStatus('Sin métodos invocables', '');
-        return;
-      }
-      if (invokeDom.run) invokeDom.run.disabled = false;
-      renderInvokeMethod();
-    }
-
-    function describeInvokeError(data) {
-      var message = data.error || 'no se pudo invocar el método';
-      if (data.unknown && data.unknown.length) {
-        message += ' (argumentos desconocidos: ' + data.unknown.join(', ') + ')';
-      }
-      if (data.missing && data.missing.length) {
-        message += ' (faltan: ' + data.missing.join(', ') + ')';
-      }
-      return message;
-    }
-
-    function postJson(url, payload) {
-      return window.fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }).then(function (response) {
-        return response.json().catch(function () { return null; }).then(function (data) {
-          return { ok: response.ok, status: response.status, data: data || {} };
-        });
-      });
-    }
-
-    function openSession(parameters) {
-      return postJson(invokeData.sessions_url, { parameters: parameters }).then(function (response) {
-        if (!response.ok || response.data.success === false) {
-          throw new Error(describeInvokeError(response.data));
-        }
-        invokeSession.id = response.data.session_id;
-        invokeSession.calls = 0;
-        invokeSession.signature = constructorSignature(parameters);
-        invokeSession.loaded = false;
-        invokeSession.loader = null;
-        invokeSession.path = null;
-        renderSessionInfo();
-        renderInvokeConstructor();
-        return invokeSession.id;
-      });
-    }
-
-    function closeSession(notify) {
-      var sessionId = invokeSession.id;
-      invokeSession.id = null;
-      invokeSession.calls = 0;
-      invokeSession.signature = null;
-      invokeSession.loaded = false;
-      invokeSession.loader = null;
-      invokeSession.path = null;
-      renderSessionInfo();
-      renderInvokeConstructor();
-      if (!sessionId) return Promise.resolve();
-      var template = invokeData.session_url_template || '/api/sessions/{session_id}';
-      return window.fetch(template.replace('{session_id}', sessionId), {
-        method: 'DELETE'
-      }).then(function () {
-        if (notify) setInvokeStatus('Sesión cerrada', 'ok');
-      }).catch(function () {
-        /* la sesión expira sola en el servidor */
-      });
-    }
-
-    /* Rellena un control del formulario con un valor JSON. */
-    function fillField(control, value) {
-      var kind = control.getAttribute('data-kind');
-      if (kind === 'bool') {
-        control.checked = value === true;
-        return;
-      }
-      if (kind === 'raw') {
-        control.value = JSON.stringify(value);
-        return;
-      }
-      control.value = value === null || value === undefined ? '' : String(value);
-    }
-
-    function validatedConstructor() {
-      var constructor = collectFields(playgroundData, 'ic');
-      if (constructor.invalid.length) {
-        setInvokeStatus('Revisa el constructor: ' + constructor.invalid.join('; '), 'error');
-        return null;
-      }
-      if (constructor.missing.length) {
-        setInvokeStatus(
-          'Faltan parámetros del constructor: ' + constructor.missing.join(', '),
-          'error'
-        );
-        return null;
-      }
-      return constructor.values;
-    }
-
-    /* Pide al servidor datos dummy coherentes con el constructor elegido. */
-    function fillSampleArguments() {
-      var method = currentInvokeMethod();
-      var loaded = invokeSession.id && invokeSession.loaded;
-      if (!invokeData || (invokeData.buildable === false && !loaded) || !method) {
-        if (invokeData && invokeData.buildable === false && !loaded) {
-          setInvokeStatus('Requiere objetos Python', 'error');
-        } else {
-          setInvokeStatus('No hay ningún método que invocar', 'error');
-        }
-        return;
-      }
-      var parameters = loaded ? {} : validatedConstructor();
-      if (!parameters) return;
-      var endpoint = invokeData.sample_endpoint ||
-        '/api/models/' + invokeData.model_id + '/sample';
-      if (invokeDom.sample) invokeDom.sample.disabled = true;
-      setInvokeStatus('Generando datos de ejemplo…', '');
-      postJson(endpoint, { method: method.name, parameters: parameters })
-        .then(function (response) {
-          var data = response.data;
-          if (!response.ok || data.success === false) {
-            setInvokeStatus('Error: ' + describeInvokeError(data), 'error');
-            return;
-          }
-          var samples = data.arguments || {};
-          (method.fields || []).forEach(function (field, index) {
-            if (!Object.prototype.hasOwnProperty.call(samples, field.name)) return;
-            var control = document.getElementById('iv-' + index);
-            if (control) fillField(control, samples[field.name]);
-          });
-          updateInvokeSnippet();
-          setInvokeStatus('Datos de ejemplo generados', 'ok');
-        })
-        .catch(function (error) {
-          setInvokeStatus('Error de red: ' + error.message, 'error');
-        })
-        .then(function () {
-          if (invokeDom.sample) invokeDom.sample.disabled = false;
-        });
-    }
-
-    function runInvoke() {
-      if (!invokeData) return;
-      var loaded = invokeSession.id && invokeSession.loaded;
-      if (invokeData.buildable === false && !loaded) return;
-      var method = currentInvokeMethod();
-      if (!method) {
-        setInvokeStatus('No hay ningún método que invocar', 'error');
-        return;
-      }
-      var argumentsValues = collectFields(method, 'iv');
-      if (argumentsValues.invalid.length) {
-        setInvokeStatus('Revisa: ' + argumentsValues.invalid.join('; '), 'error');
-        return;
-      }
-      if (argumentsValues.missing.length) {
-        setInvokeStatus('Faltan argumentos: ' + argumentsValues.missing.join(', '), 'error');
-        return;
-      }
-      var constructorValues = { values: {} };
-      if (!loaded) {
-        constructorValues = collectFields(playgroundData, 'ic');
-        if (constructorValues.invalid.length) {
-          setInvokeStatus('Revisa el constructor: ' + constructorValues.invalid.join('; '), 'error');
-          return;
-        }
-        if (constructorValues.missing.length) {
-          setInvokeStatus(
-            'Faltan parámetros del constructor: ' + constructorValues.missing.join(', '),
-            'error'
-          );
-          return;
-        }
-      }
-      var useSession = invokeDom.useSession && invokeDom.useSession.checked;
-      if (invokeDom.run) invokeDom.run.disabled = true;
-      setInvokeStatus('Invocando…', '');
-      var request;
-      if (useSession) {
-        var signature = constructorSignature(constructorValues.values);
-        var reuse = invokeSession.id &&
-          (invokeSession.loaded || invokeSession.signature === signature);
-        var sessionPromise = reuse
-          ? Promise.resolve(invokeSession.id)
-          : closeSession(false).then(function () {
-              return openSession(constructorValues.values);
-            });
-        request = sessionPromise.then(function (sessionId) {
-          var template = invokeData.session_invoke_url_template
-            || '/api/sessions/{session_id}/invoke';
-          var payload = { method: method.name, arguments: argumentsValues.values };
-          if (!invokeSession.loaded) payload.parameters = constructorValues.values;
-          return postJson(template.replace('{session_id}', sessionId), payload);
-        });
-      } else {
-        var directPayload = {
-          method: method.name,
-          arguments: argumentsValues.values,
-          parameters: constructorValues.values
-        };
-        if (invokeSession.loaded) {
-          directPayload.parameters = {};
-          directPayload.path = invokeSession.path;
-          directPayload.loader = invokeSession.loader;
-        }
-        request = postJson(invokeData.endpoint, directPayload);
-      }
-      request.then(function (response) {
-        var data = response.data;
-        if (!response.ok || data.success === false) {
-          if (response.status === 404 && useSession && invokeSession.id) {
-            invokeSession.id = null;
-            invokeSession.calls = 0;
-            renderSessionInfo();
-          }
-          setInvokeStatus('Error: ' + describeInvokeError(data), 'error');
-          showInvokeResult(data.error || 'Error desconocido', data.detail || '', false);
-          return;
-        }
-        if (useSession) {
-          invokeSession.id = data.session_id || invokeSession.id;
-          invokeSession.signature = signature;
-          invokeSession.calls = typeof data.calls === 'number'
-            ? data.calls
-            : invokeSession.calls + 1;
-          renderSessionInfo();
-          renderInvokeConstructor();
-        }
-        var lines = [
-          'método : ' + (data.method || method.name),
-          'tipo   : ' + (data.result_type || '—'),
-          'repr   : ' + (data.result_repr || '—')
-        ];
-        if (data.result !== undefined && data.result !== null) {
-          lines.push('', 'resultado:', JSON.stringify(data.result, null, 2));
-        }
-        if (data.stdout) lines.push('', 'salida:', data.stdout);
-        var elapsed = typeof data.elapsed === 'number' ? ' en ' + data.elapsed + ' s' : '';
-        setInvokeStatus(
-          'Llamada completada' + elapsed + (data.rebuilt ? ' (instancia reconstruida)' : ''),
-          'ok'
-        );
-        showInvokeResult(lines.join('\n'), data.stderr || '', true);
-      }).catch(function (error) {
-        setInvokeStatus('Error: ' + error.message, 'error');
-        showInvokeResult(String(error.message || error), '', false);
-      }).then(function () {
-        if (invokeDom.run) invokeDom.run.disabled = false;
-      });
-    }
-
-    /* Arranque de la pestaña: sin esto el <select> queda vacío y los botones
-       no responden, porque nada llama a renderInvoke() ni registra eventos. */
-    /* Abrir el bloque de código al navegar a #codigo desde el índice. */
-    var sourceBlock = document.getElementById('codigo');
-    if (sourceBlock) {
-      var openSource = function () { sourceBlock.open = true; };
-      if (window.location.hash === '#codigo') openSource();
-      document.addEventListener('click', function (event) {
-        var link = event.target.closest ? event.target.closest('a[href="#codigo"]') : null;
-        if (link) openSource();
-      });
-    }
-
-    renderLoad();
-    renderInvoke();
-    if (invokeDom.select) {
-      invokeDom.select.addEventListener('change', renderInvokeMethod);
-    }
-    if (invokeDom.run) {
-      invokeDom.run.addEventListener('click', runInvoke);
-    }
-    if (invokeDom.sample) {
-      invokeDom.sample.addEventListener('click', fillSampleArguments);
-    }
-    if (invokeDom.reset) {
-      invokeDom.reset.addEventListener('click', function () {
-        renderInvokeMethod();
-        renderInvokeConstructor(true);
-        if (invokeDom.result) invokeDom.result.hidden = true;
-        setInvokeStatus('Argumentos restablecidos', '');
-      });
-    }
-    if (invokeDom.useSession) {
-      invokeDom.useSession.addEventListener('change', function () {
-        if (!invokeDom.useSession.checked && invokeSession.id) {
-          closeSession(false);
-        }
-      });
-    }
-    if (invokeDom.closeSession) {
-      invokeDom.closeSession.addEventListener('click', function () {
-        closeSession(true);
-      });
-    }
-  })();
-</script>
+<script src="/preview.js" defer></script>
 </body>
 </html>
+
+
+
