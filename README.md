@@ -62,6 +62,39 @@ The interface follows one design system inspired by the Databricks platform:
 The catalog is re-introspected when a model source changes (`LM_CATALOG_TTL`), so
 editing `likelihood/models` is reflected without restarting the server.
 
+### Docker
+
+The `Dockerfile` bundles the server, the scientific stack and the catalog
+sources; `docker-compose.yml` runs it with the usual `LM_*` settings.
+
+```bash
+docker build -t likelihood-catalog .
+docker run --rm -p 8000:8000 likelihood-catalog     # http://localhost:8000
+
+# Optional: models that need TensorFlow / PyTorch / scikit-learn
+docker build --build-arg INSTALL_FULL_EXTRAS=true -t likelihood-catalog:full .
+
+# Compose (reads a local .env file, if present)
+docker compose up --build
+LM_API_TOKEN=change-me docker compose up --build     # protected /api
+LM_PORT=9000 docker compose up                       # container + published port
+```
+
+Notes:
+
+* The image runs as the unprivileged user `likelihood` (uid 1001), so mounted
+  model files must be readable by that user.
+* Compose mounts `likelihood/models` read-only, which keeps the live catalog
+  reload while you edit a model source. Remove the mount to use the copy baked
+  into the image.
+* `LM_API_TOKEN` stays empty by default (open catalogue). Set it before exposing
+  the container beyond localhost.
+* The image ships a `HEALTHCHECK` against `/api/health`; `docker ps` shows
+  `healthy` once the catalogue is ready.
+* Model version history (`GET /api/models/<id>/versions`) is read from `git log`,
+  and the build context excludes `.git`, so that endpoint answers `503` inside
+  the container. Run the server from a checkout when you need it.
+
 ### Environment variables
 
 The server reads optional `LM_*` environment variables (each overridable with

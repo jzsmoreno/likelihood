@@ -1,0 +1,36 @@
+# Build context for the catalog image: keep sources, drop tooling and secrets.
+.git
+.gitattributes
+.github
+
+# Local environments and caches
+.venv
+venv
+env
+__pycache__
+**/__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.ipynb_checkpoints
+
+# Packaging artefacts
+build
+dist
+*.egg-info
+
+# Not needed by the running server
+docs
+notebooks
+tests
+
+# Local configuration, secrets and logs
+.env
+.env.*
+*.log
+
+# Container files themselves
+Dockerfile
+docker-compose*.yml
+.dockerignore
