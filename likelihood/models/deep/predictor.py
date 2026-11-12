@@ -37,6 +37,12 @@ class GetInsights:
         The trained model to analyze.
     inputs : `np.ndarray`
         The input data for analysis.
+
+    Notes
+    -----
+    The analyzer is a view over a trained classifier plus its inputs, so it has
+    no checkpoint of its own: persist the :class:`AutoClassifier` instead and
+    build ``GetInsights(model, inputs)`` again when the report is needed.
     """
 
     def __init__(self, model: AutoClassifier, inputs: np.ndarray) -> None:

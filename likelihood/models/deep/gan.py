@@ -1,6 +1,7 @@
 """Generative adversarial network model definitions."""
 
 import os
+from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import numpy as np
@@ -62,6 +63,15 @@ class GANRegressor(tf.keras.Model):
         """
         self.gan = tf.keras.models.Sequential([self.generator, self.discriminator], name="gan")
 
+        self._compile_models()
+        super(GANRegressor, self).build(input_shape)
+
+    def _compile_models(self) -> None:
+        """Compile the generator, the discriminator and the adversarial model.
+
+        ``build`` uses it for a fresh instance and :meth:`load_model` after
+        restoring an archive, so a loaded model can keep training.
+        """
         self.generator.compile(
             optimizer=self.optimizer,
             loss=tf.keras.losses.MeanAbsolutePercentageError(),
@@ -73,7 +83,6 @@ class GANRegressor(tf.keras.Model):
         )
 
         self.gan.compile(optimizer=self.optimizer, loss="binary_crossentropy")
-        super(GANRegressor, self).build(input_shape)
 
     def _build_generator(self) -> tf.keras.Model:
         generator = tf.keras.Sequential(name="generator")
@@ -361,3 +370,51 @@ class GANRegressor(tf.keras.Model):
             l2_reg=config["l2_reg"],
             optimizer=config["optimizer"],
         )
+
+    def save_model(self, path: str | Path = "./gan_regressor.keras") -> None:
+        """Serialize the GAN to a Keras archive.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default="./gan_regressor.keras"
+            Destination file. The ``.keras`` extension is appended when the path
+            does not already use it.
+
+        Notes
+        -----
+        The archive uses the native Keras format, so it can also be opened with
+        ``tf.keras.models.load_model(path, custom_objects={"GANRegressor":
+        GANRegressor}, compile=False)``.
+        """
+        target = Path(path)
+        if target.suffix != ".keras":
+            target = target.with_name(target.name + ".keras")
+        self.save(str(target))
+
+    @classmethod
+    def load_model(cls, path: str | Path = "./gan_regressor.keras") -> "GANRegressor":
+        """Rebuild a GAN regressor from an archive written by :meth:`save_model`.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default="./gan_regressor.keras"
+            Keras archive to restore.
+
+        Returns
+        -------
+        GANRegressor
+            Model with the stored generator, discriminator and optimizer
+            settings, recompiled so it can keep training.
+
+        Raises
+        ------
+        TypeError
+            If the archive does not contain a :class:`GANRegressor`.
+        """
+        restored = tf.keras.models.load_model(
+            str(path), custom_objects={cls.__name__: cls}, compile=False
+        )
+        if not isinstance(restored, cls):
+            raise TypeError(f"{str(path)!r} does not contain a {cls.__name__} archive")
+        restored._compile_models()
+        return restored

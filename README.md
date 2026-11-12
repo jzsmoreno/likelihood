@@ -62,6 +62,25 @@ The interface follows one design system inspired by the Databricks platform:
 The catalog is re-introspected when a model source changes (`LM_CATALOG_TTL`), so
 editing `likelihood/models` is reflected without restarting the server.
 
+### Saving and loading models
+
+Models that declare a `load`/`load_model` method are shown as *Cargables* in the
+UI: their page offers "Cargar un modelo guardado" and
+`POST /api/models/<id>/load` restores the instance from a path.
+
+| Model | Save with | Load with | Artifact |
+| --- | --- | --- | --- |
+| `HMM`, `Arima`, `FourierRegression` | `save_model()` | `load_model()` | pickle |
+| `AutoClassifier`, `EnsembleClassifier`, `SimulationEngine` | `save()` | `load()` | pickle |
+| `MultiBanditNet` | `save()` | `load()` | Torch checkpoint (config + `state_dict`) |
+| `GANRegressor` | `save_model()` | `load_model()` | Keras `.keras` archive |
+| `EarlyStopping` | `save()` | `load()` | pickle (early-stopping progress) |
+| `ActionSpace` | `save()` | `load()` | pickle |
+
+The remaining classes are not loadable by design: `Env`, `AutoQL` and
+`GetInsights` wrap live objects supplied by the caller, and `OptionCriticEnv` is
+a simulator derived from an episode dataset. Their docstrings state the reason.
+
 ### Docker
 
 The `Dockerfile` bundles the server, the scientific stack and the catalog

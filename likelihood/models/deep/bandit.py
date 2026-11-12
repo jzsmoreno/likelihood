@@ -1,5 +1,6 @@
 """Bandit model definitions."""
 
+from pathlib import Path
 from typing import List
 
 import torch
@@ -243,3 +244,66 @@ class MultiBanditNet(nn.Module):
         termination_prob = self.termination_network(state)
 
         return option_probs, action_probs, termination_prob, selected_options, selected_actions
+
+    def save(self, path: str | Path = "./multibanditnet.pt") -> None:
+        """Serialize the network configuration and weights to ``path``.
+
+        The checkpoint stores the constructor arguments (including the
+        activation module) next to the ``state_dict``, so :meth:`load` can
+        rebuild the very same architecture without guessing it.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default="./multibanditnet.pt"
+            Destination file. Any extension accepted by :func:`torch.save`
+            works; ``.pt`` and ``.pth`` are the usual choices.
+        """
+        checkpoint = {
+            "format": "likelihood.models.deep.bandit.MultiBanditNet",
+            "version": 1,
+            "config": {
+                "state_dim": self.state_dim,
+                "num_options": self.num_options,
+                "num_actions_per_option": self.num_actions_per_option,
+                "num_neurons": self.num_neurons,
+                "num_layers": self.num_layers,
+                "activation": self.activation,
+                "dropout_rate": self.dropout_rate,
+            },
+            "state_dict": self.state_dict(),
+        }
+        torch.save(checkpoint, str(path))
+
+    @classmethod
+    def load(cls, path: str | Path = "./multibanditnet.pt") -> "MultiBanditNet":
+        """Rebuild a network saved with :meth:`save`.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default="./multibanditnet.pt"
+            Checkpoint written by :meth:`save`.
+
+        Returns
+        -------
+        MultiBanditNet
+            Network with the stored weights, in evaluation mode.
+
+        Raises
+        ------
+        ValueError
+            If the file is not a checkpoint written by :meth:`save`.
+
+        Notes
+        -----
+        Checkpoints are pickles, so only load files you trust.
+        """
+        try:
+            checkpoint = torch.load(str(path), map_location="cpu", weights_only=False)
+        except TypeError:  # torch < 1.13 has no ``weights_only`` argument
+            checkpoint = torch.load(str(path), map_location="cpu")
+        if not isinstance(checkpoint, dict) or "config" not in checkpoint:
+            raise ValueError(f"{str(path)!r} is not a MultiBanditNet checkpoint written by save()")
+        network = cls(**checkpoint["config"])
+        network.load_state_dict(checkpoint["state_dict"])
+        network.eval()
+        return network

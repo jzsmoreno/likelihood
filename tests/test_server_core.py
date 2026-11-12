@@ -110,6 +110,31 @@ def test_auto_classifier_exposes_the_modern_loader():
     assert core.load_spec(model)["loadable"] is True
 
 
+def test_catalog_exposes_a_loader_for_every_persistable_model():
+    """Every model with a checkpoint API is advertised as loadable."""
+    loaders = {
+        model["id"]: [loader["name"] for loader in model["loaders"]] for model in core.CATALOG
+    }
+    assert loaders["HMM"] == ["load_model"]
+    assert loaders["Arima"] == ["load_model"]
+    assert loaders["FourierRegression"] == ["load_model"]
+    assert loaders["AutoClassifier"] == ["load"]
+    assert loaders["EnsembleClassifier"] == ["load"]
+    assert loaders["SimulationEngine"] == ["load"]
+    assert loaders["GANRegressor"] == ["load_model"]
+    assert loaders["MultiBanditNet"] == ["load"]
+    assert loaders["EarlyStopping"] == ["load"]
+    assert loaders["ActionSpace"] == ["load"]
+
+
+def test_models_without_a_checkpoint_are_not_advertised_as_loadable():
+    """Live objects and dataset-derived state stay documented limitations."""
+    models = {model["id"]: model for model in core.CATALOG}
+    for model_id in ("AutoQL", "Env", "GetInsights", "OptionCriticEnv"):
+        assert models[model_id]["loaders"] == [], model_id
+        assert core.load_spec(models[model_id])["loadable"] is False
+
+
 def test_dummy_json_value_shapes_payloads_from_the_constructor():
     matrix = core.dummy_json_value("X", "np.ndarray", {"window": 4, "n_features": 3})
     assert len(matrix) == 4

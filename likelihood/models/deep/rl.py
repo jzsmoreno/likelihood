@@ -43,6 +43,11 @@ class Env:
 
     The environment samples actions from the model's predicted probability distribution and records
     the resulting transitions for training.
+
+    Notes
+    -----
+    It keeps a live model and an in-memory transition buffer, so it cannot be
+    rebuilt from a checkpoint: create it again for each training run.
     """
 
     def __init__(self, model: Any, maxlen: int = 100, name: str = "likenasium") -> None:
@@ -131,6 +136,12 @@ class AutoQL:
     - Epsilon-greedy policy for exploration
     - Replay buffer for experience replay
     - Automatic model version handling for TensorFlow
+
+    Notes
+    -----
+    The agent holds the environment and the Q-network supplied by the caller, so
+    it cannot be reconstructed from a path. Persist the ``tf.keras.Model`` with
+    its own ``save``/``load_model`` helpers and create the agent again.
     """
 
     def __init__(
