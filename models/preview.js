@@ -657,6 +657,13 @@
     select: byId('load-loader'),
     path: byId('load-path'),
     browse: byId('load-browse'),
+    useSaved: byId('load-use-saved'),
+    savedRow: byId('load-saved-row'),
+    saved: byId('load-saved'),
+    reset: byId('load-reset'),
+    resetConfirm: byId('load-reset-confirm'),
+    resetYes: byId('load-reset-yes'),
+    resetCancel: byId('load-reset-cancel'),
     verify: byId('load-verify'),
     use: byId('load-session'),
     hint: byId('load-hint'),
@@ -745,8 +752,14 @@
           lines.push('atributos: ' + data.attributes.join(', '));
         }
         var elapsed = typeof data.elapsed === 'number' ? ' en ' + data.elapsed + ' s' : '';
-        setLoadStatus('Modelo verificado' + elapsed, 'is-ok');
+        setLoadStatus('Modelo verificado' + elapsed + ' · ejemplos sincronizados', 'is-ok');
         showLoadResult(lines.join('\n'), data.stderr || '', true);
+        rememberLoadedModel({
+          path: data.path || payload.path,
+          loader: data.loader || payload.loader,
+          parameters: payload.parameters
+        });
+        synchronizeWithParameters(payload.parameters, true);
       })
       .catch(function (error) {
         setLoadStatus('Error de red: ' + error.message, 'is-error');
@@ -792,6 +805,12 @@
         'Instancia cargada desde ' + (data.load ? data.load.path : payload.path),
         'is-ok'
       );
+      rememberLoadedModel({
+        path: invokeSession.path,
+        loader: invokeSession.loader,
+        parameters: payload.parameters
+      });
+      synchronizeWithParameters(payload.parameters, true);
       selectLabTab('invoke', true);
     }).catch(function (error) {
       setLoadStatus('Error: ' + error.message, 'is-error');
@@ -841,6 +860,18 @@
       }
     }
     if (loadDom.path) loadDom.path.addEventListener('change', rememberLoadPath);
+    if (loadDom.select) loadDom.select.addEventListener('change', rememberLoadPath);
+    if (loadDom.useSaved) {
+      loadDom.useSaved.addEventListener('change', function () {
+        context.usePath = Boolean(loadDom.useSaved.checked);
+        persistContext();
+        renderSavedState();
+        if (!context.usePath && invokeSession.loaded) closeSession(false);
+      });
+    }
+    if (loadDom.reset) loadDom.reset.addEventListener('click', openResetConfirm);
+    if (loadDom.resetYes) loadDom.resetYes.addEventListener('click', resetModelConfiguration);
+    if (loadDom.resetCancel) loadDom.resetCancel.addEventListener('click', cancelResetConfirm);
     if (loadDom.verify) loadDom.verify.addEventListener('click', verifyLoadedModel);
     if (loadDom.use) {
       var sessionsAvailable = !invokeData || invokeData.sessions_enabled !== false;
@@ -850,15 +881,264 @@
         : 'Las sesiones están deshabilitadas en este servidor';
       loadDom.use.addEventListener('click', loadAsSession);
     }
+    restoreSavedContext();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Saved model context (path, loader and constructor values)           */
+  /* ------------------------------------------------------------------ */
+
+  var CONTEXT_PREFIX = 'lm-model-context:';
+  var context = { path: '', loader: '', usePath: false, parameters: null };
+
+  function modelId() {
+    if (playgroundData && playgroundData.model_id) return playgroundData.model_id;
+    if (invokeData && invokeData.model_id) return invokeData.model_id;
+    return 'model';
+  }
+
+  function contextKey() {
+    return CONTEXT_PREFIX + modelId();
+  }
+
+  function normalizeContext(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    var path = String(raw.path || '').trim();
+    if (!path) return null;
+    return {
+      path: path,
+      loader: String(raw.loader || ''),
+      usePath: raw.usePath !== false,
+      parameters: raw.parameters && typeof raw.parameters === 'object' ? raw.parameters : null
+    };
+  }
+
+  function readStoredContext() {
+    try {
+      var raw = window.localStorage.getItem(contextKey());
+      if (raw) return normalizeContext(JSON.parse(raw));
+    } catch (error) {
+      /* storage or JSON unavailable: fall through to the legacy key */
+    }
+    try {
+      var legacy = window.sessionStorage.getItem('lm-load-path') || '';
+      if (legacy) return normalizeContext({ path: legacy, usePath: true });
+    } catch (error) {
+      /* storage is optional */
+    }
+    return null;
+  }
+
+  function persistContext() {
+    try {
+      if (!context.path) {
+        window.localStorage.removeItem(contextKey());
+        return;
+      }
+      window.localStorage.setItem(
+        contextKey(),
+        JSON.stringify({
+          path: context.path,
+          loader: context.loader || '',
+          usePath: Boolean(context.usePath),
+          parameters: context.parameters || null,
+          updatedAt: new Date().toISOString()
+        })
+      );
+    } catch (error) {
+      /* storage is optional */
+    }
+  }
+
+  function forgetContext() {
+    context = { path: '', loader: '', usePath: false, parameters: null };
+    try {
+      window.localStorage.removeItem(contextKey());
+      window.sessionStorage.removeItem('lm-load-path');
+    } catch (error) {
+      /* storage is optional */
+    }
+  }
+
+  function selectedLoaderName() {
+    return loadDom.select ? loadDom.select.value || '' : '';
+  }
+
+  /* Constructor values of the catalogue: what the model uses by default. */
+  function defaultParameters() {
+    var values = {};
+    ((playgroundData && playgroundData.fields) || []).forEach(function (field) {
+      var value = field.default;
+      if ((value === null || value === undefined) && field.required) value = field.sample;
+      if (value !== null && value !== undefined) values[field.name] = value;
+    });
+    return values;
+  }
+
+  /* The saved model is only used while the user keeps it enabled. */
+  function activeSource() {
+    if (!context.path || !context.usePath) return null;
+    return { path: context.path, loader: context.loader || selectedLoaderName() };
   }
 
   function rememberLoadPath() {
     if (!loadDom.path) return;
-    try {
-      window.sessionStorage.setItem('lm-load-path', loadDom.path.value);
-    } catch (error) {
-      /* the storage is optional */
+    var value = loadDom.path.value.trim();
+    context.path = value;
+    context.loader = selectedLoaderName() || context.loader;
+    context.usePath = Boolean(value);
+    if (!value) context.parameters = null;
+    /* Editing the path invalidates the live instance created from the old one. */
+    if (invokeSession.loaded && (invokeSession.path || '') !== value) closeSession(false);
+    persistContext();
+    renderSavedState();
+  }
+
+  function renderSavedState() {
+    var hasPath = Boolean(context.path);
+    if (loadDom.savedRow) loadDom.savedRow.hidden = !hasPath;
+    if (loadDom.useSaved) loadDom.useSaved.checked = hasPath && context.usePath;
+    if (loadDom.saved) {
+      loadDom.saved.hidden = !hasPath;
+      loadDom.saved.innerHTML = hasPath
+        ? '<b>Modelo guardado:</b> <code>' + esc(context.path) + '</code>' +
+          (context.usePath ? '' : ' — no se usará en las peticiones')
+        : '';
     }
+    if (loadDom.reset) loadDom.reset.disabled = false;
+  }
+
+  function restoreSavedContext() {
+    var stored = readStoredContext();
+    if (stored) context = stored;
+    if (context.path && loadDom.path) loadDom.path.value = context.path;
+    if (context.loader && loadDom.select && loadDom.select.options) {
+      var known = Array.prototype.some.call(loadDom.select.options, function (option) {
+        return option.value === context.loader;
+      });
+      if (known) loadDom.select.value = context.loader;
+    }
+    if (context.path && loadDom.panel) loadDom.panel.open = true;
+    renderSavedState();
+    if (context.path) {
+      setLoadStatus('Modelo guardado restaurado: ' + context.path, 'is-ok');
+    }
+  }
+
+  /* Persist the artifact that was just verified/loaded. */
+  function rememberLoadedModel(payload) {
+    var path = String(payload.path || (loadDom.path ? loadDom.path.value : '') || '').trim();
+    if (!path) return;
+    context.path = path;
+    context.loader = String(payload.loader || selectedLoaderName() || '');
+    context.usePath = true;
+    context.parameters =
+      payload.parameters && Object.keys(payload.parameters).length ? payload.parameters : null;
+    if (loadDom.path) loadDom.path.value = path;
+    if (loadDom.useSaved) loadDom.useSaved.checked = true;
+    persistContext();
+    renderSavedState();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Examples and playground stay in sync with the loaded model          */
+  /* ------------------------------------------------------------------ */
+
+  function restoreFieldValues(fields, prefix, values) {
+    (fields || []).forEach(function (field, index) {
+      if (!Object.prototype.hasOwnProperty.call(values || {}, field.name)) return;
+      var control = byId(prefix + '-' + index);
+      if (control) fillField(control, values[field.name]);
+    });
+  }
+
+  /* Rebuild both constructor forms with ``parameters`` (or their defaults). */
+  function applyParameters(parameters) {
+    var values = parameters || {};
+    renderPlayground();
+    restoreFieldValues((playgroundData && playgroundData.fields) || [], 'pg', values);
+    updateSnippet();
+    renderInvokeConstructor(true);
+    restoreFieldValues((playgroundData && playgroundData.fields) || [], 'ic', values);
+    updateInvokeSnippet();
+  }
+
+  function applySamples(method, samples) {
+    (method.fields || []).forEach(function (field, index) {
+      if (!Object.prototype.hasOwnProperty.call(samples, field.name)) return;
+      var control = byId('iv-' + index);
+      if (control) fillField(control, samples[field.name]);
+    });
+  }
+
+  /* Ask the server for dummy inputs shaped by ``parameters``. */
+  function requestSamples(parameters, done) {
+    var method = currentInvokeMethod();
+    if (!invokeData || !method) {
+      if (done) done(false);
+      return;
+    }
+    var endpoint = invokeData.sample_endpoint || '/api/models/' + invokeData.model_id + '/sample';
+    postJson(endpoint, { method: method.name, parameters: parameters || {} })
+      .then(function (response) {
+        if (!response.ok || response.data.success === false) {
+          if (done) done(false);
+          return;
+        }
+        applySamples(method, response.data.arguments || {});
+        updateInvokeSnippet();
+        if (done) done(true);
+      })
+      .catch(function () {
+        if (done) done(false);
+      });
+  }
+
+  /* Refresh the playground, the invoke form and the example inputs. */
+  function synchronizeWithParameters(parameters, silent) {
+    var values = parameters && Object.keys(parameters).length ? parameters : defaultParameters();
+    applyParameters(values);
+    if (!invokeData) return;
+    renderInvokeMethod();
+    requestSamples(values, function (ok) {
+      if (!ok || silent) return;
+      setInvokeStatus('Ejemplos sincronizados con el modelo cargado', 'is-ok');
+    });
+  }
+
+  function openResetConfirm() {
+    if (loadDom.resetConfirm) loadDom.resetConfirm.hidden = false;
+  }
+
+  function cancelResetConfirm() {
+    if (loadDom.resetConfirm) loadDom.resetConfirm.hidden = true;
+  }
+
+  /* Forget the saved model and put every control back to its catalogue default. */
+  function resetModelConfiguration() {
+    forgetContext();
+    if (loadDom.path) loadDom.path.value = '';
+    if (loadDom.select && loadData) {
+      var fallback =
+        loadData.default_loader ||
+        (loadData.loaders && loadData.loaders.length ? loadData.loaders[0].name : '');
+      if (fallback) loadDom.select.value = fallback;
+    }
+    if (invokeSession.id) closeSession(false);
+    applyParameters(defaultParameters());
+    if (invokeData) {
+      renderInvokeMethod();
+      requestSamples(defaultParameters(), null);
+    }
+    if (playgroundDom.result) playgroundDom.result.hidden = true;
+    if (invokeDom.result) invokeDom.result.hidden = true;
+    if (loadDom.result) loadDom.result.hidden = true;
+    renderSavedState();
+    cancelResetConfirm();
+    setLoadStatus('Modelo guardado restablecido', 'is-ok');
+    setStatus(playgroundDom.status, '', '');
+    setInvokeStatus('Valores por defecto restablecidos', 'is-ok');
+    toast('Configuración restablecida');
   }
 
   /* ------------------------------------------------------------------ */
@@ -1253,7 +1533,7 @@
       setInvokeStatus('Sin métodos invocables', '');
       return;
     }
-    if (invokeData.buildable === false && !invokeSession.loaded) {
+    if (invokeData.buildable === false && !invokeSession.loaded && !activeSource()) {
       if (invokeDom.fields) {
         invokeDom.fields.innerHTML =
           '<p class="empty">No se puede construir desde el catálogo: ' +
@@ -1281,6 +1561,26 @@
       invokeSession.loaded = false;
       invokeSession.loader = null;
       invokeSession.path = null;
+      renderSessionInfo();
+      renderInvokeConstructor();
+      return invokeSession.id;
+    });
+  }
+
+  /* Open a session from a saved artifact (the persisted model path). */
+  function openSessionFromPath(source, parameters) {
+    var payload = { loader: source.loader || '', path: source.path };
+    if (parameters && Object.keys(parameters).length) payload.parameters = parameters;
+    return postJson(invokeData.sessions_url, payload).then(function (response) {
+      if (!response.ok || response.data.success === false) {
+        throw new Error(describeInvokeError(response.data));
+      }
+      invokeSession.id = response.data.session_id;
+      invokeSession.calls = 0;
+      invokeSession.signature = null;
+      invokeSession.loaded = true;
+      invokeSession.loader = payload.loader;
+      invokeSession.path = response.data.load ? response.data.load.path : payload.path;
       renderSessionInfo();
       renderInvokeConstructor();
       return invokeSession.id;
@@ -1342,16 +1642,23 @@
   function fillSampleArguments() {
     var method = currentInvokeMethod();
     var loaded = invokeSession.id && invokeSession.loaded;
-    if (!invokeData || (invokeData.buildable === false && !loaded) || !method) {
-      if (invokeData && invokeData.buildable === false && !loaded) {
+    if (!invokeData || (invokeData.buildable === false && !loaded && !activeSource()) || !method) {
+      if (invokeData && invokeData.buildable === false && !loaded && !activeSource()) {
         setInvokeStatus('Requiere objetos Python', 'is-error');
       } else {
         setInvokeStatus('No hay ningún método que invocar', 'is-error');
       }
       return;
     }
-    var parameters = loaded ? {} : validatedConstructor();
-    if (!parameters) return;
+    var source = activeSource();
+    var loader = currentLoader();
+    var parameters;
+    if (loaded || (source && loader && !loader.requires_instance)) {
+      parameters = {};
+    } else {
+      parameters = validatedConstructor();
+      if (!parameters) return;
+    }
     var endpoint = invokeData.sample_endpoint || '/api/models/' + invokeData.model_id + '/sample';
     if (invokeDom.sample) invokeDom.sample.disabled = true;
     setInvokeStatus('Generando datos de ejemplo…', 'is-busy');
@@ -1363,11 +1670,7 @@
           return;
         }
         var samples = data.arguments || {};
-        (method.fields || []).forEach(function (field, index) {
-          if (!Object.prototype.hasOwnProperty.call(samples, field.name)) return;
-          var control = byId('iv-' + index);
-          if (control) fillField(control, samples[field.name]);
-        });
+        applySamples(method, samples);
         updateInvokeSnippet();
         setInvokeStatus('Datos de ejemplo generados', 'is-ok');
       })
@@ -1382,7 +1685,8 @@
   function runInvoke() {
     if (!invokeData) return;
     var loaded = invokeSession.id && invokeSession.loaded;
-    if (invokeData.buildable === false && !loaded) return;
+    var source = activeSource();
+    if (invokeData.buildable === false && !loaded && !source) return;
     var method = currentInvokeMethod();
     if (!method) {
       setInvokeStatus('No hay ningún método que invocar', 'is-error');
@@ -1397,8 +1701,13 @@
       setInvokeStatus('Faltan argumentos: ' + argumentsValues.missing.join(', '), 'is-error');
       return;
     }
+    /* A saved model loaded from disk does not need the constructor form unless
+       its loader rebuilds the instance from the recorded values. */
+    var useSession = invokeDom.useSession && invokeDom.useSession.checked;
+    var loader = currentLoader();
+    var needsConstructor = !source || !loader || loader.requires_instance;
     var constructorValues = { values: {} };
-    if (!loaded) {
+    if (needsConstructor && (!loaded || !useSession)) {
       constructorValues = collectFields(playgroundData, 'ic');
       if (constructorValues.invalid.length) {
         setInvokeStatus('Revisa el constructor: ' + constructorValues.invalid.join('; '), 'is-error');
@@ -1412,18 +1721,19 @@
         return;
       }
     }
-    var useSession = invokeDom.useSession && invokeDom.useSession.checked;
     var signature = constructorSignature(constructorValues.values);
     if (invokeDom.run) invokeDom.run.disabled = true;
     setInvokeStatus('Invocando…', 'is-busy');
     var request;
     if (useSession) {
       var reuse = invokeSession.id &&
-        (invokeSession.loaded || invokeSession.signature === signature);
+        (source ? invokeSession.loaded : !invokeSession.loaded && invokeSession.signature === signature);
       var sessionPromise = reuse
         ? Promise.resolve(invokeSession.id)
         : closeSession(false).then(function () {
-          return openSession(constructorValues.values);
+          return source
+            ? openSessionFromPath(source, constructorValues.values)
+            : openSession(constructorValues.values);
         });
       request = sessionPromise.then(function (sessionId) {
         var template = invokeData.session_invoke_url_template ||
@@ -1433,15 +1743,13 @@
         return postJson(template.replace('{session_id}', sessionId), payload);
       });
     } else {
-      var directPayload = {
-        method: method.name,
-        arguments: argumentsValues.values,
-        parameters: constructorValues.values
-      };
-      if (invokeSession.loaded) {
-        directPayload.parameters = {};
-        directPayload.path = invokeSession.path;
-        directPayload.loader = invokeSession.loader;
+      var directPayload = { method: method.name, arguments: argumentsValues.values };
+      if (source) {
+        directPayload.parameters = needsConstructor ? constructorValues.values : {};
+        directPayload.path = source.path;
+        directPayload.loader = source.loader;
+      } else {
+        directPayload.parameters = constructorValues.values;
       }
       request = postJson(invokeData.endpoint, directPayload);
     }
@@ -1530,6 +1838,10 @@
     bindFileDialog();
     renderLoad();
     bindInvoke();
+    /* A restored saved model defines the defaults shown for this page. */
+    if (context.path) {
+      synchronizeWithParameters(context.parameters || defaultParameters(), true);
+    }
   }
 
   if (document.readyState === 'loading') {

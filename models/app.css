@@ -2194,6 +2194,64 @@ button.tag.is-active {
   background: var(--db-line-soft);
 }
 
+/* Saved model state inside the load panel */
+.load-saved-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--db-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.load-saved-row input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--db-lava);
+}
+
+.load-saved {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(34, 114, 180, .22);
+  border-left: 3px solid var(--db-blue);
+  border-radius: var(--db-r-sm);
+  background: var(--db-blue-soft);
+  color: var(--db-text);
+  font-size: 11.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.load-saved code {
+  font-family: var(--db-mono);
+  font-size: 10.5px;
+}
+
+.load-reset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.load-reset-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(217, 42, 23, .3);
+  border-left: 3px solid var(--db-lava);
+  border-radius: var(--db-r-sm);
+  background: var(--db-lava-soft);
+  color: var(--db-ink);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
 /* --------------------------------------------------------------------------
    17. Code, prose and metadata
    -------------------------------------------------------------------------- */

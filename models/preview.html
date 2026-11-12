@@ -227,8 +227,21 @@
                 <button class="btn btn-secondary btn-sm" type="button" id="load-verify">Verificar</button>
                 <button class="btn btn-primary btn-sm" type="button" id="load-session">Cargar y usar</button>
               </div>
+              <label class="load-saved-row" id="load-saved-row" hidden>
+                <input type="checkbox" id="load-use-saved">
+                <span>Usar el modelo guardado en las peticiones</span>
+              </label>
+              <p class="load-saved" id="load-saved" hidden></p>
               <p class="load-hint" id="load-hint"></p>
               <p class="status-note" id="load-status" role="status" aria-live="polite"></p>
+              <div class="load-reset">
+                <button class="btn btn-ghost btn-sm" type="button" id="load-reset">Restablecer modelo</button>
+                <span class="load-reset-confirm" id="load-reset-confirm" hidden>
+                  <span>¿Restablecer el modelo guardado y los valores por defecto?</span>
+                  <button class="btn btn-primary btn-sm" type="button" id="load-reset-yes">Sí, restablecer</button>
+                  <button class="btn btn-ghost btn-sm" type="button" id="load-reset-cancel">Cancelar</button>
+                </span>
+              </div>
               <div id="load-result" hidden>
                 <div class="code-head">
                   <span class="code-label" id="load-result-title">Modelo cargado</span>

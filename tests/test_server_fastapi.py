@@ -877,6 +877,16 @@ def test_sample_endpoint(client, calculator):
     assert "amount" in data["arguments"]
 
 
+def test_sample_endpoint_uses_catalog_defaults(client, calculator):
+    """The defaults come from the catalogue, not from zeroed values."""
+
+    response = client.post("/api/models/Calculator/sample", json={"method": "add"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["parameters"] == {"value": 0}
+    assert data["arguments"] == {"amount": 1}
+
+
 def test_load_spec_and_saved_model(client, calculator, tmp_path):
     spec = client.get("/api/models/Calculator/load")
     assert spec.status_code == 200

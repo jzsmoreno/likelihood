@@ -88,6 +88,28 @@ default), never navigates above it, and fills the path with the selected file or
 folder, so SavedModel/Keras directories can be picked without typing. Set
 `LM_FILE_BROWSER=0` to remove it.
 
+#### The saved model is remembered per page
+
+The model page keeps the artifact you selected (path, loader and the constructor
+values used to verify it) in `localStorage` under `lm-model-context:<model_id>`.
+On the next visit it restores the field, opens the panel, ticks **Usar el modelo
+guardado en las peticiones** and rebuilds the playground, the constructor form
+and the example arguments from those values, so the third tab is immediately
+usable.
+
+While that checkbox stays ticked, every invocation reuses the artifact: the
+session is opened with `{"loader": ..., "path": ...}` instead of constructor
+arguments (`POST /api/models/<id>/sessions`), and direct invocations send
+`path`/`loader` alongside the method (`POST /api/models/<id>/invoke`). Loaders
+that do not need a live instance (`requires_instance` is false) skip the
+constructor form; the rest keep sending its values.
+
+**Restablecer modelo** asks for confirmation and then forgets the stored
+artifact, closes the open session, clears the results and reloads the catalogue
+defaults in the playground and in the two forms. Unticking the checkbox, or
+editing the path, keeps the request in constructor mode (and closes the instance
+that was built from the old artifact).
+
 `EarlyStopping` is a training callback without a checkpoint of its own, and the
 remaining classes are not loadable by design: `Env`, `AutoQL` and `GetInsights`
 wrap live objects supplied by the caller, and `OptionCriticEnv` is a simulator
