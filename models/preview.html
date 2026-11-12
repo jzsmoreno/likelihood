@@ -223,6 +223,7 @@
                        autocomplete="off" spellcheck="false">
               </div>
               <div class="load-actions">
+                <button class="btn btn-secondary btn-sm" type="button" id="load-browse" hidden>Examinar…</button>
                 <button class="btn btn-secondary btn-sm" type="button" id="load-verify">Verificar</button>
                 <button class="btn btn-primary btn-sm" type="button" id="load-session">Cargar y usar</button>
               </div>
@@ -397,6 +398,37 @@
 </div>
 
 <button class="back-top" type="button" id="back-top" aria-label="Volver arriba" hidden>↑</button>
+
+<div class="file-dialog-backdrop" id="file-dialog" hidden>
+  <section class="file-dialog" role="dialog" aria-modal="true"
+           aria-labelledby="file-dialog-title" aria-describedby="file-dialog-path">
+    <header class="file-dialog-header">
+      <div class="file-dialog-heading">
+        <h2 id="file-dialog-title">Seleccionar un modelo guardado</h2>
+        <p class="mono" id="file-dialog-path"></p>
+      </div>
+      <button class="icon-btn" type="button" id="file-dialog-close" aria-label="Cerrar el explorador">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </header>
+    <div class="file-dialog-toolbar">
+      <button class="btn btn-secondary btn-sm" type="button" id="file-dialog-up">↑ Subir</button>
+      <button class="btn btn-ghost btn-sm" type="button" id="file-dialog-root">Inicio</button>
+      <label class="file-dialog-toggle">
+        <input type="checkbox" id="file-dialog-hidden"> Mostrar ocultos
+      </label>
+    </div>
+    <div class="file-dialog-list" id="file-dialog-list" tabindex="-1" aria-label="Carpetas y modelos"></div>
+    <p class="status-note" id="file-dialog-status" role="status" aria-live="polite"></p>
+    <footer class="file-dialog-footer">
+      <button class="btn btn-secondary btn-sm" type="button" id="file-dialog-select-dir">Usar esta carpeta</button>
+      <button class="btn btn-ghost btn-sm" type="button" id="file-dialog-cancel">Cancelar</button>
+    </footer>
+  </section>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="/preview.js" defer></script>

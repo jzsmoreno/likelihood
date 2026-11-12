@@ -178,6 +178,27 @@ LOAD_ROOT = Path(os.environ.get("LM_LOAD_ROOT") or REPO_ROOT).expanduser().resol
 #: Reject paths outside :data:`LOAD_ROOT` (``LM_LOAD_RESTRICT``; enabled by default
 #: when ``LM_LOAD_ROOT`` is explicitly configured).
 LOAD_RESTRICT = _env_flag("LM_LOAD_RESTRICT", "LM_LOAD_ROOT" in os.environ)
+#: Serve the saved-model browser (``GET /api/files``) that backs the "Examinar…"
+#: dialog (``LM_FILE_BROWSER``).  It never leaves :data:`LOAD_ROOT`.
+FILE_BROWSER_ENABLED = _env_flag("LM_FILE_BROWSER", True)
+#: Maximum number of entries returned by a single directory listing.
+FILE_BROWSER_LIMIT = max(1, int(os.environ.get("LM_FILE_BROWSER_LIMIT") or 1000))
+#: Suffixes highlighted by the browser as saved model artifacts.
+MODEL_ARTIFACT_SUFFIXES = (
+    ".bin",
+    ".ckpt",
+    ".h5",
+    ".hdf5",
+    ".joblib",
+    ".keras",
+    ".model",
+    ".pkl",
+    ".pickle",
+    ".pt",
+    ".pth",
+    ".sav",
+    ".zip",
+)
 #: Marker used to separate the playground result from anything the model prints.
 _PLAYGROUND_MARKER = "__LIKELIHOOD_PLAYGROUND__"
 
@@ -942,6 +963,12 @@ def load_spec(model: Dict[str, Any]) -> Dict[str, Any]:
         "default_loader": default,
         "root": str(LOAD_ROOT),
         "restrict_to_root": bool(LOAD_RESTRICT),
+        "browser": {
+            "enabled": bool(FILE_BROWSER_ENABLED),
+            "endpoint": "/api/files",
+            "root": str(LOAD_ROOT),
+            "entry_limit": FILE_BROWSER_LIMIT,
+        },
         "load_error": "" if loaders else "Este modelo no declara un método load()",
     }
 
@@ -1007,6 +1034,95 @@ def normalize_load_path(value: Any) -> str:
             path=text,
         )
     return str(resolved)
+
+
+def browse_root() -> Path:
+    """Directory the saved-model browser may explore (``LM_LOAD_ROOT``)."""
+    return LOAD_ROOT
+
+
+def _iso_timestamp(timestamp: float) -> str:
+    """Local ISO-like timestamp for the file listing (no timezone noise)."""
+    return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(timestamp))
+
+
+def _browser_entry(path: Path, stat: os.stat_result) -> Dict[str, Any]:
+    """Describe one file or directory of the browser listing."""
+    is_dir = path.is_dir()
+    suffix = "" if is_dir else path.suffix.lower()
+    return {
+        "name": path.name,
+        "path": str(path),
+        "kind": "dir" if is_dir else "file",
+        "size": None if is_dir else stat.st_size,
+        "modified": _iso_timestamp(stat.st_mtime),
+        "suffix": suffix,
+        "artifact": bool(suffix) and suffix in MODEL_ARTIFACT_SUFFIXES,
+    }
+
+
+def list_directory(
+    path: str = "",
+    show_hidden: bool = False,
+    limit: int = FILE_BROWSER_LIMIT,
+) -> Dict[str, Any]:
+    """List one directory for the saved-model browser (``GET /api/files``).
+
+    The listing never escapes :func:`browse_root` (``LM_LOAD_ROOT``): a path
+    outside it, a directory that does not exist or a symlink that resolves
+    outside is rejected (or skipped) instead of being served.  ``path`` may also
+    point to a file, in which case its directory is listed and the file name is
+    returned in ``selected`` so the UI can highlight it.
+    """
+    if not FILE_BROWSER_ENABLED:
+        raise APIError("El explorador de archivos está deshabilitado en este servidor", status=403)
+    root = browse_root().resolve()
+    raw = str(path or "").strip()
+    candidate = Path(raw).expanduser() if raw else root
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    try:
+        resolved = candidate.resolve()
+    except (OSError, ValueError) as exc:
+        raise ValidationError(f"Ruta de explorador inválida: {raw}") from exc
+    if resolved != root and not resolved.is_relative_to(root):
+        raise ValidationError(f'La ruta "{raw}" queda fuera de {root}', path=raw, root=str(root))
+    selected: Optional[str] = None
+    if resolved.is_file():
+        selected = resolved.name
+        resolved = resolved.parent
+    if not resolved.is_dir():
+        raise ModelNotFound(f'No existe el directorio "{raw or resolved}"')
+
+    entries: List[Dict[str, Any]] = []
+    truncated = False
+    try:
+        children = sorted(resolved.iterdir(), key=lambda item: (item.is_file(), item.name.lower()))
+    except OSError as exc:
+        raise APIError(f'No se pudo leer "{resolved}": {exc}', status=500) from exc
+    for child in children:
+        if not show_hidden and child.name.startswith("."):
+            continue
+        try:
+            if child.is_symlink() and not child.resolve().is_relative_to(root):
+                continue  # a link that leaves the browsing root is never exposed
+            entries.append(_browser_entry(child, child.stat()))
+        except OSError:  # pragma: no cover - the entry vanished mid-scan
+            continue
+        if len(entries) >= limit:
+            truncated = True
+            break
+    return {
+        "enabled": True,
+        "root": str(root),
+        "path": str(resolved),
+        "relative": "" if resolved == root else str(resolved.relative_to(root)),
+        "parent": None if resolved == root else str(resolved.parent),
+        "selected": selected,
+        "entries": entries,
+        "truncated": truncated,
+        "limit": limit,
+    }
 
 
 def prepare_load(

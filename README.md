@@ -82,6 +82,12 @@ The Keras artifacts follow the installed TensorFlow: TF > 2.15 writes a single
 directory. `AutoClassifier`, `EnsembleClassifier` and `GANRegressor` switch
 automatically and their loaders accept either format.
 
+The path field also has an **Examinar…** button that opens an in-app file
+browser (`GET /api/files`). It starts at `LM_LOAD_ROOT` (the repository by
+default), never navigates above it, and fills the path with the selected file or
+folder, so SavedModel/Keras directories can be picked without typing. Set
+`LM_FILE_BROWSER=0` to remove it.
+
 `EarlyStopping` is a training callback without a checkpoint of its own, and the
 remaining classes are not loadable by design: `Env`, `AutoQL` and `GetInsights`
 wrap live objects supplied by the caller, and `OptionCriticEnv` is a simulator
@@ -136,6 +142,10 @@ the equivalent `--` CLI flag). They let you secure the API or tune its behaviour
 | `LM_SESSIONS` | Enable long-lived model sessions. | true |
 | `LM_JOBS_WORKERS` | Number of workers for asynchronous playground jobs. | 2 |
 | `LM_CATALOG_TTL` | Cache time to live, in seconds, before the catalog is re-introspected. | 2 |
+| `LM_LOAD_ROOT` | Directory the "Examinar…" browser starts at and can never leave. | repository root |
+| `LM_LOAD_RESTRICT` | Reject `POST /load` paths outside `LM_LOAD_ROOT`. | on when `LM_LOAD_ROOT` is set |
+| `LM_FILE_BROWSER` | Serve the `GET /api/files` browser used by the "Examinar…" dialog. | true |
+| `LM_FILE_BROWSER_LIMIT` | Maximum number of entries returned by one directory listing. | 1000 |
 | `LM_GZIP_MIN_BYTES` | Minimum response size (bytes) before gzip compression. | 1024 |
 | `LM_HOST` / `LM_PORT` | Bind address and port (equivalently `SERVER_HOST` / `SERVER_PORT`). | `127.0.0.1` / `8000` |
 

@@ -27,6 +27,7 @@ The routes are the same as the previous standard-library implementation::
     GET    /api/models/<id>/versions  git commits that touched the source of a model
     GET    /api/search                ``?q=`` search with facets (autocomplete friendly)
     GET    /api/playground/<model_id> playground specification of one model
+    GET    /api/files                 browse directories under ``LM_LOAD_ROOT``
     GET    /api/models/<id>/load       saved-model loaders and path policy
     GET    /api/playground/jobs       recent asynchronous playground jobs
     GET    /api/playground/jobs/<id>  state and results of one job
@@ -1064,6 +1065,26 @@ def build_router() -> APIRouter:
         spec = core.load_spec(model)
         spec["enabled"] = bool(settings.invoke_enabled)
         return json_response(200, {"success": True, **spec})
+
+    @router.get("/api/files", tags=["load"])
+    def browse_files(request: Request) -> Response:
+        """List one directory of the saved-model browser.
+
+        The browser is confined to ``LM_LOAD_ROOT`` (the repository by default):
+        a path outside it is rejected and symlinks leaving it are skipped.  The
+        listing backs the "Examinar…" dialog of the model page, which fills the
+        ``path`` field of ``POST /api/models/<id>/load`` without typing it.
+        """
+        query = query_dict(request)
+        path = (query.get("path") or [""])[0]
+        hidden = (query.get("hidden") or [""])[0].strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        payload = core.list_directory(path, show_hidden=hidden)
+        return json_response(200, {"success": True, **payload}, {"Cache-Control": "no-store"})
 
     @router.post("/api/models/{model_id}/load", tags=["load"])
     def load_saved_model(

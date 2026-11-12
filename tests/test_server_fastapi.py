@@ -915,6 +915,78 @@ def test_load_spec_and_saved_model(client, calculator, tmp_path):
     assert invoked.json()["source"] == "path"
 
 
+def test_load_spec_advertises_the_file_browser(client, calculator):
+    """The load panel knows where the "Examinar…" dialog lives and its root."""
+    spec = client.get("/api/models/Calculator/load").json()
+    browser = spec["browser"]
+    assert browser["endpoint"] == "/api/files"
+    assert browser["root"] == str(server.LOAD_ROOT)
+    assert browser["enabled"] is bool(server.FILE_BROWSER_ENABLED)
+    assert browser["entry_limit"] >= 1
+
+
+def test_file_browser_lists_the_load_root(client, monkeypatch, tmp_path):
+    root = tmp_path / "saved-models"
+    (root / "nested").mkdir(parents=True)
+    (root / "nested" / "model.pkl").write_bytes(b"payload")
+    (root / "model.keras").write_bytes(b"archive")
+    (root / ".hidden.pkl").write_bytes(b"secret")
+    monkeypatch.setattr(server, "LOAD_ROOT", root)
+
+    listing = client.get("/api/files")
+    assert listing.status_code == 200
+    body = listing.json()
+    assert Path(body["root"]) == root.resolve()
+    assert Path(body["path"]) == root.resolve()
+    assert body["relative"] == ""
+    assert body["parent"] is None
+    # Directories first, hidden entries filtered out.
+    assert [entry["name"] for entry in body["entries"]] == ["nested", "model.keras"]
+    file_entry = body["entries"][1]
+    assert file_entry["kind"] == "file"
+    assert file_entry["artifact"] is True
+    assert file_entry["size"] == len(b"archive")
+
+    hidden = client.get("/api/files", params={"hidden": "1"}).json()
+    assert ".hidden.pkl" in [entry["name"] for entry in hidden["entries"]]
+
+    nested = client.get("/api/files", params={"path": "nested"}).json()
+    assert nested["relative"] == "nested"
+    assert Path(nested["parent"]) == root.resolve()
+
+    # Pointing at a file lists its directory and marks the file as selected.
+    selected = client.get("/api/files", params={"path": "nested/model.pkl"}).json()
+    assert selected["selected"] == "model.pkl"
+    assert Path(selected["path"]) == (root / "nested").resolve()
+
+    assert client.get("/api/files", params={"path": ".."}).status_code == 400
+    assert client.get("/api/files", params={"path": "missing"}).status_code == 404
+
+
+def test_file_browser_skips_symlinks_outside_the_root(client, monkeypatch, tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "model.pkl").write_bytes(b"x")
+    try:
+        (root / "escape").symlink_to(outside, target_is_directory=True)
+    except OSError:  # pragma: no cover - platform without symlink support
+        pytest.skip("symlinks are not available")
+    monkeypatch.setattr(server, "LOAD_ROOT", root)
+
+    listing = client.get("/api/files").json()
+    assert "escape" not in [entry["name"] for entry in listing["entries"]]
+    assert client.get("/api/files", params={"path": "escape"}).status_code == 400
+
+
+def test_file_browser_can_be_disabled(client, monkeypatch):
+    monkeypatch.setattr(server, "FILE_BROWSER_ENABLED", False)
+    assert client.get("/api/files").status_code == 403
+    spec = client.get(f"/api/models/{first_model_id()}/load").json()
+    assert spec["browser"]["enabled"] is False
+
+
 def test_load_session_keeps_the_saved_instance(client, calculator, tmp_path, session_store):
     sys.path.insert(0, str(tmp_path))
     try:

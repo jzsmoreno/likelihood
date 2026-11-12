@@ -656,6 +656,7 @@
     panel: byId('load-panel'),
     select: byId('load-loader'),
     path: byId('load-path'),
+    browse: byId('load-browse'),
     verify: byId('load-verify'),
     use: byId('load-session'),
     hint: byId('load-hint'),
@@ -815,13 +816,22 @@
           esc(loader.name + '()' + suffix) + '</option>';
       }).join('');
     }
+    var browser = loadData.browser || {};
     if (loadDom.hint) {
       var policy = loadData.restrict_to_root
         ? 'Solo se permiten rutas dentro de ' + loadData.root + '.'
         : 'Rutas relativas a ' + loadData.root + '.';
-      loadDom.hint.innerHTML = esc(policy) +
+      var browseHint = browser.enabled
+        ? ' Usa <b>Examinar…</b> para elegirla con el navegador de archivos' +
+          ' (limitado a <code>' + esc(browser.root || loadData.root) + '</code>).'
+        : '';
+      loadDom.hint.innerHTML = esc(policy) + browseHint +
         ' Se aceptan archivos <code>.pkl</code> y directorios de checkpoints.' +
         ' Carga únicamente archivos de confianza.';
+    }
+    if (loadDom.browse) {
+      loadDom.browse.hidden = !browser.enabled;
+      loadDom.browse.addEventListener('click', openFileDialog);
     }
     if (loadDom.path && !loadDom.path.value) {
       try {
@@ -830,15 +840,7 @@
         loadDom.path.value = '';
       }
     }
-    if (loadDom.path) {
-      loadDom.path.addEventListener('change', function () {
-        try {
-          window.sessionStorage.setItem('lm-load-path', loadDom.path.value);
-        } catch (error) {
-          /* the storage is optional */
-        }
-      });
-    }
+    if (loadDom.path) loadDom.path.addEventListener('change', rememberLoadPath);
     if (loadDom.verify) loadDom.verify.addEventListener('click', verifyLoadedModel);
     if (loadDom.use) {
       var sessionsAvailable = !invokeData || invokeData.sessions_enabled !== false;
@@ -848,6 +850,212 @@
         : 'Las sesiones están deshabilitadas en este servidor';
       loadDom.use.addEventListener('click', loadAsSession);
     }
+  }
+
+  function rememberLoadPath() {
+    if (!loadDom.path) return;
+    try {
+      window.sessionStorage.setItem('lm-load-path', loadDom.path.value);
+    } catch (error) {
+      /* the storage is optional */
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Saved-model file browser                                            */
+  /* ------------------------------------------------------------------ */
+
+  var fileDom = {
+    backdrop: byId('file-dialog'),
+    list: byId('file-dialog-list'),
+    path: byId('file-dialog-path'),
+    status: byId('file-dialog-status'),
+    close: byId('file-dialog-close'),
+    cancel: byId('file-dialog-cancel'),
+    up: byId('file-dialog-up'),
+    root: byId('file-dialog-root'),
+    hidden: byId('file-dialog-hidden'),
+    selectDir: byId('file-dialog-select-dir')
+  };
+
+  var fileState = { current: null, trigger: null, busy: false };
+
+  function fileEndpoint() {
+    var browser = (loadData && loadData.browser) || {};
+    return browser.endpoint || '/api/files';
+  }
+
+  function formatBytes(value) {
+    if (typeof value !== 'number') return '';
+    if (value < 1024) return value + ' B';
+    var units = ['KB', 'MB', 'GB', 'TB'];
+    var size = value / 1024;
+    var index = 0;
+    while (size >= 1024 && index < units.length - 1) {
+      size /= 1024;
+      index += 1;
+    }
+    return size.toFixed(size >= 10 ? 0 : 1) + ' ' + units[index];
+  }
+
+  function formatDate(value) {
+    return value ? String(value).replace('T', ' ').slice(0, 16) : '';
+  }
+
+  function fileRow(entry, selected) {
+    var icon = entry.kind === 'dir' ? '📁' : '📄';
+    var meta = entry.kind === 'dir' ? 'carpeta' : formatBytes(entry.size);
+    var badge = entry.artifact ? '<span class="badge badge-green">modelo</span>' : '';
+    return '<button class="file-row" type="button" role="option"' +
+      ' data-file-path="' + esc(entry.path) + '" data-file-kind="' + esc(entry.kind) + '"' +
+      ' aria-selected="' + (selected ? 'true' : 'false') + '" title="' + esc(entry.path) + '">' +
+      '<span class="file-row-icon" aria-hidden="true">' + icon + '</span>' +
+      '<span class="file-row-name">' + esc(entry.name) + '</span>' +
+      '<span class="file-row-meta">' + esc(meta + ' ' + formatDate(entry.modified)) + '</span>' +
+      badge + '</button>';
+  }
+
+  function renderListing(payload) {
+    fileState.current = payload;
+    if (fileDom.path) {
+      fileDom.path.textContent = payload.path;
+      fileDom.path.title = payload.path;
+    }
+    if (fileDom.up) fileDom.up.disabled = !payload.parent;
+    if (fileDom.selectDir) fileDom.selectDir.disabled = !payload.path;
+    var rows = (payload.entries || []).map(function (entry) {
+      return fileRow(entry, entry.name === payload.selected);
+    }).join('');
+    if (!rows) {
+      rows = '<div class="empty-state"><span class="empty-icon" aria-hidden="true">⌕</span>' +
+        '<h3>Sin archivos</h3><p>Esta carpeta está vacía o solo contiene archivos ocultos.</p></div>';
+    }
+    if (payload.truncated) {
+      rows += '<p class="status-note">Se muestran los primeros ' + esc(payload.limit) +
+        ' elementos de la carpeta.</p>';
+    }
+    fileDom.list.innerHTML = rows;
+    setStatus(fileDom.status, '', '');
+  }
+
+  function loadListing(path) {
+    if (fileState.busy) return;
+    fileState.busy = true;
+    setStatus(fileDom.status, 'Cargando…', 'is-busy');
+    var params = [];
+    if (path) params.push('path=' + encodeURIComponent(path));
+    if (fileDom.hidden && fileDom.hidden.checked) params.push('hidden=1');
+    window.fetch(fileEndpoint() + (params.length ? '?' + params.join('&') : ''))
+      .then(function (response) {
+        return response.json().catch(function () { return null; }).then(function (data) {
+          return { ok: response.ok, data: data || {} };
+        });
+      })
+      .then(function (response) {
+        if (!response.ok || response.data.success === false) {
+          fileDom.list.innerHTML = '';
+          setStatus(fileDom.status, 'Error: ' + describeInvokeError(response.data), 'is-error');
+          return;
+        }
+        renderListing(response.data);
+      })
+      .catch(function (error) {
+        setStatus(fileDom.status, 'Error de red: ' + error.message, 'is-error');
+      })
+      .then(function () {
+        fileState.busy = false;
+      });
+  }
+
+  function openFileDialog() {
+    if (!fileDom.backdrop || !loadData) return;
+    fileState.trigger = loadDom.browse || null;
+    fileDom.backdrop.hidden = false;
+    document.body.classList.add('db-body-locked');
+    loadListing(loadDom.path ? loadDom.path.value.trim() : '');
+    fileDom.list.focus();
+  }
+
+  function closeFileDialog() {
+    if (!fileDom.backdrop || fileDom.backdrop.hidden) return;
+    fileDom.backdrop.hidden = true;
+    document.body.classList.remove('db-body-locked');
+    if (fileState.trigger && document.contains(fileState.trigger)) fileState.trigger.focus();
+    fileState.trigger = null;
+  }
+
+  function choosePath(path) {
+    if (!path || !loadDom.path) return;
+    loadDom.path.value = path;
+    rememberLoadPath();
+    closeFileDialog();
+    setLoadStatus('Ruta seleccionada: ' + path, 'is-ok');
+    toast('Ruta seleccionada');
+  }
+
+  function onFileRowClick(event) {
+    var row = closest(event.target, '[data-file-path]');
+    if (!row) return;
+    var path = row.getAttribute('data-file-path');
+    if (row.getAttribute('data-file-kind') === 'dir') {
+      loadListing(path);
+      return;
+    }
+    choosePath(path);
+  }
+
+  function trapFileDialogFocus(event) {
+    var focusable = fileDom.backdrop.querySelectorAll(
+      'button:not([disabled]), input, [tabindex]:not([tabindex="-1"])'
+    );
+    if (!focusable.length) return;
+    var first = focusable[0];
+    var last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  function bindFileDialog() {
+    if (!fileDom.backdrop) return;
+    fileDom.list.addEventListener('click', onFileRowClick);
+    if (fileDom.close) fileDom.close.addEventListener('click', closeFileDialog);
+    if (fileDom.cancel) fileDom.cancel.addEventListener('click', closeFileDialog);
+    if (fileDom.up) {
+      fileDom.up.addEventListener('click', function () {
+        if (fileState.current && fileState.current.parent) loadListing(fileState.current.parent);
+      });
+    }
+    if (fileDom.root) {
+      fileDom.root.addEventListener('click', function () {
+        loadListing('');
+      });
+    }
+    if (fileDom.hidden) {
+      fileDom.hidden.addEventListener('change', function () {
+        loadListing(fileState.current ? fileState.current.path : '');
+      });
+    }
+    if (fileDom.selectDir) {
+      fileDom.selectDir.addEventListener('click', function () {
+        if (fileState.current && fileState.current.path) choosePath(fileState.current.path);
+      });
+    }
+    fileDom.backdrop.addEventListener('mousedown', function (event) {
+      if (event.target === fileDom.backdrop) closeFileDialog();
+    });
+    fileDom.backdrop.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        event.preventDefault();
+        closeFileDialog();
+        return;
+      }
+      if (event.key === 'Tab') trapFileDialogFocus(event);
+    });
   }
 
   /* ------------------------------------------------------------------ */
@@ -1319,6 +1527,7 @@
     bindPrint();
     bindLabTabs();
     bindPlayground();
+    bindFileDialog();
     renderLoad();
     bindInvoke();
   }

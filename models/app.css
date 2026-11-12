@@ -1324,6 +1324,169 @@ button.tag.is-active {
   height: 22px;
 }
 
+/* --------------------------------------------------------------------------
+   11c. File browser dialog (saved model picker)
+   -------------------------------------------------------------------------- */
+
+.file-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(17, 23, 28, .45);
+}
+
+.file-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(640px, 100%);
+  max-height: min(660px, 90vh);
+  border: 1px solid var(--db-line);
+  border-radius: var(--db-r-lg);
+  background: var(--db-surface);
+  box-shadow: var(--db-shadow-lg);
+  overflow: hidden;
+}
+
+.file-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--db-line);
+}
+
+.file-dialog-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.file-dialog-heading h2 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.file-dialog-heading p {
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--db-faint);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-dialog-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--db-line-soft);
+  background: var(--db-surface-alt);
+}
+
+.file-dialog-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--db-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.file-dialog-toggle input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--db-lava);
+}
+
+.file-dialog-list {
+  flex: 1 1 auto;
+  min-height: 170px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.file-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--db-r-sm);
+  background: transparent;
+  color: var(--db-text);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.file-row:hover,
+.file-row:focus-visible {
+  border-color: var(--db-line);
+  background: var(--db-surface-hover);
+  outline: none;
+}
+
+.file-row[aria-selected="true"] {
+  border-color: var(--db-blue);
+  background: var(--db-blue-soft);
+}
+
+.file-row-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.file-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-row[data-file-kind="dir"] .file-row-name {
+  font-weight: 600;
+}
+
+.file-row-meta {
+  color: var(--db-faint);
+  font-family: var(--db-mono);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.file-dialog .status-note {
+  margin: 0;
+  padding: 0 16px 8px;
+}
+
+.file-dialog-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--db-line);
+  background: var(--db-surface-alt);
+}
+
+@media (max-width: 640px) {
+  .file-dialog-backdrop { padding: 0; }
+  .file-dialog {
+    width: 100%;
+    height: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  .file-dialog-footer .btn { flex: 1 1 auto; }
+}
+
 
 /* --------------------------------------------------------------------------
    12. Tables
@@ -2556,6 +2719,7 @@ pre.code.is-clamped::after {
   .db-sidebar,
   .sidebar-overlay,
   .drawer-backdrop,
+  .file-dialog-backdrop,
   .info-btn,
   .info-popover,
   .toast,
