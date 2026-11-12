@@ -909,9 +909,9 @@
   function renderDrawer(model) {
     state.current = model;
     setDrawerHeader(model);
+    /* The short description already lives in the drawer header, so the panel
+       starts with the structured facts instead of repeating a text block. */
     var sections = [
-      '<section class="drawer-section"><h3>Descripción</h3><div class="prose">' +
-      esc(model.full_description || model.short_description || '') + '</div></section>',
       '<section class="drawer-section"><h3>Metadatos</h3><div class="meta-grid">' +
       metaBoxes(model) + '</div></section>',
       '<section class="drawer-section"><h3>Parámetros' +
