@@ -2,9 +2,7 @@
 
 import logging
 import os
-import pickle
 from functools import partial
-from pathlib import Path
 from shutil import rmtree
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -57,50 +55,6 @@ class EarlyStopping:
 
         if self.counter >= self.patience:
             self.stop_training = True
-
-    def save(self, path: str | Path = "./early_stopping.pkl") -> None:
-        """Serialize the callback state to disk using pickle.
-
-        The checkpoint keeps the best loss, the patience counter and the
-        ``stop_training`` flag, so a resumed training run continues with the
-        same early-stopping progress.
-
-        Parameters
-        ----------
-        path : str or pathlib.Path, default="./early_stopping.pkl"
-            Destination file.
-        """
-        with Path(path).open("wb") as file:
-            pickle.dump(self, file)
-
-    @classmethod
-    def load(cls, path: str | Path = "./early_stopping.pkl") -> "EarlyStopping":
-        """Restore a callback saved with :meth:`save`.
-
-        Parameters
-        ----------
-        path : str or pathlib.Path, default="./early_stopping.pkl"
-            Checkpoint written by :meth:`save`.
-
-        Returns
-        -------
-        EarlyStopping
-            Callback with the stored progress.
-
-        Raises
-        ------
-        TypeError
-            If the pickle does not contain an :class:`EarlyStopping` instance.
-
-        Notes
-        -----
-        Checkpoints are pickles, so only load files you trust.
-        """
-        with Path(path).open("rb") as file:
-            callback = pickle.load(file)
-        if not isinstance(callback, cls):
-            raise TypeError(f"{str(path)!r} does not contain an EarlyStopping instance")
-        return callback
 
 
 def mse_loss(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:

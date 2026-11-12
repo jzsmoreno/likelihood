@@ -222,7 +222,7 @@ class GetInsights:
                 return
 
             norm = Normalize(vmin=min(weights), vmax=max(weights))
-            cmap = cm.get_cmap("coolwarm")
+            cmap = matplotlib.colormaps["coolwarm"]
 
             edge_colors = [cmap(norm(G[u][v]["weight"])) for u, v in G.edges()]
             edge_widths = [1.0 + 2.0 * norm(abs(G[u][v]["weight"])) for u, v in G.edges()]
@@ -324,7 +324,7 @@ class GetInsights:
                 return
 
             norm = Normalize(vmin=min(weights), vmax=max(weights))
-            cmap = cm.get_cmap("coolwarm")
+            cmap = matplotlib.colormaps["coolwarm"]
 
             edge_colors = [cmap(norm(G[u][v]["weight"])) for u, v in G.edges()]
             edge_widths = [1.0 + 2.0 * norm(abs(G[u][v]["weight"])) for u, v in G.edges()]

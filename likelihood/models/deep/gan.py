@@ -1,7 +1,6 @@
 """Generative adversarial network model definitions."""
 
 import os
-from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import numpy as np
@@ -17,6 +16,8 @@ from tensorflow.keras.regularizers import l2
 from tqdm import tqdm
 
 from likelihood.tools import get_metrics
+
+from ._keras_io import load_keras_model, save_keras_model
 
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="GANRegressor")
@@ -322,6 +323,11 @@ class GANRegressor(tf.keras.Model):
     def get_config(self) -> Dict[str, Any]:
         """Get configuration dictionary for serialization.
 
+        Only JSON friendly constructor arguments are returned: the generator,
+        discriminator and adversarial models are rebuilt by ``__init__`` from
+        them, which keeps both the ``.keras`` archive and the SavedModel format
+        of TensorFlow <= 2.15 serializable.
+
         Returns
         -------
         config : `Dict[str, Any]`
@@ -334,9 +340,6 @@ class GANRegressor(tf.keras.Model):
             "activation": self.activation,
             "depth": self.depth,
             "dropout": self.dropout,
-            "generator": self.generator,
-            "discriminator": self.discriminator,
-            "gan": self.gan,
             "l2_reg": self.l2_reg,
             "optimizer": self.optimizer,
         }
@@ -360,45 +363,44 @@ class GANRegressor(tf.keras.Model):
         return cls(
             input_shape_parm=config["input_shape_parm"],
             output_shape_parm=config["output_shape_parm"],
-            num_neurons=config["num_neurons"],
-            activation=config["activation"],
-            depth=config["depth"],
-            dropout=config["dropout"],
-            generator=config["generator"],
-            discriminator=config["discriminator"],
-            gan=config["gan"],
-            l2_reg=config["l2_reg"],
-            optimizer=config["optimizer"],
+            num_neurons=config.get("num_neurons", 128),
+            activation=config.get("activation", "linear"),
+            depth=config.get("depth", 5),
+            dropout=config.get("dropout", 0.2),
+            l2_reg=config.get("l2_reg", 0.0),
+            optimizer=config.get("optimizer", "adam"),
         )
 
-    def save_model(self, path: str | Path = "./gan_regressor.keras") -> None:
-        """Serialize the GAN to a Keras archive.
+    def save_model(self, path: str = "./gan_regressor") -> None:
+        """Serialize the GAN using the format supported by the installed TF.
+
+        TensorFlow > 2.15 writes a ``.keras`` archive (the extension is appended
+        when ``path`` does not have it); TensorFlow <= 2.15 writes a SavedModel
+        directory named after ``path``.
 
         Parameters
         ----------
-        path : str or pathlib.Path, default="./gan_regressor.keras"
-            Destination file. The ``.keras`` extension is appended when the path
-            does not already use it.
+        path : str, default="./gan_regressor"
+            Destination file or directory, depending on the TensorFlow version.
 
         Notes
         -----
-        The archive uses the native Keras format, so it can also be opened with
-        ``tf.keras.models.load_model(path, custom_objects={"GANRegressor":
-        GANRegressor}, compile=False)``.
+        The artifact can also be produced with the matching Keras call
+        (``model.save("name.keras")`` on TensorFlow > 2.15,
+        ``model.save("name", save_format="tf")`` on older releases);
+        :meth:`load_model` accepts both formats.
         """
-        target = Path(path)
-        if target.suffix != ".keras":
-            target = target.with_name(target.name + ".keras")
-        self.save(str(target))
+        save_keras_model(self, path)
 
     @classmethod
-    def load_model(cls, path: str | Path = "./gan_regressor.keras") -> "GANRegressor":
-        """Rebuild a GAN regressor from an archive written by :meth:`save_model`.
+    def load_model(cls, path: str = "./gan_regressor") -> "GANRegressor":
+        """Rebuild a GAN regressor saved with :meth:`save_model`.
 
         Parameters
         ----------
-        path : str or pathlib.Path, default="./gan_regressor.keras"
-            Keras archive to restore.
+        path : str, default="./gan_regressor"
+            Keras archive, the same name without the extension, or a SavedModel
+            directory written by TensorFlow <= 2.15.
 
         Returns
         -------
@@ -409,12 +411,10 @@ class GANRegressor(tf.keras.Model):
         Raises
         ------
         TypeError
-            If the archive does not contain a :class:`GANRegressor`.
+            If the artifact does not contain a :class:`GANRegressor`.
         """
-        restored = tf.keras.models.load_model(
-            str(path), custom_objects={cls.__name__: cls}, compile=False
-        )
+        restored = load_keras_model(path, {cls.__name__: cls}, compile=False)
         if not isinstance(restored, cls):
-            raise TypeError(f"{str(path)!r} does not contain a {cls.__name__} archive")
+            raise TypeError(f"{path!r} does not contain a {cls.__name__} archive")
         restored._compile_models()
         return restored

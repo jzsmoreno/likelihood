@@ -71,15 +71,21 @@ UI: their page offers "Cargar un modelo guardado" and
 | Model | Save with | Load with | Artifact |
 | --- | --- | --- | --- |
 | `HMM`, `Arima`, `FourierRegression` | `save_model()` | `load_model()` | pickle |
-| `AutoClassifier`, `EnsembleClassifier`, `SimulationEngine` | `save()` | `load()` | pickle |
+| `AutoClassifier`, `EnsembleClassifier` | `save()` | `load()` | directory: JSON metadata + Keras components |
+| `SimulationEngine` | `save()` | `load()` | pickle |
 | `MultiBanditNet` | `save()` | `load()` | Torch checkpoint (config + `state_dict`) |
-| `GANRegressor` | `save_model()` | `load_model()` | Keras `.keras` archive |
-| `EarlyStopping` | `save()` | `load()` | pickle (early-stopping progress) |
+| `GANRegressor` | `save_model()` | `load_model()` | Keras artifact (`.keras` archive or SavedModel) |
 | `ActionSpace` | `save()` | `load()` | pickle |
 
-The remaining classes are not loadable by design: `Env`, `AutoQL` and
-`GetInsights` wrap live objects supplied by the caller, and `OptionCriticEnv` is
-a simulator derived from an episode dataset. Their docstrings state the reason.
+The Keras artifacts follow the installed TensorFlow: TF > 2.15 writes a single
+`.keras` archive while TF <= 2.15 keeps the `save_format="tf"` SavedModel
+directory. `AutoClassifier`, `EnsembleClassifier` and `GANRegressor` switch
+automatically and their loaders accept either format.
+
+`EarlyStopping` is a training callback without a checkpoint of its own, and the
+remaining classes are not loadable by design: `Env`, `AutoQL` and `GetInsights`
+wrap live objects supplied by the caller, and `OptionCriticEnv` is a simulator
+derived from an episode dataset. Their docstrings state the reason.
 
 ### Docker
 

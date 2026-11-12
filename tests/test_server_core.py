@@ -123,14 +123,13 @@ def test_catalog_exposes_a_loader_for_every_persistable_model():
     assert loaders["SimulationEngine"] == ["load"]
     assert loaders["GANRegressor"] == ["load_model"]
     assert loaders["MultiBanditNet"] == ["load"]
-    assert loaders["EarlyStopping"] == ["load"]
     assert loaders["ActionSpace"] == ["load"]
 
 
 def test_models_without_a_checkpoint_are_not_advertised_as_loadable():
-    """Live objects and dataset-derived state stay documented limitations."""
+    """Callbacks, live objects and dataset-derived state are not checkpoints."""
     models = {model["id"]: model for model in core.CATALOG}
-    for model_id in ("AutoQL", "Env", "GetInsights", "OptionCriticEnv"):
+    for model_id in ("EarlyStopping", "AutoQL", "Env", "GetInsights", "OptionCriticEnv"):
         assert models[model_id]["loaders"] == [], model_id
         assert core.load_spec(models[model_id])["loadable"] is False
 

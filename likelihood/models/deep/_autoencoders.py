@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from ._keras_io import load_keras_model, save_keras_model
 from .autoencoders import (
     EarlyStopping,
     LoRALayer,
@@ -510,11 +511,13 @@ class AutoClassifier:
         # Create directory if it doesn't exist
         os.makedirs(filepath, exist_ok=True)
 
-        # Save all component models
-        self._encoder.save(os.path.join(filepath, "encoder.keras"))
-        self._decoder.save(os.path.join(filepath, "decoder.keras"))
-        self._classifier.save(os.path.join(filepath, "classifier.keras"))
-        self._main_model.save(os.path.join(filepath, "main_model.keras"))
+        # Save every component with the format supported by the installed stack:
+        # ``.keras`` archives on TensorFlow > 2.15, SavedModel sub-directories on
+        # older releases (``save_format="tf"``).
+        save_keras_model(self._encoder, os.path.join(filepath, "encoder"))
+        save_keras_model(self._decoder, os.path.join(filepath, "decoder"))
+        save_keras_model(self._classifier, os.path.join(filepath, "classifier"))
+        save_keras_model(self._main_model, os.path.join(filepath, "main_model"))
 
         # Save configuration
         import json
@@ -561,15 +564,11 @@ class AutoClassifier:
         # Create new instance
         instance = cls(**config)
 
-        # Load component models
-        instance._encoder = tf.keras.models.load_model(os.path.join(filepath, "encoder.keras"))
-        instance._decoder = tf.keras.models.load_model(os.path.join(filepath, "decoder.keras"))
-        instance._classifier = tf.keras.models.load_model(
-            os.path.join(filepath, "classifier.keras")
-        )
-        instance._main_model = tf.keras.models.load_model(
-            os.path.join(filepath, "main_model.keras")
-        )
+        # Load component models (``.keras`` archives or SavedModel directories)
+        instance._encoder = load_keras_model(os.path.join(filepath, "encoder"))
+        instance._decoder = load_keras_model(os.path.join(filepath, "decoder"))
+        instance._classifier = load_keras_model(os.path.join(filepath, "classifier"))
+        instance._main_model = load_keras_model(os.path.join(filepath, "main_model"))
 
         return instance
 
