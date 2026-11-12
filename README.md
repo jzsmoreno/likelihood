@@ -72,11 +72,18 @@ exactly the same values for the arguments of the selected method, so an example
 never replaces a configured default:
 
 - a declared default is sent untouched, `0`, `False`, `""` and `[]` included;
+- a default that JSON cannot carry (`np.array([])`, `nn.SELU()`) is ignored, so the
+  field keeps an editable sample instead of an unusable string;
 - an optional argument without a default is left out, so the method keeps its own
   default instead of receiving an invented value;
 - only a required argument without a default is generated, shaped by the
-  constructor values (`input_shape_parm`, `n_features`, `n_states`,
+  constructor values (`input_shape_parm`, `state_dim`, `n_features`, `n_states`,
   `n_observations`…).
+
+Arrays and tensors (`np.ndarray`, `torch.Tensor`, `tf.Tensor`, `List[...]`) count as
+JSON-friendly: the invoke tab suggests a matrix shaped by the constructor and the
+sandbox builds the declared object (a `torch.Tensor` for torch annotations), so
+methods such as `MultiBanditNet.forward(state)` can be called from the page.
 
 The page keeps the two constructor forms (Playground and the invoke tab) in sync
 and regenerates the examples while you edit them: the suggested inputs always

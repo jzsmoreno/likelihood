@@ -1138,6 +1138,55 @@ def test_autoclassifier_invoke_honours_input_shape_parm(client, session_store):
         client.delete(f"/api/sessions/{session_id}")
 
 
+def test_multi_bandit_network_forward_is_invokable(client):
+    """A ``torch.Tensor`` argument travels as JSON and the sandbox builds the tensor."""
+    pytest.importorskip("torch")
+    assert any(model["id"] == "MultiBanditNet" for model in server.CATALOG)
+
+    spec = client.get("/api/models/MultiBanditNet/invoke")
+    assert spec.status_code == 200
+    methods = {method["name"]: method for method in spec.json()["methods"]}
+    assert "forward" in methods
+    state_field = next(f for f in methods["forward"]["fields"] if f["name"] == "state")
+    assert state_field["type"] == "torch.Tensor"
+    assert isinstance(state_field["sample"], list)
+    assert all(isinstance(row, list) and row for row in state_field["sample"])
+
+    sample = client.post("/api/models/MultiBanditNet/sample", json={"method": "forward"})
+    assert sample.status_code == 200, sample.json()
+    body = sample.json()
+    state_dim = body["parameters"]["state_dim"]
+    assert all(len(row) == state_dim for row in body["arguments"]["state"])
+
+    response = client.post(
+        "/api/models/MultiBanditNet/invoke",
+        json={
+            "method": "forward",
+            "parameters": body["parameters"],
+            "arguments": body["arguments"],
+        },
+    )
+    assert response.status_code == 200, response.json()
+    result = response.json()["result"]
+    assert isinstance(result, list) and len(result) == 5
+    assert all(len(part) == len(body["arguments"]["state"]) for part in result)
+
+    multiple = dict(body["arguments"])
+    multiple["multiple_option"] = True
+    response = client.post(
+        "/api/models/MultiBanditNet/invoke",
+        json={
+            "method": "forward",
+            "parameters": body["parameters"],
+            "arguments": multiple,
+        },
+    )
+    assert response.status_code == 200, response.json()
+    action_probs = response.json()["result"][1]
+    assert len(action_probs) == len(body["arguments"]["state"])
+    assert len(action_probs[0]) == body["parameters"]["num_options"]
+
+
 def test_session_invoke_rebuilds_when_the_constructor_changes(client, shape_probe, session_store):
     """A session must not keep an instance built with stale constructor values."""
     opened = []

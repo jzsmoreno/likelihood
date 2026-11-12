@@ -555,16 +555,28 @@ def _literal_for_kind(parameter: Dict[str, Any], text: Optional[str], fallback: 
     return value
 
 
+def _is_bare_word(text: str) -> bool:
+    """``softmax``/``leaky_relu`` yes, ``nn.SELU()``/``np.array([])`` no."""
+    return bool(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", text or ""))
+
+
 def _default_value(parameter: Dict[str, Any]) -> Any:
     """JSON friendly version of the recorded default of ``parameter``.
 
-    String-like parameters keep bare words (``softmax``, ``nn.SELU()``) because the
-    Playground edits them as text.  ``raw`` parameters are edited as JSON, so a source
-    expression (``np.array([])``) is not a usable default and is ignored: the field
-    falls back to the generated sample, exactly like the dummy inputs do.
+    String-like parameters keep bare words (``softmax``) because the Playground edits them as
+    text and the model accepts them verbatim.  Source expressions are not usable defaults:
+
+    * a ``raw`` parameter is edited as JSON, so ``np.array([])`` is ignored and the field falls
+      back to the generated sample, exactly like the dummy inputs do;
+    * a string parameter whose default is a call (``nn.SELU()``) cannot be typed as text either
+      (``MultiBanditNet`` only understands ``"selu"``), so it is ignored as well.
     """
     kind = parameter.get("widget") or guess_widget(parameter.get("type") or "")
-    return _literal_for_kind(parameter, parameter.get("default"), fallback=kind != "raw")
+    text = parameter.get("default")
+    value = _literal_for_kind(parameter, text, fallback=kind != "raw")
+    if isinstance(value, str) and value == text and not _is_bare_word(text):
+        return None
+    return value
 
 
 #: Argument names that usually carry a matrix (``samples × features``).
@@ -654,6 +666,10 @@ WIDTH_PARAMETERS = (
     "hidden_dim",
     # ``*_shape_parm`` is how several models name their number of input features.
     "input_shape_parm",
+    # Observation/state vectors (``MultiBanditNet(state_dim=4)``) are feature columns too.
+    "state_dim",
+    "obs_dim",
+    "observation_dim",
 )
 #: Argument names that carry a shape tuple such as ``(None, 4)``.
 SHAPE_ARGUMENTS = frozenset({"shape", "input_shape", "output_shape", "dims", "dimensions"})
@@ -712,6 +728,12 @@ SCALAR_SAMPLE_VALUES: Dict[str, Any] = {
     "n_states": 2,
     "n_clusters": 2,
     "n_models": 5,
+    # Bandit/RP models: a state vector with features, a handful of options/actions.
+    "state_dim": 4,
+    "obs_dim": 4,
+    "observation_dim": 4,
+    "num_options": 3,
+    "num_actions_per_option": 2,
     "num_layers": 2,
     "depth": 2,
     "n_estimators": 10,
@@ -806,6 +828,10 @@ def dummy_json_value(name: str, type_hint: str, parameters: Optional[Dict[str, A
         return [[float(row + column + 1) for column in range(columns)] for row in range(rows)]
     if base in SEQUENCE_ARGUMENTS or lowered in SEQUENCE_ARGUMENTS:
         return [int(index % categories) for index in range(rows)]
+    if "tensor" in type_lower:
+        # A tensor is a numeric matrix: ``(rows, columns)``, never a Python object, so a
+        # JSON list of lists is enough (the sandbox converts it to numpy/torch).
+        return [[float(row + column + 1) for column in range(columns)] for row in range(rows)]
     if any(hint in type_lower for hint in CONTAINER_HINTS):
         return [float(index + 1) for index in range(rows)]
     if lowered.endswith(("_path", "_file", "_folder", "_dir")):
@@ -875,6 +901,10 @@ def parameter_is_jsonable(parameter: Dict[str, Any]) -> bool:
     ``env``/``model`` style parameters receive Python objects, so the model can only be built from
     Python (or from a session created in Python); the API says so instead of failing later with a
     confusing missing-field error.
+
+    Container annotations (``np.ndarray``, ``torch.Tensor``, ``List[str]``...) are JSON friendly:
+    the sandbox turns the list into the declared object, so a tensor argument does not make the
+    method uncallable.
     """
     if parameter.get("variadic"):
         return False
@@ -884,7 +914,7 @@ def parameter_is_jsonable(parameter: Dict[str, Any]) -> bool:
         return True
     if _dict_with_integer_keys(type_hint):
         return False
-    if any(hint in type_hint.lower() for hint in CONTAINER_HINTS):
+    if _expects_container(type_hint):
         return True
     return dummy_json_value(parameter.get("name") or "", type_hint) is not None
 
@@ -1425,6 +1455,15 @@ def _convert(name, value, hints):
         # ``input_shape`` and friends are annotated as tuples: Keras inspects the
         # type, so a JSON list must become a real tuple.
         return tuple(value)
+    if "torch" in hint and "tensor" in hint:
+        # ``torch`` models call ``state.dim()``/``nn.Linear(state)``: a numpy array would
+        # raise "'numpy.ndarray' object has no attribute 'dim'".
+        try:
+            import torch
+
+            return torch.as_tensor(value, dtype=torch.float32)
+        except Exception:  # pragma: no cover - torch missing or odd payload
+            return value
     if "ndarray" in hint or "tensor" in hint or hint.rstrip("]").endswith("array"):
         try:
             import numpy
@@ -2130,8 +2169,10 @@ def invokable_methods(model: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Methods of ``model`` that the API is allowed to call.
 
     Methods whose required arguments cannot be expressed as JSON (a live
-    ``AutoClassifier`` instance, a ``torch.Tensor``...) are omitted: showing them
-    in the UI would only lead to a call that can never be made.
+    ``AutoClassifier`` instance, an ``Env``...) are omitted: showing them in the UI
+    would only lead to a call that can never be made.  Numeric containers are fine:
+    a ``np.ndarray``/``torch.Tensor`` argument receives the list of lists converted
+    by the sandbox.
     """
     return [
         method

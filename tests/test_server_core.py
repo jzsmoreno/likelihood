@@ -150,6 +150,53 @@ def test_dummy_json_value_reads_the_input_shape_parameter():
     assert matrix and all(len(row) == 4 for row in matrix)
 
 
+def test_tensor_arguments_are_jsonable_and_sampled_as_matrices():
+    """``torch.Tensor``/``tf.Tensor`` are containers: the sandbox converts the list."""
+    parameter = _parameter("state", "torch.Tensor", None, required=True, sample="None")
+    assert core.parameter_is_jsonable(parameter) is True
+    matrix = core.dummy_json_value("state", "torch.Tensor", {"state_dim": 4})
+    assert len(matrix) >= 2
+    assert all(len(row) == 4 for row in matrix)
+    method = {
+        "name": "forward",
+        "signature": "forward(state: torch.Tensor, multiple_option: bool = False)",
+        "parameters": [parameter],
+        "kind": "method",
+        "inherited": False,
+    }
+    assert core.method_is_jsonable(method) is True
+    arguments = core.sample_arguments({"parameters": [parameter]}, method, {"state_dim": 4})
+    assert arguments["state"] == matrix
+
+
+def test_multi_bandit_network_exposes_forward():
+    """The torch model is invokable now that tensor arguments can travel as JSON."""
+    entry = next(model for model in core.CATALOG if model["id"] == "MultiBanditNet")
+    names = [method["name"] for method in core.invokable_methods(entry)]
+    assert "forward" in names
+    assert "save" not in names  # side effects stay blocked
+    forward = core.find_method(entry, "forward")
+    arguments = core.sample_arguments(entry, forward, core.constructor_samples(entry))
+    state = arguments["state"]
+    assert len(state) >= 2 and all(len(row) == 4 for row in state)
+
+
+@pytest.mark.parametrize(
+    "type_hint,default,expected",
+    [
+        ("str", "softmax", "softmax"),
+        ("str", "leaky_relu", "leaky_relu"),
+        ("str", "''", ""),
+        ("str", "nn.SELU()", None),
+        ("list", "np.array([])", None),
+    ],
+)
+def test_source_expression_defaults_are_ignored(type_hint, default, expected):
+    """A default that JSON cannot carry falls back to the generated sample."""
+    parameter = _parameter("activation", type_hint, default)
+    assert core.playground_fields({"parameters": [parameter]})[0]["default"] == expected
+
+
 def _displayed(field):
     """Value the Playground renders for ``field`` (models/preview.js:fieldControl)."""
     value = field["default"]
