@@ -52,379 +52,85 @@ live in `models/` and are served with `ETag` and `Cache-Control` headers.
 The catalog is re-introspected when a model source changes (`LM_CATALOG_TTL`), so
 editing `likelihood/models` is reflected without restarting the server.
 
-### Server architecture
+### Environment variables
 
-`server_core.py` keeps the framework-independent code (catalog introspection,
-sandboxed playground, method invocation, live sessions, asynchronous jobs,
-notebook and preview rendering). `server_fastapi.py` exposes it over HTTP with
-FastAPI routing, Pydantic request models, middleware and the generated OpenAPI
-document. The previous standard-library HTTP server was removed; every existing
-route and JSON shape is preserved.
+The server reads optional `LM_*` environment variables (each overridable with
+the equivalent `--` CLI flag). They let you secure the API or tune its behaviour:
 
-### API
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `LM_API_TOKEN` | Protects the `/api` endpoints; clients must send `Authorization: Bearer <token>`. | none |
+| `LM_CORS_ORIGINS` | Comma-separated list of origins allowed for CORS. | none |
+| `LM_RATE_LIMIT` | Maximum requests per minute per client (`0` disables it). | 0 |
+| `LM_TRUST_PROXY` | Trust `X-Forwarded-*` headers when identifying the client address. | false |
+| `LM_PLAYGROUND` | Enable the interactive model playground. | true |
+| `LM_INVOKE` | Enable invoking model methods (still requires authentication when a token is set). | true |
+| `LM_SESSIONS` | Enable long-lived model sessions. | true |
+| `LM_JOBS_WORKERS` | Number of workers for asynchronous playground jobs. | 2 |
+| `LM_CATALOG_TTL` | Cache time to live, in seconds, before the catalog is re-introspected. | 2 |
+| `LM_GZIP_MIN_BYTES` | Minimum response size (bytes) before gzip compression. | 1024 |
+| `LM_HOST` / `LM_PORT` | Bind address and port (equivalently `SERVER_HOST` / `SERVER_PORT`). | `127.0.0.1` / `8000` |
 
-| Method | Path | Description |
-| ------ | ---- | ----------- |
-| `GET` | `/api/health` | Liveness probe with counters, per endpoint metrics and job stats (the operational detail requires the token when `LM_API_TOKEN` is set) |
-| `GET` | `/api/metrics` | The same counters in the Prometheus text exposition format |
-| `GET` | `/api/openapi.json` | OpenAPI 3.1 document generated from the catalog |
-| `GET` | `/docs` | Small viewer for the OpenAPI document |
-| `GET` | `/api/categories` | Categories with their model counts |
-| `GET` | `/api/models` | Model list; accepts `category`, `q`, `tags`, `sort`, `order`, `limit` and `offset` |
-| `GET` | `/api/models/<id>` | Everything known about one model (incl. playground spec) |
-| `GET` | `/api/models/<id>/related` | Models that share tags or category with it (`?limit=`) |
-| `GET` | `/api/models/<id>/source` | Raw source; `?download=1` sends it as `.py`, `?diff=<ref>` a git diff |
-| `GET` | `/api/models/<id>/versions` | Commits that touched the source of the model (`?limit=`) |
-| `GET` | `/api/search?q=<term>` | Faceted search: results, suggestions and `facets` |
-| `GET` | `/api/playground/<id>` | Playground specification of one model |
-| `GET` | `/api/playground/jobs` | Most recent asynchronous playground jobs |
-| `GET` | `/api/playground/jobs/<job_id>` | State and results of one job |
-| `DELETE` | `/api/playground/jobs/<job_id>` | Cancel a queued job or forget a finished one |
-| `GET` | `/api/models/<id>/invoke` | Methods that may be called on a model (with their arguments) |
-| `POST` | `/api/models/<id>/invoke` | `{"method": ..., "arguments": {...}}` builds the model and calls it (add `path`/`loader` to call a saved instance) |
-| `GET` | `/api/models/<id>/load` | Loaders (`load`, `load_model`...) and path policy of a model |
-| `POST` | `/api/models/<id>/load` | `{"path": ..., "loader": ...}` loads a saved model and returns its type and attributes |
-| `POST` | `/api/models/<id>/sample` | `{"method": ..., "parameters": {...}}` returns dummy JSON arguments |
-| `POST` | `/api/models/<id>/sessions` | Build the model once and keep it alive for several calls |
-| `GET` | `/api/sessions` | Open model sessions |
-| `GET` | `/api/sessions/<id>` | State of one session (`calls`, `errors`, `idle_seconds`) |
-| `POST` | `/api/sessions/<id>/invoke` | Call a method on the live instance |
-| `DELETE` | `/api/sessions/<id>` | Close the session and its worker process |
-| `GET` | `/api/notebook/<id>` | Download the generated `.ipynb` (accepts `?parameters=`) |
-| `POST` | `/api/playground` | `{"model_id": "...", "parameters": {...}}` builds the model |
-| `POST` | `/api/playground/jobs` | One run (or a list of runs) queued in the background |
-| `POST` | `/api/notebook` | `{"model_id": "...", "parameters": {...}}` returns the notebook JSON |
-| `POST` | `/api/search` | **Deprecated** alias of `GET /api/search` |
+Set `LM_API_TOKEN` to expose the catalogue over a network, then hand it to clients
+as a bearer token. Every other variable is optional and follows the same `LM_*`
+naming convention.
 
+### Overriding environment variables
 
-`GET /api/models` is backwards compatible: without `limit` it returns every
-model. With pagination the response adds `matched`, `offset`, `limit`,
-`has_more` and `next` (the URL of the following page, also advertised through
-`Link: <...>; rel="next"`). `GET /api/models` also sorts the result with
-`?sort=id|title|category|parameters|methods` and `?order=asc|desc` (the default
-keeps the catalog order, which is by category and title).
-
-`GET /api/models`, `/api/categories`, `/api/models/<id>`,
-`/api/models/<id>/related`, `/api/models/<id>/source`, `/api/openapi.json` and
-the static assets send `ETag` and `Cache-Control`, so conditional requests answer
-`304` while the model sources do not change. `If-None-Match` understands the `*`
-wildcard, comma separated lists and the weak `W/"..."` validators, and the assets
-also honour `If-Modified-Since`. When `LM_API_TOKEN` is set the catalog responses
-become `private` and `Vary` on the credentials, so a shared cache can never hand
-an authorised answer to an anonymous client.
-
-Every `GET` route also answers `HEAD` (the body is dropped, the headers and the
-status are the ones of the equivalent `GET`), and responses larger than
-`LM_GZIP_MIN_BYTES` are compressed with gzip when the client accepts it.
-
-`POST /api/search` still works but is deprecated: it answers with
-`Deprecation: true`, a `Sunset` date (`LM_SEARCH_ALIAS_SUNSET`, default
-`2026-12-31`) and `Link: </api/search?q=...>; rel="successor-version"`. Use
-`GET /api/search` instead.
+Every `LM_*` environment variable can be overridden on the command line with
+the equivalent flag, which takes precedence over the environment. The same
+flags can also be passed directly to `uvicorn`:
 
 ```bash
-curl -s http://127.0.0.1:8000/api/models?category=regression&limit=2 | python3 -m json.tool
-curl -s http://127.0.0.1:8000/api/search?q=deep\&tags=Deep%20Learning | python3 -m json.tool
-curl -s -o Arima.py "http://127.0.0.1:8000/api/models/Arima/source?download=1"
-curl -s "http://127.0.0.1:8000/api/models/Arima/source?diff=HEAD~1" | python3 -m json.tool
+# Prefer the API token over any LM_API_TOKEN set in the shell
+python3 server_fastapi.py --token <my-secret-token>
+
+# Allow the frontend on *.example.com (overrides LM_CORS_ORIGINS)
+python3 server_fastapi.py --cors-origin http://*.example.com
+
+# Rate limit every client to 60 requests/minute (overrides LM_RATE_LIMIT)
+python3 server_fastapi.py --rate-limit 60
+
+# Trust the reverse proxy (overrides LM_TRUST_PROXY)
+python3 server_fastapi.py --trust-proxy
+
+# Disable the playground and invoke (overrides LM_PLAYGROUND=0 / LM_INVOKE=0)
+python3 server_fastapi.py --no-playground --no-invoke
+
+# Disable gzip compression (overrides LM_GZIP_MIN_BYTES=0)
+python3 server_fastapi.py --no-compression
 ```
 
-`GET /api/search` returns `facets`: the number of matches per category and per
-tag, computed **before** the `tags` filter is applied, so the counters show how
-many models each tag would keep. Tags are comma separated and may contain
-spaces (`tags=Deep%20Learning,Regression`). `GET /api/models` accepts the same
-`tags` filter.
+The negated flags (`--no-playground`, `--no-invoke`) turn a feature off; the
+equivalent environment variables do the same with a value of `0`
+(`LM_PLAYGROUND=0`, `LM_INVOKE=0`, `LM_SESSIONS=0`).
 
-### Playground
+### Endpoints
 
-Every preview page embeds a playground built from the real `__init__`
-signature: adjust the hyperparameters, press **Ejecutar modelo** and the server
-constructs the object in a child Python process, returning its type, `repr`,
-public attributes, stdout and the elapsed time. Only JSON values are accepted
-(no Python code is evaluated), the payload is limited to 1 MiB and the child
-process is killed after `LM_PLAYGROUND_TIMEOUT` seconds (default `60`).
+Beyond the browser pages, the server exposes these JSON endpoints:
 
-The child also lowers its own limits before importing the model
-(`resource.setrlimit` for CPU, address space, file descriptors and file size)
-and installs an *import guard* that only applies to the **catalog code itself**
-(the model module, its package and anything that lives inside the repository):
-the catalog cannot pull in `subprocess`, `pty`, `ftplib`... while a third party
-library that needs them internally (matplotlib, torch, tensorflow, corner, ...)
-keeps working. The list is `LM_PLAYGROUND_BLOCKED_MODULES`; set it to an empty
-value to disable the guard, or extend it to be stricter.
-
-> If a run fails with `ImportError: El playground no permite importar '<módulo>'`,
-> the *catalog code* (not a library) tried to import a blocked module: customise
-> `LM_PLAYGROUND_BLOCKED_MODULES` for that deployment.
-
-```bash
-curl -s -X POST http://127.0.0.1:8000/api/playground \
-  -H 'Content-Type: application/json' \
-  -d '{"model_id": "HMM", "parameters": {"n_states": 3, "n_observations": 4}}' \
-  | python3 -m json.tool
+```text
+GET  /api/categories
+GET  /api/models
+POST /api/search                  # legacy search
+GET  /api/models/{id}/source
+GET  /api/models/{id}/versions
+POST /api/models/{id}/load
+POST /api/models/{id}/invoke
+POST /api/models/{id}/sample
+POST /api/playground
+GET  /api/playground/jobs
+POST /api/playground/jobs
+GET  /api/playground/jobs/{job_id}
+DELETE /api/playground/jobs/{job_id}
+GET  /api/models/{id}/sessions
+POST /api/models/{id}/sessions
+POST /api/sessions/{session_id}/invoke
+DELETE /api/sessions/{session_id}
+GET  /api/notebook
 ```
 
-#### Asynchronous jobs
-
-`POST /api/playground/jobs` accepts the same payload as `POST /api/playground`
-(plus a batch: `{"jobs": [{"model_id": ..., "parameters": {...}}, ...]}` or a
-bare JSON list) and answers `202` with a `job_id`, a `poll_url` and a `Location`
-header. A pool of `LM_JOBS_WORKERS` threads runs the requests while the client
-polls `GET /api/playground/jobs/<job_id>`:
-
-```bash
-curl -s -X POST http://127.0.0.1:8000/api/playground/jobs \
-  -H 'Content-Type: application/json' \
-  -d '{"jobs": [{"model_id": "HMM", "parameters": {"n_states": 3, "n_observations": 4}},
-                {"model_id": "Arima", "parameters": {}}]}' | python3 -m json.tool
-curl -s http://127.0.0.1:8000/api/playground/jobs/<job_id> | python3 -m json.tool
-```
-
-`status` is one of `pending`, `running`, `succeeded`, `partial` (some runs
-failed), `failed` or `cancelled`; `results` holds one entry per run. Jobs are
-pruned after `LM_JOBS_RETENTION` seconds and at most `LM_MAX_JOBS` are kept in
-memory. `DELETE /api/playground/jobs/<job_id>` cancels a queued job (`cancelling`
-while the run in flight finishes, then `cancelled`) and forgets a job that
-already finished.
-
-#### Notebooks with the playground values
-
-`POST /api/notebook` (and `GET /api/notebook/<id>?parameters=<json>`) accepts the
-same `parameters` object: the validated values become the defaults of the
-generated `ipywidgets` controls, so the notebook opens with the experiment you
-just ran.
-
-### Invocación de métodos (inferencia)
-
-Además de construir el modelo, la API puede **llamar a sus métodos** — `fit`,
-`predict`, `sample`, `forward`, ... — con argumentos JSON validados contra la
-firma real. Cada llamada se ejecuta en un proceso hijo desechable con los mismos
-límites y el mismo sandbox que el playground.
-
-```bash
-# 1) qué métodos se pueden llamar y con qué argumentos
-curl -s http://127.0.0.1:8000/api/models/HMM/invoke | python3 -m json.tool
-
-# 2) construir el modelo y llamar a un método (sin estado entre llamadas)
-curl -s -X POST http://127.0.0.1:8000/api/models/HMM/invoke \
-  -H 'Content-Type: application/json' \
-  -d '{"method": "viterbi",
-       "parameters": {"n_states": 2, "n_observations": 3},
-       "arguments": {"sequence": [0, 1, 2, 1]}}' | python3 -m json.tool
-```
-
-La respuesta incluye `result` (proyectado a JSON: listas, dicts, `ndarray` y
-`DataFrame` se convierten), `result_type`, `result_repr`, `elapsed`, `stdout` y
-`stderr`. Las listas de JSON se transforman en `ndarray`/`DataFrame` cuando la
-firma anotada lo indica.
-
-**Datos de ejemplo.** `POST /api/models/<id>/sample` recibe el método y los
-parámetros del constructor y devuelve argumentos JSON listos para invocar, con
-la forma derivada de esos parámetros (número de estados/observaciones, `window`,
-`n_features`...):
-
-```bash
-curl -s -X POST http://127.0.0.1:8000/api/models/HMM/sample \
-  -H 'Content-Type: application/json' \
-  -d '{"method": "viterbi",
-       "parameters": {"n_states": 2, "n_observations": 3}}' | python3 -m json.tool
-# {"arguments": {"sequence": [0, 1, 0]}, "parameters": {...}, ...}
-```
-
-Es lo que usa el botón **🧪 Datos de ejemplo** de la pestaña *Invocar método*:
-rellena los argumentos sin escribir JSON a mano, y sigue funcionando cuando los
-parámetros del constructor son `np.ndarray`, `DataFrame`, listas o diccionarios.
-Los valores propuestos respetan el **default real** del constructor (`n_models=5`,
-`num_neurons=128`...) y, cuando el parámetro es obligatorio, usan valores por
-nombre (`n_states=2`, `n_observations=3`, `num_classes=3`, `units=8`,
-`input_shape_parm=4`, `datapoints` como serie 1-D...).
-
-**Constructores que necesitan Python.** Algunos modelos reciben objetos que no
-se pueden expresar como JSON (`AutoQL(env, model)`, `GetInsights(model)`,
-`OptionCriticEnv(episodes)` con claves enteras). `GET /api/playground/<id>` y
-`GET /api/models/<id>/invoke` lo indican con `"buildable": false` y la lista
-`unsupported` (`name`, `type`, `reason`); la API responde `400` explicando qué
-parámetro necesita un objeto Python y la web deshabilita los botones en vez de
-fallar con un error genérico. El resto de modelos (`HMM`, `Arima`, `GANRegressor`,
-`AutoClassifier`, `EnsembleClassifier`, `SimulationEngine`...) se construyen sin
-problema con los valores propuestos.
-
-**Modelos Keras (`call` y capas internas).** Cuando la instancia expone `built`
-(Keras), la API la construye antes de ejecutar el método: `call` deja de fallar
-con `'NoneType' object is not callable` porque `build` crea el
-encoder/decoder/classifier con la forma del argumento de entrada. Los argumentos
-anotados como `tf.Tensor`/`np.ndarray` se convierten a `ndarray` en el proceso
-hijo **tanto en llamadas sin estado como en sesiones**, y los errores de Keras se
-devuelven con una explicación que nombra el argumento afectado (por ejemplo,
-`'x' (tf.Tensor)`). Si un argumento de tipo tensor/matriz recibe un número o un
-texto en lugar de una lista, la API responde `400` indicando el campo antes de
-llegar a Keras.
-
-**Política de métodos.** Solo se pueden invocar métodos públicos sin efectos
-secundarios: se excluyen propiedades, entradas inventadas por el docstring
-(`` `fit ` ``), nombres privados y todo lo que contenga `save`, `load`, `plot`,
-`write`, `download`, `delete`, `reset`, `remove`, `close` o `shutdown`. Se puede
-cambiar con:
-
-| Variable | Efecto |
-| -------- | ------ |
-| `LM_INVOKE` | `0` deshabilita por completo `/invoke` y las sesiones |
-| `LM_INVOKE_METHODS` | lista blanca explícita (sustituye la política automática) |
-| `LM_INVOKE_BLOCKED_METHODS` | nombres a bloquear además de los anteriores |
-| `LM_INVOKE_ALLOW_SIDE_EFFECTS` | `1` permite también `save`/`load`/`plot`/... |
-
-Los errores se distinguen: `400` argumentos inválidos (`unknown`, `missing`,
-`invalid` en el cuerpo), `403` método bloqueado, `404` modelo o método
-inexistente, `422` excepción del modelo (con `detail` = traza), `429` demasiadas
-llamadas simultáneas (`LM_INVOKE_MAX_CONCURRENCY`) y `504` timeout.
-
-#### Sesiones con estado
-
-`POST /api/models/<id>/invoke` reconstruye el modelo en cada llamada, así que no
-sirve para `fit` → `predict`. Para eso están las sesiones: construyen la
-instancia **una vez** en un worker dedicado y aceptan llamadas sucesivas. En la
-pestaña *Invocar método* la opción **Instancia persistente** viene marcada: la
-primera llamada construye la clase y las siguientes reutilizan la misma
-instancia (desmárcala para el modo sin estado).
-
-```bash
-# crear la sesión (una vez)
-SESSION=$(curl -s -X POST http://127.0.0.1:8000/api/models/FourierRegression/sessions \
-  -H 'Content-Type: application/json' -d '{"parameters": {}}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["session_id"])')
-
-# entrenar y predecir sobre la MISMA instancia
-curl -s -X POST "http://127.0.0.1:8000/api/sessions/$SESSION/invoke" \
-  -H 'Content-Type: application/json' \
-  -d '{"method": "fit", "arguments": {"X": [[1], [2], [3]], "y": [2, 4, 6]}}'
-curl -s -X POST "http://127.0.0.1:8000/api/sessions/$SESSION/invoke" \
-  -H 'Content-Type: application/json' \
-  -d '{"method": "predict", "arguments": {"X": [[4]]}}'
-
-# inspeccionar y cerrar
-curl -s "http://127.0.0.1:8000/api/sessions/$SESSION"
-curl -s -X DELETE "http://127.0.0.1:8000/api/sessions/$SESSION"
-```
-
-`GET /api/sessions` lista las sesiones abiertas (modelo, `parameters`, `calls`,
-`errors`, `idle_seconds`). Cada sesión es un proceso propio con `RLIMIT`,
-serializa sus llamadas y se cierra sola tras `LM_SESSION_TTL` segundos de
-inactividad; el store mantiene como máximo `LM_MAX_SESSIONS` (desaloja la menos
-usada) y una llamada que excede `LM_SESSION_TIMEOUT` mata el worker.
-`LM_SESSIONS=0` deshabilita todo el bloque.
-
-`POST /api/sessions/<id>/invoke` también acepta `parameters`. Si coinciden con
-los que construyeron la instancia, se reutiliza (el estado de `fit` sigue vivo);
-si cambian (por ejemplo `input_shape_parm`), el servidor reconstruye el modelo,
-devuelve `rebuilt: true` y un `session_id` nuevo, de modo que nunca se atiende
-una llamada con una instancia construida con parámetros obsoletos.
-
-#### Cargar un modelo guardado
-
-Los modelos que exponen `load(...)` o `load_model(...)` (por ejemplo `HMM`,
-`Arima`, `FourierRegression`, `SimulationEngine`, `EnsembleClassifier` y
-`AutoClassifier`) pueden cargarse desde una ruta. La pestaña **Laboratorio**
-muestra la sección
-*📂 Cargar un modelo guardado*: elige el loader, escribe la ruta y pulsa
-**Verificar** para construir la instancia, o **Cargar y usar** para dejarla viva
-en una sesión y llamar a sus métodos desde *Invocar método*.
-
-```bash
-# inspeccionar los loaders disponibles
-curl -s http://127.0.0.1:8000/api/models/HMM/load | python3 -m json.tool
-
-# verificar que el archivo se puede cargar
-curl -s -X POST http://127.0.0.1:8000/api/models/HMM/load \
-  -H 'Content-Type: application/json' \
-  -d '{"path": "./hmm.pkl", "loader": "load_model"}' | python3 -m json.tool
-
-# abrir una sesión sobre la instancia cargada
-curl -s -X POST http://127.0.0.1:8000/api/models/HMM/sessions \
-  -H 'Content-Type: application/json' \
-  -d '{"path": "./hmm.pkl", "loader": "load_model"}'
-```
-
-Las rutas relativas se resuelven desde la raíz del repositorio; los loaders que
-añaden `.pkl` por su cuenta funcionan tanto con `modelo` como con `modelo.pkl`.
-`LM_LOAD_ROOT` cambia la raíz y `LM_LOAD_RESTRICT=1` rechaza cualquier ruta que
-quede fuera de ella. Cargar un `pickle` ejecuta código: usa únicamente archivos
-de confianza.
-
-> **Security note:** the playground imports the package and builds real model
-> objects. The server binds to `127.0.0.1` by default; keep it that way unless
-> you trust every client that can reach the port. Launch it with
-> `--no-playground` (or `LM_PLAYGROUND=0`) to disable execution entirely, or
-> with `LM_INVOKE=0` to keep the catalog read-only.
-
-### Configuration
-
-| Variable | Default | Meaning |
-| -------- | ------- | ------- |
-| `LM_HOST` | `127.0.0.1` | Interface to bind (`SERVER_HOST` is also accepted) |
-| `LM_PORT` | `8000` | TCP port (`SERVER_PORT` is also accepted) |
-| `LM_API_TOKEN` | *(empty)* | Require `Authorization: Bearer <token>` on `/api` (health stays open, but only reports liveness) |
-| `LM_CORS_ORIGINS` | *(empty)* | Comma separated allowed origins (`*` allows any) |
-| `LM_RATE_LIMIT` | `0` | Requests per minute and client (`0` disables the limiter) |
-| `LM_CATALOG_TTL` | `2` | Seconds between checks of the model sources (`0` disables hot reload) |
-| `LM_API_CACHE_CONTROL` | `public, max-age=60, must-revalidate` | `Cache-Control` of the cacheable JSON endpoints |
-| `LM_GZIP_MIN_BYTES` | `1024` | Smallest response compressed with gzip (`0` disables the compression) |
-| `LM_TRUST_PROXY` | `0` | `1` reads `X-Forwarded-For` to identify the client (rate limiting, logs) |
-| `LM_SEARCH_ALIAS_SUNSET` | `2026-12-31` | `Sunset` date advertised by `POST /api/search` |
-| `LM_PLAYGROUND` | `1` | Set to `0`/`false` to disable `POST /api/playground` |
-| `LM_PLAYGROUND_TIMEOUT` | `60` | Maximum seconds per playground run |
-| `LM_PLAYGROUND_CPU` | `30` | CPU seconds the child process may consume |
-| `LM_PLAYGROUND_MEMORY` | `2048` | Address space of the child, in MiB |
-| `LM_PLAYGROUND_FILES` | `128` | Open file descriptors of the child |
-| `LM_PLAYGROUND_FILE_SIZE` | `32` | Largest file the child may write, in MiB |
-| `LM_PLAYGROUND_BLOCKED_MODULES` | `ftplib,pty,smtplib,subprocess,telnetlib,webbrowser,xmlrpc` | Modules the child may not import (empty disables the guard) |
-| `LM_PLAYGROUND_MAX_BATCH` | `10` | Maximum number of runs in one job |
-| `LM_JOBS_WORKERS` | `2` | Worker threads of the job queue |
-| `LM_JOBS_RETENTION` | `900` | Seconds a finished job stays in memory |
-| `LM_MAX_JOBS` | `200` | Maximum number of jobs kept in memory |
-| `LM_INVOKE` | `1` | Set to `0`/`false` to disable `/invoke` and the sessions |
-| `LM_INVOKE_TIMEOUT` | `LM_PLAYGROUND_TIMEOUT` | Maximum seconds per method call |
-| `LM_INVOKE_MAX_CONCURRENCY` | `4` | Method calls that may run at the same time |
-| `LM_INVOKE_METHODS` | *(empty)* | Explicit allowlist of method names (replaces the policy) |
-| `LM_INVOKE_BLOCKED_METHODS` | *(empty)* | Extra method names to block |
-| `LM_INVOKE_ALLOW_SIDE_EFFECTS` | `0` | Allow `save`/`load`/`plot`/... methods too |
-| `LM_SESSIONS` | `1` | Set to `0`/`false` to disable the stateful sessions |
-| `LM_MAX_SESSIONS` | `4` | Live model instances kept in memory |
-| `LM_SESSION_TTL` | `900` | Seconds an idle session stays alive |
-| `LM_SESSION_TIMEOUT` | `LM_INVOKE_TIMEOUT` | Maximum seconds per call on a session |
-| `LM_LOAD_ROOT` | repository root | Base directory for relative model paths (also restricts loads to that tree) |
-| `LM_LOAD_RESTRICT` | `1` when `LM_LOAD_ROOT` is set | Reject paths outside `LM_LOAD_ROOT` |
-
-The same options are available as flags: `--token`, `--cors-origin` (repeatable),
-`--rate-limit`, `--no-playground` and `--no-invoke` (read-only catalog), plus
-`--trust-proxy`, `--no-compression` and `--version`.
-
-### Robustness and observability
-
-* JSON bodies are capped at 1 MiB (`413`); the asynchronous job endpoint also
-  reads chunked bodies in bounded chunks, and a non JSON content type is
-  rejected with `415`.
-* Errors are mapped to their HTTP status (`400`, `401`, `403`, `404`, `405`,
-  `413`, `415`, `422`, `429`, `500`, `503`, `504`) and logged with the endpoint,
-  the status, the latency and an `X-Request-Id` that is also returned to the
-  client.
-* `GET /api/health` reports `metrics.endpoints` with the request count, the
-  status distribution and the `p50`/`p95`/`max` latency per endpoint, plus the
-  job queue, the session store and the catalog reload counters. With
-  `LM_API_TOKEN` an anonymous probe only receives the liveness fields
-  (`status`, `version`, `models`, `categories`); send the token for the rest.
-* `GET /api/metrics` exposes the same counters in the Prometheus text format
-  (`likelihood_requests_total`, `likelihood_request_errors_total`,
-  `likelihood_request_duration_seconds`, `likelihood_responses_total`), labelled
-  by the coarse endpoint bucket so their cardinality stays bounded.
-* Every response carries `X-Content-Type-Options: nosniff`,
-  `X-Frame-Options: SAMEORIGIN` and `Referrer-Policy: no-referrer`.
-* A queued playground job can be cancelled (and a finished one forgotten) with
-  `DELETE /api/playground/jobs/<job_id>`; a run in flight — one child process —
-  is never killed half way, so the job stops before its next run.
-* The catalog is rebuilt automatically when a model source changes (checked at
-  most once every `LM_CATALOG_TTL` seconds), so editing the package no longer
-  requires a restart. `--package-dir` keeps working as before.
-
-## Notebook generation
+When `LM_API_TOKEN` is set, every `/api` route requires a valid bearer token.
 
 Notebooks are generated from the same introspection catalog:
 
