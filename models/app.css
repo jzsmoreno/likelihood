@@ -21,6 +21,7 @@
      09. Toolbar, inputs and selects
      10. Buttons
      11. Badges, dots and tags
+     11b. Info button and description panel
      12. Tables
      13. Catalog cards
      14. Drawer
@@ -305,12 +306,6 @@ textarea {
 
 .muted { color: var(--db-muted); }
 .faint { color: var(--db-faint); }
-.clamp-3 {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-}
 .row {
   display: flex;
   flex-wrap: wrap;
@@ -1228,6 +1223,109 @@ button.tag.is-active {
 }
 
 /* --------------------------------------------------------------------------
+   11b. Info button and description panel
+   The short description is not rendered inline: it lives behind this control so
+   the catalog stays compact, and is revealed in an anchored info panel.
+   -------------------------------------------------------------------------- */
+
+.info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+  padding: 0;
+  border: 1px solid var(--db-line);
+  border-radius: 50%;
+  background: var(--db-surface);
+  color: var(--db-faint);
+  cursor: pointer;
+  transition: border-color .13s ease, background .13s ease, color .13s ease;
+}
+
+.info-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.info-btn:hover,
+.info-btn:focus-visible,
+.info-btn[aria-expanded="true"] {
+  border-color: var(--db-blue);
+  background: var(--db-blue-soft);
+  color: var(--db-blue);
+}
+
+.info-popover {
+  position: fixed;
+  z-index: 90;
+  width: min(340px, calc(100vw - 24px));
+  padding: 12px 13px;
+  border: 1px solid var(--db-line);
+  border-radius: var(--db-r-md);
+  background: var(--db-surface);
+  box-shadow: var(--db-shadow-md);
+}
+
+.info-popover:focus {
+  outline: none;
+}
+
+.info-popover-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.info-popover-icon {
+  flex: 0 0 auto;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.info-popover-heading {
+  display: grid;
+  flex: 1 1 auto;
+  justify-items: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.info-popover-title {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--db-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.info-popover-text {
+  margin-top: 9px;
+  color: var(--db-text);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.info-popover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--db-line-soft);
+}
+
+.info-close {
+  width: 22px;
+  height: 22px;
+}
+
+
+/* --------------------------------------------------------------------------
    12. Tables
    -------------------------------------------------------------------------- */
 
@@ -1339,13 +1437,6 @@ button.tag.is-active {
   white-space: nowrap;
 }
 
-.table .cell-desc {
-  max-width: 44ch;
-  color: var(--db-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
 .table .cell-num {
   color: var(--db-ink);
   font-variant-numeric: tabular-nums;
@@ -1443,13 +1534,6 @@ button.tag.is-active {
   color: var(--db-faint);
   font-family: var(--db-mono);
   font-size: 10.5px;
-}
-
-.catalog-card-desc {
-  flex: 1 1 auto;
-  color: var(--db-muted);
-  font-size: 12px;
-  line-height: 1.55;
 }
 
 .catalog-card-meta {
@@ -2421,7 +2505,14 @@ pre.code.is-clamped::after {
 
   .table thead th,
   .table tbody td { padding: 8px 10px; }
-  .table .cell-desc { display: none; }
+
+  /* On phones the info panel docks to the bottom instead of floating. */
+  .info-popover.is-sheet {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+  }
 
   .card-grid { padding: 10px; grid-template-columns: 1fr; }
   .drawer { width: 100%; }
@@ -2465,6 +2556,8 @@ pre.code.is-clamped::after {
   .db-sidebar,
   .sidebar-overlay,
   .drawer-backdrop,
+  .info-btn,
+  .info-popover,
   .toast,
   .skip-link,
   .page-actions,

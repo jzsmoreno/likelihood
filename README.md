@@ -54,7 +54,7 @@ The interface follows one design system inspired by the Databricks platform:
 | File | Purpose |
 | --- | --- |
 | `models/app.css` | Shared design tokens and components (top bar, sidebar, panels, tables, badges, buttons, forms, drawer, dark theme, responsive rules). |
-| `models/index.html` | Catalog workspace: collapsible navigation, KPI tiles, table and card views, filters and a model details drawer. |
+| `models/index.html` | Catalog workspace: collapsible navigation, KPI tiles, table and card views, filters, an info panel for descriptions and a model details drawer. |
 | `models/catalog.js` | Catalog behaviour (search, facets, ordering, URL state, drawer). |
 | `models/preview.html`, `models/preview.css` | Model page rendered by the server from the introspection catalog. |
 | `models/preview.js` | Playground, method invocation and saved-model loading on the model page. |

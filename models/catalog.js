@@ -519,10 +519,19 @@
       '</button></th>';
   }
 
+  /* Compact trigger for the description panel (keeps rows single-line). */
+  function infoButton(model) {
+    return '<button class="info-btn" type="button" data-info="' + esc(model.id) + '"' +
+      ' aria-expanded="false" aria-controls="info-popover"' +
+      ' aria-label="Ver la descripción de ' + esc(model.title || model.id) + '"' +
+      ' title="Ver descripción">' +
+      '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">' +
+      '<circle cx="8" cy="8" r="6.1"/><path d="M8 7.3v4.1" stroke-linecap="round"/>' +
+      '<circle cx="8" cy="4.9" r=".85" fill="currentColor" stroke="none"/></svg></button>';
+  }
+
   function tableRow(model, terms) {
     var url = previewUrl(model);
-    var description = String(model.short_description || '');
-    if (description.length > 180) description = description.slice(0, 180) + '…';
     var availability = model.loadable
       ? '<span class="badge badge-green"><span class="dot"></span>Cargable</span>'
       : '<span class="faint">—</span>';
@@ -532,10 +541,10 @@
       '<span class="model-icon" aria-hidden="true">' + esc(model.icon) + '</span>' +
       '<div><a class="model-title" href="' + url + '" data-action="open">' +
       highlight(model.title, terms) + '</a>' +
-      '<span class="model-id">' + esc(model.id) + '</span></div></div></td>' +
+      '<span class="model-id">' + esc(model.id) + '</span></div>' +
+      infoButton(model) + '</div></td>' +
       '<td><span class="badge category-' + esc(model.category) + '">' +
       esc(model.category_label) + '</span></td>' +
-      '<td class="cell-desc hide-md">' + highlight(description, terms) + '</td>' +
       '<td class="cell-num">' + esc(model.parameter_count || 0) + '</td>' +
       '<td class="cell-num">' + esc(model.method_count || 0) + '</td>' +
       '<td class="hide-sm">' + availability + '</td>' +
@@ -556,7 +565,6 @@
       '<thead><tr>' +
       sortHeader('title', 'Modelo') +
       sortHeader('category', 'Categoría') +
-      '<th scope="col" class="hide-md">Descripción</th>' +
       sortHeader('parameters', 'Parámetros', 'num-head') +
       sortHeader('methods', 'Métodos', 'num-head') +
       '<th scope="col" class="hide-sm">Carga</th>' +
@@ -582,6 +590,8 @@
   }
 
   function renderResults(list) {
+    /* The rows are rebuilt below, so an anchored panel would point nowhere. */
+    closeInfo(false);
     if (!list.length) {
       renderEmpty();
       return;
@@ -599,8 +609,6 @@
 
   function cardHtml(model) {
     var terms = state.terms || [];
-    var description = String(model.short_description || '');
-    if (description.length > 200) description = description.slice(0, 200) + '…';
     var url = previewUrl(model);
     var availability = model.loadable
       ? '<span class="meta-sep">·</span><span class="meta-item">' +
@@ -619,13 +627,14 @@
       '<span class="badge category-' + esc(model.category) + '">' +
       esc(model.category_label) + '</span>' +
       '</div>' +
-      '<p class="catalog-card-desc clamp-3">' + highlight(description, terms) + '</p>' +
       modelTags(model, 4) +
       '<div class="catalog-card-meta">' +
       '<span class="meta-item">' + esc(model.parameter_count || 0) + ' parámetros</span>' +
       '<span class="meta-sep">·</span>' +
       '<span class="meta-item">' + esc(model.method_count || 0) + ' métodos</span>' +
       availability +
+      '<span class="spacer"></span>' +
+      infoButton(model) +
       '</div>' +
       '<div class="catalog-card-actions">' +
       '<button class="btn btn-secondary btn-sm" type="button" data-action="open">Ficha</button>' +
@@ -927,6 +936,120 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* Description info panel                                              */
+  /* ------------------------------------------------------------------ */
+
+  var infoState = { id: null, trigger: null };
+
+  function closeInfo(restoreFocus) {
+    if (!dom.infoPopover || dom.infoPopover.hidden) return;
+    dom.infoPopover.hidden = true;
+    dom.infoPopover.innerHTML = '';
+    dom.infoPopover.classList.remove('is-sheet');
+    dom.infoPopover.style.top = '';
+    dom.infoPopover.style.left = '';
+    if (infoState.trigger) {
+      infoState.trigger.setAttribute('aria-expanded', 'false');
+      if (restoreFocus && document.contains(infoState.trigger)) infoState.trigger.focus();
+    }
+    infoState.id = null;
+    infoState.trigger = null;
+  }
+
+  /* Anchor the panel to its trigger, flipping above when there is no room. */
+  function positionInfo(trigger) {
+    var popover = dom.infoPopover;
+    popover.classList.remove('is-sheet');
+    if (window.matchMedia('(max-width: 640px)').matches) {
+      popover.classList.add('is-sheet');
+      popover.style.top = '';
+      popover.style.left = '';
+      return;
+    }
+    var margin = 8;
+    var viewportWidth = window.innerWidth || 1024;
+    var viewportHeight = window.innerHeight || 768;
+    var rect = trigger.getBoundingClientRect();
+    var width = popover.offsetWidth || 340;
+    var height = popover.offsetHeight || 190;
+    var left = Math.min(
+      Math.max(margin, rect.right - width),
+      Math.max(margin, viewportWidth - width - margin)
+    );
+    var top = rect.bottom + 6;
+    if (top + height > viewportHeight - margin) {
+      top = Math.max(margin, rect.top - height - 6);
+    }
+    popover.style.top = Math.round(top) + 'px';
+    popover.style.left = Math.round(left) + 'px';
+  }
+
+  function openInfo(modelId, trigger) {
+    if (!dom.infoPopover) return;
+    var model = findModel(modelId) || state.current;
+    if (!model || model.id !== modelId) return;
+    closeInfo(false);
+    var description = String(model.short_description || '').trim() ||
+      'Este modelo no declara una descripción corta.';
+    dom.infoPopover.innerHTML =
+      '<div class="info-popover-head">' +
+      '<span class="info-popover-icon" aria-hidden="true">' + esc(model.icon) + '</span>' +
+      '<div class="info-popover-heading">' +
+      '<span class="info-popover-title">' + esc(model.title || model.id) + '</span>' +
+      '<span class="badge category-' + esc(model.category) + '">' +
+      esc(model.category_label) + '</span>' +
+      '</div>' +
+      '<button class="icon-btn info-close" type="button" data-info-close' +
+      ' aria-label="Cerrar la descripción">' +
+      '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"' +
+      ' aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke-linecap="round"/></svg>' +
+      '</button>' +
+      '</div>' +
+      '<p class="info-popover-text" id="info-popover-text">' +
+      highlight(description, state.terms) + '</p>' +
+      '<div class="info-popover-actions">' +
+      '<button class="btn btn-secondary btn-xs" type="button" data-info-open="' +
+      esc(model.id) + '">Abrir ficha</button>' +
+      '<a class="btn btn-ghost btn-xs" href="' + previewUrl(model) + '">Página del modelo</a>' +
+      '<button class="btn btn-ghost btn-xs" type="button" data-copy="#info-popover-text"' +
+      ' data-toast="Descripción copiada">Copiar</button>' +
+      '</div>';
+    dom.infoPopover.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    infoState.id = model.id;
+    infoState.trigger = trigger;
+    bindCopyButtons(dom.infoPopover);
+    positionInfo(trigger);
+    dom.infoPopover.focus();
+  }
+
+  function bindInfo() {
+    if (!dom.infoPopover) return;
+    dom.infoPopover.addEventListener('click', function (event) {
+      if (closest(event.target, '[data-info-close]')) {
+        event.preventDefault();
+        closeInfo(true);
+        return;
+      }
+      var opener = closest(event.target, '[data-info-open]');
+      if (opener) {
+        var modelId = opener.getAttribute('data-info-open');
+        closeInfo(false);
+        openDrawer(modelId, null);
+      }
+    });
+    document.addEventListener('click', function (event) {
+      if (dom.infoPopover.hidden) return;
+      if (closest(event.target, '[data-info]')) return;
+      if (closest(event.target, '#info-popover')) return;
+      closeInfo(false);
+    });
+    /* A floating panel would drift away from its trigger: close it instead. */
+    window.addEventListener('scroll', function () { closeInfo(false); }, { passive: true });
+    window.addEventListener('resize', function () { closeInfo(false); });
+  }
+
+  /* ------------------------------------------------------------------ */
   /* URL state                                                           */
   /* ------------------------------------------------------------------ */
 
@@ -1188,6 +1311,16 @@
       resetFilters();
       return;
     }
+    var infoTrigger = closest(target, '[data-info]');
+    if (infoTrigger) {
+      var infoId = infoTrigger.getAttribute('data-info');
+      if (infoState.id === infoId && dom.infoPopover && !dom.infoPopover.hidden) {
+        closeInfo(true);
+      } else {
+        openInfo(infoId, infoTrigger);
+      }
+      return;
+    }
     var tagButton = closest(target, '[data-tag]');
     if (tagButton) {
       setTag(tagButton.getAttribute('data-tag'));
@@ -1226,6 +1359,11 @@
       }
     }
     if (event.key === 'Escape' || event.key === 'Esc') {
+      if (dom.infoPopover && !dom.infoPopover.hidden) {
+        event.preventDefault();
+        closeInfo(true);
+        return;
+      }
       if (document.body.classList.contains('sidebar-open')) {
         closeMobileSidebar();
         return;
@@ -1353,6 +1491,7 @@
     dom.serverStatusText = byId('server-status-text');
     dom.themeToggle = byId('theme-toggle');
     dom.toast = byId('toast');
+    dom.infoPopover = byId('info-popover');
     dom.drawerBackdrop = byId('drawer-backdrop');
     dom.drawer = byId('drawer');
     dom.drawerTitle = byId('drawer-title');
@@ -1368,6 +1507,7 @@
     syncViewButtons();
     syncSidebarToggle();
     bindEvents();
+    bindInfo();
     loadHealth();
     loadCatalog();
   }

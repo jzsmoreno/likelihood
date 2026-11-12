@@ -453,6 +453,7 @@ def test_catalog_page_uses_the_shared_design_system(client):
     assert 'id="drawer"' in html
     assert 'id="results"' in html
     assert 'id="view-table"' in html
+    assert 'id="info-popover"' in html
     assert "api/models" in html
 
 
