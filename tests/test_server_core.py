@@ -315,6 +315,27 @@ def test_model_brief_exposes_the_import_statement():
     model = next(item for item in core.CATALOG if item["id"] == "Arima")
     brief = core.model_brief(model)
     assert brief["import_statement"] == model["import_statement"]
+    assert brief["model_type_id"] == model["id"]
+
+
+def test_endpoint_label_bounds_serving_and_monitoring_ids():
+    """Model/deployment ids must not become unbounded Prometheus labels."""
+    assert (
+        core.endpoint_label("GET", "/api/serving/models/mdl-123")
+        == "GET /api/serving/models/<model_id>"
+    )
+    assert (
+        core.endpoint_label("DELETE", "/api/serving/endpoints/hmm-a/metrics")
+        == "DELETE /api/serving/endpoints/<endpoint_id>/metrics"
+    )
+    assert (
+        core.endpoint_label("DELETE", "/api/monitoring/endpoints/hmm-a/metrics")
+        == "DELETE /api/monitoring/endpoints/<endpoint_id>/metrics"
+    )
+    assert (
+        core.endpoint_label("GET", "/api/serving/endpoints/hmm-a/")
+        == "GET /api/serving/endpoints/<endpoint_id>"
+    )
 
 
 def test_rate_limiter_and_metrics():

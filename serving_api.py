@@ -49,6 +49,38 @@ def _model_or_404(settings: Any, model_id: str) -> Dict[str, Any]:
     return model
 
 
+def _resolve_model(
+    settings: Any, data: Dict[str, Any]
+) -> tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
+    """Resolve a deployment payload into ``(catalog_model, model_instance)``.
+
+    ``model_id`` keeps accepting the catalog id for old clients; when it matches a
+    registered instance the deployment reuses it (one model, many deployments).
+    """
+    raw_model_id = str(data.get("model_id") or "").strip()
+    model_type_id = str(data.get("model_type_id") or data.get("catalog_model_id") or "").strip()
+    instance: Optional[Dict[str, Any]] = None
+    if raw_model_id:
+        try:
+            instance = settings.serving.get_model(raw_model_id)
+        except core.ModelNotFound:
+            instance = None
+    if instance is not None:
+        if model_type_id and model_type_id != instance["model_type_id"]:
+            raise core.ValidationError(
+                f'La instancia "{raw_model_id}" pertenece a '
+                f'{instance["model_type_id"]}, no a {model_type_id}'
+            )
+        model_type_id = instance["model_type_id"]
+    else:
+        model_type_id = model_type_id or raw_model_id
+    if not model_type_id:
+        raise core.ValidationError(
+            "Indica 'model_id' (instancia existente) o 'model_type_id' (modelo del catálogo)"
+        )
+    return _model_or_404(settings, model_type_id), instance
+
+
 def require_serving(settings: Any) -> None:
     """Serving reuses the invocation sandbox, so both switches must be on."""
     if not getattr(settings, "serving_enabled", True):
@@ -64,7 +96,17 @@ class DeploymentRequest(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    model_id: str = Field(default="", description="Modelo del catálogo que se despliega.")
+    model_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Instancia de modelo existente (``mdl-...``). Por compatibilidad, si no "
+            "existe una instancia con ese id se interpreta como el id del catálogo."
+        ),
+    )
+    model_type_id: Optional[str] = Field(
+        default=None,
+        description="Id del modelo del catálogo (tipo/arquitectura) para una nueva instancia.",
+    )
     method: str = Field(default="", description="Método de inferencia que expone el endpoint.")
     endpoint_name: Optional[str] = Field(
         default=None, description="Nombre visible del endpoint (único)."
@@ -92,12 +134,60 @@ class DeploymentRequest(BaseModel):
         return data
 
 
+class ModelRequest(BaseModel):
+    """Body of ``POST /api/serving/models``."""
+
+    model_config = ConfigDict(extra="allow")
+
+    model_type_id: Optional[str] = Field(
+        default=None, description="Id del modelo del catálogo que se instancia."
+    )
+    model_id: Optional[str] = Field(
+        default=None, description="Alias de ``model_type_id`` para clientes antiguos."
+    )
+    name: Optional[str] = Field(default=None, description="Nombre visible de la instancia.")
+    description: Optional[str] = Field(default=None, description="Descripción libre.")
+    parameters: Optional[Dict[str, Any]] = Field(
+        default=None, description="Argumentos del constructor del modelo."
+    )
+    load: Optional[Dict[str, Any]] = Field(
+        default=None, description="Carga opcional del artefacto entrenado."
+    )
+
+    def payload(self) -> Dict[str, Any]:
+        data = {key: value for key, value in self.model_dump().items() if value is not None}
+        data.update(self.model_extra or {})
+        return data
+
+
+def _model_instance_brief(settings: Any, model_id: str) -> Optional[Dict[str, Any]]:
+    """Small projection of a model instance for endpoint payloads."""
+    try:
+        model = settings.serving.get_model(model_id)
+    except core.ModelNotFound:
+        return None
+    return {
+        "model_id": model["model_id"],
+        "model_instance_id": model["model_id"],
+        "model_type_id": model.get("model_type_id"),
+        "name": model.get("name"),
+        "parameters": model.get("parameters") or {},
+        "load": model.get("load") or {"enabled": False},
+        "loaded_artifact": model.get("loaded_artifact"),
+        "created_at": model.get("created_at"),
+    }
+
+
 def _brief(deployment: Dict[str, Any]) -> Dict[str, Any]:
     """Small endpoint projection used by lists and filters."""
     return {
         "id": deployment["id"],
+        "deployment_id": deployment.get("deployment_id") or deployment["id"],
         "name": deployment["name"],
         "model_id": deployment["model_id"],
+        "model_instance_id": deployment["model_id"],
+        "model_type_id": deployment.get("model_type_id"),
+        "catalog_model_id": deployment.get("catalog_model_id") or deployment.get("model_type_id"),
         "model_name": deployment["model_name"],
         "model_title": deployment.get("model_title") or deployment["model_name"],
         "model_icon": deployment.get("model_icon") or "📦",
@@ -133,7 +223,7 @@ def deployment_payload(
     """Full endpoint payload with live model/method metadata and URLs."""
     payload = dict(deployment)
     payload.pop("_method", None)
-    model = find_model(settings.catalog, deployment["model_id"])
+    model = find_model(settings.catalog, deployment.get("model_type_id") or deployment["model_id"])
     method = None
     if model is not None:
         method = core.find_method(model, deployment["method"])
@@ -151,6 +241,11 @@ def deployment_payload(
         {
             "status_label": label,
             "status_tone": tone,
+            "deployment_id": deployment.get("deployment_id") or deployment["id"],
+            "model_instance_id": deployment["model_id"],
+            "model_type_id": deployment.get("model_type_id"),
+            "catalog_model_id": deployment.get("catalog_model_id")
+            or deployment.get("model_type_id"),
             "endpoint_url": base + path,
             "endpoint_path": path,
             "predict_url": path,
@@ -163,12 +258,14 @@ def deployment_payload(
                 core.model_brief(model)
                 if model is not None
                 else {
-                    "id": deployment["model_id"],
+                    "id": deployment.get("model_type_id") or deployment["model_id"],
+                    "model_type_id": deployment.get("model_type_id"),
                     "title": deployment.get("model_title") or deployment["model_id"],
                     "icon": deployment.get("model_icon") or "📦",
                     "available": False,
                 }
             ),
+            "model_instance": _model_instance_brief(settings, deployment["model_id"]),
             "model_available": model is not None,
             "method_available": method is not None,
             "inference_like": serving_core.is_inference_method(deployment["method"]),
@@ -238,7 +335,10 @@ def build_router() -> APIRouter:
         settings: Any = Depends(get_settings),
         q: str = Query("", description="Busca por nombre, modelo o método."),
         status: str = Query("", description="running, stopped, failed o deploying."),
-        model_id: str = Query("", description="Filtra por modelo del catálogo."),
+        model_id: str = Query(
+            "", description="Filtra por instancia (mdl-...) o, por compatibilidad, por tipo."
+        ),
+        model_type_id: str = Query("", description="Filtra por modelo del catálogo."),
     ) -> JSONResponse:
         """Every deployed endpoint with its all-time counters."""
         require_serving(settings)
@@ -248,7 +348,12 @@ def build_router() -> APIRouter:
         wanted_status = (status or "").strip().lower()
         rows: List[Dict[str, Any]] = []
         for deployment in settings.serving.list():
-            if model_id and deployment["model_id"] != model_id:
+            if model_id and model_id not in {
+                deployment.get("model_id"),
+                deployment.get("model_type_id"),
+            }:
+                continue
+            if model_type_id and deployment.get("model_type_id") != model_type_id:
                 continue
             if wanted_status and deployment["status"] != wanted_status:
                 continue
@@ -257,6 +362,7 @@ def build_router() -> APIRouter:
                     [
                         deployment["name"],
                         deployment["model_id"],
+                        deployment.get("model_type_id") or "",
                         deployment["model_name"],
                         deployment["method"],
                         deployment.get("description") or "",
@@ -298,8 +404,8 @@ def build_router() -> APIRouter:
         """
         require_serving(settings)
         data = body.payload()
-        model = _model_or_404(settings, str(data.get("model_id") or ""))
-        deployment = settings.serving.create(model, data)
+        model, instance = _resolve_model(settings, data)
+        deployment = settings.serving.create(model, data, instance=instance)
         payload = deployment_payload(
             settings,
             deployment,
@@ -320,8 +426,8 @@ def build_router() -> APIRouter:
         """Validate a deployment payload without creating the endpoint."""
         require_serving(settings)
         data = body.payload()
-        model = _model_or_404(settings, str(data.get("model_id") or ""))
-        result = settings.serving.preview(model, data)
+        model, instance = _resolve_model(settings, data)
+        result = settings.serving.preview(model, data, instance=instance)
         return _no_store({"success": True, **result})
 
     @router.get("/api/serving/endpoints/{endpoint_id}", tags=[SERVING_TAG])
@@ -342,7 +448,7 @@ def build_router() -> APIRouter:
         """Code samples generated from the deployed model and method."""
         require_serving(settings)
         deployment = settings.serving.get(endpoint_id)
-        model = _model_or_404(settings, deployment["model_id"])
+        model = _model_or_404(settings, deployment.get("model_type_id") or deployment["model_id"])
         method = core.method_for_invocation(model, deployment["method"])
         docs = serving_core.build_docs(
             deployment,
@@ -401,7 +507,7 @@ def build_router() -> APIRouter:
         """
         require_serving(settings)
         deployment = settings.serving.get(endpoint_id)
-        model = _model_or_404(settings, deployment["model_id"])
+        model = _model_or_404(settings, deployment.get("model_type_id") or deployment["model_id"])
         result = settings.serving.predict(deployment["id"], model, body)
         return _no_store(result, 200)
 
@@ -424,7 +530,7 @@ def build_router() -> APIRouter:
         """Restart a stopped endpoint (revalidates the method and the artifact)."""
         require_serving(settings)
         deployment = settings.serving.get(endpoint_id)
-        model = _model_or_404(settings, deployment["model_id"])
+        model = _model_or_404(settings, deployment.get("model_type_id") or deployment["model_id"])
         deployment = settings.serving.restart(deployment["id"], model)
         return json_response(
             202,
@@ -437,10 +543,70 @@ def build_router() -> APIRouter:
 
     @router.delete("/api/serving/endpoints/{endpoint_id}", tags=[SERVING_TAG])
     def delete_endpoint(endpoint_id: str, settings: Any = Depends(get_settings)) -> JSONResponse:
-        """Delete an endpoint. Its past events remain in the monitoring history."""
+        """Permanently delete a deployment and all its monitoring metrics.
+
+        The catalog model and the model instance are preserved, so another
+        deployment of the same model continues to work.
+        """
         require_serving(settings)
-        deployment = settings.serving.delete(endpoint_id)
-        return _no_store({"success": True, "endpoint_id": deployment["id"], "deleted": True})
+        result = settings.serving.delete(endpoint_id)
+        return _no_store(
+            {
+                "success": True,
+                "deleted": True,
+                "endpoint_id": result["deployment_id"],
+                **result,
+            }
+        )
+
+    @router.delete("/api/serving/endpoints/{endpoint_id}/metrics", tags=[SERVING_TAG])
+    @router.delete("/api/monitoring/endpoints/{endpoint_id}/metrics", tags=[MONITORING_TAG])
+    def delete_endpoint_metrics(
+        endpoint_id: str, settings: Any = Depends(get_settings)
+    ) -> JSONResponse:
+        """Manually delete every monitoring event of one deployment.
+
+        The deployment and its model instance are kept; only the event log rows that
+        belong to this deployment are removed.
+        """
+        require_serving(settings)
+        result = settings.serving.clear_metrics(endpoint_id)
+        return _no_store(
+            {
+                "success": True,
+                "deleted": True,
+                "endpoint_id": result["deployment_id"],
+                **result,
+            }
+        )
+
+    @router.get("/api/serving/models", tags=[SERVING_TAG])
+    def list_models(settings: Any = Depends(get_settings)) -> JSONResponse:
+        """Registered model instances, independent from their deployments."""
+        require_serving(settings)
+        models = settings.serving.list_models()
+        return _no_store({"success": True, "count": len(models), "models": models})
+
+    @router.post("/api/serving/models", status_code=201, tags=[SERVING_TAG])
+    def create_model(body: ModelRequest, settings: Any = Depends(get_settings)) -> JSONResponse:
+        """Register a model instance with its own unique ``model_id``."""
+        require_serving(settings)
+        data = body.payload()
+        model_type_id = str(data.get("model_type_id") or data.get("model_id") or "").strip()
+        model = _model_or_404(settings, model_type_id)
+        created = settings.serving.create_model(model, data)
+        return json_response(
+            201,
+            {"success": True, "model": created, **created},
+            {"Location": f"/api/serving/models/{created['model_id']}"},
+        )
+
+    @router.get("/api/serving/models/{model_id}", tags=[SERVING_TAG])
+    def get_model(model_id: str, settings: Any = Depends(get_settings)) -> JSONResponse:
+        """One registered model instance."""
+        require_serving(settings)
+        model = settings.serving.get_model(model_id)
+        return _no_store({"success": True, "model": model, **model})
 
     # -- monitoring --------------------------------------------------------
 
@@ -458,29 +624,42 @@ def build_router() -> APIRouter:
         range: str = Query("24h", description="1h, 24h, 7d, 30d o custom."),
         start: Optional[str] = Query(None, description="Inicio ISO-8601 (custom)."),
         end: Optional[str] = Query(None, description="Fin ISO-8601 (custom)."),
-        model_id: str = Query("", description="Filtra por modelo."),
+        model_id: str = Query("", description="Filtra por instancia de modelo (mdl-...)."),
+        model_type_id: str = Query("", description="Filtra por modelo del catálogo."),
         endpoint_id: str = Query("", description="Filtra por endpoint."),
+        deployment_id: str = Query("", description="Alias de endpoint_id."),
     ) -> JSONResponse:
         """Global KPIs, time series, breakdowns, errors and resource sample."""
         window = _window(range, start, end)
         deployments = settings.serving.list()
         events = settings.serving.events.events()
-        payload = monitoring_core.overview(events, deployments, window, model_id, endpoint_id)
+        payload = monitoring_core.overview(
+            events,
+            deployments,
+            window,
+            model_id=model_id,
+            endpoint_id=endpoint_id,
+            model_type_id=model_type_id,
+            deployment_id=deployment_id,
+        )
         options = monitoring_core.endpoint_index(deployments, events)
-        models: Dict[str, Dict[str, Any]] = {}
-        for option in options:
-            key = option.get("model_id") or ""
-            if key:
-                models.setdefault(
-                    key,
-                    {"id": key, "name": option.get("model_name") or key},
-                )
+        models = [
+            {
+                "id": model["model_id"],
+                "model_instance_id": model["model_id"],
+                "model_type_id": model.get("model_type_id") or "",
+                "name": model.get("model_name") or model["model_id"],
+                "instance_name": model.get("name") or model["model_id"],
+                "deployments": model.get("deployment_count") or 0,
+            }
+            for model in settings.serving.list_models()
+        ]
         payload.update(
             {
                 "success": True,
                 "options": {
                     "endpoints": options,
-                    "models": sorted(models.values(), key=lambda item: item["name"].lower()),
+                    "models": sorted(models, key=lambda item: item["name"].lower()),
                 },
                 "deployments": [_brief(deployment) for deployment in deployments],
             }
@@ -494,6 +673,7 @@ def build_router() -> APIRouter:
         start: Optional[str] = Query(None),
         end: Optional[str] = Query(None),
         model_id: str = Query(""),
+        model_type_id: str = Query(""),
     ) -> JSONResponse:
         """Per-endpoint aggregates for the selected window."""
         window = _window(range, start, end)
@@ -503,6 +683,7 @@ def build_router() -> APIRouter:
             window["start"],
             window["end"],
             model_id=model_id,
+            model_type_id=model_type_id,
         )
         rows = monitoring_core.endpoint_breakdown(events)
         for row in rows:
@@ -554,7 +735,9 @@ def build_router() -> APIRouter:
         start: Optional[str] = Query(None),
         end: Optional[str] = Query(None),
         model_id: str = Query(""),
+        model_type_id: str = Query(""),
         endpoint_id: str = Query(""),
+        deployment_id: str = Query(""),
         status: str = Query("", description="success o error"),
         limit: int = Query(50, ge=1, le=500),
         offset: int = Query(0, ge=0),
@@ -565,9 +748,11 @@ def build_router() -> APIRouter:
             settings.serving.events.events(),
             window["start"],
             window["end"],
-            endpoint_id,
-            model_id,
-            status,
+            endpoint_id=endpoint_id,
+            model_id=model_id,
+            status=status,
+            model_type_id=model_type_id,
+            deployment_id=deployment_id,
         )
         newest = list(reversed(events))
         page = newest[offset : offset + limit]

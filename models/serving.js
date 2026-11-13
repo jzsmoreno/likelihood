@@ -12,6 +12,8 @@
   var state = {
     health: null,
     models: [],
+    instances: [],
+    reuseInstance: null,
     modelFilter: '',
     modelCategory: '',
     selectedModel: null,
@@ -317,7 +319,9 @@
     var selected = dom.modelFilter.value;
     var models = {};
     state.endpoints.forEach(function (endpoint) {
-      models[endpoint.model_id] = endpoint.model_title || endpoint.model_name || endpoint.model_id;
+      models[endpoint.model_id] =
+        (endpoint.model_title || endpoint.model_name || endpoint.model_type_id || endpoint.model_id) +
+        ' · ' + endpoint.model_id;
     });
     var html = '<option value="">Todos</option>';
     Object.keys(models).sort().forEach(function (key) {
@@ -382,8 +386,10 @@
       '<td><div class="cell-name"><span class="model-icon">' + esc(endpoint.model_icon || '⇢') + '</span>' +
       '<span><a class="model-title" href="/serving/' + encodeURIComponent(endpoint.id) + '">' + esc(endpoint.name) + '</a>' +
       '<span class="model-id mono">' + esc(endpoint.id) + '</span></span></div></td>' +
-      '<td><a href="/preview/' + encodeURIComponent(endpoint.model_id) + '">' + esc(endpoint.model_title || endpoint.model_name) + '</a>' +
-      '<span class="model-id mono">' + esc(endpoint.model_id) + '</span></td>' +
+      '<td><a href="/preview/' + encodeURIComponent(endpoint.model_type_id || endpoint.model_id) + '">' +
+      esc(endpoint.model_title || endpoint.model_name) + '</a>' +
+      '<span class="model-id mono">' + esc(endpoint.model_type_id || endpoint.model_id) + '</span>' +
+      '<span class="model-id mono" title="model_id de la instancia">' + esc(endpoint.model_id) + '</span></td>' +
       '<td><span class="mono">' + esc(endpoint.method) + '</span></td>' +
       '<td>' + statusBadge(endpoint.status, endpoint.status_label) + '</td>' +
       '<td class="cell-num">' + fmt(stats.requests || 0) + '</td>' +
@@ -442,6 +448,7 @@
 
   function resetWizard(modelId) {
     state.selectedModel = modelId ? { id: modelId } : null;
+    state.reuseInstance = null;
     state.modelFilter = '';
     state.modelCategory = '';
     state.modelDetail = null;
@@ -463,18 +470,24 @@
 
   function openWizard(modelId) {
     resetWizard(modelId);
-    if (!state.models.length) {
-      api('/api/models?limit=200').then(function (data) {
-        state.models = data.models || [];
-        showWizard();
-        if (modelId) selectModel(modelId);
-      }).catch(function (error) {
-        toast(error.message, true);
-      });
-    } else {
+    var catalogRequest = state.models.length
+      ? Promise.resolve(state.models)
+      : api('/api/models?limit=200').then(function (data) {
+          state.models = data.models || [];
+          return state.models;
+        });
+    Promise.all([
+      catalogRequest,
+      api('/api/serving/models').then(function (data) {
+        state.instances = data.models || [];
+        return state.instances;
+      }).catch(function () { return []; })
+    ]).then(function () {
       showWizard();
       if (modelId) selectModel(modelId);
-    }
+    }).catch(function (error) {
+      toast(error.message, true);
+    });
   }
 
   function showWizard() {
@@ -566,8 +579,13 @@
   }
 
 
-  function selectModel(modelId) {
+  function selectModel(modelId, instance) {
     var brief = state.models.filter(function (model) { return model.id === modelId; })[0] || { id: modelId };
+    if (instance) {
+      state.reuseInstance = instance;
+    } else if (!state.reuseInstance || state.reuseInstance.model_type_id !== modelId) {
+      state.reuseInstance = null;
+    }
     if (state.selectedModel && state.selectedModel.id !== modelId) {
       state.loadEnabled = false;
       state.loadPath = '';
@@ -590,6 +608,14 @@
       });
       state.method = preferredMethod(state.methods);
       state.parametersText = defaultParameters();
+      if (state.reuseInstance) {
+        state.parametersText = JSON.stringify(state.reuseInstance.parameters || {}, null, 2);
+        state.loadEnabled = Boolean(
+          state.reuseInstance.load && state.reuseInstance.load.enabled
+        );
+        state.loader = (state.reuseInstance.load && state.reuseInstance.load.loader) || '';
+        state.loadPath = (state.reuseInstance.load && state.reuseInstance.load.path) || '';
+      }
       state.nameTouched = false;
       if (state.method) {
         state.name = slug(modelId) + '-' + slug(state.method.name);
@@ -621,8 +647,19 @@
         return '<option value="' + esc(key) + '"' + (state.modelCategory === key ? ' selected' : '') + '>' +
           esc(categories[key]) + '</option>';
       }).join('');
+    var instanceOptions = '<option value="">Crear una instancia nueva</option>' +
+      state.instances.map(function (instance) {
+        var selected = state.reuseInstance && state.reuseInstance.model_id === instance.model_id;
+        var label = (instance.name || instance.model_name || instance.model_id) +
+          ' · ' + instance.model_type_id + ' · ' + instance.model_id;
+        return '<option value="' + esc(instance.model_id) + '"' + (selected ? ' selected' : '') + '>' +
+          esc(label) + '</option>';
+      }).join('');
     panel.innerHTML = '<h3 class="wizard-section-title">1 · Selecciona un modelo</h3>' +
-      '<p class="wizard-section-sub">Modelos introspeccionados de la librería. Solo se podrán exponer los métodos que aceptan argumentos JSON.</p>' +
+      '<p class="wizard-section-sub">Elige el tipo de modelo del catálogo o reutiliza una instancia registrada. Cada instancia tiene un <code>model_id</code> único; un modelo puede alimentar varios deployments.</p>' +
+      '<div class="wizard-field" style="margin-bottom:12px"><label for="wizard-model-instance">Instancia de modelo (opcional)</label>' +
+      '<select class="select" id="wizard-model-instance">' + instanceOptions + '</select>' +
+      '<span class="hint">Reutilizar una instancia conserva sus parámetros y su artefacto cargado.</span></div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
       '<div class="search-field" style="max-width:none;flex:1 1 220px">' +
       '<span class="search-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.4"/><path d="M10.3 10.3 14 14" stroke-linecap="round"/></svg></span>' +
@@ -650,8 +687,28 @@
         renderStepModel();
       });
     }
+    var instanceSelect = byId('wizard-model-instance');
+    if (instanceSelect) {
+      instanceSelect.addEventListener('change', function () {
+        var found = state.instances.filter(function (item) {
+          return item.model_id === instanceSelect.value;
+        })[0];
+        if (found) {
+          state.reuseInstance = found;
+          selectModel(found.model_type_id, found);
+        } else {
+          state.reuseInstance = null;
+          state.parametersText = defaultParameters();
+          state.loadEnabled = false;
+          state.loadPath = '';
+          state.loader = '';
+          renderWizard();
+        }
+      });
+    }
     each(panel.querySelectorAll('.model-pick'), function (button) {
       button.addEventListener('click', function () {
+        state.reuseInstance = null;
         selectModel(button.getAttribute('data-model'));
       });
     });
@@ -674,6 +731,9 @@
     var model = state.modelDetail;
     return '<div class="model-summary">' +
       summaryItem('Modelo', model.name) +
+      (state.reuseInstance
+        ? summaryItem('Instancia reutilizada', state.reuseInstance.model_id)
+        : summaryItem('Nueva instancia', 'se generará un model_id único')) +
       summaryItem('Versión', (state.health && state.health.version ? 'v' + state.health.version : '—') +
         ' · ' + (model.module || '')) +
       summaryItem('Tipo', 'Clase · ' + (model.category_label || model.category)) +
@@ -692,6 +752,22 @@
   function renderStepLoad() {
     var panel = byId('wizard-panel-2');
     if (!panel || !state.modelDetail) return;
+    if (state.reuseInstance) {
+      var instance = state.reuseInstance;
+      panel.innerHTML = '<h3 class="wizard-section-title">2 · Modelo reutilizado</h3>' +
+        '<p class="wizard-section-sub">Este deployment usará una instancia de modelo ya registrada. No se crea otro modelo ni se modifica el existente.</p>' +
+        '<div class="info-strip"><strong>model_id:</strong> <code>' + esc(instance.model_id) +
+        '</code> · <strong>tipo:</strong> <code>' + esc(instance.model_type_id) + '</code></div>' +
+        '<div class="review-grid" style="margin-top:12px">' +
+        reviewCard('Instancia', instance.name || instance.model_id) +
+        reviewCard('Fuente', instance.load && instance.load.enabled
+          ? 'Modelo guardado · ' + (instance.load.loader || '') + ' · ' + (instance.load.path || '')
+          : 'Constructor') +
+        reviewCard('Parámetros', JSON.stringify(instance.parameters || {})) +
+        reviewCard('Deployments', String(instance.deployment_count || 0)) +
+        '</div>';
+      return;
+    }
     var model = state.modelDetail;
     var loaders = model.loaders || [];
     var canLoad = loaders.length > 0;
@@ -839,6 +915,8 @@
       '</div>' +
       '<div class="review-grid" style="margin-top:14px">' +
       reviewCard('Modelo', state.selectedModel.name + ' · ' + (state.selectedModel.signature || '')) +
+      reviewCard('Model ID', state.reuseInstance ? state.reuseInstance.model_id : 'nuevo · se generará al desplegar') +
+      reviewCard('Deployment ID', 'se generará desde el nombre del endpoint') +
       reviewCard('Método', state.method.name + ' · ' + state.method.signature) +
       reviewCard('Fuente', loadSummary) +
       reviewCard('Runtime', state.timeout + ' s · ' + state.concurrency + ' en paralelo') +
@@ -874,7 +952,10 @@
       throw new Error('Los parámetros del constructor deben ser un objeto JSON');
     }
     return {
-      model_id: state.modelDetail.id,
+      model_id: state.reuseInstance ? state.reuseInstance.model_id : undefined,
+      model_type_id: state.reuseInstance
+        ? state.reuseInstance.model_type_id
+        : (state.modelDetail.model_type_id || state.modelDetail.id),
       method: state.method.name,
       endpoint_name: state.name,
       description: state.description,
@@ -1024,15 +1105,18 @@
       '<div class="page-eyebrow"><a href="/serving">Endpoints</a> · Serving</div>' +
       '<h1>' + esc(endpoint.name) + statusBadge(endpoint.status, endpoint.status_label) + '</h1>' +
       '<div class="endpoint-hero-sub">' +
-      '<span><a href="/preview/' + encodeURIComponent(endpoint.model_id) + '">' + esc(endpoint.model_title || endpoint.model_name) + '</a></span>' +
+      '<span><a href="/preview/' + encodeURIComponent(endpoint.model_type_id || endpoint.model_id) + '">' +
+      esc(endpoint.model_title || endpoint.model_name) + '</a></span>' +
       '<span class="mono">' + esc(endpoint.method_signature || endpoint.method) + '</span>' +
       '<span>revisión v' + esc(endpoint.revision || 1) + '</span>' +
+      '<span class="mono">model_id: ' + esc(endpoint.model_id) + '</span>' +
       '</div></div>' +
       '<div class="endpoint-hero-actions">' +
       (running ? '<button class="btn btn-primary btn-sm" type="button" data-endpoint-action="test">Probar</button>' : '') +
       (running ? '<button class="btn btn-secondary btn-sm" type="button" data-endpoint-action="stop">Detener</button>' : '') +
       (!running && !deploying ? '<button class="btn btn-primary btn-sm" type="button" data-endpoint-action="restart">Reiniciar</button>' : '') +
       (deploying ? '<button class="btn btn-secondary btn-sm" type="button" disabled><span class="spinner" style="width:12px;height:12px"></span> Desplegando</button>' : '') +
+      '<button class="btn btn-ghost btn-sm" type="button" data-endpoint-action="clear-metrics">Borrar métricas</button>' +
       '<button class="btn btn-ghost btn-sm" type="button" data-endpoint-action="delete">Eliminar</button>' +
       '</div></div>' +
       '<div class="endpoint-url-bar">' +
@@ -1042,7 +1126,9 @@
       '<a class="btn btn-ghost btn-sm" href="/monitoring/' + encodeURIComponent(endpoint.id) + '">Monitorización</a>' +
       '</div>' +
       '<div class="endpoint-meta-grid">' +
-      meta('Modelo', endpoint.model_id) +
+      meta('Modelo', endpoint.model_type_id || endpoint.model_id) +
+      meta('Model ID', endpoint.model_id) +
+      meta('Deployment ID', endpoint.deployment_id || endpoint.id) +
       meta('Método', endpoint.method) +
       meta('Fuente', endpoint.load && endpoint.load.enabled ? 'Modelo cargado' : 'Constructor') +
       meta('Timeout', endpoint.config.timeout_seconds + ' s') +
@@ -1119,6 +1205,7 @@
       if (name === 'test') switchTab('probar');
       if (name === 'stop') endpointAction('stop');
       if (name === 'restart') endpointAction('restart');
+      if (name === 'clear-metrics') endpointAction('clear-metrics');
       if (name === 'delete') endpointAction('delete');
     });
   }
@@ -1126,13 +1213,32 @@
   function endpointAction(action) {
     var endpoint = state.endpoint;
     if (!endpoint) return;
+    if (action === 'clear-metrics') {
+      confirmAction(
+        'Borrar métricas del deployment',
+        'Se eliminarán todas las métricas de <strong>' + esc(endpoint.name) +
+          '</strong> (deployment <code>' + esc(endpoint.deployment_id || endpoint.id) + '</code>). ' +
+          'El deployment, su modelo (<code>' + esc(endpoint.model_id) + '</code>) y las métricas de otros deployments no se modifican.',
+        function () {
+          return api('/api/serving/endpoints/' + encodeURIComponent(endpoint.id) + '/metrics', {
+            method: 'DELETE'
+          }).then(function (result) {
+            toast((result.metrics_deleted || 0) + ' métricas eliminadas');
+            loadEndpoint(endpoint.id);
+          }).catch(function (error) { toast(error.message, true); });
+        }
+      );
+      return;
+    }
     if (action === 'delete') {
       confirmAction(
         'Eliminar endpoint',
-        'El endpoint <strong>' + esc(endpoint.name) + '</strong> dejará de aceptar peticiones. El historial de métricas se conserva para auditoría.',
+        'El endpoint <strong>' + esc(endpoint.name) + '</strong> dejará de aceptar peticiones. ' +
+          'También se eliminarán automáticamente todas sus métricas de monitoring. ' +
+          'El modelo del catálogo y la instancia <code>' + esc(endpoint.model_id) + '</code> se conservan.',
         function () {
-          return api('/api/serving/endpoints/' + encodeURIComponent(endpoint.id), { method: 'DELETE' }).then(function () {
-            toast('Endpoint eliminado');
+          return api('/api/serving/endpoints/' + encodeURIComponent(endpoint.id), { method: 'DELETE' }).then(function (result) {
+            toast('Endpoint eliminado · ' + (result.metrics_deleted || 0) + ' métricas borradas');
             window.location.href = '/serving';
           }).catch(function (error) { toast(error.message, true); });
         }
@@ -1184,7 +1290,9 @@
       '<span class="panel-sub">inmutable mientras está en ejecución</span></div><div class="panel-body">' +
       '<div class="review-grid">' +
       reviewCard('Endpoint', endpoint.name) +
-      reviewCard('Modelo', endpoint.model_id) +
+      reviewCard('Deployment ID', endpoint.deployment_id || endpoint.id) +
+      reviewCard('Modelo', endpoint.model_type_id || endpoint.model_id) +
+      reviewCard('Model ID', endpoint.model_id) +
       reviewCard('Método', endpoint.method) +
       reviewCard('Timeout', endpoint.config.timeout_seconds + ' s') +
       reviewCard('Concurrencia', String(endpoint.config.max_concurrency)) +
@@ -1376,6 +1484,11 @@
     var sample = docs.samples.filter(function (item) { return item.language === language; })[0] || docs.samples[0];
     var fields = (docs.request_schema && docs.request_schema.fields) || [];
     panel.innerHTML =
+      '<div class="info-strip" style="margin-bottom:14px">' +
+      '<span><strong>Deployment:</strong> <code>' + esc(docs.deployment_id || docs.endpoint_id) + '</code></span>' +
+      '<span><strong>Model ID:</strong> <code>' + esc(docs.model_id || '—') + '</code></span>' +
+      '<span><strong>Tipo:</strong> <code>' + esc(docs.model_type_id || docs.model.model_type_id || '—') + '</code></span>' +
+      '</div>' +
       '<div class="info-strip' + (docs.auth.required ? ' is-warn' : '') + '" style="margin-bottom:14px">' +
       (docs.auth.required
         ? '<strong>Autenticación requerida.</strong> ' + esc(docs.auth.note)

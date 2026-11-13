@@ -748,6 +748,9 @@ def _to_model(record: Dict[str, Any]) -> Dict[str, Any]:
     label, icon = category_meta(model["category"])
     model["category_label"] = label
     model["icon"] = icon
+    # ``id`` is the catalog type/architecture.  Deployed instances get their own
+    # unique ``model_id``; ``model_type_id`` makes the distinction explicit.
+    model["model_type_id"] = model["id"]
     model["short_description"] = _first_paragraph(split_sections(model["docstring"]).get("", []))
     model["full_description"] = model["docstring"].strip() or model["short_description"]
     model["title"] = split_identifier(model["name"])

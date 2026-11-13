@@ -14,6 +14,7 @@ Run with::
 from __future__ import annotations
 
 import asyncio
+import json
 import pickle
 import sys
 import time
@@ -360,3 +361,331 @@ def test_inference_method_policy():
     assert serving_core.is_inference_method("fit_transform") is False
     assert serving_core.is_inference_method("build") is False
     assert serving_core.is_inference_method("train_on_batch") is False
+
+
+def test_unique_model_instances_reuse_and_metric_cleanup(tmp_path, monkeypatch):
+    """Two instances, a reused instance, manual purge and automatic purge."""
+    app, settings = make_app(tmp_path, monkeypatch)
+
+    async def scenario():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+
+            async def deploy(name):
+                response = await client.post(
+                    "/api/serving/endpoints",
+                    json=deployment_payload(endpoint_name=name),
+                )
+                assert response.status_code == 202, response.text
+                return await wait_running(client, name)
+
+            first = await deploy("calc-a")
+            second = await deploy("calc-b")
+            assert first["model_id"] != second["model_id"]
+            assert first["model_id"].startswith("mdl-")
+            assert first["deployment_id"] != second["deployment_id"]
+            assert first["model_type_id"] == second["model_type_id"] == "Calculator"
+
+            instances = (await client.get("/api/serving/models")).json()["models"]
+            assert {first["model_id"], second["model_id"]} <= {
+                model["model_id"] for model in instances
+            }
+            standalone = await client.post(
+                "/api/serving/models",
+                json={
+                    "model_type_id": "Calculator",
+                    "name": "standalone-calculator",
+                    "parameters": {"value": 7},
+                },
+            )
+            assert standalone.status_code == 201, standalone.text
+            standalone_model = standalone.json()["model"]
+            assert standalone_model["model_id"].startswith("mdl-")
+            assert (
+                await client.get(f"/api/serving/models/{standalone_model['model_id']}")
+            ).status_code == 200
+
+            # A third deployment reuses the first model instance.
+            reuse = deployment_payload(endpoint_name="calc-c")
+            reuse["model_id"] = first["model_id"]
+            reuse["model_type_id"] = "Calculator"
+            reused = await client.post("/api/serving/endpoints", json=reuse)
+            assert reused.status_code == 202, reused.text
+            third = await wait_running(client, "calc-c")
+            assert third["model_id"] == first["model_id"]
+            assert third["deployment_id"] != first["deployment_id"]
+
+            for endpoint_id in ("calc-a", "calc-b", "calc-c"):
+                response = await client.post(
+                    f"/api/serving/endpoints/{endpoint_id}/predict",
+                    json={"input": 1},
+                )
+                assert response.status_code == 200, response.text
+                body = response.json()
+                assert body["deployment_id"] == endpoint_id
+
+            events_a = (
+                await client.get("/api/monitoring/events?range=24h&endpoint_id=calc-a")
+            ).json()["events"]
+            assert events_a[0]["deployment_id"] == "calc-a"
+            assert events_a[0]["model_id"] == first["model_id"]
+            assert events_a[0]["model_type_id"] == "Calculator"
+
+            models = (await client.get("/api/monitoring/models?range=24h")).json()["models"]
+            by_model = {row["model_id"]: row for row in models}
+            assert by_model[first["model_id"]]["deployments"] == ["calc-a", "calc-c"]
+            assert by_model[second["model_id"]]["deployments"] == ["calc-b"]
+
+            cleared = await client.delete("/api/serving/endpoints/calc-a/metrics")
+            assert cleared.status_code == 200, cleared.text
+            assert cleared.json()["metrics_deleted"] >= 1
+
+            remaining_a = (
+                await client.get("/api/monitoring/events?range=24h&endpoint_id=calc-a")
+            ).json()
+            remaining_b = (
+                await client.get("/api/monitoring/events?range=24h&endpoint_id=calc-b")
+            ).json()
+            remaining_c = (
+                await client.get("/api/monitoring/events?range=24h&endpoint_id=calc-c")
+            ).json()
+            assert remaining_a["total"] == 0
+            assert remaining_b["total"] >= 1
+            assert remaining_c["total"] >= 1
+
+            # Deleting a deployment removes only its metrics; the model instance
+            # and the other deployments of the same model stay intact.
+            deleted = await client.delete("/api/serving/endpoints/calc-b")
+            assert deleted.status_code == 200, deleted.text
+            assert deleted.json()["deployment_id"] == "calc-b"
+            assert deleted.json()["model_id"] == second["model_id"]
+            assert deleted.json()["metrics_deleted"] >= 1
+
+            assert (await client.get("/api/monitoring/events?range=24h&endpoint_id=calc-b")).json()[
+                "total"
+            ] == 0
+            assert (await client.get("/api/monitoring/events?range=24h&endpoint_id=calc-c")).json()[
+                "total"
+            ] >= 1
+            assert (await client.get(f"/api/serving/models/{first['model_id']}")).status_code == 200
+            assert (
+                await client.get(f"/api/serving/models/{second['model_id']}")
+            ).status_code == 200
+            assert (await client.get("/api/models/Calculator")).status_code == 200
+
+            # Deleting the last deployment of an instance keeps the instance too.
+            await client.delete("/api/serving/endpoints/calc-a")
+            assert (await client.get("/api/monitoring/events?range=24h&endpoint_id=calc-c")).json()[
+                "total"
+            ] >= 1
+            assert (await client.get(f"/api/serving/models/{first['model_id']}")).status_code == 200
+            await client.delete("/api/serving/endpoints/calc-c")
+
+    try:
+        run(scenario)
+    finally:
+        settings.serving.shutdown()
+
+
+def test_metric_cleanup_and_deletion_survive_a_restart(tmp_path):
+    """Manual purge and automatic purge must be durable and model-safe."""
+    store_dir = tmp_path / "persisted"
+    store_dir.mkdir()
+    now = time.time()
+
+    def deployment(identifier: str, model_id: str) -> dict:
+        return {
+            "id": identifier,
+            "deployment_id": identifier,
+            "name": identifier,
+            "model_id": model_id,
+            "model_instance_id": model_id,
+            "model_type_id": "Calculator",
+            "catalog_model_id": "Calculator",
+            "model_name": "Calculator",
+            "model_title": "Calculator",
+            "method": "predict",
+            "method_signature": "predict(amount: int = 1) -> int",
+            "parameters": {"value": 1},
+            "load": {"enabled": False},
+            "config": {"timeout_seconds": 30, "max_concurrency": 1},
+            "status": "running",
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "log": [],
+        }
+
+    def event(identifier: str, model_id: str, status: str) -> dict:
+        return {
+            "id": f"{identifier}-{status}",
+            "timestamp": now,
+            "at": serving_core.iso(),
+            "endpoint_id": identifier,
+            "deployment_id": identifier,
+            "endpoint_name": identifier,
+            "model_id": model_id,
+            "model_instance_id": model_id,
+            "model_type_id": "Calculator",
+            "catalog_model_id": "Calculator",
+            "model_name": "Calculator",
+            "method": "predict",
+            "status": status,
+            "http_status": 200 if status == "success" else 500,
+            "latency_ms": 2.0,
+        }
+
+    (store_dir / "deployments.json").write_text(
+        json.dumps(
+            {
+                "version": serving_core.STORE_VERSION,
+                "deployments": [
+                    deployment("dep-a", "mdl-a"),
+                    deployment("dep-b", "mdl-b"),
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (store_dir / "models.json").write_text(
+        json.dumps(
+            {
+                "version": serving_core.STORE_VERSION,
+                "models": [
+                    {
+                        "model_id": "mdl-a",
+                        "model_type_id": "Calculator",
+                        "name": "instance a",
+                        "parameters": {"value": 1},
+                        "load": {"enabled": False},
+                    },
+                    {
+                        "model_id": "mdl-b",
+                        "model_type_id": "Calculator",
+                        "name": "instance b",
+                        "parameters": {"value": 2},
+                        "load": {"enabled": False},
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (store_dir / "events.jsonl").write_text(
+        "\n".join(
+            json.dumps(item)
+            for item in (
+                event("dep-a", "mdl-a", "success"),
+                event("dep-a", "mdl-a", "error"),
+                event("dep-b", "mdl-b", "success"),
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    store = serving_core.ServingStore(store_dir)
+    try:
+        assert len(store.events) == 3
+        cleaned = store.clear_metrics("dep-a")
+        assert cleaned["deployment_id"] == "dep-a"
+        assert cleaned["model_id"] == "mdl-a"
+        assert cleaned["metrics_deleted"] == 2
+        assert store.get("dep-a")["model_id"] == "mdl-a"
+        assert store.get_model("mdl-a")["model_type_id"] == "Calculator"
+        assert [item["deployment_id"] for item in store.events.events()] == ["dep-b"]
+
+        removed = store.delete("dep-b")
+        assert removed["deployment_id"] == "dep-b"
+        assert removed["metrics_deleted"] == 1
+        # Deleting one deployment never affects the sibling deployment/model.
+        assert [item["id"] for item in store.list()] == ["dep-a"]
+        assert store.get_model("mdl-a")["model_id"] == "mdl-a"
+        assert store.get_model("mdl-b")["model_type_id"] == "Calculator"
+        assert len(store.events) == 0
+
+        # The last deployment can be deleted without touching the instances.
+        removed = store.delete("dep-a")
+        assert removed["metrics_deleted"] == 0
+        assert store.list() == []
+        assert store.get_model("mdl-a")["model_id"] == "mdl-a"
+    finally:
+        store.shutdown()
+
+    reopened = serving_core.ServingStore(store_dir)
+    try:
+        assert reopened.list() == []
+        assert len(reopened.events) == 0
+        assert reopened.get_model("mdl-a")["name"] == "instance a"
+        assert reopened.get_model("mdl-b")["name"] == "instance b"
+    finally:
+        reopened.shutdown()
+
+
+def test_legacy_store_is_migrated_to_unique_instances(tmp_path):
+    """Version-1 deployments/events receive stable unique model ids."""
+    store_dir = tmp_path / "legacy"
+    store_dir.mkdir()
+    now = time.time()
+    (store_dir / "deployments.json").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "deployments": [
+                    {
+                        "id": "old-one",
+                        "name": "old-one",
+                        "model_id": "Calculator",
+                        "model_name": "Calculator",
+                        "method": "predict",
+                        "parameters": {"value": 1},
+                        "load": {"enabled": False},
+                        "config": {"timeout_seconds": 30, "max_concurrency": 1},
+                        "status": "running",
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "log": [],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (store_dir / "events.jsonl").write_text(
+        json.dumps(
+            {
+                "id": "old-event",
+                "timestamp": now,
+                "at": serving_core.iso(),
+                "endpoint_id": "old-one",
+                "endpoint_name": "old-one",
+                "model_id": "Calculator",
+                "model_name": "Calculator",
+                "status": "success",
+                "http_status": 200,
+                "latency_ms": 1.0,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    store = serving_core.ServingStore(store_dir)
+    try:
+        deployment = store.get("old-one")
+        assert deployment["model_id"].startswith("mdl-")
+        assert deployment["model_id"] != "Calculator"
+        assert deployment["model_type_id"] == "Calculator"
+        assert deployment["deployment_id"] == "old-one"
+        assert store.get_model(deployment["model_id"])["model_type_id"] == "Calculator"
+        event = store.events.events()[0]
+        assert event["model_id"] == deployment["model_id"]
+        assert event["model_type_id"] == "Calculator"
+        assert event["deployment_id"] == "old-one"
+        # Reopening the migrated store must be stable (idempotent migration).
+        store.shutdown()
+        reopened = serving_core.ServingStore(store_dir)
+        try:
+            assert reopened.get("old-one")["model_id"] == deployment["model_id"]
+            assert reopened.events.events()[0]["model_id"] == deployment["model_id"]
+        finally:
+            reopened.shutdown()
+    finally:
+        store.shutdown()

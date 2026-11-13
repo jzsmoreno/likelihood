@@ -326,6 +326,23 @@
   </main>
 </div>
 
+<div class="lm-dialog-backdrop" id="confirm-dialog" hidden>
+  <section class="lm-dialog" style="width:min(460px,100%)" role="alertdialog" aria-modal="true"
+           aria-labelledby="confirm-title" aria-describedby="confirm-text">
+    <header class="lm-dialog-header">
+      <div class="lm-dialog-heading">
+        <div class="lm-dialog-eyebrow">Confirmación</div>
+        <h2 class="lm-dialog-title" id="confirm-title">Confirmar acción</h2>
+      </div>
+    </header>
+    <div class="lm-dialog-body"><p class="confirm-text" id="confirm-text"></p></div>
+    <footer class="lm-dialog-footer">
+      <button class="btn btn-secondary" type="button" id="confirm-cancel">Cancelar</button>
+      <button class="btn btn-primary" type="button" id="confirm-accept">Confirmar</button>
+    </footer>
+  </section>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="/charts.js" defer></script>

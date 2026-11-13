@@ -50,17 +50,22 @@ The routes are the same as the previous standard-library implementation::
     DELETE /api/jobs/<id>             cancel or forget any asynchronous job
     POST   /api/notebook              ``{"model_id": ..., "parameters": {...}}``
     POST   /api/search                deprecated alias of ``GET /api/search``
+
 Model Serving and Model Monitoring (implemented in :mod:`serving_api`)::
 
     GET    /serving, /serving/<id>             endpoint workspace and detail
     GET    /monitoring, /monitoring/<id>       analytics dashboard and endpoint view
+    GET    /api/serving/models                 registered model instances
+    POST   /api/serving/models                 register a model instance -> 201
+    GET    /api/serving/models/<model_id>
     GET    /api/serving/endpoints              deployed endpoints and counters
     POST   /api/serving/endpoints              deploy -> 202
     POST   /api/serving/validate               validate a deployment payload
     GET    /api/serving/endpoints/<id>         endpoint configuration/status/log
     POST   /api/serving/endpoints/<id>/predict inference (records a monitoring event)
     POST   /api/serving/endpoints/<id>/stop|restart
-    DELETE /api/serving/endpoints/<id>
+    DELETE /api/serving/endpoints/<id>         deployment + its monitoring metrics
+    DELETE /api/serving/endpoints/<id>/metrics manual monitoring cleanup
     GET    /api/serving/endpoints/<id>/docs    generated Python/cURL/JS/HTTP samples
     GET    /api/monitoring/overview            KPIs, series, breakdowns, resources
     GET    /api/monitoring/endpoints           per-endpoint aggregates

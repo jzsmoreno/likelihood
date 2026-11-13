@@ -131,10 +131,19 @@ def filter_events(
     endpoint_id: str = "",
     model_id: str = "",
     status: str = "",
+    model_type_id: str = "",
+    deployment_id: str = "",
 ) -> List[Dict[str, Any]]:
-    """Events inside ``[start, end)`` matching the optional filters."""
-    wanted_endpoint = (endpoint_id or "").strip()
+    """Events inside ``[start, end)`` matching the optional filters.
+
+    ``model_id`` selects a unique model instance.  For old clients it also accepts
+    the catalog/type id (``model_type_id``), matching either field.  ``endpoint_id``
+    and ``deployment_id`` are equivalent identifiers of one deployment.
+    """
+    wanted_endpoint = (endpoint_id or deployment_id or "").strip()
+    wanted_deployment = (deployment_id or endpoint_id or "").strip()
     wanted_model = (model_id or "").strip()
+    wanted_type = (model_type_id or "").strip()
     wanted_status = (status or "").strip().lower()
     selected: List[Dict[str, Any]] = []
     for event in events:
@@ -144,9 +153,22 @@ def filter_events(
             continue
         if stamp < start or stamp >= end:
             continue
-        if wanted_endpoint and str(event.get("endpoint_id") or "") != wanted_endpoint:
+        event_endpoint = str(event.get("endpoint_id") or "")
+        event_deployment = str(event.get("deployment_id") or event_endpoint)
+        if wanted_endpoint and event_endpoint != wanted_endpoint:
             continue
-        if wanted_model and str(event.get("model_id") or "") != wanted_model:
+        if wanted_deployment and event_deployment != wanted_deployment:
+            continue
+        if wanted_model:
+            candidates = {
+                str(event.get("model_id") or ""),
+                str(event.get("model_type_id") or ""),
+                str(event.get("catalog_model_id") or ""),
+                str(event.get("legacy_model_id") or ""),
+            }
+            if wanted_model not in candidates:
+                continue
+        if wanted_type and str(event.get("model_type_id") or "") != wanted_type:
             continue
         if wanted_status and str(event.get("status") or "").lower() != wanted_status:
             continue
@@ -177,10 +199,11 @@ def aggregate(events: Sequence[Dict[str, Any]], minutes: Optional[float] = None)
         if event.get("status") == "error":
             label = str(event.get("error_type") or "Error")
             error_types[label] = error_types.get(label, 0) + 1
-        if event.get("endpoint_id"):
-            endpoints.add(str(event["endpoint_id"]))
-        if event.get("model_id"):
-            models.add(str(event["model_id"]))
+        if event.get("deployment_id") or event.get("endpoint_id"):
+            endpoints.add(str(event.get("deployment_id") or event.get("endpoint_id")))
+        key_model = event.get("model_id") or event.get("model_type_id")
+        if key_model:
+            models.add(str(key_model))
         request_bytes += int(event.get("request_bytes") or 0)
         response_bytes += int(event.get("response_bytes") or 0)
     total_latency = sum(latencies)
@@ -279,8 +302,11 @@ def endpoint_breakdown(events: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]
         rows.append(
             {
                 "endpoint_id": key,
+                "deployment_id": latest.get("deployment_id") or key,
                 "endpoint_name": latest.get("endpoint_name") or key,
-                "model_id": latest.get("model_id") or "",
+                "model_id": latest.get("model_id") or latest.get("model_type_id") or "",
+                "model_instance_id": latest.get("model_id") or latest.get("model_type_id") or "",
+                "model_type_id": latest.get("model_type_id") or "",
                 "model_name": latest.get("model_name") or "",
                 "method": latest.get("method") or "",
                 "last_request_at": latest.get("at"),
@@ -295,17 +321,23 @@ def model_breakdown(events: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Per-model totals, ordered by request volume."""
     groups: Dict[str, List[Dict[str, Any]]] = {}
     for event in events:
-        key = str(event.get("model_id") or "unknown")
+        key = str(event.get("model_id") or event.get("model_type_id") or "unknown")
         groups.setdefault(key, []).append(event)
     rows: List[Dict[str, Any]] = []
     for key, group in groups.items():
         totals = aggregate(group)
-        endpoints = {str(event.get("endpoint_id") or "") for event in group}
+        deployments = {
+            str(event.get("deployment_id") or event.get("endpoint_id") or "") for event in group
+        }
+        latest = group[-1]
         rows.append(
             {
                 "model_id": key,
-                "model_name": group[-1].get("model_name") or key,
-                "endpoints": len(endpoints),
+                "model_instance_id": key,
+                "model_type_id": latest.get("model_type_id") or "",
+                "model_name": latest.get("model_name") or key,
+                "endpoints": len(deployments),
+                "deployments": sorted(deployments),
                 **totals,
             }
         )
@@ -340,23 +372,29 @@ def endpoint_index(
     for deployment in deployments:
         index[deployment["id"]] = {
             "id": deployment["id"],
+            "deployment_id": deployment.get("deployment_id") or deployment["id"],
             "name": deployment["name"],
             "model_id": deployment.get("model_id") or "",
+            "model_instance_id": deployment.get("model_id") or "",
+            "model_type_id": deployment.get("model_type_id") or "",
             "model_name": deployment.get("model_name") or "",
             "method": deployment.get("method") or "",
             "status": deployment.get("status") or "",
             "exists": True,
         }
     for event in events:
-        key = str(event.get("endpoint_id") or "")
+        key = str(event.get("endpoint_id") or event.get("deployment_id") or "")
         if not key:
             continue
         entry = index.setdefault(
             key,
             {
                 "id": key,
+                "deployment_id": event.get("deployment_id") or key,
                 "name": event.get("endpoint_name") or key,
-                "model_id": event.get("model_id") or "",
+                "model_id": event.get("model_id") or event.get("model_type_id") or "",
+                "model_instance_id": event.get("model_id") or event.get("model_type_id") or "",
+                "model_type_id": event.get("model_type_id") or "",
                 "model_name": event.get("model_name") or "",
                 "method": event.get("method") or "",
                 "status": "deleted",
@@ -549,22 +587,46 @@ def overview(
     window: Dict[str, Any],
     model_id: str = "",
     endpoint_id: str = "",
+    model_type_id: str = "",
+    deployment_id: str = "",
 ) -> Dict[str, Any]:
     """Global dashboard payload (KPIs, series, breakdowns and resources)."""
-    current = filter_events(events, window["start"], window["end"], endpoint_id, model_id)
+    current = filter_events(
+        events,
+        window["start"],
+        window["end"],
+        endpoint_id=endpoint_id,
+        model_id=model_id,
+        model_type_id=model_type_id,
+        deployment_id=deployment_id,
+    )
     previous = filter_events(
         events,
         window["previous_start"],
         window["previous_end"],
-        endpoint_id,
-        model_id,
+        endpoint_id=endpoint_id,
+        model_id=model_id,
+        model_type_id=model_type_id,
+        deployment_id=deployment_id,
     )
     deployments = [
         deployment
         for deployment in deployments
-        if (not endpoint_id or deployment["id"] == endpoint_id)
-        and (not model_id or deployment.get("model_id") == model_id)
+        if (not endpoint_id and not deployment_id)
+        or deployment["id"] in {endpoint_id, deployment_id}
     ]
+    if model_id:
+        deployments = [
+            deployment
+            for deployment in deployments
+            if deployment.get("model_id") == model_id or deployment.get("model_type_id") == model_id
+        ]
+    if model_type_id:
+        deployments = [
+            deployment
+            for deployment in deployments
+            if deployment.get("model_type_id") == model_type_id
+        ]
     totals = aggregate(current, window["minutes"])
     previous_totals = aggregate(previous, window["minutes"])
     stats = _deployment_stats(deployments)
@@ -660,8 +722,11 @@ def endpoint_detail(
         "endpoint": (
             {
                 "id": deployment["id"],
+                "deployment_id": deployment.get("deployment_id") or deployment["id"],
                 "name": deployment["name"],
                 "model_id": deployment["model_id"],
+                "model_instance_id": deployment["model_id"],
+                "model_type_id": deployment.get("model_type_id") or "",
                 "model_name": deployment["model_name"],
                 "method": deployment["method"],
                 "status": deployment["status"],
@@ -670,8 +735,11 @@ def endpoint_detail(
             if deployment
             else {
                 "id": endpoint_id,
+                "deployment_id": latest.get("deployment_id") or endpoint_id,
                 "name": latest.get("endpoint_name") or endpoint_id,
                 "model_id": latest.get("model_id") or model_id,
+                "model_instance_id": latest.get("model_id") or model_id,
+                "model_type_id": latest.get("model_type_id") or "",
                 "model_name": latest.get("model_name") or "",
                 "method": latest.get("method") or "",
                 "status": "deleted",

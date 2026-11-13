@@ -21,6 +21,7 @@ Design notes
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import math
@@ -131,6 +132,12 @@ INFERENCE_HINTS = (
     "anomaly",
 )
 
+#: Schema version of ``deployments.json``/``models.json``.  Version 2 separates the
+#: unique model instance (``model_id``) from its catalog type (``model_type_id``) and
+#: from the deployment id.
+STORE_VERSION = 2
+MODEL_STORE_VERSION = 1
+
 #: Human labels and tone classes used by the UI and the JSON payloads.
 STATUS_LABELS = {
     "deploying": ("Desplegando", "progress"),
@@ -183,6 +190,17 @@ def slugify(value: str) -> str:
     ascii_text = decomposed.encode("ascii", "ignore").decode("ascii").lower()
     cleaned = re.sub(r"[^a-z0-9]+", "-", ascii_text).strip("-")
     return cleaned[:63].strip("-") or "endpoint"
+
+
+def new_model_id() -> str:
+    """Generate the unique identifier of one model instance."""
+    return f"mdl-{uuid.uuid4().hex[:12]}"
+
+
+def legacy_model_id(endpoint_id: str, model_type_id: str = "") -> str:
+    """Deterministic instance id used when migrating old event records."""
+    digest = hashlib.sha1(f"{endpoint_id}|{model_type_id}".encode("utf-8")).hexdigest()[:12]
+    return f"mdl-legacy-{digest}"
 
 
 def is_inference_method(name: str) -> bool:
@@ -309,6 +327,64 @@ class EventLog:
         with self._lock:
             return len(self._events)
 
+    def _rewrite_locked(self) -> None:
+        """Persist the current in-memory events atomically."""
+        try:
+            _atomic_write(
+                self.path,
+                "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in self._events),
+            )
+        except OSError as exc:  # pragma: no cover - defensive
+            LOGGER.warning("No se pudo reescribir %s: %s", self.path, exc)
+
+    def delete_endpoint(self, endpoint_id: str) -> int:
+        """Remove every event of one deployment, returning the number deleted.
+
+        Only the events whose ``endpoint_id``/``deployment_id`` matches are removed;
+        the rest of the monitoring history stays untouched.
+        """
+        wanted = str(endpoint_id or "").strip()
+        if not wanted:
+            return 0
+        with self._lock:
+            kept = [
+                event
+                for event in self._events
+                if str(event.get("deployment_id") or event.get("endpoint_id") or "") != wanted
+            ]
+            deleted = len(self._events) - len(kept)
+            if not deleted:
+                return 0
+            self._events = deque(kept, maxlen=self.limit)
+            self._rewrite_locked()
+        return deleted
+
+    def migrate(self, model_by_endpoint: Dict[str, str]) -> int:
+        """Add the version-2 identity fields to legacy events.
+
+        Every old event had only the catalog model id.  The migration keeps that
+        value as ``model_type_id`` and assigns the unique instance id of its
+        deployment (or a deterministic legacy id when the deployment is gone).
+        """
+        migrated = 0
+        with self._lock:
+            for event in self._events:
+                if event.get("model_type_id") and event.get("deployment_id"):
+                    continue
+                old_model_id = str(event.get("model_id") or event.get("model_name") or "")
+                endpoint_id = str(event.get("endpoint_id") or "")
+                event["model_type_id"] = old_model_id
+                event["catalog_model_id"] = old_model_id
+                event["deployment_id"] = endpoint_id
+                event["model_id"] = model_by_endpoint.get(
+                    endpoint_id, legacy_model_id(endpoint_id, old_model_id)
+                )
+                event["model_instance_id"] = event["model_id"]
+                migrated += 1
+            if migrated:
+                self._rewrite_locked()
+        return migrated
+
 
 class ServingStore:
     """Deployment registry, lifecycle and inference gateway."""
@@ -316,16 +392,39 @@ class ServingStore:
     def __init__(self, directory: Optional[Path] = None, max_events: Optional[int] = None) -> None:
         self.directory = Path(directory or STORE_DIR)
         self.deployments_path = self.directory / "deployments.json"
-        self.events = EventLog(self.directory, max_events or MAX_EVENTS)
+        self.models_path = self.directory / "models.json"
         self._lock = threading.RLock()
         self._deployments: Dict[str, Dict[str, Any]] = {}
+        self._models: Dict[str, Dict[str, Any]] = {}
         self._semaphores: Dict[str, threading.BoundedSemaphore] = {}
         self._executor = ThreadPoolExecutor(
             max_workers=DEPLOY_WORKERS, thread_name_prefix="lm-serving"
         )
+        self._load_models()
         self._load()
+        self.events = EventLog(self.directory, max_events or MAX_EVENTS)
+        self._migrate_event_log()
 
     # -- persistence ------------------------------------------------------
+
+    def _load_models(self) -> None:
+        if not self.models_path.is_file():
+            return
+        try:
+            with open(self.models_path, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, json.JSONDecodeError) as exc:  # pragma: no cover - corrupt store
+            LOGGER.warning("No se pudo leer %s: %s", self.models_path, exc)
+            return
+        records = data.get("models") if isinstance(data, dict) else data
+        if not isinstance(records, list):
+            return
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            model = self._normalise_model_record(record)
+            if model["model_id"]:
+                self._models[model["model_id"]] = model
 
     def _load(self) -> None:
         if not self.deployments_path.is_file():
@@ -339,9 +438,12 @@ class ServingStore:
         records = data.get("deployments") if isinstance(data, dict) else data
         if not isinstance(records, list):
             return
+        changed = not isinstance(data, dict) or int(data.get("version") or 1) < STORE_VERSION
         for record in records:
             if not isinstance(record, dict) or not record.get("id"):
                 continue
+            record, migrated = self._migrate_deployment_record(record)
+            changed = changed or migrated
             deployment = self._normalise_record(record)
             if deployment["status"] == "deploying":
                 # No worker survived the restart: the deployment never finished.
@@ -353,19 +455,146 @@ class ServingStore:
                 deployment["log"].append(
                     {"at": iso(), "level": "error", "message": deployment["last_error"]}
                 )
+                changed = True
             self._deployments[deployment["id"]] = deployment
+            before_models = len(self._models)
+            self._ensure_model_record_locked(deployment)
+            if len(self._models) != before_models:
+                changed = True
             self._semaphore(deployment)
+        if changed:
+            with self._lock:
+                self._persist_locked()
+                self._persist_models_locked()
+
+    def _migrate_deployment_record(self, record: Dict[str, Any]) -> tuple[Dict[str, Any], bool]:
+        """Apply the version-2 identity migration to one deployment record."""
+        migrated = dict(record)
+        endpoint_id = str(migrated.get("id") or "")
+        deployment_id = str(migrated.get("deployment_id") or endpoint_id)
+        old_model_id = str(
+            migrated.get("model_id")
+            or migrated.get("catalog_model_id")
+            or migrated.get("model_name")
+            or ""
+        )
+        model_type_id = str(
+            migrated.get("model_type_id") or migrated.get("catalog_model_id") or old_model_id
+        )
+        model_id = str(migrated.get("model_id") or "")
+        changed = False
+        # A version-1 record used the catalog id in model_id and had no
+        # model_type_id/deployment_id.  Give every old deployment its own instance.
+        if not migrated.get("model_type_id") or model_id == model_type_id:
+            model_id = new_model_id()
+            changed = True
+        if not model_id:
+            model_id = new_model_id()
+            changed = True
+        for key, value in (
+            ("deployment_id", deployment_id),
+            ("model_id", model_id),
+            ("model_type_id", model_type_id),
+            ("catalog_model_id", model_type_id),
+            ("model_instance_id", model_id),
+        ):
+            if migrated.get(key) != value:
+                migrated[key] = value
+                changed = True
+        return migrated, changed
+
+    @staticmethod
+    def _normalise_model_record(record: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalise one model-instance record."""
+        model_type_id = str(record.get("model_type_id") or record.get("catalog_model_id") or "")
+        model_id = str(record.get("model_id") or "")
+        return {
+            "model_id": model_id,
+            "model_instance_id": model_id,
+            "model_type_id": model_type_id,
+            "catalog_model_id": model_type_id,
+            "name": str(record.get("name") or record.get("model_name") or model_type_id),
+            "description": str(record.get("description") or ""),
+            "model_name": str(record.get("model_name") or model_type_id),
+            "model_title": str(
+                record.get("model_title") or record.get("model_name") or model_type_id
+            ),
+            "model_icon": str(record.get("model_icon") or "📦"),
+            "model_category": str(record.get("model_category") or ""),
+            "model_module": str(record.get("model_module") or ""),
+            "model_signature": str(record.get("model_signature") or ""),
+            "parameters": dict(record.get("parameters") or {}),
+            "load": dict(record.get("load") or {"enabled": False}),
+            "loaded_artifact": record.get("loaded_artifact"),
+            "created_at": str(record.get("created_at") or iso()),
+            "updated_at": str(record.get("updated_at") or record.get("created_at") or iso()),
+            "last_error": str(record.get("last_error") or ""),
+        }
+
+    def _ensure_model_record_locked(self, deployment: Dict[str, Any]) -> Dict[str, Any]:
+        """Create the model-instance record of a migrated/legacy deployment."""
+        model_id = str(deployment.get("model_id") or "")
+        model_type_id = str(
+            deployment.get("model_type_id")
+            or deployment.get("catalog_model_id")
+            or deployment.get("model_name")
+            or ""
+        )
+        existing = self._models.get(model_id)
+        if existing is not None:
+            return existing
+        record = self._normalise_model_record(
+            {
+                "model_id": model_id,
+                "model_type_id": model_type_id,
+                "model_name": deployment.get("model_name") or model_type_id,
+                "model_title": deployment.get("model_title") or model_type_id,
+                "model_icon": deployment.get("model_icon"),
+                "model_category": deployment.get("model_category"),
+                "model_module": deployment.get("model_module"),
+                "model_signature": deployment.get("model_signature"),
+                "parameters": deployment.get("parameters") or {},
+                "load": deployment.get("load") or {"enabled": False},
+                "loaded_artifact": deployment.get("loaded_artifact"),
+                "created_at": deployment.get("created_at"),
+                "updated_at": deployment.get("updated_at"),
+            }
+        )
+        self._models[model_id] = record
+        return record
+
+    def _migrate_event_log(self) -> None:
+        """Migrate old events once the deployment registry is available."""
+        mapping = {
+            deployment["id"]: deployment["model_id"] for deployment in self._deployments.values()
+        }
+        migrated = self.events.migrate(mapping)
+        if migrated:
+            LOGGER.info("Migrados %d eventos de serving al esquema v2", migrated)
 
     @staticmethod
     def _normalise_record(record: Dict[str, Any]) -> Dict[str, Any]:
         """Fill the fields a deployment persisted by an older version may miss."""
+        model_type_id = str(
+            record.get("model_type_id")
+            or record.get("catalog_model_id")
+            or record.get("model_id")
+            or ""
+        )
+        model_id = str(record.get("model_id") or model_type_id)
         return {
             "id": str(record.get("id")),
+            "deployment_id": str(record.get("deployment_id") or record.get("id")),
             "name": str(record.get("name") or record.get("id")),
             "description": str(record.get("description") or ""),
-            "model_id": str(record.get("model_id") or ""),
-            "model_name": str(record.get("model_name") or record.get("model_id") or ""),
-            "model_title": str(record.get("model_title") or record.get("model_name") or ""),
+            "model_id": model_id,
+            "model_instance_id": model_id,
+            "model_type_id": model_type_id,
+            "catalog_model_id": model_type_id,
+            "model_name": str(record.get("model_name") or model_type_id),
+            "model_title": str(
+                record.get("model_title") or record.get("model_name") or model_type_id
+            ),
             "model_icon": str(record.get("model_icon") or "📦"),
             "model_category": str(record.get("model_category") or ""),
             "model_module": str(record.get("model_module") or ""),
@@ -397,7 +626,7 @@ class ServingStore:
 
     def _persist_locked(self) -> None:
         payload = {
-            "version": 1,
+            "version": STORE_VERSION,
             "updated_at": iso(),
             "deployments": [self._deployments[key] for key in sorted(self._deployments)],
         }
@@ -408,6 +637,20 @@ class ServingStore:
             )
         except OSError as exc:  # pragma: no cover - read only volume
             LOGGER.warning("No se pudo persistir %s: %s", self.deployments_path, exc)
+
+    def _persist_models_locked(self) -> None:
+        payload = {
+            "version": MODEL_STORE_VERSION,
+            "updated_at": iso(),
+            "models": [self._models[key] for key in sorted(self._models)],
+        }
+        try:
+            _atomic_write(
+                self.models_path,
+                json.dumps(payload, ensure_ascii=False, indent=2, default=str),
+            )
+        except OSError as exc:  # pragma: no cover - read only volume
+            LOGGER.warning("No se pudo persistir %s: %s", self.models_path, exc)
 
     # -- helpers ----------------------------------------------------------
 
@@ -459,52 +702,52 @@ class ServingStore:
                 statuses[deployment["status"]] = statuses.get(deployment["status"], 0) + 1
             return {
                 "endpoints": len(self._deployments),
+                "models": len(self._models),
                 "statuses": statuses,
                 "events": len(self.events),
                 "store": str(self.directory),
             }
 
-    # -- validation -------------------------------------------------------
+    # -- model instances --------------------------------------------------
 
-    def validate(self, model: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate one deployment payload and return its normalised form.
+    def _find_model(self, model_id: str) -> Dict[str, Any]:
+        model = self._models.get(str(model_id or "").strip())
+        if model is None:
+            raise core.ModelNotFound(f"Modelo de serving no encontrado: {model_id}")
+        return model
 
-        Raises
-        ------
-        core.APIError
-            With a ``400``/``404``/``422`` status when a field, the method, a
-            constructor argument or the saved-model path is not usable.
-        """
+    def get_model(self, model_id: str) -> Dict[str, Any]:
+        """Return one registered model instance."""
+        with self._lock:
+            return self._public(self._find_model(model_id))
+
+    def list_models(self) -> List[Dict[str, Any]]:
+        """Every registered model instance with its deployment references."""
+        with self._lock:
+            records = []
+            for model in self._models.values():
+                deployments = [
+                    deployment["id"]
+                    for deployment in self._deployments.values()
+                    if deployment.get("model_id") == model["model_id"]
+                ]
+                records.append(
+                    {
+                        **self._public(model),
+                        "deployment_count": len(deployments),
+                        "deployments": sorted(deployments),
+                    }
+                )
+        records.sort(key=lambda item: item.get("created_at") or "", reverse=True)
+        return records
+
+    def validate_model(self, model: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate the configuration of a model instance (without a deployment)."""
         if not isinstance(data, dict):
-            raise core.ValidationError("La configuración del endpoint debe ser un objeto")
-
-        requested_name = str(data.get("endpoint_name") or data.get("name") or "").strip()
-        method_name = str(data.get("method") or "").strip()
-        if not method_name:
-            raise core.ValidationError("El campo 'method' es obligatorio")
-        method = core.method_for_invocation(model, method_name)
-        if not is_inference_method(method["name"]):
-            raise core.ValidationError(
-                f'El método "{method["name"]}" entrena o prepara el modelo; '
-                "selecciona un método de inferencia (predict, forward, transform…)"
-            )
-        if not core.method_is_jsonable(method):
-            raise core.ValidationError(
-                f'El método "{method["name"]}" tiene argumentos que no se pueden enviar como JSON'
-            )
-
-        name = requested_name or f"{slugify(model['id'])}-{slugify(method['name'])}"
-        if not _ENDPOINT_NAME.match(name):
-            raise core.ValidationError(
-                "El nombre del endpoint debe tener entre 2 y 63 caracteres y usar solo "
-                "letras, números, puntos, guiones y guiones bajos"
-            )
-
-        description = str(data.get("description") or "").strip()[:500]
+            raise core.ValidationError("La configuración del modelo debe ser un objeto")
         raw_parameters = data.get("parameters", data.get("params", {})) or {}
         if not isinstance(raw_parameters, dict):
             raise core.ValidationError("El campo 'parameters' debe ser un objeto")
-
         load = _normalise_load(data.get("load"), raw_parameters, model)
         warnings: List[str] = []
         if load["enabled"]:
@@ -534,13 +777,144 @@ class ServingStore:
                 )
         else:
             parameters = core.coerce_model_parameters(model, raw_parameters, require_all=True)
+        name = str(data.get("name") or data.get("model_name") or "").strip()
+        description = str(data.get("description") or "").strip()[:500]
+        return {
+            "name": name or f"{model['name']} · instancia",
+            "description": description,
+            "model_type_id": model["id"],
+            "catalog_model_id": model["id"],
+            "model_name": model["name"],
+            "model_title": model.get("title") or model["name"],
+            "model_icon": model.get("icon") or "📦",
+            "model_category": model.get("category") or "",
+            "model_module": model.get("module") or "",
+            "model_signature": model.get("signature") or "",
+            "parameters": parameters,
+            "load": load,
+            "warnings": warnings,
+        }
+
+    def create_model(self, model: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
+        """Register a unique model instance and persist it."""
+        form = self.validate_model(model, data)
+        warnings = form.pop("warnings", [])
+        with self._lock:
+            model_id = new_model_id()
+            while model_id in self._models:
+                model_id = new_model_id()
+            record = self._normalise_model_record(
+                {
+                    **form,
+                    "model_id": model_id,
+                    "created_at": iso(),
+                    "updated_at": iso(),
+                }
+            )
+            self._models[model_id] = record
+            self._persist_models_locked()
+            result = self._public(record)
+            result["warnings"] = warnings
+        return result
+
+    # -- validation -------------------------------------------------------
+
+    def validate(
+        self,
+        model: Dict[str, Any],
+        data: Dict[str, Any],
+        instance: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Validate one deployment payload and return its normalised form.
+
+        When ``instance`` is given, its parameters/load configuration is reused and
+        the deployment does not create another model instance.
+
+        Raises
+        ------
+        core.APIError
+            With a ``400``/``404``/``422`` status when a field, the method, a
+            constructor argument or the saved-model path is not usable.
+        """
+        if not isinstance(data, dict):
+            raise core.ValidationError("La configuración del endpoint debe ser un objeto")
+        if instance is not None and str(instance.get("model_type_id")) != str(model["id"]):
+            raise core.ValidationError(
+                f'La instancia "{instance.get("model_id")}" pertenece a '
+                f'{instance.get("model_type_id")}, no a {model["id"]}'
+            )
+
+        requested_name = str(data.get("endpoint_name") or data.get("name") or "").strip()
+        method_name = str(data.get("method") or "").strip()
+        if not method_name:
+            raise core.ValidationError("El campo 'method' es obligatorio")
+        method = core.method_for_invocation(model, method_name)
+        if not is_inference_method(method["name"]):
+            raise core.ValidationError(
+                f'El método "{method["name"]}" entrena o prepara el modelo; '
+                "selecciona un método de inferencia (predict, forward, transform…)"
+            )
+        if not core.method_is_jsonable(method):
+            raise core.ValidationError(
+                f'El método "{method["name"]}" tiene argumentos que no se pueden enviar como JSON'
+            )
+
+        name = requested_name or f"{slugify(model['id'])}-{slugify(method['name'])}"
+        if not _ENDPOINT_NAME.match(name):
+            raise core.ValidationError(
+                "El nombre del endpoint debe tener entre 2 y 63 caracteres y usar solo "
+                "letras, números, puntos, guiones y guiones bajos"
+            )
+
+        description = str(data.get("description") or "").strip()[:500]
+        raw_parameters = data.get("parameters", data.get("params", {})) or {}
+        if instance is not None:
+            raw_parameters = dict(instance.get("parameters") or {})
+        if not isinstance(raw_parameters, dict):
+            raise core.ValidationError("El campo 'parameters' debe ser un objeto")
+
+        warnings: List[str] = []
+        if instance is not None:
+            load = dict(instance.get("load") or {"enabled": False})
+            parameters = raw_parameters
+        else:
+            load = _normalise_load(data.get("load"), raw_parameters, model)
+            if load["enabled"]:
+                prepared = core.prepare_load(
+                    model,
+                    {
+                        "loader": load["loader"],
+                        "path": load["path"],
+                        "parameters": load["parameters"],
+                    },
+                )
+                load.update(
+                    {
+                        "loader": prepared["name"],
+                        "path": prepared["path"],
+                        "path_parameter": prepared.get("path_parameter"),
+                        "parameters": prepared["parameters"],
+                        "requires_instance": bool(prepared["requires_instance"]),
+                    }
+                )
+                parameters = prepared["parameters"]
+                artifact = _artifact_path(prepared["path"])
+                if not artifact.exists():
+                    warnings.append(
+                        f'La ruta "{prepared["path"]}" no existe todavía; el despliegue '
+                        "fallará al intentar cargar el modelo."
+                    )
+            else:
+                parameters = core.coerce_model_parameters(model, raw_parameters, require_all=True)
 
         config = _normalise_config(data.get("config"))
 
         return {
             "name": name,
             "description": description,
-            "model_id": model["id"],
+            "model_id": instance.get("model_id") if instance else "",
+            "model_type_id": model["id"],
+            "catalog_model_id": model["id"],
             "model_name": model["name"],
             "model_title": model.get("title") or model["name"],
             "model_icon": model.get("icon") or "📦",
@@ -558,10 +932,15 @@ class ServingStore:
             "warnings": warnings,
         }
 
-    def preview(self, model: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
+    def preview(
+        self,
+        model: Dict[str, Any],
+        data: Dict[str, Any],
+        instance: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Validation result for ``POST /api/serving/validate`` (never raises)."""
         try:
-            form = self.validate(model, data)
+            form = self.validate(model, data, instance=instance)
         except core.APIError as exc:
             return {
                 "valid": False,
@@ -585,6 +964,9 @@ class ServingStore:
             "errors": [],
             "warnings": form["warnings"],
             "name": form["name"],
+            "model_id": form.get("model_id") or "new",
+            "model_type_id": form.get("model_type_id"),
+            "catalog_model_id": form.get("catalog_model_id"),
             "method": {
                 "name": form["method"],
                 "signature": form["method_signature"],
@@ -599,9 +981,19 @@ class ServingStore:
 
     # -- lifecycle --------------------------------------------------------
 
-    def create(self, model: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
-        """Register a deployment and validate/load it in the background (``202``)."""
-        form = self.validate(model, data)
+    def create(
+        self,
+        model: Dict[str, Any],
+        data: Dict[str, Any],
+        instance: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Register a deployment and validate/load it in the background (``202``).
+
+        Without ``instance`` a new unique model instance is registered first.  With
+        an existing instance, the deployment reuses it (one model can have several
+        deployments) while its ``deployment_id`` remains independent.
+        """
+        form = self.validate(model, data, instance=instance)
         warnings = form.pop("warnings", [])
         form.pop("_method", None)
         with self._lock:
@@ -614,9 +1006,48 @@ class ServingStore:
             while identifier in self._deployments:
                 identifier = f"{base}-{counter}"
                 counter += 1
+            if instance is None:
+                model_id = new_model_id()
+                while model_id in self._models:
+                    model_id = new_model_id()
+                model_instance = self._normalise_model_record(
+                    {
+                        "model_id": model_id,
+                        "model_type_id": form["model_type_id"],
+                        "name": f'{form["model_name"]} · {form["name"]}',
+                        "description": form.get("description") or "",
+                        "model_name": form["model_name"],
+                        "model_title": form["model_title"],
+                        "model_icon": form["model_icon"],
+                        "model_category": form["model_category"],
+                        "model_module": form["model_module"],
+                        "model_signature": form["model_signature"],
+                        "parameters": form["parameters"],
+                        "load": form["load"],
+                        "created_at": iso(),
+                        "updated_at": iso(),
+                    }
+                )
+                self._models[model_id] = model_instance
+            else:
+                model_id = str(instance["model_id"])
+                model_instance = self._models.get(model_id) or self._normalise_model_record(
+                    instance
+                )
+            form.update(
+                {
+                    "model_id": model_id,
+                    "model_instance_id": model_id,
+                    "model_type_id": model["id"],
+                    "catalog_model_id": model["id"],
+                    "parameters": model_instance["parameters"],
+                    "load": model_instance["load"],
+                }
+            )
             deployment = {
                 **form,
                 "id": identifier,
+                "deployment_id": identifier,
                 "status": "deploying",
                 "created_at": iso(),
                 "updated_at": iso(),
@@ -633,6 +1064,7 @@ class ServingStore:
             self._deployments[identifier] = deployment
             self._semaphore(deployment)
             self._persist_locked()
+            self._persist_models_locked()
             result = self._public(deployment)
             self._executor.submit(self._deploy, identifier, model)
         return result
@@ -713,6 +1145,12 @@ class ServingStore:
                         level="success",
                     )
                 self._log(deployment, "Endpoint listo para recibir peticiones", level="success")
+                model_instance = self._models.get(deployment.get("model_id") or "")
+                if model_instance is not None:
+                    model_instance["loaded_artifact"] = artifact
+                    model_instance["updated_at"] = iso()
+                    model_instance["last_error"] = ""
+                    self._persist_models_locked()
                 self._persist_locked()
         except core.APIError as exc:
             self._fail(endpoint_id, str(exc), getattr(exc, "detail", ""))
@@ -730,6 +1168,11 @@ class ServingStore:
             self._log(deployment, message, level="error")
             if detail:
                 self._log(deployment, detail[-1500:], level="detail")
+            model_instance = self._models.get(deployment.get("model_id") or "")
+            if model_instance is not None:
+                model_instance["last_error"] = message
+                model_instance["updated_at"] = iso()
+                self._persist_models_locked()
             self._persist_locked()
 
     def stop(self, endpoint_id: str) -> Dict[str, Any]:
@@ -764,8 +1207,27 @@ class ServingStore:
             self._executor.submit(self._deploy, endpoint_id, model)
         return result
 
+    def clear_metrics(self, endpoint_id: str) -> Dict[str, Any]:
+        """Delete all monitoring events of one deployment and nothing else."""
+        with self._lock:
+            deployment = self._find(endpoint_id)
+            deployment_id = deployment["id"]
+            model_id = deployment["model_id"]
+        deleted = self.events.delete_endpoint(deployment_id)
+        return {
+            "id": deployment_id,
+            "endpoint_id": deployment_id,
+            "deployment_id": deployment_id,
+            "model_id": model_id,
+            "metrics_deleted": deleted,
+        }
+
     def delete(self, endpoint_id: str) -> Dict[str, Any]:
-        """Remove an endpoint (rejected while it is deploying)."""
+        """Permanently remove a deployment and its monitoring metrics.
+
+        The catalog model and the model-instance record are never deleted; another
+        deployment of the same model keeps working and its own metrics remain.
+        """
         with self._lock:
             deployment = self._find(endpoint_id)
             if deployment["status"] == "deploying":
@@ -776,7 +1238,17 @@ class ServingStore:
             removed = self._deployments.pop(deployment["id"])
             self._semaphores.pop(deployment["id"], None)
             self._persist_locked()
-        return self._public(removed)
+            public_removed = self._public(removed)
+        metrics_deleted = self.events.delete_endpoint(public_removed["id"])
+        return {
+            "deployment": public_removed,
+            "id": public_removed["id"],
+            "endpoint_id": public_removed["id"],
+            "deployment_id": public_removed["id"],
+            "model_id": public_removed["model_id"],
+            "model_type_id": public_removed.get("model_type_id"),
+            "metrics_deleted": metrics_deleted,
+        }
 
     def shutdown(self) -> None:
         """Release the background workers (called from the app lifespan)."""
@@ -873,9 +1345,12 @@ class ServingStore:
             )
             return {
                 "success": True,
+                "deployment_id": snapshot.get("deployment_id") or snapshot["id"],
                 "endpoint_id": snapshot["id"],
                 "endpoint_name": snapshot["name"],
                 "model_id": snapshot["model_id"],
+                "model_instance_id": snapshot["model_id"],
+                "model_type_id": snapshot.get("model_type_id"),
                 "method": snapshot["method"],
                 "prediction": result.get("result"),
                 "prediction_type": result.get("result_type"),
@@ -958,9 +1433,15 @@ class ServingStore:
         deployment: Dict[str, Any], status: str, http_status: int, elapsed_ms: float
     ) -> Dict[str, Any]:
         return {
+            "deployment_id": deployment.get("deployment_id") or deployment["id"],
             "endpoint_id": deployment["id"],
             "endpoint_name": deployment["name"],
             "model_id": deployment["model_id"],
+            "model_instance_id": deployment["model_id"],
+            "model_type_id": deployment.get("model_type_id") or deployment.get("model_name"),
+            "catalog_model_id": deployment.get("catalog_model_id")
+            or deployment.get("model_type_id")
+            or deployment.get("model_name"),
             "model_name": deployment["model_name"],
             "method": deployment["method"],
             "status": status,
@@ -975,7 +1456,7 @@ class ServingStore:
         return [
             event
             for event in self.events.recent(max(limit * 8, limit))
-            if str(event.get("endpoint_id") or "") == wanted
+            if str(event.get("deployment_id") or event.get("endpoint_id") or "") == wanted
         ][:limit]
 
 
@@ -1200,9 +1681,11 @@ def build_docs(
 
     response_example = {
         "success": True,
+        "deployment_id": deployment.get("deployment_id") or deployment["id"],
         "endpoint_id": deployment["id"],
         "endpoint_name": deployment["name"],
         "model_id": deployment["model_id"],
+        "model_type_id": deployment.get("model_type_id"),
         "method": deployment["method"],
         "prediction": "<salida JSON del método>",
         "prediction_type": "ndarray",
@@ -1214,8 +1697,13 @@ def build_docs(
     }
 
     return {
+        "deployment_id": deployment.get("deployment_id") or deployment["id"],
         "endpoint_id": deployment["id"],
         "endpoint_name": deployment["name"],
+        "model_id": deployment["model_id"],
+        "model_instance_id": deployment["model_id"],
+        "model_type_id": deployment.get("model_type_id"),
+        "catalog_model_id": deployment.get("catalog_model_id") or deployment.get("model_type_id"),
         "endpoint_url": endpoint_url,
         "endpoint_path": path,
         "method": {
@@ -1228,6 +1716,7 @@ def build_docs(
         },
         "model": {
             "id": model["id"],
+            "model_type_id": model["id"],
             "name": model["name"],
             "title": model.get("title") or model["name"],
             "module": model.get("module") or "",

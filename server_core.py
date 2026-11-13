@@ -496,8 +496,20 @@ def endpoint_label(method: str, path: str) -> str:
             "/api/serving/endpoints/<endpoint_id>/<action>",
         ),
         (
+            re.compile(r"^/api/serving/endpoints/[^/]+/metrics$"),
+            "/api/serving/endpoints/<endpoint_id>/metrics",
+        ),
+        (
             re.compile(r"^/api/serving/endpoints/[^/]+$"),
             "/api/serving/endpoints/<endpoint_id>",
+        ),
+        (
+            re.compile(r"^/api/serving/models/[^/]+$"),
+            "/api/serving/models/<model_id>",
+        ),
+        (
+            re.compile(r"^/api/monitoring/endpoints/[^/]+/metrics$"),
+            "/api/monitoring/endpoints/<endpoint_id>/metrics",
         ),
         (
             re.compile(r"^/api/monitoring/endpoints/[^/]+$"),
@@ -528,6 +540,7 @@ def model_brief(model: Dict[str, Any]) -> Dict[str, Any]:
     """Small projection used by listings and search results."""
     return {
         "id": model["id"],
+        "model_type_id": model.get("model_type_id") or model["id"],
         "title": model["title"],
         "icon": model["icon"],
         "category": model["category"],

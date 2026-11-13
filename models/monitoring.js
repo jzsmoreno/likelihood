@@ -249,7 +249,8 @@
       var currentModel = dom.modelFilter.value;
       dom.modelFilter.innerHTML = '<option value="">Todos los modelos</option>' +
         options.models.map(function (model) {
-          return '<option value="' + esc(model.id) + '">' + esc(model.name) + '</option>';
+          return '<option value="' + esc(model.id) + '">' +
+            esc(model.name + ' · ' + model.id) + '</option>';
         }).join('');
       dom.modelFilter.value = currentModel;
     }
@@ -401,11 +402,11 @@
     LMCharts.bars(byId('chart-models'), {
       items: models.map(function (row) {
         return {
-          label: row.model_name,
+          label: row.model_name + ' · ' + row.model_id,
           value: row.requests,
           key: row.model_id,
           color: 'navy',
-          meta: row.endpoints + ' endpoints · ' + ms(row.avg_latency_ms)
+          meta: row.endpoints + ' deployments · ' + ms(row.avg_latency_ms)
         };
       }),
       limit: 8,
@@ -453,12 +454,17 @@
         '<div class="page-eyebrow"><a href="/monitoring">Monitoring</a> · Endpoint</div>' +
         '<h1 class="page-title"><span class="page-icon" aria-hidden="true">◫</span> ' + esc(endpoint.name) +
         ' <span class="status-badge status-' + esc(status) + '"><span class="dot"></span>' + esc(label) + '</span></h1>' +
-        '<p class="page-subtitle">' + esc(endpoint.model_name || endpoint.model_id || '') +
+        '<p class="page-subtitle">' + esc(endpoint.model_name || endpoint.model_type_id || '') +
         (endpoint.method ? ' · <code>' + esc(endpoint.method) + '</code>' : '') +
-        ' · estadísticas del endpoint en ' + esc((detail.range && detail.range.label) || '') + '.</p></div>' +
+        ' · deployment <code>' + esc(endpoint.deployment_id || endpoint.id) + '</code>' +
+        ' · model_id <code>' + esc(endpoint.model_id || '—') + '</code>' +
+        ' · ' + esc((detail.range && detail.range.label) || '') + '.</p></div>' +
         '<div class="page-actions">' +
         '<a class="btn btn-secondary" href="/monitoring">← Overview global</a>' +
-        (deployment ? '<a class="btn btn-primary" href="/serving/' + encodeURIComponent(deployment.id) + '">Abrir endpoint</a>' : '') +
+        (deployment
+          ? '<button class="btn btn-ghost" type="button" data-monitor-action="clear-metrics">Borrar métricas</button>' +
+            '<a class="btn btn-primary" href="/serving/' + encodeURIComponent(deployment.id) + '">Abrir endpoint</a>'
+          : '') +
         '</div></div>' +
         (deployment ? '' : '<div class="info-strip is-warn" style="margin-bottom:14px">Este endpoint ya no existe en Model Serving; se muestran los datos históricos del registro de inferencias.</div>');
     }
@@ -670,7 +676,9 @@
       '<div class="review-grid">' +
       review('Fecha', isoDate(event.at)) +
       review('Endpoint', event.endpoint_name || event.endpoint_id || '—') +
-      review('Modelo', event.model_name || event.model_id || '—') +
+      review('Deployment ID', event.deployment_id || event.endpoint_id || '—') +
+      review('Modelo', event.model_name || event.model_type_id || '—') +
+      review('Model ID', event.model_id || '—') +
       review('Método', event.method || '—') +
       review('Estado', (event.status || '') + ' · HTTP ' + (event.http_status || '—')) +
       review('Latencia', ms(event.latency_ms || 0)) +
@@ -831,6 +839,89 @@
   }
 
 
+  var confirmCallback = null;
+
+  function confirmMonitoringAction(title, text, callback) {
+    if (!dom.confirmDialog) return;
+    confirmCallback = callback;
+    if (byId('confirm-title')) byId('confirm-title').textContent = title;
+    if (byId('confirm-text')) byId('confirm-text').innerHTML = text;
+    dom.confirmDialog.hidden = false;
+    window.requestAnimationFrame(function () {
+      dom.confirmDialog.classList.add('is-open');
+    });
+    document.body.classList.add('db-body-locked');
+  }
+
+  function closeMonitoringConfirm() {
+    if (!dom.confirmDialog) return;
+    dom.confirmDialog.classList.remove('is-open');
+    window.setTimeout(function () {
+      dom.confirmDialog.hidden = true;
+      document.body.classList.remove('db-body-locked');
+    }, 160);
+    confirmCallback = null;
+  }
+
+  function acceptMonitoringConfirm() {
+    if (!confirmCallback) { closeMonitoringConfirm(); return; }
+    var callback = confirmCallback;
+    var accept = byId('confirm-accept');
+    if (accept) accept.disabled = true;
+    Promise.resolve(callback()).then(function () {
+      if (accept) accept.disabled = false;
+      closeMonitoringConfirm();
+    }).catch(function (error) {
+      if (accept) accept.disabled = false;
+      toast(error.message, true);
+    });
+  }
+
+  function clearEndpointMetrics() {
+    var detail = state.detail;
+    var deployment = detail && detail.deployment;
+    if (!deployment) return;
+    confirmMonitoringAction(
+      'Borrar métricas del deployment',
+      'Se eliminarán todas las métricas de <strong>' + esc(deployment.name) +
+        '</strong> (deployment <code>' + esc(deployment.id) + '</code>). ' +
+        'El deployment y su modelo (<code>' + esc(deployment.model_id) + '</code>) se conservan.',
+      function () {
+        return api('/api/serving/endpoints/' + encodeURIComponent(deployment.id) + '/metrics', {
+          method: 'DELETE'
+        }).then(function (result) {
+          toast((result.metrics_deleted || 0) + ' métricas eliminadas');
+          loadMonitoring(false);
+        });
+      }
+    );
+  }
+
+  function bindMonitoringDialogs() {
+    var cancel = byId('confirm-cancel');
+    if (cancel) cancel.addEventListener('click', closeMonitoringConfirm);
+    var accept = byId('confirm-accept');
+    if (accept) accept.addEventListener('click', acceptMonitoringConfirm);
+    if (dom.confirmDialog) {
+      dom.confirmDialog.addEventListener('click', function (event) {
+        if (event.target === dom.confirmDialog) closeMonitoringConfirm();
+      });
+    }
+    var header = byId('endpoint-monitoring-header');
+    if (header) {
+      header.addEventListener('click', function (event) {
+        if (event.target.closest('[data-monitor-action="clear-metrics"]')) {
+          clearEndpointMetrics();
+        }
+      });
+    }
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && dom.confirmDialog && !dom.confirmDialog.hidden) {
+        closeMonitoringConfirm();
+      }
+    });
+  }
+
   /* ------------------------------------------------------------------ */
   /* Startup                                                             */
   /* ------------------------------------------------------------------ */
@@ -851,6 +942,7 @@
     dom.events = byId('global-events');
     dom.updated = byId('monitor-updated');
     dom.crumbCurrent = byId('crumb-current');
+    dom.confirmDialog = byId('confirm-dialog');
 
     var match = window.location.pathname.match(/^\/monitoring\/([^/]+)\/?$/);
     state.endpointRoute = match && match[1] ? decodeURIComponent(match[1]) : '';
@@ -864,6 +956,7 @@
     bindSidebar();
     bindTheme();
     bindControls();
+    bindMonitoringDialogs();
     syncRangeButtons();
     loadHealth();
     if (state.endpointRoute) {

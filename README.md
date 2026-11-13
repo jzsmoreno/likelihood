@@ -103,6 +103,36 @@ real parameter schema, the payload example, the expected response and the Bearer
 token instructions when `LM_API_TOKEN` protects the API. Samples and copy buttons are
 dynamic; there is no hardcoded model or endpoint name.
 
+#### Model instances and deployments
+
+Serving separates three identities that version 1 of the store conflated:
+
+| Identity | Example | Meaning |
+| --- | --- | --- |
+| `model_type_id` | `HMM` | The model class/architecture discovered by the catalog. |
+| `model_id` | `mdl-4f7a1c2b9d01` | One registered model instance (constructor/load configuration). |
+| `deployment_id` / `id` | `hmm-forward-prod` | One HTTP deployment. |
+
+Model instances are stored in `models.json` and exposed through
+`GET/POST /api/serving/models`. Deploying without a `model_id` creates a new unique
+instance; sending an existing `model_id` reuses it, so one model can feed several
+deployments while every deployment keeps its own `deployment_id`. `model_type_id`
+accepts the catalog id, and requests using the old `model_id: "HMM"` form still work:
+if no instance with that id exists, it is treated as the catalog type. Existing
+version-1 `deployments.json` and `events.jsonl` files are migrated on startup to the
+version-2 schema with stable unique ids.
+
+#### Monitoring retention and deletion
+
+Every event carries both the unique `model_id` and the `deployment_id`. The endpoint
+detail page and the endpoint monitoring page include a **Borrar métricas** action
+(with confirmation) that clears only the events of that deployment. Permanently
+deleting a deployment automatically deletes its monitoring metrics. Neither action
+deletes the catalog model nor the registered model instance; another deployment of
+the same instance keeps its metrics and keeps working. Manual cleanup is also
+available through `DELETE /api/serving/endpoints/<deployment_id>/metrics` (and the
+alias `DELETE /api/monitoring/endpoints/<deployment_id>/metrics`).
+
 Deployments and events are persisted in `output/serving/` (override with
 `LM_SERVING_STORE`). `deployments.json` survives a restart; the event log is a bounded
 JSONL file that is rotated when it grows beyond 16 MiB. Inference runs in short-lived
@@ -341,7 +371,10 @@ Model Serving and Model Monitoring add:
 
 ```text
 GET    /api/serving/overview
-GET    /api/serving/endpoints                  # ?q=&status=&model_id=
+GET    /api/serving/models                     # model instances (unique model_id)
+POST   /api/serving/models                     # register an instance -> 201
+GET    /api/serving/models/{model_id}
+GET    /api/serving/endpoints                  # ?q=&status=&model_id=&model_type_id=
 POST   /api/serving/endpoints                  # deploy -> 202
 POST   /api/serving/validate                   # validate without creating
 GET    /api/serving/endpoints/{id}
@@ -351,13 +384,16 @@ POST   /api/serving/endpoints/{id}/predict     # inference
 POST   /api/serving/endpoints/{id}/stop
 POST   /api/serving/endpoints/{id}/restart
 POST   /api/serving/endpoints/{id}/start       # alias of restart
-DELETE /api/serving/endpoints/{id}
+DELETE /api/serving/endpoints/{id}             # deployment + its metrics
+DELETE /api/serving/endpoints/{id}/metrics     # metrics only (manual cleanup)
+DELETE /api/monitoring/endpoints/{id}/metrics  # alias
 
 GET    /api/monitoring/overview                # ?range=&start=&end=&model_id=&endpoint_id=
 GET    /api/monitoring/endpoints               # per-endpoint aggregates
 GET    /api/monitoring/models                  # per-model aggregates
 GET    /api/monitoring/events                  # ?range=&status=&limit=&offset=
 GET    /api/monitoring/endpoints/{id}          # endpoint-level analytics + history
+DELETE /api/monitoring/endpoints/{id}/metrics  # alias of the serving cleanup
 GET    /api/monitoring/resources               # host sample / explicit limitation
 ```
 
@@ -369,16 +405,23 @@ metric is generated when there is no traffic.
 
 ```bash
 # 1. Deploy a method of the catalog (the backend validates the constructor values)
+#    and creates a unique model instance automatically.
 curl -s -X POST localhost:8000/api/serving/endpoints \
   -H 'Content-Type: application/json' \
   -d '{
-        "model_id": "HMM",
+        "model_type_id": "HMM",
         "method": "forward",
         "endpoint_name": "hmm-forward",
         "parameters": {"n_states": 3},
         "config": {"timeout_seconds": 60, "max_concurrency": 2},
         "load": {"enabled": false}
       }'
+
+# 1b. Or register an instance explicitly and deploy several endpoints with it:
+curl -s -X POST localhost:8000/api/serving/models \
+  -H 'Content-Type: application/json' \
+  -d '{"model_type_id": "HMM", "parameters": {"n_states": 3}}'
+# then POST /api/serving/endpoints with {"model_id": "mdl-…", ...}
 
 # 2. Poll until status is running
 curl -s localhost:8000/api/serving/endpoints/hmm-forward
