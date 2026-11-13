@@ -165,6 +165,16 @@ Notes:
 
 * The image runs as the unprivileged user `likelihood` (uid 1001), so mounted
   model files must be readable by that user.
+* Runs started from the UI (`/api/playground`, `/invoke` and the sessions) cap
+  the address space of the child process with `LM_PLAYGROUND_MEMORY`
+  (8 GiB by default, `0` disables it). Importing TensorFlow maps ~2.5 GiB on its
+  own: a lower value fails with `libtensorflow_cc.so.2: failed to map segment
+  from shared object`.
+* The model page submits every invocation as a background job
+  (`LM_INVOKE_JOB_TIMEOUT`, 15 min) and polls it, so a cold TensorFlow import
+  no longer hits the 60 s limit of the synchronous route. The compose file also
+  sets `LM_INVOKE_JOB_RETRIES=1` (retry a timed out job with exponential
+  backoff); the code default is `0`.
 * Compose mounts `likelihood/models` read-only, which keeps the live catalog
   reload while you edit a model source. Remove the mount to use the copy baked
   into the image.
@@ -190,6 +200,12 @@ the equivalent `--` CLI flag). They let you secure the API or tune its behaviour
 | `LM_PLAYGROUND` | Enable the interactive model playground. | true |
 | `LM_INVOKE` | Enable invoking model methods (still requires authentication when a token is set). | true |
 | `LM_SESSIONS` | Enable long-lived model sessions. | true |
+| `LM_PLAYGROUND_MEMORY` | Address space (MiB) each sandboxed model process may map; raise it for heavy models or set `0` to disable the cap. | 8192 |
+| `LM_INVOKE_TIMEOUT` | Seconds a synchronous `/invoke` or session call may take. | 60 |
+| `LM_INVOKE_JOB_TIMEOUT` | Seconds a background invocation (`/invoke/jobs`) may take. | 900 |
+| `LM_INVOKE_MAX_TIMEOUT` | Upper bound of the `timeout` a client may request in the body. | 3600 |
+| `LM_INVOKE_JOB_RETRIES` | Retries of a background invocation that timed out or whose worker died (`0` disables them). | 0 |
+| `LM_INVOKE_JOB_BACKOFF` / `LM_INVOKE_JOB_BACKOFF_MAX` | First pause (seconds) between retries and its ceiling; the pause doubles on every attempt. | 2 / 30 |
 | `LM_JOBS_WORKERS` | Number of workers for asynchronous playground jobs. | 2 |
 | `LM_CATALOG_TTL` | Cache time to live, in seconds, before the catalog is re-introspected. | 2 |
 | `LM_LOAD_ROOT` | Directory the "Examinar…" browser starts at and can never leave. | repository root |
@@ -245,18 +261,44 @@ GET  /api/models/{id}/source
 GET  /api/models/{id}/versions
 POST /api/models/{id}/load
 POST /api/models/{id}/invoke
+POST /api/models/{id}/invoke/jobs     # asynchronous call -> 202 + job_id
 POST /api/models/{id}/sample
 POST /api/playground
 GET  /api/playground/jobs
 POST /api/playground/jobs
 GET  /api/playground/jobs/{job_id}
 DELETE /api/playground/jobs/{job_id}
+GET  /api/jobs                        # every job (?kind=invoke|playground)
+GET  /api/jobs/{job_id}
+DELETE /api/jobs/{job_id}
 GET  /api/models/{id}/sessions
 POST /api/models/{id}/sessions
 POST /api/sessions/{session_id}/invoke
 DELETE /api/sessions/{session_id}
 GET  /api/notebook
 ```
+
+### Long running calls
+
+A model that imports TensorFlow needs minutes on a cold container, which does
+not fit in one request. Every call accepts a `timeout` (seconds, capped by
+`LM_INVOKE_MAX_TIMEOUT`) and `POST /api/models/{id}/invoke/jobs` runs it in the
+background with `LM_INVOKE_JOB_TIMEOUT` (900 s by default):
+
+```bash
+curl -s -X POST localhost:8000/api/models/Arima/invoke/jobs \
+  -H 'Content-Type: application/json' \
+  -d '{"method": "fit", "arguments": {"data": [...]}, "timeout": 900}'
+# {"success": true, "job_id": "…", "status": "pending", "poll_url": "/api/jobs/…"}
+
+curl -s localhost:8000/api/jobs/<job_id>    # poll until status is final
+```
+
+`LM_INVOKE_JOB_RETRIES` retries a job that timed out (or whose worker died)
+with exponential backoff (`LM_INVOKE_JOB_BACKOFF`, capped by
+`LM_INVOKE_JOB_BACKOFF_MAX`) and doubles the time budget on every attempt. The
+model page uses this endpoint automatically, so its progress survives a page
+reload.
 
 When `LM_API_TOKEN` is set, every `/api` route requires a valid bearer token.
 

@@ -7,11 +7,13 @@ rate limiter, the metrics and the invoke bootstrap contracts that are easy to re
 
 from __future__ import annotations
 
+import io
 import json
 import sys
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -429,3 +431,158 @@ def test_invoke_bootstrap_contracts():
     assert "_mark_prepared" in core._SANDBOX_PRELUDE
     assert '"numpy"' in core._SANDBOX_PRELUDE
     assert "instance = _build()" in core._SESSION_BOOTSTRAP
+
+
+def test_memory_mapping_errors_point_at_the_playground_limit():
+    # A low RLIMIT_AS makes TensorFlow fail while mapping its shared objects.
+    message = core.friendly_invocation_error(
+        "ImportError: libtensorflow_cc.so.2: failed to map segment from shared object"
+    )
+    assert "LM_PLAYGROUND_MEMORY" in message
+    assert message.startswith("ImportError: libtensorflow_cc.so.2")
+    # Unrelated errors are reported untouched.
+    assert core.friendly_invocation_error("KeyError: 'missing'") == "KeyError: 'missing'"
+
+
+def test_sandbox_memory_leaves_room_for_tensorflow():
+    # Importing TensorFlow maps ~2.5 GiB of address space before any model is
+    # built, so the default must stay above the 2 GiB ceiling that used to break
+    # every TensorFlow invocation. ``0`` means "no limit" and is also valid.
+    assert core.PLAYGROUND_MEMORY_MB == 0 or core.PLAYGROUND_MEMORY_MB >= 4096
+    assert core.playground_limits()["memory"] == core.PLAYGROUND_MEMORY_MB * 1024 * 1024
+
+
+def test_requested_timeout_accepts_and_bounds_the_budget():
+    assert core.requested_timeout({}, 60) == 60
+    assert core.requested_timeout({"timeout": ""}, 60) == 60
+    assert core.requested_timeout({"timeout": 300}, 60) == 300
+    assert core.requested_timeout({"timeout_seconds": "12"}, 60) == 12
+    with pytest.raises(core.ValidationError):
+        core.requested_timeout({"timeout": 0}, 60)
+    with pytest.raises(core.ValidationError):
+        core.requested_timeout({"timeout": "abc"}, 60)
+    with pytest.raises(core.ValidationError):
+        core.requested_timeout({"timeout": core.INVOKE_MAX_TIMEOUT + 1}, 60)
+
+
+def wait_for_job(queue: core.JobQueue, job: core.PlaygroundJob, timeout: float = 10.0):
+    """Block until ``job`` reaches a final state (the tests run it in a pool)."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline and not job.done:
+        time.sleep(0.01)
+    assert job.done, f"el job {job.id} no terminó a tiempo"
+    return job
+
+
+def test_invoke_job_runs_with_its_own_timeout(monkeypatch):
+    timeouts = []
+
+    def fake_run(model, method, parameters, arguments, timeout=None, load=None):
+        timeouts.append(timeout)
+        return {"method": method["name"], "result": 7, "elapsed": 0.01}
+
+    monkeypatch.setattr(core, "run_invoke", fake_run)
+    queue = core.JobQueue(workers=1)
+    try:
+        job = queue.submit_invoke(
+            {"id": "Fake", "name": "Fake", "module": "fake"},
+            {"name": "add"},
+            {},
+            {},
+            timeout=900,
+        )
+        wait_for_job(queue, job)
+    finally:
+        queue.shutdown()
+    assert job.kind == "invoke"
+    assert job.status == "succeeded"
+    assert timeouts == [900]
+    result = job.to_dict()["results"][0]
+    assert result["success"] is True
+    assert result["method"] == "add"
+    assert result["result"] == 7
+
+
+def test_invoke_job_retries_a_timeout_with_exponential_backoff(monkeypatch):
+    timeouts = []
+
+    def flaky_run(model, method, parameters, arguments, timeout=None, load=None):
+        timeouts.append(timeout)
+        if len(timeouts) == 1:
+            raise core.InvocationError("La llamada superó el límite de 10 segundos", status=504)
+        return {"method": method["name"], "result": 1}
+
+    monkeypatch.setattr(core, "run_invoke", flaky_run)
+    monkeypatch.setattr(core, "INVOKE_JOB_RETRIES", 2)
+    monkeypatch.setattr(core, "INVOKE_JOB_BACKOFF", 0.0)
+    queue = core.JobQueue(workers=1)
+    try:
+        job = queue.submit_invoke(
+            {"id": "Fake", "name": "Fake", "module": "fake"},
+            {"name": "add"},
+            {},
+            {},
+            timeout=10,
+        )
+        wait_for_job(queue, job)
+    finally:
+        queue.shutdown()
+    assert job.status == "succeeded"
+    assert job.attempts == 2
+    assert timeouts == [10, 20]  # every retry doubles the time budget
+
+
+def test_invoke_job_does_not_retry_model_errors(monkeypatch):
+    calls = []
+
+    def broken_run(model, method, parameters, arguments, timeout=None, load=None):
+        calls.append(timeout)
+        raise core.InvocationError("ValueError: datos inválidos", status=422)
+
+    monkeypatch.setattr(core, "run_invoke", broken_run)
+    monkeypatch.setattr(core, "INVOKE_JOB_RETRIES", 3)
+    monkeypatch.setattr(core, "INVOKE_JOB_BACKOFF", 0.0)
+    queue = core.JobQueue(workers=1)
+    try:
+        job = queue.submit_invoke(
+            {"id": "Fake", "name": "Fake", "module": "fake"},
+            {"name": "add"},
+            {},
+            {},
+            timeout=30,
+        )
+        wait_for_job(queue, job)
+    finally:
+        queue.shutdown()
+    assert job.status == "failed"
+    assert len(calls) == 1
+    assert job.results[0]["status"] == 422
+
+
+def test_session_build_uses_the_requested_timeout(monkeypatch):
+    waited = []
+    created = []
+
+    class StubSession:
+        def __init__(self, session_id, model, parameters, process, timeout, load=None):
+            self.id = session_id
+            self.timeout = timeout
+            self.last_used = time.time()
+            created.append(timeout)
+
+        def wait_ready(self, timeout=None):
+            waited.append(timeout)
+            return {}
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(core, "ModelSession", StubSession)
+    monkeypatch.setattr(core, "_spawn", lambda script: SimpleNamespace(stdin=io.StringIO()))
+    store = core.SessionStore(maximum=1, ttl=10, timeout=60)
+    session = store.create(
+        {"id": "Fake", "name": "Fake", "module": "fake", "parameters": []}, {}, timeout=600
+    )
+    assert session.id
+    assert created == [600]
+    assert waited == [600]  # the old code capped the build at 60 s

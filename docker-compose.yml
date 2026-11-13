@@ -34,6 +34,13 @@ services:
       LM_INVOKE: "${LM_INVOKE:-1}"
       LM_SESSIONS: "${LM_SESSIONS:-1}"
       LM_CATALOG_TTL: "${LM_CATALOG_TTL:-2}"
+      # Address space of each sandboxed model process, in MiB. TensorFlow maps
+      # ~2.5 GiB just to import: raise it for heavy models, or set 0 to disable.
+      LM_PLAYGROUND_MEMORY: "${LM_PLAYGROUND_MEMORY:-8192}"
+      # Long calls: a background invocation may take 15 min and retry a timeout.
+      LM_INVOKE_JOB_TIMEOUT: "${LM_INVOKE_JOB_TIMEOUT:-900}"
+      LM_INVOKE_MAX_TIMEOUT: "${LM_INVOKE_MAX_TIMEOUT:-3600}"
+      LM_INVOKE_JOB_RETRIES: "${LM_INVOKE_JOB_RETRIES:-1}"
       LM_GZIP_MIN_BYTES: "${LM_GZIP_MIN_BYTES:-1024}"
       LM_TRUST_PROXY: "${LM_TRUST_PROXY:-0}"
       # Serve saved models from a mounted directory (see the volumes block):

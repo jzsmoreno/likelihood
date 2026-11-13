@@ -869,6 +869,69 @@ def test_invoke_requires_the_method(client, calculator):
     assert response.json()["success"] is False
 
 
+def test_sync_invoke_accepts_a_timeout(client, calculator):
+    response = client.post(
+        "/api/models/Calculator/invoke",
+        json={
+            "method": "add",
+            "arguments": {"amount": 1},
+            "parameters": {"value": 1},
+            "timeout": 120,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["result"] == 2
+
+
+def test_invoke_job_runs_in_the_background(client, calculator):
+    created = client.post(
+        "/api/models/Calculator/invoke/jobs",
+        json={
+            "method": "add",
+            "arguments": {"amount": 4},
+            "parameters": {"value": 1},
+            "timeout": 300,
+        },
+    )
+    assert created.status_code == 202
+    body = created.json()
+    assert body["kind"] == "invoke"
+    assert body["timeout_seconds"] == 300
+    assert created.headers["Location"] == body["poll_url"] == f"/api/jobs/{body['job_id']}"
+    job: Optional[Dict[str, Any]] = None
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        polled = client.get(body["poll_url"])
+        assert polled.status_code == 200
+        job = polled.json()
+        if job["status"] not in {"pending", "running"}:
+            break
+        time.sleep(0.1)
+    assert job is not None
+    assert job["status"] == "succeeded"
+    assert job["attempts"] == 1
+    result = job["results"][0]
+    assert result["success"] is True
+    assert result["method"] == "add"
+    assert result["result"] == 5
+    listing = client.get("/api/jobs?kind=invoke")
+    assert listing.status_code == 200
+    assert any(item["job_id"] == body["job_id"] for item in listing.json()["jobs"])
+    playground = client.get("/api/playground/jobs")
+    assert all(item["kind"] == "playground" for item in playground.json()["jobs"])
+    assert client.delete(f"/api/jobs/{body['job_id']}").status_code == 200
+    assert client.get("/api/jobs/does-not-exist").status_code == 404
+
+
+def test_invoke_job_rejects_an_excessive_timeout(client, calculator):
+    response = client.post(
+        "/api/models/Calculator/invoke/jobs",
+        json={"method": "add", "timeout": server.INVOKE_MAX_TIMEOUT + 1},
+    )
+    assert response.status_code == 400
+    assert response.json()["success"] is False
+
+
 def test_sample_endpoint(client, calculator):
     response = client.post("/api/models/Calculator/sample", json={"method": "add"})
     assert response.status_code == 200
@@ -1112,7 +1175,12 @@ def test_autoclassifier_invoke_honours_input_shape_parm(client, session_store):
         "units": 8,
         "activation": "relu",
     }
-    created = client.post("/api/models/AutoClassifier/sessions", json={"parameters": parameters})
+    # A cold TensorFlow import takes minutes: ask for a longer build budget, which
+    # is what ``timeout`` is for (the fixture store only allows 30 s per call).
+    created = client.post(
+        "/api/models/AutoClassifier/sessions",
+        json={"parameters": parameters, "timeout": 600},
+    )
     assert created.status_code == 201
     session_id = created.json()["session_id"]
     try:

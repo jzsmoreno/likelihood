@@ -32,7 +32,7 @@ import uuid
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Deque, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Deque, Dict, List, Optional, Sequence, Tuple
 from urllib.parse import quote, unquote
 
 from model_catalog import DEFAULT_PACKAGE_DIR, REPO_ROOT, build_catalog, category_meta, guess_widget
@@ -83,7 +83,10 @@ PLAYGROUND_TIMEOUT = float(os.environ.get("LM_PLAYGROUND_TIMEOUT") or 60)
 #: CPU seconds the playground child may consume before the kernel kills it.
 PLAYGROUND_CPU_SECONDS = int(os.environ.get("LM_PLAYGROUND_CPU") or 30)
 #: Address space of the playground child, in MiB (``0`` disables the limit).
-PLAYGROUND_MEMORY_MB = int(os.environ.get("LM_PLAYGROUND_MEMORY") or 2048)
+#: TensorFlow maps ~2.5 GiB *just to import* (``libtensorflow_cc.so.2``), so a
+#: 2 GiB ceiling made every TensorFlow model die in the child with ``failed to
+#: map segment from shared object``; 8 GiB still bounds a runaway model.
+PLAYGROUND_MEMORY_MB = int(os.environ.get("LM_PLAYGROUND_MEMORY") or 8192)
 #: Open file descriptors the playground child may hold (``0`` disables the limit).
 PLAYGROUND_MAX_FILES = int(os.environ.get("LM_PLAYGROUND_FILES") or 128)
 #: Largest file the playground child may write, in MiB (``0`` disables the limit).
@@ -138,6 +141,25 @@ INVOKE_ENABLED = _env_flag("LM_INVOKE", True)
 INVOKE_TIMEOUT = float(os.environ.get("LM_INVOKE_TIMEOUT") or PLAYGROUND_TIMEOUT)
 #: Number of method calls that may run at the same time (``LM_INVOKE_MAX_CONCURRENCY``).
 INVOKE_MAX_CONCURRENCY = max(1, int(os.environ.get("LM_INVOKE_MAX_CONCURRENCY") or 4))
+#: Seconds a *background* invocation may take (``LM_INVOKE_JOB_TIMEOUT``).  A job
+#: does not hold an HTTP connection open, so it gets a much larger budget than
+#: the synchronous route: importing TensorFlow alone takes minutes on a cold
+#: container.
+INVOKE_JOB_TIMEOUT = float(os.environ.get("LM_INVOKE_JOB_TIMEOUT") or max(INVOKE_TIMEOUT, 900.0))
+#: Upper bound of the ``timeout`` a client may request in the body
+#: (``LM_INVOKE_MAX_TIMEOUT``); ``0`` would let a hung child live forever.
+INVOKE_MAX_TIMEOUT = float(os.environ.get("LM_INVOKE_MAX_TIMEOUT") or 3600.0)
+#: Extra attempts of a background invocation that timed out or whose worker died
+#: (``LM_INVOKE_JOB_RETRIES``; ``0`` disables the retries).  Every retry doubles
+#: the time budget, up to :data:`INVOKE_MAX_TIMEOUT`.
+INVOKE_JOB_RETRIES = max(0, int(os.environ.get("LM_INVOKE_JOB_RETRIES") or 0))
+#: Seconds of the first pause before retrying; it doubles on every attempt
+#: (``LM_INVOKE_JOB_BACKOFF``).
+INVOKE_JOB_BACKOFF = max(0.0, float(os.environ.get("LM_INVOKE_JOB_BACKOFF") or 2.0))
+#: Ceiling of that exponential backoff (``LM_INVOKE_JOB_BACKOFF_MAX``).
+INVOKE_JOB_BACKOFF_MAX = max(0.0, float(os.environ.get("LM_INVOKE_JOB_BACKOFF_MAX") or 30.0))
+#: Statuses of a child that are worth retrying (timed out / died before answering).
+_RETRYABLE_STATUSES = frozenset({503, 504})
 #: Method name fragments that are never invoked (filesystem/side effect methods).
 INVOKE_SIDE_EFFECT_METHODS = (
     "save",
@@ -459,11 +481,13 @@ def endpoint_label(method: str, path: str) -> str:
     patterns = (
         (re.compile(r"^/api/models/[^/]+/source$"), "/api/models/<model_id>/source"),
         (re.compile(r"^/api/models/[^/]+/versions$"), "/api/models/<model_id>/versions"),
+        (re.compile(r"^/api/models/[^/]+/invoke/jobs$"), "/api/models/<model_id>/invoke/jobs"),
         (re.compile(r"^/api/models/[^/]+/invoke$"), "/api/models/<model_id>/invoke"),
         (re.compile(r"^/api/models/[^/]+/sample$"), "/api/models/<model_id>/sample"),
         (re.compile(r"^/api/models/[^/]+/sessions$"), "/api/models/<model_id>/sessions"),
         (re.compile(r"^/api/models/[^/]+$"), "/api/models/<model_id>"),
         (re.compile(r"^/api/playground/jobs/[^/]+$"), "/api/playground/jobs/<job_id>"),
+        (re.compile(r"^/api/jobs/[^/]+$"), "/api/jobs/<job_id>"),
         (re.compile(r"^/api/playground/[^/]+$"), "/api/playground/<model_id>"),
         (re.compile(r"^/api/sessions/[^/]+/invoke$"), "/api/sessions/<session_id>/invoke"),
         (re.compile(r"^/api/sessions/[^/]+$"), "/api/sessions/<session_id>"),
@@ -1986,7 +2010,7 @@ def run_playground(
             result_line = payload_line
     if not result_line:
         raise PlaygroundError(
-            _last_error_line(stderr) or "No se pudo construir el modelo",
+            friendly_invocation_error(_last_error_line(stderr) or "No se pudo construir el modelo"),
             detail=stderr[-4000:],
         )
     try:
@@ -2059,7 +2083,7 @@ def run_load(
             result_line = payload_line
     if not result_line:
         raise LoadError(
-            _last_error_line(stderr) or "No se pudo cargar el modelo",
+            friendly_invocation_error(_last_error_line(stderr) or "No se pudo cargar el modelo"),
             detail=stderr[-4000:],
         )
     try:
@@ -2244,6 +2268,8 @@ def invoke_spec(model: Dict[str, Any]) -> Dict[str, Any]:
         "model_name": model["name"],
         "import_statement": model["import_statement"],
         "endpoint": f"/api/models/{model['id']}/invoke",
+        "jobs_endpoint": f"/api/models/{model['id']}/invoke/jobs",
+        "jobs_url_template": "/api/jobs/{job_id}",
         "sample_endpoint": f"/api/models/{model['id']}/sample",
         "sessions_url": f"/api/models/{model['id']}/sessions",
         "session_url_template": "/api/sessions/{session_id}",
@@ -2253,6 +2279,9 @@ def invoke_spec(model: Dict[str, Any]) -> Dict[str, Any]:
         "buildable": not blocked,
         "unsupported": blocked,
         "timeout_seconds": INVOKE_TIMEOUT,
+        "job_timeout_seconds": INVOKE_JOB_TIMEOUT,
+        "max_timeout_seconds": INVOKE_MAX_TIMEOUT,
+        "job_retries": INVOKE_JOB_RETRIES,
         "session_ttl_seconds": SESSION_TTL,
         "max_sessions": MAX_SESSIONS,
         "side_effects_blocked": not INVOKE_ALLOW_SIDE_EFFECTS,
@@ -2359,6 +2388,39 @@ def prepare_invocation(
 _KERAS_POSITIONAL_ERROR = "Only input tensors may be passed as positional arguments"
 
 
+def requested_timeout(data: Dict[str, Any], default: float) -> float:
+    """Read the optional ``timeout`` (seconds) of an invocation payload.
+
+    A cold TensorFlow import can take minutes, so a client may raise the budget
+    of one call with ``{"timeout": 600}`` (``timeout_seconds`` is accepted too);
+    the value is capped by :data:`INVOKE_MAX_TIMEOUT` and must be positive, so a
+    hung child can never live forever.
+    """
+    raw = data.get("timeout", data.get("timeout_seconds"))
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return default
+    try:
+        value = float(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("El campo 'timeout' debe ser un número de segundos") from exc
+    if not math.isfinite(value) or value <= 0:
+        raise ValidationError("El campo 'timeout' debe ser mayor que 0 segundos")
+    if value > INVOKE_MAX_TIMEOUT:
+        raise ValidationError(
+            f"El campo 'timeout' no puede superar {INVOKE_MAX_TIMEOUT:g} segundos"
+        )
+    return value
+
+
+#: Errors the kernel raises when the child cannot map a large shared object.
+#: Under ``RLIMIT_AS``/``RLIMIT_DATA`` the import of TensorFlow (and the OpenBLAS
+#: buffers numpy reserves) fails this way instead of raising ``MemoryError``.
+_ADDRESS_SPACE_ERRORS = (
+    "failed to map segment from shared object",
+    "Memory allocation still failed",
+)
+
+
 def friendly_invocation_error(
     message: str,
     method: str = "",
@@ -2377,6 +2439,13 @@ def friendly_invocation_error(
             f"{text} · Keras solo acepta tensores como argumento posicional: "
             "revisa que el valor de entrada sea una matriz/lista JSON (no un "
             f"número o un texto).{hint}"
+        )
+    if any(fragment in text for fragment in _ADDRESS_SPACE_ERRORS):
+        return (
+            f"{text} · El proceso hijo no tiene espacio de direcciones suficiente para "
+            "cargar las librerías del modelo (TensorFlow necesita ~2,5 GiB solo para "
+            "importarse): sube LM_PLAYGROUND_MEMORY (por ejemplo, 8192) o ponlo a 0 "
+            "para desactivar el límite."
         )
     if method == "call" and "NoneType' object is not callable" in text:
         return (
@@ -2444,7 +2513,11 @@ def run_invoke(
             result_line = payload_line
     if not result_line:
         raise InvocationError(
-            _last_error_line(stderr) or "No se pudo construir el modelo",
+            friendly_invocation_error(
+                _last_error_line(stderr) or "No se pudo construir el modelo",
+                method["name"],
+                method_fields(method),
+            ),
             detail=stderr[-4000:],
         )
     try:
@@ -2593,7 +2666,9 @@ class ModelSession:
         response = self._receive(self.timeout if timeout is None else timeout)
         if response.get("event") == "error":
             raise InvocationError(
-                response.get("error") or "No se pudo construir el modelo",
+                friendly_invocation_error(
+                    response.get("error") or "No se pudo construir el modelo"
+                ),
                 detail=(response.get("traceback") or self.stderr_tail())[-4000:],
             )
         self.info = {
@@ -2603,8 +2678,15 @@ class ModelSession:
         }
         return self.info
 
-    def invoke(self, method: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Call ``method`` on the live instance and return its JSON result."""
+    def invoke(
+        self, method: str, arguments: Dict[str, Any], timeout: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """Call ``method`` on the live instance and return its JSON result.
+
+        ``timeout`` overrides the budget of this call only (the session default
+        stays in :attr:`timeout`), which is how a client waits for a slow method
+        without reopening the session.
+        """
         if self._closed:
             raise InvocationError("La sesión está cerrada", status=404)
         with self._lock:
@@ -2621,7 +2703,7 @@ class ModelSession:
                 }
             )
             try:
-                response = self._receive(self.timeout)
+                response = self._receive(self.timeout if timeout is None else timeout)
             except InvocationError:
                 # A timed out or dead worker cannot be reused.
                 self.errors += 1
@@ -2752,7 +2834,7 @@ def start_session(
             raise InvocationError("No se pudo comunicar con la sesión", status=503)
         stream.write(payload + "\n")
         stream.flush()
-        session.wait_ready(min(timeout, 60.0))
+        session.wait_ready(timeout)
     except (InvocationError, BrokenPipeError, OSError):
         session.close()
         raise
@@ -2780,8 +2862,14 @@ class SessionStore:
         model: Dict[str, Any],
         parameters: Dict[str, Any],
         load: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None,
     ) -> ModelSession:
-        """Start a new session, evicting the least recently used one if needed."""
+        """Start a new session, evicting the least recently used one if needed.
+
+        ``timeout`` raises the budget of the initial build (a cold TensorFlow
+        import takes minutes); it also becomes the per-call timeout of the
+        session, which is what ``GET /api/sessions/<id>`` reports.
+        """
         with self._lock:
             self._prune()
             evicted: Optional[ModelSession] = None
@@ -2792,12 +2880,18 @@ class SessionStore:
         if evicted is not None:
             LOGGER.info("Sesión %s desalojada (máximo %d)", evicted.id, self._maximum)
             evicted.close()
-        session = start_session(model, parameters, self._timeout, load=load)
+        timeout = self._timeout if timeout is None else timeout
+        session = start_session(model, parameters, timeout, load=load)
         with self._lock:
             self._sessions[session.id] = session
         return session
 
-    def replace(self, session: ModelSession, parameters: Dict[str, Any]) -> ModelSession:
+    def replace(
+        self,
+        session: ModelSession,
+        parameters: Dict[str, Any],
+        timeout: Optional[float] = None,
+    ) -> ModelSession:
         """Rebuild ``session`` with new constructor values.
 
         A live instance cannot change its constructor arguments, so the worker is replaced by one
@@ -2808,7 +2902,7 @@ class SessionStore:
         with self._lock:
             previous = self._sessions.pop(session.id, None)
         try:
-            replacement = self.create(session.model, parameters)
+            replacement = self.create(session.model, parameters, timeout=timeout)
         except BaseException:
             if previous is not None:
                 with self._lock:
@@ -2879,18 +2973,36 @@ SESSIONS = SessionStore()
 INVOKE_SLOTS = threading.BoundedSemaphore(INVOKE_MAX_CONCURRENCY)
 
 
-class PlaygroundJob:
-    """One asynchronous playground request, possibly holding several runs.
+def _run_signature(run: Dict[str, Any]) -> Dict[str, Any]:
+    """Extra keys a job result carries (the invoked method, when there is one)."""
+    method = run.get("method")
+    name = method.get("name") if isinstance(method, dict) else None
+    return {"method": name} if name else {}
 
-    ``POST /api/playground/jobs`` returns its id immediately; the client polls ``GET
-    /api/playground/jobs/<id>`` until ``status`` leaves ``pending``/ ``running``.  A pool of worker
-    threads keeps the cost of the background machinery bounded while every model still runs in its
-    own child process.
+
+class PlaygroundJob:
+    """One asynchronous model request, possibly holding several runs.
+
+    It backs both the playground batches (``POST /api/playground/jobs``) and the
+    long method invocations (``POST /api/models/<id>/invoke/jobs``): ``kind``
+    says which one it is and ``runner`` is the callable that executes one entry
+    (``None`` means a plain :func:`run_playground`).  The endpoint returns the id
+    immediately; the client polls ``GET /api/jobs/<id>`` until ``status`` leaves
+    ``pending``/``running``.  A pool of worker threads keeps the cost of the
+    background machinery bounded while every model still runs in its own child
+    process.
     """
 
-    def __init__(self, runs: List[Dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        runs: List[Dict[str, Any]],
+        kind: str = "playground",
+        runner: Optional[Callable[[Dict[str, Any], Optional[float]], Dict[str, Any]]] = None,
+    ) -> None:
         self.id = uuid.uuid4().hex[:12]
         self.runs = runs
+        self.kind = kind
+        self.runner = runner
         self.status = "pending"
         self.created_at = time.time()
         self.started_at: Optional[float] = None
@@ -2898,6 +3010,12 @@ class PlaygroundJob:
         self.results: List[Dict[str, Any]] = []
         self.error = ""
         self.cancel_requested = False
+        #: Seconds one entry may take (``None`` keeps the ``run_playground`` default).
+        self.timeout: Optional[float] = None
+        #: Retries of a transient failure and the pause before each one.
+        self.retries = 0
+        self.attempts = 0
+        self.backoff = 0.0
 
     @property
     def batch(self) -> bool:
@@ -2925,6 +3043,7 @@ class PlaygroundJob:
         """JSON projection of the job."""
         payload: Dict[str, Any] = {
             "job_id": self.id,
+            "kind": self.kind,
             "status": self.status,
             "batch": self.batch,
             "runs": len(self.runs),
@@ -2933,6 +3052,8 @@ class PlaygroundJob:
             "finished_at": self.finished_at,
             "elapsed": self.elapsed(),
             "cancel_requested": self.cancel_requested,
+            "timeout_seconds": self.timeout,
+            "attempts": self.attempts,
             "error": self.error,
         }
         if include_results:
@@ -2986,11 +3107,59 @@ class JobQueue:
     def submit(self, runs: List[Dict[str, Any]]) -> PlaygroundJob:
         """Queue ``runs`` (``[{"model": ..., "parameters": ...}, ...]``)."""
         job = PlaygroundJob(runs)
+        self._enqueue(job)
+        return job
+
+    def submit_invoke(
+        self,
+        model: Dict[str, Any],
+        method: Dict[str, Any],
+        parameters: Dict[str, Any],
+        arguments: Dict[str, Any],
+        load: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None,
+    ) -> PlaygroundJob:
+        """Queue one method call (``POST /api/models/<id>/invoke/jobs``).
+
+        The job gets :data:`INVOKE_JOB_TIMEOUT` seconds by default (the
+        synchronous route keeps :data:`INVOKE_TIMEOUT`) and
+        :data:`INVOKE_JOB_RETRIES` attempts with exponential backoff: every retry
+        doubles the time budget, because a timeout is usually a cold import that
+        the next attempt, with the page cache warm, can finish.
+        """
+
+        def invoke_run(target: Dict[str, Any], budget: Optional[float]) -> Dict[str, Any]:
+            """Build the model and call the method inside a fresh child process."""
+            return run_invoke(
+                target["model"],
+                target["method"],
+                target["parameters"],
+                target["arguments"],
+                timeout=budget,
+                load=target.get("load"),
+            )
+
+        run = {
+            "model": model,
+            "method": method,
+            "parameters": parameters,
+            "arguments": arguments,
+            "load": load,
+        }
+        job = PlaygroundJob([run], kind="invoke")
+        job.timeout = INVOKE_JOB_TIMEOUT if timeout is None else timeout
+        job.retries = INVOKE_JOB_RETRIES
+        job.backoff = INVOKE_JOB_BACKOFF
+        job.runner = invoke_run
+        self._enqueue(job)
+        return job
+
+    def _enqueue(self, job: PlaygroundJob) -> None:
+        """Store ``job`` and hand it to the worker pool."""
         with self._lock:
             self._prune()
             self._jobs[job.id] = job
         self._pool().submit(self._run, job)
-        return job
 
     def _run(self, job: PlaygroundJob) -> None:
         """Execute every run of ``job`` and store the individual outcomes."""
@@ -3000,39 +3169,12 @@ class JobQueue:
         for run in job.runs:
             if job.cancel_requested:
                 break
-            model = run["model"]
-            parameters = run["parameters"]
-            try:
-                result = run_playground(model, parameters)
-            except PlaygroundError as exc:
-                job.results.append(
-                    {
-                        "success": False,
-                        "model_id": model["id"],
-                        "parameters": parameters,
-                        "status": exc.status,
-                        "error": str(exc),
-                        "detail": exc.detail,
-                    }
-                )
-                continue
-            except Exception as exc:  # pragma: no cover - defensive
-                LOGGER.exception("Fallo inesperado del job %s en %s", job.id, model["id"])
-                job.results.append(
-                    {
-                        "success": False,
-                        "model_id": model["id"],
-                        "parameters": parameters,
-                        "status": 500,
-                        "error": str(exc),
-                        "detail": "",
-                    }
-                )
-                continue
-            successes += 1
-            entry = {"success": True, "model_id": model["id"], "parameters": parameters}
-            entry.update(result)
-            job.results.append(entry)
+            result = self._execute(job, run)
+            if result is None:
+                break
+            if result.get("success"):
+                successes += 1
+            job.results.append(result)
         total = len(job.runs)
         if job.cancel_requested:
             job.status = "cancelled"
@@ -3046,6 +3188,77 @@ class JobQueue:
             errors = [result.get("error", "") for result in job.results if result.get("error")]
             job.error = "; ".join(errors)[:500]
         job.finished_at = time.time()
+
+    def _execute(self, job: PlaygroundJob, run: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Run one entry of ``job``, retrying transient failures with backoff.
+
+        ``None`` means the job was cancelled while waiting for a retry, so the
+        entry produced no result at all.
+        """
+        model = run["model"]
+        parameters = run.get("parameters") or {}
+        timeout = job.timeout
+        for attempt in range(job.retries + 1):
+            job.attempts = attempt + 1
+            try:
+                if job.runner is None:
+                    result = run_playground(model, parameters)
+                else:
+                    result = job.runner(run, timeout)
+            except PlaygroundError as exc:
+                if (
+                    exc.status not in _RETRYABLE_STATUSES
+                    or attempt >= job.retries
+                    or job.cancel_requested
+                ):
+                    return {
+                        "success": False,
+                        "model_id": model["id"],
+                        "parameters": parameters,
+                        **_run_signature(run),
+                        "status": exc.status,
+                        "error": str(exc),
+                        "detail": exc.detail,
+                    }
+                delay = min(job.backoff * (2**attempt), INVOKE_JOB_BACKOFF_MAX)
+                LOGGER.warning(
+                    "El job %s falló en el intento %d de %d (%s); reintento en %.1f s",
+                    job.id,
+                    attempt + 1,
+                    job.retries + 1,
+                    exc,
+                    delay,
+                )
+                if delay:
+                    time.sleep(delay)
+                if job.cancel_requested:
+                    return None
+                if timeout:
+                    # The retry gets twice the budget, up to the hard ceiling: a
+                    # cold import that timed out usually fits once the libraries
+                    # are in the page cache.
+                    timeout = min(timeout * 2, max(INVOKE_MAX_TIMEOUT, timeout))
+                continue
+            except Exception as exc:  # pragma: no cover - defensive
+                LOGGER.exception("Fallo inesperado del job %s en %s", job.id, model["id"])
+                return {
+                    "success": False,
+                    "model_id": model["id"],
+                    "parameters": parameters,
+                    **_run_signature(run),
+                    "status": 500,
+                    "error": str(exc),
+                    "detail": "",
+                }
+            entry: Dict[str, Any] = {
+                "success": True,
+                "model_id": model["id"],
+                "parameters": parameters,
+                **_run_signature(run),
+            }
+            entry.update(result)
+            return entry
+        return None
 
     def cancel(self, job_id: str) -> Optional[PlaygroundJob]:
         """Ask ``job_id`` to stop; ``None`` when the job is unknown.
@@ -3080,11 +3293,13 @@ class JobQueue:
             self._prune()
             return self._jobs.get(job_id)
 
-    def recent(self, limit: int = 20) -> List[PlaygroundJob]:
-        """Return the jobs, newest first."""
+    def recent(self, limit: int = 20, kind: Optional[str] = None) -> List[PlaygroundJob]:
+        """Return the jobs, newest first; ``kind`` narrows the playground/invoke mix."""
         with self._lock:
             self._prune()
             jobs = sorted(self._jobs.values(), key=lambda job: job.created_at, reverse=True)
+        if kind is not None:
+            jobs = [job for job in jobs if job.kind == kind]
         return jobs[: max(1, limit)]
 
     def snapshot(self) -> Dict[str, Any]:

@@ -32,18 +32,22 @@ The routes are the same as the previous standard-library implementation::
     GET    /api/playground/jobs       recent asynchronous playground jobs
     GET    /api/playground/jobs/<id>  state and results of one job
     GET    /api/models/<id>/invoke    methods that may be called on one model
+    GET    /api/jobs                  recent asynchronous jobs (``?kind=``)
+    GET    /api/jobs/<job_id>         state and results of one asynchronous job
     GET    /api/sessions              open model sessions
     GET    /api/sessions/<id>         state of one session
     GET    /api/notebook/<model_id>   generated ``.ipynb`` download (``?parameters=``)
     POST   /api/playground            ``{"model_id": ..., "parameters": {...}}``
     POST   /api/playground/jobs       one run or a list of runs -> ``202`` and a ``job_id``
     POST   /api/models/<id>/invoke    ``{"method": ..., "arguments": {...}}``
+    POST   /api/models/<id>/invoke/jobs  the same call in the background -> ``202``
     POST   /api/models/<id>/load      load a saved model from ``{"path": ...}``
     POST   /api/models/<id>/sample    dummy arguments for one method
     POST   /api/models/<id>/sessions  build the model once and keep it alive
     POST   /api/sessions/<id>/invoke  call a method on the live instance
     DELETE /api/sessions/<id>         close a session
     DELETE /api/playground/jobs/<id>  cancel a pending job or forget a finished one
+    DELETE /api/jobs/<id>             cancel or forget any asynchronous job
     POST   /api/notebook              ``{"model_id": ..., "parameters": {...}}``
     POST   /api/search                deprecated alias of ``GET /api/search``
 
@@ -225,6 +229,14 @@ class InvokeRequest(_AliasedBody):
             "distintos a los de la instancia viva la reconstruyen."
         ),
     )
+    timeout: Optional[float] = Field(
+        default=None,
+        description=(
+            "Segundos que puede tardar la llamada (por defecto LM_INVOKE_TIMEOUT; "
+            "máximo LM_INVOKE_MAX_TIMEOUT). Un modelo con TensorFlow puede tardar "
+            "minutos en importarse."
+        ),
+    )
 
 
 class SessionRequest(_AliasedBody):
@@ -232,6 +244,13 @@ class SessionRequest(_AliasedBody):
 
     parameters: Optional[Dict[str, Any]] = Field(
         default=None, description="Argumentos del constructor del modelo."
+    )
+    timeout: Optional[float] = Field(
+        default=None,
+        description=(
+            "Segundos para construir la instancia y para cada llamada posterior "
+            "(por defecto LM_SESSION_TIMEOUT; máximo LM_INVOKE_MAX_TIMEOUT)."
+        ),
     )
 
 
@@ -1145,7 +1164,7 @@ def build_router() -> APIRouter:
         """Retrieve the most recent jobs , without their results."""
         query = query_dict(request)
         limit, _ = pagination({**query, "limit": query.get("limit") or ["20"]})
-        jobs = settings.jobs.recent(limit or 20)
+        jobs = settings.jobs.recent(limit or 20, kind="playground")
         return json_response(
             200,
             {
@@ -1240,6 +1259,67 @@ def build_router() -> APIRouter:
             {"Cache-Control": "no-store"},
         )
 
+    # -- asynchronous jobs (playground batches and long invocations) --------
+
+    @router.get("/api/jobs", tags=["jobs"])
+    def jobs_list(request: Request, settings: ServerSettings = Depends(get_settings)) -> Response:
+        """Recent jobs of any kind, without their results (``?kind=``, ``?limit=``)."""
+        query = query_dict(request)
+        limit, _ = pagination({**query, "limit": query.get("limit") or ["20"]})
+        kind = (query.get("kind") or [""])[0].strip() or None
+        if kind is not None and kind not in {"playground", "invoke"}:
+            raise core.ValidationError("El parámetro 'kind' debe ser 'playground' o 'invoke'")
+        jobs = settings.jobs.recent(limit or 20, kind=kind)
+        return json_response(
+            200,
+            {
+                "success": True,
+                "count": len(jobs),
+                "jobs": [job.to_dict(include_results=False) for job in jobs],
+            },
+        )
+
+    @router.get("/api/jobs/{job_id}", tags=["jobs"])
+    def jobs_get(job_id: str, settings: ServerSettings = Depends(get_settings)) -> Response:
+        """State (and results) of one asynchronous job."""
+        job = settings.jobs.get(job_id.strip())
+        if job is None:
+            raise core.ModelNotFound(f"Job no encontrado o expirado: {job_id}")
+        payload: Dict[str, Any] = {"success": True}
+        payload.update(job.to_dict())
+        payload["poll_url"] = f"/api/jobs/{job.id}"
+        return json_response(200, payload, {"Cache-Control": "no-store"})
+
+    @router.delete("/api/jobs/{job_id}", tags=["jobs"])
+    def jobs_delete(job_id: str, settings: ServerSettings = Depends(get_settings)) -> Response:
+        """Cancel a queued job, or forget a job that already finished.
+
+        A child process that is already running is never interrupted (the model
+        owns it): the job stops before its next attempt and reports ``cancelled``.
+        """
+        job_id = job_id.strip()
+        job = settings.jobs.cancel(job_id)
+        if job is None:
+            raise core.ModelNotFound(f"Job no encontrado o expirado: {job_id}")
+        if job.cancel_requested and job.status == "running":
+            status = "cancelling"
+        else:
+            status = job.status
+            settings.jobs.forget(job_id)
+        return json_response(
+            200,
+            {
+                "success": True,
+                "job_id": job.id,
+                "kind": job.kind,
+                "status": status,
+                "poll_url": f"/api/jobs/{job.id}",
+                "runs": len(job.runs),
+                "completed": len(job.results),
+            },
+            {"Cache-Control": "no-store"},
+        )
+
     @router.get("/api/playground/{model_id}", tags=["playground"])
     def playground_spec_endpoint(
         model_id: str, settings: ServerSettings = Depends(get_settings)
@@ -1280,7 +1360,14 @@ def build_router() -> APIRouter:
             parameters = load.get("parameters") or {}
         acquire_invoke_slot(settings)
         try:
-            result = core.run_invoke(model, method, parameters, arguments, load=load)
+            result = core.run_invoke(
+                model,
+                method,
+                parameters,
+                arguments,
+                timeout=core.requested_timeout(data, core.INVOKE_TIMEOUT),
+                load=load,
+            )
         except core.PlaygroundError as exc:
             exc.extra.setdefault("model_id", model["id"])
             raise
@@ -1298,6 +1385,50 @@ def build_router() -> APIRouter:
         }
         payload.update(result)
         return json_response(200, payload)
+
+    @router.post("/api/models/{model_id}/invoke/jobs", status_code=202, tags=["invoke"])
+    def invoke_enqueue(
+        model_id: str, body: InvokeRequest, settings: ServerSettings = Depends(get_settings)
+    ) -> Response:
+        """Queue a method call and return ``202`` with a ``job_id``.
+
+        A cold TensorFlow import takes minutes, which does not fit in one HTTP
+        request: the call runs in the shared job pool with ``LM_INVOKE_JOB_TIMEOUT``
+        seconds (and ``LM_INVOKE_JOB_RETRIES`` retries with exponential backoff)
+        while the client polls ``GET /api/jobs/<job_id>`` until the status leaves
+        ``pending``/``running``.
+        """
+        require_invoke(settings)
+        model = model_or_404(settings, model_id)
+        data = body.payload()
+        load = None
+        if any(key in data for key in ("path", "file", "filepath", "load")):
+            load = core.prepare_load(model, data)
+        method, arguments, parameters = core.prepare_invocation(
+            model, data, with_parameters=load is None
+        )
+        if load is not None:
+            parameters = load.get("parameters") or {}
+        timeout = core.requested_timeout(data, core.INVOKE_JOB_TIMEOUT)
+        job = settings.jobs.submit_invoke(
+            model, method, parameters, arguments, load=load, timeout=timeout
+        )
+        poll_url = f"/api/jobs/{job.id}"
+        return json_response(
+            202,
+            {
+                "success": True,
+                "job_id": job.id,
+                "kind": job.kind,
+                "status": job.status,
+                "model_id": model["id"],
+                "method": method["name"],
+                "timeout_seconds": job.timeout,
+                "retries": job.retries,
+                "poll_url": poll_url,
+            },
+            {"Location": poll_url, "Cache-Control": "no-store"},
+        )
 
     @router.post("/api/models/{model_id}/sample", tags=["invoke"])
     def sample(
@@ -1361,7 +1492,8 @@ def build_router() -> APIRouter:
             if not isinstance(raw_parameters, dict):
                 raise core.ValidationError("El campo 'parameters' debe ser un objeto")
             parameters = core.coerce_model_parameters(model, raw_parameters)
-        session = settings.sessions.create(model, parameters, load=load)
+        timeout = core.requested_timeout(data, core.SESSION_TIMEOUT)
+        session = settings.sessions.create(model, parameters, load=load, timeout=timeout)
         location = f"/api/sessions/{session.id}"
         payload: Dict[str, Any] = {
             "success": True,
@@ -1401,6 +1533,7 @@ def build_router() -> APIRouter:
         if session is None:
             raise core.ModelNotFound(f"Sesión no encontrada o expirada: {session_id}")
         data = body.payload()
+        timeout = core.requested_timeout(data, session.timeout)
         method, arguments, _ = core.prepare_invocation(session.model, data, with_parameters=False)
         rebuilt = False
         raw_parameters = data.get("parameters", data.get("params"))
@@ -1411,9 +1544,9 @@ def build_router() -> APIRouter:
                 raise core.ValidationError("El campo 'parameters' debe ser un objeto")
             parameters = core.coerce_model_parameters(session.model, raw_parameters)
             if core.parameters_signature(parameters) != session.parameters_signature:
-                session = settings.sessions.replace(session, parameters)
+                session = settings.sessions.replace(session, parameters, timeout=timeout)
                 rebuilt = True
-        result = session.invoke(method["name"], arguments)
+        result = session.invoke(method["name"], arguments, timeout=timeout)
         payload: Dict[str, Any] = {
             "success": True,
             "model_id": session.model["id"],

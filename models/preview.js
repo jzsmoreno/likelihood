@@ -504,6 +504,103 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* Asynchronous invocation                                             */
+  /* ------------------------------------------------------------------ */
+
+  /* Polling starts at 1 s and backs off exponentially up to 8 s; a transient
+     network/5xx error is retried up to INVOKE_POLL_RETRIES times. */
+  var INVOKE_POLL_BASE_MS = 1000;
+  var INVOKE_POLL_MAX_MS = 8000;
+  var INVOKE_POLL_RETRIES = 8;
+
+  /* Seconds the server accepts for a long call (LM_INVOKE_JOB_TIMEOUT). */
+  function invokeBudget() {
+    if (!invokeData) return null;
+    var seconds = invokeData.job_timeout_seconds || invokeData.timeout_seconds;
+    return typeof seconds === 'number' && seconds > 0 ? seconds : null;
+  }
+
+  function invokeJobsEndpoint() {
+    if (!invokeData) return '';
+    if (invokeData.jobs_endpoint) return invokeData.jobs_endpoint;
+    return invokeData.endpoint ? invokeData.endpoint + '/jobs' : '';
+  }
+
+  function jobFailure(job) {
+    var first = (job.results || [])[0] || {};
+    return {
+      ok: false,
+      status: first.status || 500,
+      data: {
+        error: first.error || job.error || 'La llamada falló',
+        detail: first.detail || ''
+      }
+    };
+  }
+
+  function pollInvokeJob(url, wait, failures, startedAt) {
+    return new Promise(function (resolve, reject) {
+      window.setTimeout(function () {
+        window.fetch(url, { headers: { Accept: 'application/json' } })
+          .then(function (response) {
+            return response.json().catch(function () { return null; }).then(function (data) {
+              return { ok: response.ok, status: response.status, data: data || {} };
+            });
+          })
+          .then(function (response) {
+            if (!response.ok) {
+              if (response.status >= 500) throw new Error(describeInvokeError(response.data));
+              reject(new Error(describeInvokeError(response.data)));
+              return;
+            }
+            var job = response.data;
+            if (job.status === 'succeeded' || job.status === 'partial') {
+              resolve({ ok: true, status: 200, data: (job.results || [])[0] || {} });
+              return;
+            }
+            if (job.status === 'failed' || job.status === 'cancelled') {
+              resolve(jobFailure(job));
+              return;
+            }
+            var seconds = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
+            setInvokeStatus(
+              (job.status === 'pending' ? 'En cola' : 'Invocando') +
+                (seconds ? ' · ' + seconds + ' s' : '') +
+                ' · el servidor sigue trabajando, puedes seguir esperando',
+              'is-busy'
+            );
+            pollInvokeJob(url, INVOKE_POLL_BASE_MS, 0, startedAt).then(resolve, reject);
+          })
+          .catch(function (error) {
+            if (failures >= INVOKE_POLL_RETRIES) {
+              reject(error);
+              return;
+            }
+            var next = Math.min(wait * 2, INVOKE_POLL_MAX_MS);
+            setInvokeStatus(
+              'Reconectando en ' + Math.round(next / 1000) + ' s: ' + error.message,
+              'is-busy'
+            );
+            pollInvokeJob(url, next, failures + 1, startedAt).then(resolve, reject);
+          });
+      }, wait);
+    });
+  }
+
+  /* Submit the call as a background job; older servers keep the sync route. */
+  function submitInvokeJob(payload) {
+    var endpoint = invokeJobsEndpoint();
+    if (!endpoint) return postJson(invokeData.endpoint, payload);
+    setInvokeStatus('Encolando la llamada…', 'is-busy');
+    return postJson(endpoint, payload).then(function (response) {
+      var data = response.data;
+      if (!response.ok || data.success === false) return response;
+      var url = data.poll_url || ('/api/jobs/' + data.job_id);
+      return pollInvokeJob(url, INVOKE_POLL_BASE_MS, 0, Date.now());
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Playground                                                          */
   /* ------------------------------------------------------------------ */
 
@@ -789,6 +886,8 @@
     setLoadStatus('Abriendo una instancia con el modelo guardado…', 'is-busy');
     var start = invokeSession.id ? closeSession(false) : Promise.resolve();
     start.then(function () {
+      var budget = invokeBudget();
+      if (budget) payload.timeout = budget;
       return postJson(invokeData.sessions_url, payload);
     }).then(function (response) {
       var data = response.data;
@@ -1617,7 +1716,10 @@
   }
 
   function openSession(parameters) {
-    return postJson(invokeData.sessions_url, { parameters: parameters }).then(function (response) {
+    var payload = { parameters: parameters };
+    var budget = invokeBudget();
+    if (budget) payload.timeout = budget;
+    return postJson(invokeData.sessions_url, payload).then(function (response) {
       if (!response.ok || response.data.success === false) {
         throw new Error(describeInvokeError(response.data));
       }
@@ -1637,6 +1739,8 @@
   function openSessionFromPath(source, parameters) {
     var payload = { loader: source.loader || '', path: source.path };
     if (parameters && Object.keys(parameters).length) payload.parameters = parameters;
+    var budget = invokeBudget();
+    if (budget) payload.timeout = budget;
     return postJson(invokeData.sessions_url, payload).then(function (response) {
       if (!response.ok || response.data.success === false) {
         throw new Error(describeInvokeError(response.data));
@@ -1806,6 +1910,8 @@
           '/api/sessions/{session_id}/invoke';
         var payload = { method: method.name, arguments: argumentsValues.values };
         if (!invokeSession.loaded) payload.parameters = constructorValues.values;
+        var budget = invokeBudget();
+        if (budget) payload.timeout = budget;
         return postJson(template.replace('{session_id}', sessionId), payload);
       });
     } else {
@@ -1817,7 +1923,7 @@
       } else {
         directPayload.parameters = constructorValues.values;
       }
-      request = postJson(invokeData.endpoint, directPayload);
+      request = submitInvokeJob(directPayload);
     }
     request.then(function (response) {
       var data = response.data;
