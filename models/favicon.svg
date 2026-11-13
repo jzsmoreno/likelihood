@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Likelihood">
-  <rect width="64" height="64" rx="12" fill="#ff3621"/>
-  <g transform="translate(8 8) scale(3)" fill="#ffffff">
-    <path d="M6.2 1.6h3.6v1.1h-.8v2.7l3 5.1a2 2 0 0 1-1.8 3H5.8a2 2 0 0 1-1.8-3l3-5.1V2.7h-.8z"/>
-    <circle cx="6.4" cy="10.6" r="1" fill="#ff3621"/>
-    <circle cx="9.4" cy="11.4" r=".7" fill="#ff3621"/>
-  </g>
-</svg>
