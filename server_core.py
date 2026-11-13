@@ -479,6 +479,30 @@ def endpoint_label(method: str, path: str) -> str:
     """
     clean = path.rstrip("/") or "/"
     patterns = (
+        (
+            re.compile(r"^/api/serving/endpoints/[^/]+/predict$"),
+            "/api/serving/endpoints/<endpoint_id>/predict",
+        ),
+        (
+            re.compile(r"^/api/serving/endpoints/[^/]+/docs$"),
+            "/api/serving/endpoints/<endpoint_id>/docs",
+        ),
+        (
+            re.compile(r"^/api/serving/endpoints/[^/]+/events$"),
+            "/api/serving/endpoints/<endpoint_id>/events",
+        ),
+        (
+            re.compile(r"^/api/serving/endpoints/[^/]+/(stop|start|restart)$"),
+            "/api/serving/endpoints/<endpoint_id>/<action>",
+        ),
+        (
+            re.compile(r"^/api/serving/endpoints/[^/]+$"),
+            "/api/serving/endpoints/<endpoint_id>",
+        ),
+        (
+            re.compile(r"^/api/monitoring/endpoints/[^/]+$"),
+            "/api/monitoring/endpoints/<endpoint_id>",
+        ),
         (re.compile(r"^/api/models/[^/]+/source$"), "/api/models/<model_id>/source"),
         (re.compile(r"^/api/models/[^/]+/versions$"), "/api/models/<model_id>/versions"),
         (re.compile(r"^/api/models/[^/]+/invoke/jobs$"), "/api/models/<model_id>/invoke/jobs"),

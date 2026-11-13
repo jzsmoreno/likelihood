@@ -50,6 +50,25 @@ The routes are the same as the previous standard-library implementation::
     DELETE /api/jobs/<id>             cancel or forget any asynchronous job
     POST   /api/notebook              ``{"model_id": ..., "parameters": {...}}``
     POST   /api/search                deprecated alias of ``GET /api/search``
+Model Serving and Model Monitoring (implemented in :mod:`serving_api`)::
+
+    GET    /serving, /serving/<id>             endpoint workspace and detail
+    GET    /monitoring, /monitoring/<id>       analytics dashboard and endpoint view
+    GET    /api/serving/endpoints              deployed endpoints and counters
+    POST   /api/serving/endpoints              deploy -> 202
+    POST   /api/serving/validate               validate a deployment payload
+    GET    /api/serving/endpoints/<id>         endpoint configuration/status/log
+    POST   /api/serving/endpoints/<id>/predict inference (records a monitoring event)
+    POST   /api/serving/endpoints/<id>/stop|restart
+    DELETE /api/serving/endpoints/<id>
+    GET    /api/serving/endpoints/<id>/docs    generated Python/cURL/JS/HTTP samples
+    GET    /api/monitoring/overview            KPIs, series, breakdowns, resources
+    GET    /api/monitoring/endpoints           per-endpoint aggregates
+    GET    /api/monitoring/models              per-model aggregates
+    GET    /api/monitoring/events              request history
+    GET    /api/monitoring/endpoints/<id>      endpoint-level analytics
+
+
 
 The interactive documentation is served by FastAPI itself at ``/docs`` and the
 OpenAPI document at ``/api/openapi.json``.  ``HEAD`` is answered by every ``GET``
@@ -102,6 +121,8 @@ from starlette.middleware.gzip import GZipMiddleware
 
 import notebook_generator
 import server_core as core
+import serving_api
+import serving_core
 from model_catalog import (
     category_index,
     facet_counts,
@@ -163,10 +184,12 @@ class ServerSettings:
         self.rate_limiter = core.RateLimiter(core.RATE_LIMIT)
         self.jobs = core.JobQueue()
         self.sessions = core.SessionStore()
+        self.serving = serving_core.ServingStore()
         self.invoke_slots = threading.BoundedSemaphore(core.INVOKE_MAX_CONCURRENCY)
         self.playground_enabled = core.PLAYGROUND_ENABLED
         self.invoke_enabled = core.INVOKE_ENABLED
         self.sessions_enabled = core.SESSIONS_ENABLED
+        self.serving_enabled = core._env_flag("LM_SERVING", True)
         self.api_token = core.API_TOKEN
         self.cors_origins: Tuple[str, ...] = core.CORS_ORIGINS
         self.gzip_min_bytes = core.GZIP_MIN_BYTES
@@ -830,6 +853,10 @@ def build_router() -> APIRouter:
     """Build the API router with every catalogue endpoint."""
     router = APIRouter()
 
+    # Serving and monitoring keep their routes in a separate module, but share
+    # the application middleware, error handlers and authentication.
+    router.include_router(serving_api.build_router())
+
     # -- catalogue metadata -------------------------------------------------
 
     @router.get("/api/health", tags=["metadata"])
@@ -847,11 +874,18 @@ def build_router() -> APIRouter:
             "api_version": API_VERSION,
             "models": counts["total"],
             "categories": len(category_index(settings.catalog)),
+            "authentication": {"enabled": bool(settings.api_token), "scheme": "Bearer"},
+            "serving": {
+                "enabled": bool(settings.serving_enabled),
+                "endpoints": settings.serving.snapshot()["endpoints"],
+                "statuses": settings.serving.snapshot()["statuses"],
+            },
         }
         if not settings.api_token or getattr(request.state, "authenticated", False):
             payload.update(
                 {
                     "summary": counts,
+                    "serving_store": settings.serving.snapshot(),
                     "playground": {
                         "enabled": bool(settings.playground_enabled),
                         "timeout_seconds": core.PLAYGROUND_TIMEOUT,
@@ -1736,6 +1770,28 @@ def build_router() -> APIRouter:
             {"Cache-Control": "no-store"},
         )
 
+    # -- platform pages (serving + monitoring) ------------------------------
+
+    @router.get("/serving", tags=["pages"])
+    def serving_page(request: Request) -> Response:
+        """Model Serving workspace (endpoint list and deployment wizard)."""
+        return serve_asset(core.ASSETS_DIR / "serving.html", request)
+
+    @router.get("/serving/{endpoint_id}", tags=["pages"])
+    def serving_endpoint_page(endpoint_id: str, request: Request) -> Response:
+        """Endpoint detail: configuration, inference playground and API usage."""
+        return serve_asset(core.ASSETS_DIR / "serving.html", request)
+
+    @router.get("/monitoring", tags=["pages"])
+    def monitoring_page(request: Request) -> Response:
+        """Model Monitoring analytics dashboard."""
+        return serve_asset(core.ASSETS_DIR / "monitoring.html", request)
+
+    @router.get("/monitoring/{endpoint_id}", tags=["pages"])
+    def monitoring_endpoint_page(endpoint_id: str, request: Request) -> Response:
+        """Endpoint-level monitoring view."""
+        return serve_asset(core.ASSETS_DIR / "monitoring.html", request)
+
     @router.get("/{asset_path:path}", tags=["pages"])
     def static_asset(asset_path: str, request: Request) -> Response:
         """Any other path is resolved inside ``models/`` (traversal proof)."""
@@ -1768,6 +1824,7 @@ def create_app(
         yield
         state.jobs.shutdown()
         state.sessions.shutdown()
+        state.serving.shutdown()
 
     app = FastAPI(
         title="Likelihood catalogue",
@@ -1966,6 +2023,11 @@ def _main(argv: Optional[Sequence[str]] = None) -> int:
         help="deshabilita /invoke y las sesiones (el catálogo queda de solo lectura)",
     )
     parser.add_argument(
+        "--no-serving",
+        action="store_true",
+        help="deshabilita Model Serving y Model Monitoring (equivale a LM_SERVING=0)",
+    )
+    parser.add_argument(
         "--token",
         default=None,
         help="exige Authorization: Bearer <token> en /api (equivale a LM_API_TOKEN)",
@@ -2007,6 +2069,8 @@ def _main(argv: Optional[Sequence[str]] = None) -> int:
     if arguments.no_invoke:
         settings.invoke_enabled = False
         settings.sessions_enabled = False
+    if arguments.no_serving:
+        settings.serving_enabled = False
     if arguments.token is not None:
         settings.api_token = arguments.token.strip()
     if arguments.cors_origin:

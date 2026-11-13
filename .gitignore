@@ -137,6 +137,9 @@ output.txt
 errores_d401.txt
 pytest_output.txt
 
+# Model Serving runtime store (deployments.json + events.jsonl)
+/output/serving/
+
 # Ignore <files>.png for testing
 /examples/*.png
 

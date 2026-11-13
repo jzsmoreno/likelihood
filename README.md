@@ -45,9 +45,11 @@ python3 server_fastapi.py --list              # print the catalog and exit
 python3 server_fastapi.py --version           # package version and exit
 ```
 
-The browser UI is available at `/` and `/preview/<model_id>`. `/docs` is the
-FastAPI Swagger UI and `/api/openapi.json` the generated OpenAPI document. Assets
-live in `models/` and are served with `ETag` and `Cache-Control` headers.
+The browser UI is available at `/`, `/preview/<model_id>`, `/serving` and
+`/monitoring` (plus `/serving/<endpoint_id>` and `/monitoring/<endpoint_id>`).
+`/docs` is the FastAPI Swagger UI and `/api/openapi.json` the generated OpenAPI
+document. Assets live in `models/` and are served with `ETag` and `Cache-Control`
+headers.
 
 The interface follows one design system inspired by the Databricks platform:
 
@@ -58,9 +60,58 @@ The interface follows one design system inspired by the Databricks platform:
 | `models/catalog.js` | Catalog behaviour (search, facets, ordering, URL state, drawer). |
 | `models/preview.html`, `models/preview.css` | Model page rendered by the server from the introspection catalog. |
 | `models/preview.js` | Playground, method invocation and saved-model loading on the model page. |
+| `models/serving.html`, `models/serving.js` | Model Serving workspace: endpoint list, deployment wizard, inference playground and generated API docs. |
+| `models/monitoring.html`, `models/monitoring.js` | Model Monitoring dashboard: KPIs, latency, errors, usage and endpoint-level analytics. |
+| `models/charts.js` | Dependency-free SVG/HTML chart library (lines, stacked bars, horizontal bars, donuts). |
+| `models/platform.css` | Serving/monitoring components layered on the shared design tokens. |
 
 The catalog is re-introspected when a model source changes (`LM_CATALOG_TTL`), so
 editing `likelihood/models` is reflected without restarting the server.
+
+### Model Serving and Model Monitoring
+
+Two additional workspaces extend the catalog. They reuse the **same** introspection
+catalog, the sandboxed child-process invocation (`server_core.run_invoke`) and the
+saved-model loaders (`server_core.prepare_load` / `run_load`): the serving layer does
+not duplicate model-loading logic.
+
+| Page | Purpose |
+| --- | --- |
+| `/serving` | Deploy an invokable method as an HTTP endpoint, list endpoints and manage their lifecycle. |
+| `/serving/<endpoint_id>` | Endpoint detail: configuration, deployment log, inference playground, activity and generated API usage. |
+| `/monitoring` | Global dashboard over every inference served by the endpoints. |
+| `/monitoring/<endpoint_id>` | KPIs, latency, errors, usage patterns and request history of one endpoint. |
+
+The deployment wizard walks through four steps: select a model from the catalog,
+optionally load a trained artifact (loader + path, with the in-app file browser),
+select an inference method (only JSON-callable methods that do not train/build the
+model), and configure the endpoint name, timeout and concurrency. The configuration
+is validated before creation; the artifact is then loaded in a background thread and
+the endpoint reports `deploying` until it becomes `running` (or `failed` with the real
+error and log). Endpoints support stop, restart/start and delete.
+
+Each endpoint exposes `POST /api/serving/endpoints/<id>/predict`, accepts the
+`{"input": ...}` shorthand for single-argument methods, `{"inputs": {...}}` or
+`{"arguments": {...}}`, and returns the JSON projection of the method result plus a
+`request_id` and the measured latency. Every call (successful or failed) appends one
+line to `events.jsonl`; that file is the **only** source of the monitoring metrics.
+Nothing is fabricated: an empty store renders zero KPIs and explicit empty states.
+
+The API usage tab is generated from the deployed method (`GET
+/api/serving/endpoints/<id>/docs`): Python, cURL, JavaScript and raw HTTP samples, the
+real parameter schema, the payload example, the expected response and the Bearer
+token instructions when `LM_API_TOKEN` protects the API. Samples and copy buttons are
+dynamic; there is no hardcoded model or endpoint name.
+
+Deployments and events are persisted in `output/serving/` (override with
+`LM_SERVING_STORE`). `deployments.json` survives a restart; the event log is a bounded
+JSONL file that is rotated when it grows beyond 16 MiB. Inference runs in short-lived
+child processes, so per-endpoint CPU/GPU sampling is not available: the resources panel
+reports the server process (when the optional `psutil` package is installed) and states
+the limitation explicitly instead of inventing numbers. Every prediction starts the
+same sandboxed child interpreter as `POST /api/models/<id>/invoke`; for TensorFlow or
+Torch models the first call of each request includes the import time, so size the
+endpoint `timeout_seconds` (and `LM_INVOKE_TIMEOUT`) accordingly.
 
 ### Playground defaults and example inputs
 
@@ -200,6 +251,14 @@ the equivalent `--` CLI flag). They let you secure the API or tune its behaviour
 | `LM_PLAYGROUND` | Enable the interactive model playground. | true |
 | `LM_INVOKE` | Enable invoking model methods (still requires authentication when a token is set). | true |
 | `LM_SESSIONS` | Enable long-lived model sessions. | true |
+| `LM_SERVING` | Enable Model Serving and Model Monitoring (`0`/`--no-serving` keeps only the catalog). | true |
+| `LM_SERVING_STORE` | Directory that keeps `deployments.json` and `events.jsonl`. | `output/serving` |
+| `LM_SERVING_TIMEOUT` | Default per-request timeout of a deployed endpoint, in seconds (capped by `LM_INVOKE_MAX_TIMEOUT`). | `LM_INVOKE_TIMEOUT` |
+| `LM_SERVING_CONCURRENCY` | Default simultaneous predictions per endpoint. | 1 |
+| `LM_SERVING_DEPLOY_TIMEOUT` | Seconds the background saved-model validation/load may take. | 600 |
+| `LM_SERVING_WORKERS` | Background workers that validate/load deployments. | 2 |
+| `LM_SERVING_MAX_EVENTS` | Inference events kept in memory and reloaded from the log. | 20000 |
+| `LM_SERVING_LOG_INPUTS` | Store a short input/output preview in each monitoring event (`0` disables it). | true |
 | `LM_PLAYGROUND_MEMORY` | Address space (MiB) each sandboxed model process may map; raise it for heavy models or set `0` to disable the cap. | 8192 |
 | `LM_INVOKE_TIMEOUT` | Seconds a synchronous `/invoke` or session call may take. | 60 |
 | `LM_INVOKE_JOB_TIMEOUT` | Seconds a background invocation (`/invoke/jobs`) may take. | 900 |
@@ -245,9 +304,9 @@ python3 server_fastapi.py --no-playground --no-invoke
 python3 server_fastapi.py --no-compression
 ```
 
-The negated flags (`--no-playground`, `--no-invoke`) turn a feature off; the
-equivalent environment variables do the same with a value of `0`
-(`LM_PLAYGROUND=0`, `LM_INVOKE=0`, `LM_SESSIONS=0`).
+The negated flags (`--no-playground`, `--no-invoke`, `--no-serving`) turn a feature
+off; the equivalent environment variables do the same with a value of `0`
+(`LM_PLAYGROUND=0`, `LM_INVOKE=0`, `LM_SESSIONS=0`, `LM_SERVING=0`).
 
 ### Endpoints
 
@@ -277,6 +336,70 @@ POST /api/sessions/{session_id}/invoke
 DELETE /api/sessions/{session_id}
 GET  /api/notebook
 ```
+
+Model Serving and Model Monitoring add:
+
+```text
+GET    /api/serving/overview
+GET    /api/serving/endpoints                  # ?q=&status=&model_id=
+POST   /api/serving/endpoints                  # deploy -> 202
+POST   /api/serving/validate                   # validate without creating
+GET    /api/serving/endpoints/{id}
+GET    /api/serving/endpoints/{id}/docs        # generated code samples/schema
+GET    /api/serving/endpoints/{id}/events      # ?limit=&status=
+POST   /api/serving/endpoints/{id}/predict     # inference
+POST   /api/serving/endpoints/{id}/stop
+POST   /api/serving/endpoints/{id}/restart
+POST   /api/serving/endpoints/{id}/start       # alias of restart
+DELETE /api/serving/endpoints/{id}
+
+GET    /api/monitoring/overview                # ?range=&start=&end=&model_id=&endpoint_id=
+GET    /api/monitoring/endpoints               # per-endpoint aggregates
+GET    /api/monitoring/models                  # per-model aggregates
+GET    /api/monitoring/events                  # ?range=&status=&limit=&offset=
+GET    /api/monitoring/endpoints/{id}          # endpoint-level analytics + history
+GET    /api/monitoring/resources               # host sample / explicit limitation
+```
+
+`range` accepts `1h`, `24h`, `7d`, `30d` or `custom` (then `start`/`end` are
+ISO-8601 or epoch seconds). The monitoring answers aggregate `events.jsonl`; no
+metric is generated when there is no traffic.
+
+### Deploying and invoking an endpoint
+
+```bash
+# 1. Deploy a method of the catalog (the backend validates the constructor values)
+curl -s -X POST localhost:8000/api/serving/endpoints \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "model_id": "HMM",
+        "method": "forward",
+        "endpoint_name": "hmm-forward",
+        "parameters": {"n_states": 3},
+        "config": {"timeout_seconds": 60, "max_concurrency": 2},
+        "load": {"enabled": false}
+      }'
+
+# 2. Poll until status is running
+curl -s localhost:8000/api/serving/endpoints/hmm-forward
+
+# 3. Call it with the single-argument shorthand, `inputs` or `arguments`
+curl -s -X POST localhost:8000/api/serving/endpoints/hmm-forward/predict \
+  -H 'Content-Type: application/json' \
+  -d '{"input": [0, 1, 2, 1, 0]}'
+
+# 4. Generated API documentation (Python, cURL, JavaScript, HTTP)
+curl -s localhost:8000/api/serving/endpoints/hmm-forward/docs
+
+# 5. Monitoring
+curl -s 'localhost:8000/api/monitoring/overview?range=24h'
+```
+
+A deployment created with `load.enabled=true` stores the loader and path, calls the
+existing saved-model loader during deployment, and uses that loaded instance for
+every prediction. `loaded_artifact` in the endpoint payload records the loader, path,
+type and load time. Set `LM_API_TOKEN` to require `Authorization: Bearer <token>` on
+every serving and monitoring route (the generated docs include the header).
 
 ### Long running calls
 
@@ -319,8 +442,15 @@ example and `ipywidgets` controls derived from the constructor signature.
 ```bash
 python3 -m pytest tests/test_server_core.py -v    # catalog, coercion and invoke helpers
 python3 -m pytest tests/test_server_fastapi.py -v # FastAPI server, API and playground
+python3 -m pytest tests/test_serving.py -v        # serving lifecycle, inference, docs and monitoring
 python3 -m pytest tests/test_hmm.py -v            # model tests (requires the full extras)
 ```
+
+`tests/test_serving.py` builds the app over a temporary introspected model package
+and exercises deployment, prediction, the generated docs, saved-model loading,
+stop/restart/delete and the monitoring aggregates through `httpx.ASGITransport`
+(``TestClient`` is not used because the pinned Starlette predates the installed
+httpx).
 
 `tests/test_server_fastapi.py` drives the FastAPI application through its
 `TestClient` (install the `tests` extra for `pytest` and `httpx`). It covers the

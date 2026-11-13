@@ -77,6 +77,21 @@
   <aside class="db-sidebar" id="sidebar" aria-label="Secciones del modelo">
     <div class="db-sidebar-nav">
       <div class="side-section">
+        <div class="side-title">Plataforma</div>
+        <a class="side-link" href="/">
+          <span class="side-icon" aria-hidden="true">▦</span>
+          <span class="side-label">Catálogo de modelos</span>
+        </a>
+        <a class="side-link" href="/serving?model={{MODEL_ID}}">
+          <span class="side-icon" aria-hidden="true">⇢</span>
+          <span class="side-label">Desplegar en Serving</span>
+        </a>
+        <a class="side-link" href="/monitoring">
+          <span class="side-icon" aria-hidden="true">◫</span>
+          <span class="side-label">Model Monitoring</span>
+        </a>
+      </div>
+      <div class="side-section">
         <div class="side-title">En esta página</div>
         <nav id="toc" aria-label="Secciones del modelo">
           <a class="side-link" href="#descripcion" data-section="descripcion">
