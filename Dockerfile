@@ -16,7 +16,7 @@
 FROM python:3.12-slim AS runtime
 
 # Install the optional `[full]` extras (tensorflow, torch, keras-tuner, ...).
-ARG INSTALL_FULL_EXTRAS=false
+ARG INSTALL_FULL_EXTRAS=true
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

@@ -15,7 +15,7 @@ services:
       context: .
       args:
         # "true" adds tensorflow, torch, keras-tuner, scikit-learn, pyvis.
-        INSTALL_FULL_EXTRAS: "${INSTALL_FULL_EXTRAS:-false}"
+        INSTALL_FULL_EXTRAS: "${INSTALL_FULL_EXTRAS:-true}"
     image: likelihood-catalog:latest
     # Reap the child processes used by the playground and the live sessions.
     init: true
