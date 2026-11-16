@@ -49,7 +49,7 @@ el.replaceWith(d);
 <dl>
 <dt id="likelihood.models.deep.bandit.MultiBanditNet"><code class="flex name class">
 <span>class <span class="ident">MultiBanditNet</span></span>
-<span>(</span><span>state_dim: int,<br>num_options: int,<br>num_actions_per_option: int | List[int],<br>num_neurons: int = 128,<br>num_layers: int = 1,<br>activation: torch.nn.modules.module.Module = ReLU())</span>
+<span>(</span><span>state_dim: int,<br>num_options: int,<br>num_actions_per_option: int | List[int],<br>num_neurons: int = 128,<br>num_layers: int = 1,<br>activation: str | torch.nn.modules.module.Module = SELU(),<br>dropout_rate: float = 0.3)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -89,49 +89,139 @@ el.replaceWith(d);
         num_actions_per_option: int | List[int],
         num_neurons: int = 128,
         num_layers: int = 1,
-        activation: nn.Module = nn.ReLU(),
-    ):
+        activation: str | nn.Module = nn.SELU(),
+        dropout_rate: float = 0.3,
+    ) -&gt; None:
         super(MultiBanditNet, self).__init__()
         self.state_dim = state_dim
         self.num_options = num_options
         self.num_actions_per_option = num_actions_per_option
         self.num_neurons = num_neurons
         self.num_layers = num_layers
-        self.activation = activation
+        self.activation = (
+            self._activation_module(activation) if isinstance(activation, str) else activation
+        )
+        self.dropout_rate = max(0.0, dropout_rate)
+
+        def build_action_network(num_actions: int) -&gt; nn.Sequential:
+            layers = [nn.Linear(state_dim, self.num_neurons), self.activation]
+            for _ in range(max(0, self.num_layers - 1)):
+                if self.dropout_rate &gt; 0:
+                    layers.extend(
+                        [
+                            nn.Dropout(self.dropout_rate),
+                            nn.Linear(self.num_neurons, self.num_neurons),
+                            self.activation,
+                        ]
+                    )
+                else:
+                    layers.extend([nn.Linear(self.num_neurons, self.num_neurons), self.activation])
+            layers.append(nn.Linear(self.num_neurons, num_actions))
+            return nn.Sequential(*layers)
+
+        # Low-level (action) Q-networks for each option with additional linear layers
+        self.action_networks = nn.ModuleList(
+            build_action_network(
+                num_actions_per_option[i]
+                if isinstance(num_actions_per_option, list)
+                else num_actions_per_option
+            )
+            for i in range(self.num_options)
+        )
+
+        def _dropout() -&gt; nn.Module:
+            return nn.Dropout(self.dropout_rate) if self.dropout_rate &gt; 0 else nn.Identity()
 
         self.option_network = nn.Sequential(
             nn.Linear(state_dim, self.num_neurons),
-            nn.ReLU(),
+            self.activation,
+            _dropout(),
             nn.Linear(
                 self.num_neurons, num_options
             ),  # Output a probability distribution over options
         )
 
-        # Low-level (action) Q-networks for each option with additional linear layers
-        self.action_networks = nn.ModuleList()
-        for i in range(num_options):
-            action_network_layers = [nn.Linear(state_dim, self.num_neurons), self.activation]
-            for _ in range(self.num_layers - 1):
-                action_network_layers.extend(
-                    [nn.Linear(self.num_neurons, self.num_neurons), self.activation]
-                )
-            num_actions = (
-                num_actions_per_option
-                if not isinstance(num_actions_per_option, list)
-                else num_actions_per_option[i]
-            )  # Output Q-values for each action in this option
-            action_network_layers.append(nn.Linear(self.num_neurons, num_actions))
-            self.action_networks.append(nn.Sequential(*action_network_layers))
-
         # Option termination network
         self.termination_network = nn.Sequential(
             nn.Linear(state_dim, self.num_neurons),
-            nn.ReLU(),
+            self.activation,
+            _dropout(),
             nn.Linear(self.num_neurons, 1),  # Single output for termination probability (0-1)
             nn.Sigmoid(),
         )
+        self.value_network = nn.Sequential(
+            nn.Linear(state_dim, self.num_neurons),
+            self.activation,
+            nn.Dropout(self.dropout_rate) if self.dropout_rate &gt; 0 else nn.Identity(),
+            nn.Linear(self.num_neurons, 1),
+        )
+        self.num_actions = [net[-1].out_features for net in self.action_networks]
+        self.equal_action_sizes = len(set(self.num_actions)) == 1
+        self.max_num_actions = max(self.num_actions)
 
-    def forward(self, state: torch.Tensor, multiple_option: bool = False):
+    @classmethod
+    def _activation_module(cls, activation: str) -&gt; nn.Module:
+        &#34;&#34;&#34;Instantiate the activation module from its name.
+
+        The catalog exposes ``activation`` as a plain string (``&#34;relu&#34;``, ``&#34;selu&#34;``, ``&#34;sigmoid&#34;``,
+        ``&#34;tanh&#34;``, ``&#34;leaky_relu&#34;``); this maps the name to the matching :class:`torch.nn.Module`
+        subclass used inside the network.
+        &#34;&#34;&#34;
+        name = str(activation).lower()
+        activations = {
+            &#34;relu&#34;: nn.ReLU(),
+            &#34;relu6&#34;: nn.ReLU6(),
+            &#34;rrelu&#34;: nn.RReLU(),
+            &#34;selu&#34;: nn.SELU(),
+            &#34;leaky_relu&#34;: nn.LeakyReLU(),
+            &#34;sigmoid&#34;: nn.Sigmoid(),
+            &#34;tanh&#34;: nn.Tanh(),
+            &#34;hardswish&#34;: nn.Hardswish(),
+            &#34;gelu&#34;: nn.GELU(),
+            &#34;elu&#34;: nn.ELU(),
+            &#34;softplus&#34;: nn.Softplus(),
+            &#34;softmax&#34;: nn.Softmax(dim=-1),
+            &#34;identity&#34;: nn.Identity(),
+        }
+        if name not in activations:
+            raise ValueError(f&#34;Unsupported activation: {activation!r}&#34;)
+        return activations[name]
+
+    def apply_initialization(self, method: str = &#34;xavier_uniform&#34;) -&gt; None:
+        &#34;&#34;&#34;Apply a specific initialization method to all linear layers in the network.
+
+        Parameters
+        ----------
+        method : str, default &#34;xavier_uniform&#34;
+            The initialization method to use. Supported methods:
+            &#39;xavier_uniform&#39;, &#39;xavier_normal&#39;, &#39;kaiming_uniform&#39;, &#39;kaiming_normal&#39;,
+            &#39;orthogonal&#39;, &#39;uniform&#39;, &#39;normal&#39;, &#39;zeros&#39;, &#39;ones&#39;
+        &#34;&#34;&#34;
+        init_dispatch = {
+            &#34;xavier_uniform&#34;: nn.init.xavier_uniform_,
+            &#34;xavier_normal&#34;: nn.init.xavier_normal_,
+            &#34;kaiming_uniform&#34;: nn.init.kaiming_uniform_,
+            &#34;kaiming_normal&#34;: nn.init.kaiming_normal_,
+            &#34;orthogonal&#34;: nn.init.orthogonal_,
+            &#34;uniform&#34;: nn.init.uniform_,
+            &#34;normal&#34;: nn.init.normal_,
+            &#34;zeros&#34;: nn.init.zeros_,
+            &#34;ones&#34;: nn.init.ones_,
+        }
+
+        if method not in init_dispatch:
+            raise ValueError(f&#34;Unsupported initialization method: {method}&#34;)
+
+        # Iterates over all modules (including submodules) and initializes linear layers
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                init_dispatch[method](m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
+    def forward(
+        self, state: torch.Tensor, multiple_option: bool = False, temperature: float = 1.0
+    ) -&gt; tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         &#34;&#34;&#34;
         Parameters
         ----------
@@ -139,6 +229,12 @@ el.replaceWith(d);
             Tensor of shape (batch_size, state_dim) or (state_dim,)
         multiple_option : bool, default False
             Whether the model should return probabilities for multiple options.
+        temperature : float, default 1.0
+            Temperature used to control the sharpness of the output probability
+            distribution. A value of ``1.0`` preserves the default behavior.
+            Values greater than ``1.0`` produce a softer (more uniform)
+            distribution, while values between ``0`` and ``1.0`` produce a
+            sharper (more peaked) distribution. Must be strictly positive.
 
         Returns
         -------
@@ -159,43 +255,107 @@ el.replaceWith(d);
             state = state.unsqueeze(0)
         batch_size = state.size(0)
 
-        # Option probabilities
         option_probs = torch.softmax(
-            self.option_network(state), dim=-1
+            self.option_network(state) / temperature, dim=-1
         )  # (batch_size, num_options)
 
+        device = state.device
+        num_options = len(self.action_networks)
+
         if multiple_option:
-            all_action_probs = [
-                torch.softmax(self.action_networks[i](state), dim=-1)  # (batch_size, num_actions)
-                for i in range(self.num_options)
-            ]
-            action_probs = torch.stack(all_action_probs, dim=1)
-            selected_actions = torch.argmax(action_probs, dim=-1)
+            action_probs = torch.zeros(batch_size, num_options, self.max_num_actions, device=device)
+            selected_actions = torch.zeros(batch_size, num_options, dtype=torch.long, device=device)
+
+            for i, net in enumerate(self.action_networks):
+                probs = torch.softmax(net(state) / temperature, dim=-1)
+                n_act = probs.size(-1)
+                action_probs[:, i, :n_act] = probs
+                selected_actions[:, i] = torch.argmax(probs, dim=-1)
+
             selected_options = torch.argmax(option_probs, dim=-1)
-            selected_action_probs = action_probs[torch.arange(batch_size), selected_options, :]
+
         else:
-            selected_options = torch.multinomial(option_probs, 1).squeeze(-1)  # (batch_size,)
-            action_probs = torch.stack(
-                [
-                    torch.softmax(
-                        self.action_networks[selected_options[i]](state[i].unsqueeze(0)), dim=-1
-                    ).squeeze(0)
-                    for i in range(batch_size)
-                ],
-                dim=0,
-            )  # (batch_size, num_actions)
-            selected_actions = torch.argmax(action_probs, dim=-1)
-            selected_action_probs = action_probs
+            selected_options = torch.multinomial(option_probs, 1).squeeze(-1)
+            action_probs = torch.zeros(batch_size, self.max_num_actions, device=device)
+            selected_actions = torch.zeros(batch_size, dtype=torch.long, device=device)
 
-        termination_prob = self.termination_network(state)  # (batch_size, 1)
+            for opt_idx in torch.unique(selected_options):
+                mask = selected_options == opt_idx
+                if mask.any():
+                    states_opt = state[mask]
+                    probs = torch.softmax(
+                        self.action_networks[opt_idx](states_opt) / temperature, dim=-1
+                    )
+                    n_act = probs.size(-1)
+                    action_probs[mask, :n_act] = probs
+                    selected_actions[mask] = torch.argmax(probs, dim=-1)
 
-        return (
-            option_probs,
-            selected_action_probs if not multiple_option else action_probs,
-            termination_prob,
-            selected_options,
-            selected_actions,
-        )</code></pre>
+        termination_prob = self.termination_network(state)
+
+        return option_probs, action_probs, termination_prob, selected_options, selected_actions
+
+    def save(self, path: str | Path = &#34;./multibanditnet.pt&#34;) -&gt; None:
+        &#34;&#34;&#34;Serialize the network configuration and weights to ``path``.
+
+        The checkpoint stores the constructor arguments (including the
+        activation module) next to the ``state_dict``, so :meth:`load` can
+        rebuild the very same architecture without guessing it.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default=&#34;./multibanditnet.pt&#34;
+            Destination file. Any extension accepted by :func:`torch.save`
+            works; ``.pt`` and ``.pth`` are the usual choices.
+        &#34;&#34;&#34;
+        checkpoint = {
+            &#34;format&#34;: &#34;likelihood.models.deep.bandit.MultiBanditNet&#34;,
+            &#34;version&#34;: 1,
+            &#34;config&#34;: {
+                &#34;state_dim&#34;: self.state_dim,
+                &#34;num_options&#34;: self.num_options,
+                &#34;num_actions_per_option&#34;: self.num_actions_per_option,
+                &#34;num_neurons&#34;: self.num_neurons,
+                &#34;num_layers&#34;: self.num_layers,
+                &#34;activation&#34;: self.activation,
+                &#34;dropout_rate&#34;: self.dropout_rate,
+            },
+            &#34;state_dict&#34;: self.state_dict(),
+        }
+        torch.save(checkpoint, str(path))
+
+    @classmethod
+    def load(cls, path: str | Path = &#34;./multibanditnet.pt&#34;) -&gt; &#34;MultiBanditNet&#34;:
+        &#34;&#34;&#34;Rebuild a network saved with :meth:`save`.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default=&#34;./multibanditnet.pt&#34;
+            Checkpoint written by :meth:`save`.
+
+        Returns
+        -------
+        MultiBanditNet
+            Network with the stored weights, in evaluation mode.
+
+        Raises
+        ------
+        ValueError
+            If the file is not a checkpoint written by :meth:`save`.
+
+        Notes
+        -----
+        Checkpoints are pickles, so only load files you trust.
+        &#34;&#34;&#34;
+        try:
+            checkpoint = torch.load(str(path), map_location=&#34;cpu&#34;, weights_only=False)
+        except TypeError:  # torch &lt; 1.13 has no ``weights_only`` argument
+            checkpoint = torch.load(str(path), map_location=&#34;cpu&#34;)
+        if not isinstance(checkpoint, dict) or &#34;config&#34; not in checkpoint:
+            raise ValueError(f&#34;{str(path)!r} is not a MultiBanditNet checkpoint written by save()&#34;)
+        network = cls(**checkpoint[&#34;config&#34;])
+        network.load_state_dict(checkpoint[&#34;state_dict&#34;])
+        network.eval()
+        return network</code></pre>
 </details>
 <div class="desc"><p>A neural network for the multi-armed bandit problem with several options.</p>
 <h2 id="parameters">Parameters</h2>
@@ -253,15 +413,66 @@ zero; the option and value networks are not dropped.</dd>
 </dl>
 <h3>Methods</h3>
 <dl>
-<dt id="likelihood.models.deep.bandit.MultiBanditNet.forward"><code class="name flex">
-<span>def <span class="ident">forward</span></span>(<span>self, state: torch.Tensor, multiple_option: bool = False) ‑> Callable[..., typing.Any]</span>
+<dt id="likelihood.models.deep.bandit.MultiBanditNet.apply_initialization"><code class="name flex">
+<span>def <span class="ident">apply_initialization</span></span>(<span>self, method: str = 'xavier_uniform') ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def forward(self, state: torch.Tensor, multiple_option: bool = False):
+<pre><code class="python">def apply_initialization(self, method: str = &#34;xavier_uniform&#34;) -&gt; None:
+    &#34;&#34;&#34;Apply a specific initialization method to all linear layers in the network.
+
+    Parameters
+    ----------
+    method : str, default &#34;xavier_uniform&#34;
+        The initialization method to use. Supported methods:
+        &#39;xavier_uniform&#39;, &#39;xavier_normal&#39;, &#39;kaiming_uniform&#39;, &#39;kaiming_normal&#39;,
+        &#39;orthogonal&#39;, &#39;uniform&#39;, &#39;normal&#39;, &#39;zeros&#39;, &#39;ones&#39;
+    &#34;&#34;&#34;
+    init_dispatch = {
+        &#34;xavier_uniform&#34;: nn.init.xavier_uniform_,
+        &#34;xavier_normal&#34;: nn.init.xavier_normal_,
+        &#34;kaiming_uniform&#34;: nn.init.kaiming_uniform_,
+        &#34;kaiming_normal&#34;: nn.init.kaiming_normal_,
+        &#34;orthogonal&#34;: nn.init.orthogonal_,
+        &#34;uniform&#34;: nn.init.uniform_,
+        &#34;normal&#34;: nn.init.normal_,
+        &#34;zeros&#34;: nn.init.zeros_,
+        &#34;ones&#34;: nn.init.ones_,
+    }
+
+    if method not in init_dispatch:
+        raise ValueError(f&#34;Unsupported initialization method: {method}&#34;)
+
+    # Iterates over all modules (including submodules) and initializes linear layers
+    for m in self.modules():
+        if isinstance(m, nn.Linear):
+            init_dispatch[method](m.weight)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)</code></pre>
+</details>
+<div class="desc"><p>Apply a specific initialization method to all linear layers in the network.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>method</code></strong> :&ensp;<code>str</code>, default <code>"xavier_uniform"</code></dt>
+<dd>The initialization method to use. Supported methods:
+'xavier_uniform', 'xavier_normal', 'kaiming_uniform', 'kaiming_normal',
+'orthogonal', 'uniform', 'normal', 'zeros', 'ones'</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.models.deep.bandit.MultiBanditNet.forward"><code class="name flex">
+<span>def <span class="ident">forward</span></span>(<span>self,<br>state: torch.Tensor,<br>multiple_option: bool = False,<br>temperature: float = 1.0) ‑> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def forward(
+    self, state: torch.Tensor, multiple_option: bool = False, temperature: float = 1.0
+) -&gt; tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     &#34;&#34;&#34;
     Parameters
     ----------
@@ -269,6 +480,12 @@ zero; the option and value networks are not dropped.</dd>
         Tensor of shape (batch_size, state_dim) or (state_dim,)
     multiple_option : bool, default False
         Whether the model should return probabilities for multiple options.
+    temperature : float, default 1.0
+        Temperature used to control the sharpness of the output probability
+        distribution. A value of ``1.0`` preserves the default behavior.
+        Values greater than ``1.0`` produce a softer (more uniform)
+        distribution, while values between ``0`` and ``1.0`` produce a
+        sharper (more peaked) distribution. Must be strictly positive.
 
     Returns
     -------
@@ -289,43 +506,44 @@ zero; the option and value networks are not dropped.</dd>
         state = state.unsqueeze(0)
     batch_size = state.size(0)
 
-    # Option probabilities
     option_probs = torch.softmax(
-        self.option_network(state), dim=-1
+        self.option_network(state) / temperature, dim=-1
     )  # (batch_size, num_options)
 
+    device = state.device
+    num_options = len(self.action_networks)
+
     if multiple_option:
-        all_action_probs = [
-            torch.softmax(self.action_networks[i](state), dim=-1)  # (batch_size, num_actions)
-            for i in range(self.num_options)
-        ]
-        action_probs = torch.stack(all_action_probs, dim=1)
-        selected_actions = torch.argmax(action_probs, dim=-1)
+        action_probs = torch.zeros(batch_size, num_options, self.max_num_actions, device=device)
+        selected_actions = torch.zeros(batch_size, num_options, dtype=torch.long, device=device)
+
+        for i, net in enumerate(self.action_networks):
+            probs = torch.softmax(net(state) / temperature, dim=-1)
+            n_act = probs.size(-1)
+            action_probs[:, i, :n_act] = probs
+            selected_actions[:, i] = torch.argmax(probs, dim=-1)
+
         selected_options = torch.argmax(option_probs, dim=-1)
-        selected_action_probs = action_probs[torch.arange(batch_size), selected_options, :]
+
     else:
-        selected_options = torch.multinomial(option_probs, 1).squeeze(-1)  # (batch_size,)
-        action_probs = torch.stack(
-            [
-                torch.softmax(
-                    self.action_networks[selected_options[i]](state[i].unsqueeze(0)), dim=-1
-                ).squeeze(0)
-                for i in range(batch_size)
-            ],
-            dim=0,
-        )  # (batch_size, num_actions)
-        selected_actions = torch.argmax(action_probs, dim=-1)
-        selected_action_probs = action_probs
+        selected_options = torch.multinomial(option_probs, 1).squeeze(-1)
+        action_probs = torch.zeros(batch_size, self.max_num_actions, device=device)
+        selected_actions = torch.zeros(batch_size, dtype=torch.long, device=device)
 
-    termination_prob = self.termination_network(state)  # (batch_size, 1)
+        for opt_idx in torch.unique(selected_options):
+            mask = selected_options == opt_idx
+            if mask.any():
+                states_opt = state[mask]
+                probs = torch.softmax(
+                    self.action_networks[opt_idx](states_opt) / temperature, dim=-1
+                )
+                n_act = probs.size(-1)
+                action_probs[mask, :n_act] = probs
+                selected_actions[mask] = torch.argmax(probs, dim=-1)
 
-    return (
-        option_probs,
-        selected_action_probs if not multiple_option else action_probs,
-        termination_prob,
-        selected_options,
-        selected_actions,
-    )</code></pre>
+    termination_prob = self.termination_network(state)
+
+    return option_probs, action_probs, termination_prob, selected_options, selected_actions</code></pre>
 </details>
 <div class="desc"><h2 id="parameters">Parameters</h2>
 <dl>
@@ -333,6 +551,12 @@ zero; the option and value networks are not dropped.</dd>
 <dd>Tensor of shape (batch_size, state_dim) or (state_dim,)</dd>
 <dt><strong><code>multiple_option</code></strong> :&ensp;<code>bool</code>, default <code>False</code></dt>
 <dd>Whether the model should return probabilities for multiple options.</dd>
+<dt><strong><code>temperature</code></strong> :&ensp;<code>float</code>, default <code>1.0</code></dt>
+<dd>Temperature used to control the sharpness of the output probability
+distribution. A value of <code>1.0</code> preserves the default behavior.
+Values greater than <code>1.0</code> produce a softer (more uniform)
+distribution, while values between <code>0</code> and <code>1.0</code> produce a
+sharper (more peaked) distribution. Must be strictly positive.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
@@ -426,6 +650,7 @@ works; <code>.pt</code> and <code>.pth</code> are the usual choices.</dd>
 <li>
 <h4><code><a title="likelihood.models.deep.bandit.MultiBanditNet" href="#likelihood.models.deep.bandit.MultiBanditNet">MultiBanditNet</a></code></h4>
 <ul class="">
+<li><code><a title="likelihood.models.deep.bandit.MultiBanditNet.apply_initialization" href="#likelihood.models.deep.bandit.MultiBanditNet.apply_initialization">apply_initialization</a></code></li>
 <li><code><a title="likelihood.models.deep.bandit.MultiBanditNet.forward" href="#likelihood.models.deep.bandit.MultiBanditNet.forward">forward</a></code></li>
 <li><code><a title="likelihood.models.deep.bandit.MultiBanditNet.load" href="#likelihood.models.deep.bandit.MultiBanditNet.load">load</a></code></li>
 <li><code><a title="likelihood.models.deep.bandit.MultiBanditNet.save" href="#likelihood.models.deep.bandit.MultiBanditNet.save">save</a></code></li>

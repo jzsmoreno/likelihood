@@ -45,6 +45,173 @@ el.replaceWith(d);
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
+<dt id="likelihood.tools.models_tools.analyze_network_variations"><code class="name flex">
+<span>def <span class="ident">analyze_network_variations</span></span>(<span>model: torch.nn.modules.module.Module,<br>sample_data: numpy.ndarray,<br>train_option: bool = False,<br>temperature: float = 1.0,<br>plot_graph: bool = False) ‑> Tuple[pandas.core.frame.DataFrame, pandas.core.frame.DataFrame, int]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def analyze_network_variations(
+    model: torch.nn.Module,
+    sample_data: np.ndarray,
+    train_option: bool = False,
+    temperature: float = 1.0,
+    plot_graph: bool = False,
+) -&gt; Tuple[pd.DataFrame, pd.DataFrame, int]:
+    &#34;&#34;&#34;Analyzes the output variations of option_network and action_networks for a given sample.
+
+    Parameters
+    ----------
+    model : `torch.nn.Module`
+        The MultiBanditNet model to analyze.
+    sample_data : `np.ndarray`
+        Input sample data of shape (n_samples, state_dim).
+    train_option : `bool`, optional
+        Whether to use train mode, by default False.
+    temperature : float, default 1.0
+        Temperature used to control the sharpness of the output probability
+        distribution. A value of ``1.0`` preserves the default behavior.
+        Values greater than ``1.0`` produce a softer (more uniform)
+        distribution, while values between ``0`` and ``1.0`` produce a
+        sharper (more peaked) distribution. Must be strictly positive.
+    plot_graph : bool, default False
+        Whether to generate and display plots visualizing the variation
+        statistics of the option and action network outputs.
+
+    Returns
+    -------
+    `pd.DataFrame`
+        Table with statistics for option_network dimensions.
+    `pd.DataFrame`
+        Table with statistics for action_networks dimensions.
+    int
+        Index of the dimension with maximum variation in option_network.
+    int
+        Index of the dimension with maximum variation in action_networks.
+    &#34;&#34;&#34;
+    if train_option:
+        model.train()
+    else:
+        model.eval()
+
+    state_tensor = torch.tensor(sample_data, dtype=torch.float32)
+    model.to(&#34;cpu&#34;)
+    state_tensor = state_tensor.to(&#34;cpu&#34;)
+
+    # Get raw outputs from option_network and apply softmax with temperature
+    option_raw_outputs = model.option_network(state_tensor)
+    option_probs = torch.softmax(option_raw_outputs / temperature, dim=-1)
+
+    option_outputs = {}
+    option_prob_outputs = {}
+
+    for i in range(model.num_options):
+        option_outputs[f&#34;Option {i}&#34;] = option_raw_outputs[..., i].detach().numpy()
+        option_prob_outputs[f&#34;Option {i}&#34;] = option_probs[..., i].detach().numpy()
+
+    # Get raw outputs from action_networks and apply softmax with temperature
+    action_outputs = {}
+    action_prob_outputs = {}
+
+    for opt_idx, net in enumerate(model.action_networks):
+        network_output = net(state_tensor)
+        network_probs = torch.softmax(network_output / temperature, dim=-1)
+
+        num_actions = network_probs.shape[-1]
+        for act_idx in range(num_actions):
+            key = f&#34;Option {opt_idx}, Action {act_idx}&#34;
+
+            action_outputs[key] = network_output[..., act_idx].detach().numpy()
+
+            action_prob_outputs[key] = network_probs[..., act_idx].detach().numpy()
+    if plot_graph:
+        plot_two_region_histograms_boxplots(option_outputs, action_outputs)
+    option_stats = {}
+    for opt_name in option_outputs:
+        logits = option_outputs[opt_name]
+        probs = option_prob_outputs[opt_name]
+
+        option_stats[opt_name] = {
+            &#34;Mean&#34;: np.mean(logits),
+            &#34;Std&#34;: np.std(logits),
+            &#34;Min&#34;: np.min(logits),
+            &#34;Max&#34;: np.max(logits),
+            &#34;Range&#34;: np.ptp(logits),
+            &#34;Variance&#34;: np.var(logits),
+            &#34;Prob Mean&#34;: np.mean(probs),
+            &#34;Prob Std&#34;: np.std(probs),
+        }
+
+    action_stats = {}
+    for act_name in action_outputs:
+        logits = action_outputs[act_name]
+        probs = action_prob_outputs[act_name]
+
+        action_stats[act_name] = {
+            &#34;Mean&#34;: np.mean(logits),
+            &#34;Std&#34;: np.std(logits),
+            &#34;Min&#34;: np.min(logits),
+            &#34;Max&#34;: np.max(logits),
+            &#34;Range&#34;: np.ptp(logits),
+            &#34;Variance&#34;: np.var(logits),
+            &#34;Prob Mean&#34;: np.mean(probs),
+            &#34;Prob Std&#34;: np.std(probs),
+        }
+
+    option_df = pd.DataFrame(option_stats).T
+    action_df = pd.DataFrame(action_stats).T
+
+    max_variation_opt_dim = None
+    max_range = -float(&#34;inf&#34;)
+
+    for opt_name, stats in option_stats.items():
+        if stats[&#34;Range&#34;] &gt; max_range:
+            max_range = stats[&#34;Range&#34;]
+            max_variation_opt_dim = int(opt_name.split()[-1])
+
+    max_variation_act_dim = None
+    max_action_range = -float(&#34;inf&#34;)
+
+    for act_name, stats in action_stats.items():
+        if stats[&#34;Range&#34;] &gt; max_action_range:
+            max_action_range = stats[&#34;Range&#34;]
+            max_variation_act_dim = act_name
+
+    return option_df, action_df, max_variation_opt_dim, max_variation_act_dim</code></pre>
+</details>
+<div class="desc"><p>Analyzes the output variations of option_network and action_networks for a given sample.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>model</code></strong> :&ensp;<code>torch.nn.Module</code></dt>
+<dd>The MultiBanditNet model to analyze.</dd>
+<dt><strong><code>sample_data</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Input sample data of shape (n_samples, state_dim).</dd>
+<dt><strong><code>train_option</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Whether to use train mode, by default False.</dd>
+<dt><strong><code>temperature</code></strong> :&ensp;<code>float</code>, default <code>1.0</code></dt>
+<dd>Temperature used to control the sharpness of the output probability
+distribution. A value of <code>1.0</code> preserves the default behavior.
+Values greater than <code>1.0</code> produce a softer (more uniform)
+distribution, while values between <code>0</code> and <code>1.0</code> produce a
+sharper (more peaked) distribution. Must be strictly positive.</dd>
+<dt><strong><code>plot_graph</code></strong> :&ensp;<code>bool</code>, default <code>False</code></dt>
+<dd>Whether to generate and display plots visualizing the variation
+statistics of the option and action network outputs.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>pd.DataFrame</code></dt>
+<dt>Table with statistics for option_network dimensions.</dt>
+<dt><code>pd.DataFrame</code></dt>
+<dt>Table with statistics for action_networks dimensions.</dt>
+<dt><code>int</code></dt>
+<dd>Index of the dimension with maximum variation in option_network.</dd>
+<dt><code>int</code></dt>
+<dd>Index of the dimension with maximum variation in action_networks.</dd>
+</dl></div>
+</dd>
 <dt id="likelihood.tools.models_tools.apply_lora"><code class="name flex">
 <span>def <span class="ident">apply_lora</span></span>(<span>model: keras.src.models.model.Model, rank: int = 4) ‑> keras.src.models.model.Model</span>
 </code></dt>
@@ -179,14 +346,12 @@ and adaptation capacity.</p></div>
         option_probs, action_probs, termination_probs, selected_option, action = model(
             state_tensor, multiple_option
         )
-
         if multiple_option:
             action = torch.multinomial(action_probs.squeeze(0), 1).squeeze(-1)
             option = torch.multinomial(option_probs.squeeze(0), 1).squeeze(-1)
         else:
             action = torch.multinomial(action_probs, 1).item()
             option = torch.multinomial(option_probs, 1).item()
-
         old_probs.append(get_selected_probs(action_probs, action))
 
         terminate = torch.bernoulli(termination_probs).item() &gt; 0.5
@@ -205,12 +370,12 @@ and adaptation capacity.</p></div>
 
         tolerance_count += 1
         trajectory.append((state, selected_option, action, reward, next_state, terminate, done))
-        state = next_state
 
         if verbose:
             print_trajectory_info(
                 state, selected_option, action, reward, next_state, terminate, done
             )
+        state = next_state
 
     returns = []
     advantages = []
@@ -285,6 +450,122 @@ and adaptation capacity.</p></div>
 <dd>The list of advantage terms for each step.</dd>
 <dt><strong><code>old_probs</code></strong> :&ensp;<code>list[float]</code></dt>
 <dd>The list of old policy probabilities for each step.</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.tools.models_tools.display_network_analysis"><code class="name flex">
+<span>def <span class="ident">display_network_analysis</span></span>(<span>model: torch.nn.modules.module.Module,<br>sample_data: numpy.ndarray,<br>multiple_option: bool = False,<br>temperature: float = 1.0,<br>plot_graph: bool = True) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def display_network_analysis(
+    model: torch.nn.Module,
+    sample_data: np.ndarray,
+    multiple_option: bool = False,
+    temperature: float = 1.0,
+    plot_graph: bool = True,
+) -&gt; None:
+    &#34;&#34;&#34;Analyze and visualize network statistics for a given model and sample data.
+
+    This function performs network analysis on the provided model using the sample
+    data and optionally displays the results as a graph.
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        The PyTorch neural network model to analyze.
+    sample_data : np.ndarray
+        Input data used for the network analysis.
+    multiple_option : bool, optional
+        If True, enable multiple option analysis. Default is False.
+    temperature : float, optional
+        Temperature parameter for the analysis. Default is 1.0.
+    plot_graph : bool, optional
+        If True, display the analysis graph. Default is True.
+
+    Returns
+    -------
+    None
+        This function does not return any value. It performs analysis and optionally
+        displays a graph.
+    &#34;&#34;&#34;
+    option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
+        model, sample_data, multiple_option, temperature, plot_graph
+    )
+
+    def highlight_row(row: pd.Series, target: Any) -&gt; List[str]:
+        if row.name == target:
+            return [&#34;background-color: #ffec99; font-weight: bold&#34;] * len(row)
+        return [&#34;&#34;] * len(row)
+
+    option_format = {col: &#34;{:.5f}&#34; for col in option_df.columns}
+    action_format = {col: &#34;{:.5f}&#34; for col in action_df.columns}
+
+    option_style = (
+        option_df.style.format(option_format)
+        .apply(highlight_row, axis=1, target=max_opt_dim)
+        .background_gradient(cmap=&#34;Blues&#34;)
+        .set_caption(&#34;🧠 Option Network Statistics&#34;)
+    )
+
+    action_style = (
+        action_df.style.format(action_format)
+        .apply(highlight_row, axis=1, target=max_act_dim)
+        .background_gradient(cmap=&#34;Greens&#34;)
+        .set_caption(&#34;🎯 Action Network Statistics&#34;)
+    )
+
+    if &#34;Probability&#34; in option_df.columns:
+        option_style = option_style.background_gradient(
+            cmap=&#34;Oranges&#34;, subset=[&#34;Prob Mean&#34;, &#34;Prob Std&#34;]
+        )
+
+    if &#34;Probability&#34; in action_df.columns:
+        action_style = action_style.background_gradient(
+            cmap=&#34;Oranges&#34;, subset=[&#34;Prob Mean&#34;, &#34;Prob Std&#34;]
+        )
+
+    display(option_style)
+    display(action_style)
+
+    display(HTML(f&#34;&#34;&#34;
+    &lt;div style=&#34;
+        margin-top:20px;
+        padding:15px;
+        border-left:5px solid #1976d2;
+        border-radius:4px;
+    &#34;&gt;
+        &lt;b&gt;Summary&lt;/b&gt;&lt;br&gt;
+        Samples analyzed: {len(sample_data):,}&lt;br&gt;
+        Temperature: {temperature}&lt;br&gt;
+        Most variable option dimension: {max_opt_dim}&lt;br&gt;
+        Most variable action dimension: {max_act_dim}
+    &lt;/div&gt;
+    &#34;&#34;&#34;))</code></pre>
+</details>
+<div class="desc"><p>Analyze and visualize network statistics for a given model and sample data.</p>
+<p>This function performs network analysis on the provided model using the sample
+data and optionally displays the results as a graph.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>model</code></strong> :&ensp;<code>torch.nn.Module</code></dt>
+<dd>The PyTorch neural network model to analyze.</dd>
+<dt><strong><code>sample_data</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Input data used for the network analysis.</dd>
+<dt><strong><code>multiple_option</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>If True, enable multiple option analysis. Default is False.</dd>
+<dt><strong><code>temperature</code></strong> :&ensp;<code>float</code>, optional</dt>
+<dd>Temperature parameter for the analysis. Default is 1.0.</dd>
+<dt><strong><code>plot_graph</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>If True, display the analysis graph. Default is True.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>None</code></dt>
+<dd>This function does not return any value. It performs analysis and optionally
+displays a graph.</dd>
 </dl></div>
 </dd>
 <dt id="likelihood.tools.models_tools.get_selected_probs"><code class="name flex">
@@ -422,6 +703,436 @@ single DataFrame.</p>
 <h2 id="notes">Notes</h2>
 <p>The returned DataFrame will have one row for each node and one column for each of the computed metrics.</p></div>
 </dd>
+<dt id="likelihood.tools.models_tools.grpo_loss"><code class="name flex">
+<span>def <span class="ident">grpo_loss</span></span>(<span>advantages: torch.Tensor,<br>old_action_probs: torch.Tensor,<br>action_probs: torch.Tensor,<br>epsilon: float = 0.2,<br>beta_kl: float = 0.04) ‑> torch.Tensor</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def grpo_loss(
+    advantages: torch.Tensor,
+    old_action_probs: torch.Tensor,
+    action_probs: torch.Tensor,
+    epsilon: float = 0.2,
+    beta_kl: float = 0.04,
+) -&gt; torch.Tensor:
+    &#34;&#34;&#34;Compute the Group Relative Policy Optimization (GRPO) loss.
+
+    GRPO replaces the value-function-based advantage of PPO with group-relative
+    advantages (normalized within a group of samples) and adds a KL divergence
+    penalty to constrain policy updates, making it a critic‑free algorithm.
+
+    Parameters
+    ----------
+    advantages : `torch.Tensor`
+        Group‑relative advantages, typically computed as
+        ``(returns - mean(returns)) / (std(returns) + 1e-8)`` across a group
+        of trajectories sampled from the same (or similar) states.
+    old_action_probs : `torch.Tensor`
+        The action probabilities from the old policy (before the update).
+    action_probs : `torch.Tensor`
+        The action probabilities from the current policy (after the update).
+    epsilon : `float`, optional, default=0.2
+        The clipping parameter that limits how much the policy can change
+        between updates.
+    beta_kl : `float`, optional, default=0.04
+        Coefficient controlling the strength of the KL‑divergence penalty
+        that keeps the new policy close to the old policy.
+
+    Returns
+    -------
+    loss : `torch.Tensor`
+        The GRPO loss, averaged across the batch.  The loss consists of a
+        clipped surrogate objective (identical to PPO) plus an approximate
+        KL‑divergence regularisation term.
+
+    Notes
+    -----
+    The surrogate objective is identical to the PPO clipped objective,
+    so the policy update logic is the same; the only differences are:
+
+    * advantages are *group‑normalised* instead of GAE‑based, and
+    * a KL‑penalty (approximated via the squared log‑ratio) is added.
+    &#34;&#34;&#34;
+    if advantages.dim() == 1:
+        advantages = advantages.unsqueeze(-1)
+
+    action_probs = torch.clamp(action_probs, min=1e-8)
+    old_action_probs = torch.clamp(old_action_probs, min=1e-8)
+    log_ratio = torch.log(action_probs) - torch.log(old_action_probs)
+
+    ratio = torch.exp(log_ratio)  # π(a|s) / π_old(a|s)
+    if log_ratio.ndim &gt; 1:
+        ratio = ratio.mean(dim=1)
+    ratio = ratio.view(advantages.shape)
+    clipped_ratio = torch.clamp(ratio, 1 - epsilon, 1 + epsilon)
+
+    # Clipped surrogate objective (same form as PPO)
+    surrogate_loss = -torch.min(ratio * advantages, clipped_ratio * advantages)
+
+    # Approximate KL divergence penalty:  (log π_θ - log π_old)²
+    kl_penalty = beta_kl * (log_ratio**2).mean()
+
+    return surrogate_loss.mean() + kl_penalty</code></pre>
+</details>
+<div class="desc"><p>Compute the Group Relative Policy Optimization (GRPO) loss.</p>
+<p>GRPO replaces the value-function-based advantage of PPO with group-relative
+advantages (normalized within a group of samples) and adds a KL divergence
+penalty to constrain policy updates, making it a critic‑free algorithm.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>advantages</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>Group‑relative advantages, typically computed as
+<code>(returns - mean(returns)) / (std(returns) + 1e-8)</code> across a group
+of trajectories sampled from the same (or similar) states.</dd>
+<dt><strong><code>old_action_probs</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>The action probabilities from the old policy (before the update).</dd>
+<dt><strong><code>action_probs</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>The action probabilities from the current policy (after the update).</dd>
+<dt><strong><code>epsilon</code></strong> :&ensp;<code>float</code>, optional, default=<code>0.2</code></dt>
+<dd>The clipping parameter that limits how much the policy can change
+between updates.</dd>
+<dt><strong><code>beta_kl</code></strong> :&ensp;<code>float</code>, optional, default=<code>0.04</code></dt>
+<dd>Coefficient controlling the strength of the KL‑divergence penalty
+that keeps the new policy close to the old policy.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>loss</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>The GRPO loss, averaged across the batch.
+The loss consists of a
+clipped surrogate objective (identical to PPO) plus an approximate
+KL‑divergence regularisation term.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>The surrogate objective is identical to the PPO clipped objective,
+so the policy update logic is the same; the only differences are:</p>
+<ul>
+<li>advantages are <em>group‑normalised</em> instead of GAE‑based, and</li>
+<li>a KL‑penalty (approximated via the squared log‑ratio) is added.</li>
+</ul></div>
+</dd>
+<dt id="likelihood.tools.models_tools.network_analysis_table"><code class="name flex">
+<span>def <span class="ident">network_analysis_table</span></span>(<span>model: torch.nn.modules.module.Module,<br>sample_data: numpy.ndarray,<br>train_option: bool = False,<br>temperature: float = 1.0) ‑> str</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def network_analysis_table(
+    model: torch.nn.Module,
+    sample_data: np.ndarray,
+    train_option: bool = False,
+    temperature: float = 1.0,
+) -&gt; str:
+    &#34;&#34;&#34;Create a well-formatted table showing statistics for option_network and action_networks.
+
+    Parameters
+    ----------
+    model : `torch.nn.Module`
+        The MultiBanditNet model to analyze.
+    sample_data : `np.ndarray`
+        Input sample data of shape (n_samples, state_dim).
+    train_option : `bool`, optional
+        Whether to use train mode, by default False.
+    temperature : float, default 1.0
+        Temperature used to control the sharpness of the output probability
+        distribution. A value of ``1.0`` preserves the default behavior.
+        Values greater than ``1.0`` produce a softer (more uniform)
+        distribution, while values between ``0`` and ``1.0`` produce a
+        sharper (more peaked) distribution. Must be strictly positive.
+
+    Returns
+    -------
+    str
+        Formatted string with network analysis tables.
+    &#34;&#34;&#34;
+    option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
+        model,
+        sample_data,
+        train_option,
+        temperature,
+    )
+
+    def format_df(df: pd.DataFrame, highlight_idx: Optional[int] = None) -&gt; str:
+        df = df.copy()
+
+        numeric_cols = df.select_dtypes(include=[&#34;number&#34;]).columns
+        df[numeric_cols] = df[numeric_cols].round(5)
+
+        index_labels = []
+        for idx in df.index:
+            if highlight_idx is not None and idx == highlight_idx:
+                index_labels.append(f&#34;★ {idx}&#34;)
+            else:
+                index_labels.append(str(idx))
+
+        df.index = index_labels
+
+        return tabulate(
+            df,
+            headers=&#34;keys&#34;,
+            tablefmt=&#34;rounded_outline&#34;,
+            floatfmt=&#34;.5f&#34;,
+            showindex=True,
+        )
+
+    report = []
+
+    report.append(&#34;═&#34; * 80)
+    report.append(&#34;                 NETWORK OUTPUT VARIATION ANALYSIS&#34;)
+    report.append(&#34;═&#34; * 80)
+    report.append(&#34;&#34;)
+    report.append(&#34;┌──────────────────────────────────────────────────────────────┐&#34;)
+    report.append(&#34;│ OPTION NETWORK                                               │&#34;)
+    report.append(&#34;└──────────────────────────────────────────────────────────────┘&#34;)
+    report.append(&#34;&#34;)
+
+    report.append(format_df(option_df, max_opt_dim))
+    report.append(&#34;&#34;)
+
+    if max_opt_dim is not None:
+        report.append(f&#34;★ Most variable option dimension : {max_opt_dim}&#34;)
+
+    report.append(&#34;&#34;)
+    report.append(&#34;┌──────────────────────────────────────────────────────────────┐&#34;)
+    report.append(&#34;│ ACTION NETWORKS                                              │&#34;)
+    report.append(&#34;└──────────────────────────────────────────────────────────────┘&#34;)
+    report.append(&#34;&#34;)
+
+    report.append(format_df(action_df, max_act_dim))
+    report.append(&#34;&#34;)
+
+    if max_act_dim is not None:
+        report.append(f&#34;★ Most variable action dimension : {max_act_dim}&#34;)
+
+    report.append(&#34;&#34;)
+    report.append(&#34;─&#34; * 80)
+    report.append(&#34;SUMMARY&#34;)
+    report.append(&#34;─&#34; * 80)
+
+    report.append(f&#34;Option dimensions analyzed : {len(option_df)}&#34;)
+    report.append(f&#34;Action dimensions analyzed : {len(action_df)}&#34;)
+    report.append(f&#34;Samples analyzed           : {len(sample_data):,}&#34;)
+
+    if max_opt_dim is not None:
+        report.append(f&#34;Highest option variation   : {max_opt_dim}&#34;)
+
+    if max_act_dim is not None:
+        report.append(f&#34;Highest action variation   : {max_act_dim}&#34;)
+
+    report.append(&#34;─&#34; * 80)
+
+    return &#34;\n&#34;.join(report)</code></pre>
+</details>
+<div class="desc"><p>Create a well-formatted table showing statistics for option_network and action_networks.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>model</code></strong> :&ensp;<code>torch.nn.Module</code></dt>
+<dd>The MultiBanditNet model to analyze.</dd>
+<dt><strong><code>sample_data</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Input sample data of shape (n_samples, state_dim).</dd>
+<dt><strong><code>train_option</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Whether to use train mode, by default False.</dd>
+<dt><strong><code>temperature</code></strong> :&ensp;<code>float</code>, default <code>1.0</code></dt>
+<dd>Temperature used to control the sharpness of the output probability
+distribution. A value of <code>1.0</code> preserves the default behavior.
+Values greater than <code>1.0</code> produce a softer (more uniform)
+distribution, while values between <code>0</code> and <code>1.0</code> produce a
+sharper (more peaked) distribution. Must be strictly positive.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>str</code></dt>
+<dd>Formatted string with network analysis tables.</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.tools.models_tools.plot_two_region_histograms_boxplots"><code class="name flex">
+<span>def <span class="ident">plot_two_region_histograms_boxplots</span></span>(<span>option_outputs: Dict[str, numpy.ndarray],<br>action_outputs: Dict[str, numpy.ndarray]) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def plot_two_region_histograms_boxplots(
+    option_outputs: Dict[str, np.ndarray],
+    action_outputs: Dict[str, np.ndarray],
+) -&gt; None:
+    &#34;&#34;&#34;
+    Create a figure with:
+      - Top panel: overlaid histograms for option outputs.
+      - Bottom panel: boxplots for action outputs.
+
+    Parameters
+    ----------
+    option_outputs : dict[str, np.ndarray]
+        Mapping from option name to array of output values.
+
+    action_outputs : dict[str, np.ndarray]
+        Mapping from action name to array of output values.
+
+    Returns
+    -------
+    None
+    &#34;&#34;&#34;
+    sns.set_theme(style=&#34;whitegrid&#34;, context=&#34;notebook&#34;)
+    show_actions = len(action_outputs) &lt;= 5
+    is_dark = plt.rcParams.get(&#34;figure.facecolor&#34;) not in [&#34;#ffffff&#34;, &#34;white&#34;]
+    palette = sns.color_palette(&#34;viridis&#34;, max(len(option_outputs), 1))
+
+    if is_dark:
+        bg = &#34;#121212&#34;
+        fg = &#34;#EAEAEA&#34;
+        grid_alpha = 0.12
+        spine_color = &#34;#666666&#34;
+        legend_bg = &#34;#1e1e1e&#34;
+    else:
+        bg = &#34;#ffffff&#34;
+        fg = &#34;#111111&#34;
+        grid_alpha = 0.08
+        spine_color = &#34;#333333&#34;
+        legend_bg = &#34;#ffffff&#34;
+
+    plt.rcParams.update(
+        {
+            &#34;figure.facecolor&#34;: bg,
+            &#34;axes.facecolor&#34;: bg,
+            &#34;axes.edgecolor&#34;: spine_color,
+            &#34;axes.labelcolor&#34;: fg,
+            &#34;xtick.color&#34;: fg,
+            &#34;ytick.color&#34;: fg,
+            &#34;text.color&#34;: fg,
+        }
+    )
+
+    if show_actions:
+        fig, (ax_top, ax_bottom) = plt.subplots(
+            2,
+            1,
+            figsize=(9, 4.3),
+            gridspec_kw={&#34;height_ratios&#34;: [3.2, 1.3]},
+        )
+        fig.subplots_adjust(hspace=0.18)
+    else:
+        fig, ax_top = plt.subplots(figsize=(9, 3.2))
+
+    fig.patch.set_facecolor(bg)
+    ax_top.set_facecolor(bg)
+    if show_actions:
+        ax_bottom.set_facecolor(bg)
+
+    for color, (opt_name, values) in zip(palette, option_outputs.items()):
+        values = np.asarray(values).ravel()
+
+        sns.histplot(
+            values,
+            bins=35,
+            stat=&#34;density&#34;,
+            alpha=0.22,
+            color=color,
+            edgecolor=None,
+            ax=ax_top,
+            label=opt_name,
+        )
+
+        sns.kdeplot(
+            values,
+            color=color,
+            linewidth=1.8,
+            ax=ax_top,
+        )
+
+    ax_top.grid(axis=&#34;y&#34;, alpha=grid_alpha)
+    ax_top.grid(axis=&#34;x&#34;, visible=False)
+
+    ax_top.spines[&#34;top&#34;].set_visible(False)
+    ax_top.spines[&#34;right&#34;].set_visible(False)
+    ax_top.spines[&#34;left&#34;].set_color(spine_color)
+    ax_top.spines[&#34;bottom&#34;].set_color(spine_color)
+
+    ax_top.tick_params(labelsize=9)
+
+    if option_outputs:
+        leg = ax_top.legend(
+            frameon=True,
+            fontsize=8.5,
+            ncol=min(4, len(option_outputs)),
+            loc=&#34;upper right&#34;,
+        )
+        leg.get_frame().set_facecolor(legend_bg)
+        leg.get_frame().set_edgecolor(&#34;none&#34;)
+        leg.get_frame().set_alpha(0.6)
+
+    if show_actions:
+        labels, action_data = [], []
+
+        for act_name, values in action_outputs.items():
+            values = np.asarray(values).squeeze().ravel()
+            if values.size == 0:
+                continue
+            labels.append(act_name)
+            action_data.append(values)
+
+        if action_data:
+            bp = ax_bottom.boxplot(
+                action_data,
+                labels=labels,
+                patch_artist=True,
+                widths=0.55,
+                showfliers=False,
+                medianprops={&#34;linewidth&#34;: 1.8, &#34;color&#34;: fg},
+                whiskerprops={&#34;color&#34;: spine_color},
+                capprops={&#34;color&#34;: spine_color},
+            )
+
+            box_colors = sns.color_palette(&#34;viridis&#34;, len(bp[&#34;boxes&#34;]))
+
+            for box, color in zip(bp[&#34;boxes&#34;], box_colors):
+                box.set_facecolor(color)
+                box.set_alpha(0.85)
+                box.set_edgecolor(&#34;none&#34;)
+
+            ax_bottom.grid(axis=&#34;y&#34;, alpha=grid_alpha)
+            ax_bottom.grid(axis=&#34;x&#34;, visible=False)
+
+            ax_bottom.spines[&#34;top&#34;].set_visible(False)
+            ax_bottom.spines[&#34;right&#34;].set_visible(False)
+
+            ax_bottom.tick_params(labelsize=9)
+
+            plt.setp(
+                ax_bottom.get_xticklabels(),
+                rotation=20,
+                ha=&#34;right&#34;,
+                fontsize=8.5,
+                color=fg,
+            )
+        else:
+            ax_bottom.set_visible(False)
+
+    plt.tight_layout(pad=0.5)
+    plt.show()</code></pre>
+</details>
+<div class="desc"><p>Create a figure with:
+- Top panel: overlaid histograms for option outputs.
+- Bottom panel: boxplots for action outputs.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>option_outputs</code></strong> :&ensp;<code>dict[str, np.ndarray]</code></dt>
+<dd>Mapping from option name to array of output values.</dd>
+<dt><strong><code>action_outputs</code></strong> :&ensp;<code>dict[str, np.ndarray]</code></dt>
+<dd>Mapping from action name to array of output values.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>None</code></dt>
+<dd>&nbsp;</dd>
+</dl></div>
+</dd>
 <dt id="likelihood.tools.models_tools.ppo_loss"><code class="name flex">
 <span>def <span class="ident">ppo_loss</span></span>(<span>advantages: torch.Tensor,<br>old_action_probs: torch.Tensor,<br>action_probs: torch.Tensor,<br>epsilon: float = 0.2) ‑> torch.Tensor</span>
 </code></dt>
@@ -456,8 +1167,11 @@ single DataFrame.</p>
     &#34;&#34;&#34;
     if advantages.dim() == 1:
         advantages = advantages.unsqueeze(-1)
-    action_probs = action_probs.view(old_action_probs.shape)
-    log_ratio = torch.log(action_probs + 1e-8) - torch.log(old_action_probs + 1e-8)
+
+    action_probs = torch.clamp(action_probs, min=1e-8)
+    old_action_probs = torch.clamp(old_action_probs, min=1e-8)
+    log_ratio = torch.log(action_probs) - torch.log(old_action_probs)
+
     ratio = torch.exp(log_ratio)  # π(a|s) / π_old(a|s)
     if log_ratio.ndim &gt; 1:
         ratio = ratio.mean(dim=1)
@@ -1096,11 +1810,7 @@ Exponential decay rate for epsilon per episode.</p>
     device = torch.device(&#34;cuda:0&#34; if torch.cuda.is_available() else &#34;cpu&#34;)
     model = model.to(device)
     advantages_per_epoch = []
-
-    for epoch in range(num_epochs):
-        trajectory, returns, advantages, old_probs = collect_experience(env, model, **kwargs)
-        avg_advantage = sum(advantages) / len(advantages)
-        advantages_per_epoch.append(avg_advantage)
+    multiple_option = getattr(env, &#34;multiple_option&#34;, False)
 
     for epoch in range(num_epochs):
         if mode == &#34;ppo_mode&#34;:
@@ -1171,8 +1881,10 @@ Exponential decay rate for epsilon per episode.</p>
         states = torch.tensor(np.concatenate(all_states, axis=0), dtype=torch.float32).to(device)
         actions = torch.cat([a.to(device) for a in all_actions])
         old_probs_tensor = (
-            torch.tensor(old_probs, dtype=torch.float32).view(actions.shape).to(device)
+            torch.cat([op.to(device) for op in all_old_probs_list]).view(actions.shape).detach()
         )
+        returns_tensor = torch.cat([r.to(device) for r in all_returns_list])
+        advantages_tensor = torch.cat([a.to(device) for a in all_advantages_list])
 
         dataset = TensorDataset(
             states, actions, returns_tensor, advantages_tensor, old_probs_tensor
@@ -1184,7 +1896,6 @@ Exponential decay rate for epsilon per episode.</p>
         # ----------------------------------------------------------------
         epoch_loss = 0
         num_batches = 0
-
         for (
             batch_states,
             batch_actions,
@@ -1195,21 +1906,37 @@ Exponential decay rate for epsilon per episode.</p>
             optimizer.zero_grad()
 
             option_probs, action_probs, termination_probs, selected_option, action = model(
-                batch_states
+                batch_states, multiple_option
             )
-            if action_probs.ndim == 2 and batch_actions.ndim == 1:
-                batch_current_probs = action_probs.gather(1, batch_actions.unsqueeze(1))
-                ppo_loss_value = ppo_loss(
-                    batch_advantages, batch_old_probs, batch_current_probs, epsilon=epsilon
+            batch_current_probs = action_probs.gather(
+                batch_actions.ndim, batch_actions.unsqueeze(-1)
+            ).squeeze(-1)
+
+            if mode == &#34;ppo_mode&#34;:
+                # --- PPO loss -------------------------------------------
+                policy_loss = ppo_loss(
+                    batch_advantages,
+                    batch_old_probs,
+                    batch_current_probs,
+                    epsilon=epsilon,
                 )
+                batch_values = model.value_network(batch_states).squeeze(-1)
+                batch_returns_target = batch_advantages + batch_values.detach()
+                value_loss = torch.nn.functional.mse_loss(batch_values, batch_returns_target)
+                entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
+                loss = policy_loss + value_coef * value_loss - beta * entropy.mean()
             else:
-                ppo_loss_value = ppo_loss(
-                    batch_advantages, batch_old_probs, action_probs, epsilon=epsilon
+                # --- GRPO loss ------------------------------------------
+                policy_loss = grpo_loss(
+                    batch_advantages,
+                    batch_old_probs,
+                    batch_current_probs,
+                    epsilon=epsilon,
+                    beta_kl=beta_kl,
                 )
+                entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
+                loss = policy_loss - beta * entropy.mean()
 
-            entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
-
-            loss = ppo_loss_value + beta * entropy.mean()
             avg_advantages = batch_advantages.mean().item()
             loss.backward()
             optimizer.step()
@@ -1927,10 +2654,15 @@ A DataFrame with the transformed range columns.</p>
 </li>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
+<li><code><a title="likelihood.tools.models_tools.analyze_network_variations" href="#likelihood.tools.models_tools.analyze_network_variations">analyze_network_variations</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.apply_lora" href="#likelihood.tools.models_tools.apply_lora">apply_lora</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.collect_experience" href="#likelihood.tools.models_tools.collect_experience">collect_experience</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.display_network_analysis" href="#likelihood.tools.models_tools.display_network_analysis">display_network_analysis</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.get_selected_probs" href="#likelihood.tools.models_tools.get_selected_probs">get_selected_probs</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.graph_metrics" href="#likelihood.tools.models_tools.graph_metrics">graph_metrics</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.grpo_loss" href="#likelihood.tools.models_tools.grpo_loss">grpo_loss</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.network_analysis_table" href="#likelihood.tools.models_tools.network_analysis_table">network_analysis_table</a></code></li>
+<li><code><a title="likelihood.tools.models_tools.plot_two_region_histograms_boxplots" href="#likelihood.tools.models_tools.plot_two_region_histograms_boxplots">plot_two_region_histograms_boxplots</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.ppo_loss" href="#likelihood.tools.models_tools.ppo_loss">ppo_loss</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.print_trajectory_info" href="#likelihood.tools.models_tools.print_trajectory_info">print_trajectory_info</a></code></li>
 <li><code><a title="likelihood.tools.models_tools.remove_collinearity" href="#likelihood.tools.models_tools.remove_collinearity">remove_collinearity</a></code></li>
