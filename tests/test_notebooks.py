@@ -79,7 +79,6 @@ def find_notebooks():
 @pytest.mark.parametrize("notebook_path", find_notebooks())
 def test_notebook_execution(notebook_path: Path):
     """Execute a notebook and verify that it runs without errors."""
-
     with notebook_path.open(encoding="utf-8") as fh:
         nb = nbformat.read(fh, as_version=4)
 

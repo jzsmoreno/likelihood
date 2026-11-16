@@ -1,3 +1,5 @@
+"""Regression model definitions."""
+
 import pickle
 
 import matplotlib.pyplot as plt
@@ -12,7 +14,7 @@ from likelihood.tools import *
 
 
 class AbstractArima(FeaturesArima):
-    """A class that implements the auto-regressive arima (1, 0, 0) model
+    """A class that implements the auto-regressive arima (1, 0, 0) model.
 
     Parameters
     ----------
@@ -192,10 +194,24 @@ class AbstractArima(FeaturesArima):
         return np.array(y_pred)
 
     def save_model(self, name: str = "model") -> None:
+        """Save the model parameters to a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default "model".
+        """
         with open(name + ".pkl", "wb") as file:
             pickle.dump(self.theta_trained, file)
 
     def load_model(self, name: str = "model") -> None:
+        """Load the model parameters from a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default "model".
+        """
         with open(name + ".pkl", "rb") as file:
             self.theta_trained = pickle.load(file)
 
@@ -219,6 +235,28 @@ class AbstractArima(FeaturesArima):
     def plot_pred(
         self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
     ) -> None:
+        """Plot predicted values against real values with confidence intervals.
+
+        This method creates a visualization comparing the predicted and actual values,
+        including a confidence interval band around the predictions.
+
+        Parameters
+        ----------
+        y_real : np.ndarray
+            The actual/real values to compare against predictions.
+        y_pred : np.ndarray
+            The predicted values from the model.
+        ci : float, optional
+            The confidence interval level (default is 0.90).
+        mode : bool, optional
+            If True, save the plot as a PNG file; if False, only display (default is True).
+
+        Returns
+        -------
+        None
+            This method does not return a value; it displays/imports a plot and prints
+            confidence interval information.
+        """
         sns.set_theme(style="whitegrid")
         plt.figure(figsize=(5, 3))
         n = self.n_steps
@@ -253,6 +291,12 @@ class AbstractArima(FeaturesArima):
         plt.show()
 
     def summary(self) -> None:
+        """Print a summary of the model parameters.
+
+        Returns
+        -------
+        None
+        """
         print("\nSummary:")
         print("-----------------------")
         print("Lenght of theta: {}".format(len(self.theta_trained)))
@@ -261,7 +305,7 @@ class AbstractArima(FeaturesArima):
 
 
 class FourierRegression(AbstractArima):
-    """A class that implements the arima model with FFT noise filtering
+    """A class that implements the arima model with FFT noise filtering.
 
     Parameters
     ----------
@@ -273,7 +317,6 @@ class FourierRegression(AbstractArima):
     new_datapoints : np.ndarray
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
-
     """
 
     __slots__ = ["datapoints_", "sigma", "mode", "mov", "n_walkers", "name"]
@@ -289,6 +332,17 @@ class FourierRegression(AbstractArima):
         self.datapoints_ = datapoints
 
     def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False) -> None:
+        """Fit the FourierRegression model by denoising the datapoints.
+
+        Parameters
+        ----------
+        sigma : int
+            Sigma parameter for denoising.
+        mov : int
+            Moving window size.
+        mode : bool
+            Denoising mode.
+        """
         self.sigma = sigma
         self.mode = mode
         self.mov = mov
@@ -299,6 +353,32 @@ class FourierRegression(AbstractArima):
     def predict(
         self, n_steps: int, n_walkers: int = 1, name: str = "fourier_model", save: bool = True
     ) -> np.ndarray:
+        """Predict future values using the FourierRegression model.
+
+        This method predicts future values by training ARIMA models on sliding windows
+        of the denoised datapoints and generating predictions for n_steps time periods.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        n_walkers : int, optional
+            The number of walkers/moving window positions to use (default is 1).
+        name : str, optional
+            The base name for saving models if save is True (default is "fourier_model").
+        save : bool, optional
+            Whether to save individual ARIMA models during processing (default is True).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that fit() has been called previously to denoise the datapoints.
+        """
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -320,6 +400,28 @@ class FourierRegression(AbstractArima):
         return new_datapoints
 
     def load_predict(self, n_steps: int, name: str = "fourier_model") -> np.ndarray:
+        """Predict future values using pre-saved ARIMA models.
+
+        This method loads previously saved ARIMA models and uses them to generate
+        predictions for n_steps time periods without retraining.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        name : str, optional
+            The base name used when saving the models (default is "fourier_model").
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that models were previously saved using predict() with save=True.
+        """
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -374,7 +476,7 @@ class Arima(AbstractArima):
         noise: float = 0,
         tol: float = 1e-5,
     ) -> None:
-        """Initializes the ARIMA model with given parameters.
+        """Initialize the ARIMA model with given parameters.
 
         Parameters
         ----------
@@ -405,7 +507,7 @@ class Arima(AbstractArima):
         self.tol = tol
 
     def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -> np.ndarray:
-        """Computes the prior probability or prediction based on ARIMA model.
+        """Compute the prior probability or prediction based on ARIMA model.
 
         Parameters
         ----------

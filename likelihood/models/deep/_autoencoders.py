@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from ._keras_io import load_keras_model, save_keras_model
 from .autoencoders import (
     EarlyStopping,
     LoRALayer,
@@ -23,23 +24,59 @@ from .autoencoders import (
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="stabilize_log_var")
 def stabilize_log_var(x: tf.Tensor) -> tf.Tensor:
+    """Add a small constant to the log variance to avoid numerical instability.
+
+    Parameters
+    ----------
+    x : `tf.Tensor`
+        The log variance.
+
+    Returns
+    -------
+    `tf.Tensor`
+        The stabilized log variance.
+    """
     return x + 1e-7
 
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="sampling_wrapper")
 def sampling_wrapper(args: Tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
+    """Sample from the latent distribution given the mean and log variance.
+
+    Parameters
+    ----------
+    args : `Tuple[tf.Tensor, tf.Tensor]`
+        The tuple of the mean and log variance.
+
+    Returns
+    -------
+    `tf.Tensor`
+        The sampled values.
+    """
     mean, log_var = args
     return sampling(mean, log_var)
 
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="sampling_output_shape")
 def sampling_output_shape(input_shapes: List[int]) -> int:
+    """Return the output shape of the sampling layer.
+
+    Parameters
+    ----------
+    input_shapes : `List[int]`
+        The input shapes.
+
+    Returns
+    -------
+    `int`
+        The batch size.
+    """
     return input_shapes[0]
 
 
 class AutoClassifier:
-    """
-    An auto-classifier model that automatically determines the best classification strategy based on the input data.
+    """An auto-classifier model that automatically determines the best classification strategy based
+    on the input data.
 
     Parameters
     ----------
@@ -82,6 +119,21 @@ class AutoClassifier:
         activation: str,
         **kwargs: Any,
     ) -> None:
+        """Initialize the auto-classifier model.
+
+        Parameters
+        ----------
+        input_shape_parm : `int` or `None`
+            The shape of the input data.
+        num_classes : `int` or `None`
+            The number of classes in the dataset.
+        units : `int`
+            The number of neurons in each hidden layer.
+        activation : `str`
+            The type of activation function to use for the neural network layers.
+        **kwargs : `dict`
+            Additional keyword arguments for model configuration.
+        """
         self.input_shape_parm = input_shape_parm
         self.num_classes = num_classes
         self.units = units
@@ -301,8 +353,7 @@ class AutoClassifier:
         patience: int = 10,
         **kwargs: Any,
     ) -> None:
-        """
-        Trains the encoder and decoder on the input data.
+        """Trains the encoder and decoder on the input data.
 
         Parameters
         ----------
@@ -362,7 +413,9 @@ class AutoClassifier:
         self.freeze_encoder_decoder()
 
     def freeze_encoder_decoder(self) -> None:
-        """Freezes the encoder and decoder layers to prevent them from being updated during training."""
+        """Freezes the encoder and decoder layers to prevent them from being updated during
+        training.
+        """
         if self._encoder:
             for layer in self._encoder.layers:
                 layer.trainable = False
@@ -386,14 +439,15 @@ class AutoClassifier:
         self._build_main_model()
 
     def set_encoder_decoder(self, source_model: "AutoClassifier") -> None:
-        """
-        Sets the encoder and decoder layers from another AutoClassifier instance,
-        ensuring compatibility in dimensions.
+        """Set the encoder and decoder layers from another AutoClassifier instance.
+
+        This ensures compatibility in dimensions.
 
         Parameters
         ----------
-        source_model : AutoClassifier
+        source_model : `AutoClassifier`
             The source model to copy the encoder and decoder layers from.
+
         Raises
         ------
         ValueError
@@ -445,23 +499,25 @@ class AutoClassifier:
         return self._main_model.predict(*args, **kwargs)
 
     def save(self, filepath: str, **kwargs: Any) -> None:
-        """
-        Save the complete model including all components.
+        """Save the complete model including all components.
 
         Parameters
         ----------
-        filepath : str
-            Path where to save the model."""
+        filepath : `str`
+            Path where to save the model.
+        """
         import os
 
         # Create directory if it doesn't exist
         os.makedirs(filepath, exist_ok=True)
 
-        # Save all component models
-        self._encoder.save(os.path.join(filepath, "encoder.keras"))
-        self._decoder.save(os.path.join(filepath, "decoder.keras"))
-        self._classifier.save(os.path.join(filepath, "classifier.keras"))
-        self._main_model.save(os.path.join(filepath, "main_model.keras"))
+        # Save every component with the format supported by the installed stack:
+        # ``.keras`` archives on TensorFlow > 2.15, SavedModel sub-directories on
+        # older releases (``save_format="tf"``).
+        save_keras_model(self._encoder, os.path.join(filepath, "encoder"))
+        save_keras_model(self._decoder, os.path.join(filepath, "decoder"))
+        save_keras_model(self._classifier, os.path.join(filepath, "classifier"))
+        save_keras_model(self._main_model, os.path.join(filepath, "main_model"))
 
         # Save configuration
         import json
@@ -486,8 +542,7 @@ class AutoClassifier:
 
     @classmethod
     def load(cls: type["AutoClassifier"], filepath: str) -> "AutoClassifier":
-        """
-        Load a complete model from saved components.
+        """Load a complete model from saved components.
 
         Parameters
         ----------
@@ -509,15 +564,11 @@ class AutoClassifier:
         # Create new instance
         instance = cls(**config)
 
-        # Load component models
-        instance._encoder = tf.keras.models.load_model(os.path.join(filepath, "encoder.keras"))
-        instance._decoder = tf.keras.models.load_model(os.path.join(filepath, "decoder.keras"))
-        instance._classifier = tf.keras.models.load_model(
-            os.path.join(filepath, "classifier.keras")
-        )
-        instance._main_model = tf.keras.models.load_model(
-            os.path.join(filepath, "main_model.keras")
-        )
+        # Load component models (``.keras`` archives or SavedModel directories)
+        instance._encoder = load_keras_model(os.path.join(filepath, "encoder"))
+        instance._decoder = load_keras_model(os.path.join(filepath, "decoder"))
+        instance._classifier = load_keras_model(os.path.join(filepath, "classifier"))
+        instance._main_model = load_keras_model(os.path.join(filepath, "main_model"))
 
         return instance
 
@@ -585,8 +636,7 @@ def call_existing_code(
     num_layers: int = 1,
     **kwargs: Any,
 ) -> AutoClassifier:
-    """
-    Calls an existing AutoClassifier instance.
+    """Call an existing AutoClassifier instance.
 
     Parameters
     ----------
@@ -646,7 +696,7 @@ def build_model(
     num_classes: Optional[int],
     **kwargs: Any,
 ) -> AutoClassifier:
-    """Builds a neural network model using Keras Tuner's search algorithm.
+    """Build a neural network model using Keras Tuner's search algorithm.
 
     Parameters
     ----------
@@ -787,7 +837,7 @@ def setup_model(
     method: str = "Hyperband",
     **kwargs,
 ) -> AutoClassifier:
-    """Setup model for training and tuning.
+    """Set up model for training and tuning.
 
     Parameters
     ----------

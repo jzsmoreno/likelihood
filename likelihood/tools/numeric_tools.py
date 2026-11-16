@@ -1,3 +1,5 @@
+"""Numerical data manipulation utilities for numeric columns."""
+
 from typing import Dict
 
 import numpy as np
@@ -12,6 +14,37 @@ def get_metrics(
     predicted_column_name: str,
     verbose: bool = False,
 ) -> Dict[str, float]:
+    """Calculate performance metrics from a DataFrame containing actual and predicted values.
+
+    Computes accuracy, precision, recall, F1-score, and Cohen's kappa from the provided
+    dataset. Results are printed if verbose is True, otherwise returned as a dictionary.
+
+    Parameters
+    ----------
+    dataset : pd.DataFrame
+        Input DataFrame containing the actual and predicted class columns.
+    actual_column_name : str
+        Name of the column with the true/actual class labels.
+    predicted_column_name : str
+        Name of the column with the model's predicted class labels.
+    verbose : bool, optional
+        If True, print the computed metrics to stdout. Default is False.
+
+    Returns
+    -------
+    Dict[str, float]
+        A dictionary containing the following keys and their corresponding metric values:
+        - 'accuracy': Overall accuracy percentage
+        - 'precision': Precision score
+        - 'recall': Recall score
+        - 'f1_score': F1-score
+        - 'kappa': Cohen's kappa coefficient
+
+    Notes
+    -----
+    Metrics are calculated from a confusion matrix derived from the dataset. All metrics
+    are expressed as percentages except for Cohen's kappa, which is a normalized value.
+    """
     # Variables to keep track of the number of correct and total predictions
     true_positives = 0  # Correctly predicted positives
     true_negatives = 0  # Correctly predicted negatives
@@ -112,7 +145,6 @@ def xi_corr(df: pd.DataFrame) -> pd.DataFrame:
         A square dataframe with variable names as both index and columns,
         containing their corresponding correlation coefficients.
     """
-
     columns = df.select_dtypes(include="number").columns
     n = len(columns)
 
@@ -128,26 +160,23 @@ def xi_corr(df: pd.DataFrame) -> pd.DataFrame:
                 correlation = xicor(x, y)
                 correlations.loc[col1, col2] = round(correlation, 8)
                 correlations.loc[col2, col1] = round(correlation, 8)  # Mirror the correlation
-
     return correlations
 
 
-"""
-@article{Chatterjee2019ANC,
-  title={A New Coefficient of Correlation},
-  author={Sourav Chatterjee},
-  journal={Journal of the American Statistical Association},
-  year={2019},
-  volume={116},
-  pages={2009 - 2022},
-  url={https://api.semanticscholar.org/CorpusID:202719281}
-} 
-"""
+#   @article{Chatterjee2019ANC,
+#     title={A New Coefficient of Correlation},
+#     author={Sourav Chatterjee},
+#     journal={Journal of the American Statistical Association},
+#     year={2019},
+#     volume={116},
+#     pages={2009 - 2022},
+#     url={https://api.semanticscholar.org/CorpusID:202719281}
+#   }
+# -------------------------------------------------------------------------
 
 
 def xicor(X: np.ndarray, Y: np.ndarray, ties: bool = True, random_seed: int = None) -> float:
-    """
-    Calculate a generalized coefficient of correlation between two variables.
+    """Calculate a generalized coefficient of correlation between two variables.
 
     This coefficient is an extension of Pearson's correlation, accounting for ties with optional randomization.
 
@@ -201,7 +230,7 @@ def xicor(X: np.ndarray, Y: np.ndarray, ties: bool = True, random_seed: int = No
 
 
 def ecprint(A: np.ndarray) -> None:
-    """Function that prints the augmented matrix.
+    """Print the augmented matrix.
 
     Parameters
     ----------
@@ -233,7 +262,7 @@ def sor_elimination(
     error: float = 1e-3,
     verbose: bool = True,
 ) -> np.ndarray:
-    """Computes the Successive Over-Relaxation algorithm.
+    """Compute the Successive Over-Relaxation algorithm.
 
     Parameters
     ----------
@@ -278,7 +307,7 @@ def sor_elimination(
 
 
 def gauss_elimination(A: np.ndarray | list, pr: int = 2) -> np.ndarray:
-    """Computes the Gauss elimination algorithm.
+    """Compute the Gauss elimination algorithm.
 
     Parameters
     ----------
@@ -293,7 +322,6 @@ def gauss_elimination(A: np.ndarray | list, pr: int = 2) -> np.ndarray:
     X : `np.ndarray`
         The solution of the system of $n$ equationsS
     """
-
     n = len(A)
     X = [0 for _ in range(n)]
 
@@ -338,8 +366,7 @@ def gauss_elimination(A: np.ndarray | list, pr: int = 2) -> np.ndarray:
 
 
 def find_multiples(target: int) -> tuple[int, int] | None:
-    """
-    Find two factors of a given target number that are as close to each other as possible.
+    """Find two factors of a given target number that are as close to each other as possible.
 
     Parameters
     ----------

@@ -1,3 +1,5 @@
+"""Generative adversarial network model definitions."""
+
 import os
 from typing import Any, Dict, Tuple
 
@@ -15,12 +17,12 @@ from tqdm import tqdm
 
 from likelihood.tools import get_metrics
 
+from ._keras_io import load_keras_model, save_keras_model
+
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="GANRegressor")
 class GANRegressor(tf.keras.Model):
-    """
-    GANRegressor is a custom Keras model that combines a generator and a discriminator
-    """
+    """GANRegressor is a custom Keras model that combines a generator and a discriminator."""
 
     def __init__(
         self,
@@ -49,8 +51,28 @@ class GANRegressor(tf.keras.Model):
         self.build(dummy_input.shape)
 
     def build(self, input_shape: Tuple[int, ...]) -> None:
+        """Build the GAN model architecture.
+
+        Parameters
+        ----------
+        input_shape : `Tuple[int, ...]`
+            The shape of the input tensor.
+
+        Returns
+        -------
+        None
+        """
         self.gan = tf.keras.models.Sequential([self.generator, self.discriminator], name="gan")
 
+        self._compile_models()
+        super(GANRegressor, self).build(input_shape)
+
+    def _compile_models(self) -> None:
+        """Compile the generator, the discriminator and the adversarial model.
+
+        ``build`` uses it for a fresh instance and :meth:`load_model` after
+        restoring an archive, so a loaded model can keep training.
+        """
         self.generator.compile(
             optimizer=self.optimizer,
             loss=tf.keras.losses.MeanAbsolutePercentageError(),
@@ -62,7 +84,6 @@ class GANRegressor(tf.keras.Model):
         )
 
         self.gan.compile(optimizer=self.optimizer, loss="binary_crossentropy")
-        super(GANRegressor, self).build(input_shape)
 
     def _build_generator(self) -> tf.keras.Model:
         generator = tf.keras.Sequential(name="generator")
@@ -106,8 +127,7 @@ class GANRegressor(tf.keras.Model):
         validation_split: float = 0.2,
         verbose: int = 1,
     ) -> pd.DataFrame:
-        """
-        Train the GAN model.
+        """Train the GAN model.
 
         Parameters
         ----------
@@ -240,8 +260,7 @@ class GANRegressor(tf.keras.Model):
         validation_split: float = 0.2,
         patience: int = 3,
     ) -> pd.DataFrame:
-        """
-        Train the generator model.
+        """Train the generator model.
 
         Parameters
         ----------
@@ -287,9 +306,33 @@ class GANRegressor(tf.keras.Model):
         return pd.DataFrame(history.history)
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        """Compute the output tensor by passing inputs through the generator.
+
+        Parameters
+        ----------
+        inputs : `tf.Tensor`
+            Input tensor to the model.
+
+        Returns
+        -------
+        `tf.Tensor`
+            Output tensor of shape (batch_size, 1).
+        """
         return self.generator(inputs)[:, 0]
 
     def get_config(self) -> Dict[str, Any]:
+        """Get configuration dictionary for serialization.
+
+        Only JSON friendly constructor arguments are returned: the generator,
+        discriminator and adversarial models are rebuilt by ``__init__`` from
+        them, which keeps both the ``.keras`` archive and the SavedModel format
+        of TensorFlow <= 2.15 serializable.
+
+        Returns
+        -------
+        config : `Dict[str, Any]`
+            Configuration dictionary.
+        """
         config = {
             "input_shape_parm": self.input_shape_parm,
             "output_shape_parm": self.output_shape_parm,
@@ -297,9 +340,6 @@ class GANRegressor(tf.keras.Model):
             "activation": self.activation,
             "depth": self.depth,
             "dropout": self.dropout,
-            "generator": self.generator,
-            "discriminator": self.discriminator,
-            "gan": self.gan,
             "l2_reg": self.l2_reg,
             "optimizer": self.optimizer,
         }
@@ -308,16 +348,73 @@ class GANRegressor(tf.keras.Model):
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> "GANRegressor":
+        """Reconstruct an instance from its configuration dictionary.
+
+        Parameters
+        ----------
+        config : `Dict[str, Any]`
+            Configuration dictionary containing the instance's parameters.
+
+        Returns
+        -------
+        `GANRegressor`
+            Reconstructed instance.
+        """
         return cls(
             input_shape_parm=config["input_shape_parm"],
             output_shape_parm=config["output_shape_parm"],
-            num_neurons=config["num_neurons"],
-            activation=config["activation"],
-            depth=config["depth"],
-            dropout=config["dropout"],
-            generator=config["generator"],
-            discriminator=config["discriminator"],
-            gan=config["gan"],
-            l2_reg=config["l2_reg"],
-            optimizer=config["optimizer"],
+            num_neurons=config.get("num_neurons", 128),
+            activation=config.get("activation", "linear"),
+            depth=config.get("depth", 5),
+            dropout=config.get("dropout", 0.2),
+            l2_reg=config.get("l2_reg", 0.0),
+            optimizer=config.get("optimizer", "adam"),
         )
+
+    def save_model(self, path: str = "./gan_regressor") -> None:
+        """Serialize the GAN using the format supported by the installed TF.
+
+        TensorFlow > 2.15 writes a ``.keras`` archive (the extension is appended
+        when ``path`` does not have it); TensorFlow <= 2.15 writes a SavedModel
+        directory named after ``path``.
+
+        Parameters
+        ----------
+        path : str, default="./gan_regressor"
+            Destination file or directory, depending on the TensorFlow version.
+
+        Notes
+        -----
+        The artifact can also be produced with the matching Keras call
+        (``model.save("name.keras")`` on TensorFlow > 2.15,
+        ``model.save("name", save_format="tf")`` on older releases);
+        :meth:`load_model` accepts both formats.
+        """
+        save_keras_model(self, path)
+
+    @classmethod
+    def load_model(cls, path: str = "./gan_regressor") -> "GANRegressor":
+        """Rebuild a GAN regressor saved with :meth:`save_model`.
+
+        Parameters
+        ----------
+        path : str, default="./gan_regressor"
+            Keras archive, the same name without the extension, or a SavedModel
+            directory written by TensorFlow <= 2.15.
+
+        Returns
+        -------
+        GANRegressor
+            Model with the stored generator, discriminator and optimizer
+            settings, recompiled so it can keep training.
+
+        Raises
+        ------
+        TypeError
+            If the artifact does not contain a :class:`GANRegressor`.
+        """
+        restored = load_keras_model(path, {cls.__name__: cls}, compile=False)
+        if not isinstance(restored, cls):
+            raise TypeError(f"{path!r} does not contain a {cls.__name__} archive")
+        restored._compile_models()
+        return restored

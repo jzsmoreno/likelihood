@@ -1,0 +1,12 @@
+# docformatter --in-place --black .
+# black .
+[tool.black]
+line-length = 100
+
+[tool.docformatter]
+recursive = true
+wrap-summaries = 100
+wrap-descriptions = 100
+
+[tool.ruff.lint]
+ignore = ["D205"]

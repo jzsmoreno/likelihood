@@ -1,3 +1,7 @@
+"""Module for core likelihood computations, including data preprocessing, model fitting, and
+analysis utilities.
+"""
+
 from typing import Callable, List, Optional, Tuple
 
 import corner
@@ -6,7 +10,7 @@ import numpy as np
 
 
 def lnprior(theta: np.ndarray, conditions: List[Tuple[float, float]]) -> float:
-    """Computes the prior probability.
+    """Compute the prior probability.
 
     Parameters
     ----------
@@ -40,7 +44,7 @@ def fun_like(
     conditions: List[Tuple[float, float]] = None,
     var2: float = 1.0,
 ) -> float:
-    """Computes the likelihood.
+    """Compute the likelihood.
 
     Parameters
     ----------
@@ -83,7 +87,7 @@ def fun_like(
 
 
 def update_theta(theta: np.ndarray, d: float) -> np.ndarray:
-    """Updates the theta parameters.
+    """Update the theta parameters.
 
     Parameters
     ----------
@@ -97,7 +101,7 @@ def update_theta(theta: np.ndarray, d: float) -> np.ndarray:
     theta_new : `np.array`
         An ndarray with the updated theta values.
     """
-    return np.random.normal(theta, d / 2.0)
+    return theta + np.random.normal(0.0, d / 2.0)
 
 
 def walk(
@@ -112,7 +116,7 @@ def walk(
     tol: float = 1e-4,
     mode: bool = True,
 ) -> Tuple[np.ndarray, List[np.ndarray], float]:
-    """Executes the walker implementation.
+    """Execute the walker implementation.
 
     Parameters
     ----------
@@ -161,7 +165,9 @@ def walk(
         if y0 <= tol or y1 <= tol:
             if mode:
                 print("Goal reached!")
-            return (theta_new, nwalk, y1) if y1 <= tol else (theta, nwalk, y0)
+            if y1 <= tol:
+                return (theta_new, nwalk, y1)
+            return (theta, nwalk, y0)
 
         if y1 >= y0:
             ratio = y0 / y1
@@ -194,7 +200,7 @@ def walkers(
     mode: bool = False,
     figname: str = "fig_out.png",
 ) -> Tuple[List[np.ndarray], List[float]]:
-    """Executes multiple walkers.
+    """Execute multiple walkers.
 
     Parameters
     ----------

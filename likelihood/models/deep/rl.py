@@ -1,3 +1,9 @@
+"""Reinforcement learning algorithms and utilities for the likelihood package.
+
+This module provides utilities for training and evaluating reinforcement learning (RL) models,
+including environment wrappers, exploration policies, and training loops.
+"""
+
 import os
 import random
 from collections import deque
@@ -13,6 +19,17 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
 def print_progress_bar(iteration: int, total: int, length: int = 30) -> None:
+    """Print a progress bar to the console showing training progress.
+
+    Parameters
+    ----------
+    iteration : int
+        The current iteration number.
+    total : int
+        The total number of iterations.
+    length : int
+        The length of the progress bar. Default is 30.
+    """
     percent = f"{100 * (iteration / float(total)):.1f}"
     filled_length = int(length * iteration // total)
     bar = "█" * filled_length + "-" * (length - filled_length)
@@ -22,9 +39,19 @@ def print_progress_bar(iteration: int, total: int, length: int = 30) -> None:
 
 
 class Env:
+    """Wraps a Keras model to provide a reinforcement learning environment.
+
+    The environment samples actions from the model's predicted probability distribution and records
+    the resulting transitions for training.
+
+    Notes
+    -----
+    It keeps a live model and an in-memory transition buffer, so it cannot be
+    rebuilt from a checkpoint: create it again for each training run.
+    """
+
     def __init__(self, model: Any, maxlen: int = 100, name: str = "likenasium") -> None:
-        """
-        Initialize the environment with a model.
+        """Initialize the environment with a model.
 
         Parameters
         ----------
@@ -47,8 +74,7 @@ class Env:
     def step(
         self, state: np.ndarray, action: int, verbose: int = 0
     ) -> Tuple[Any, int, float, Any, bool]:
-        """
-        Perform an environment step with the given action.
+        """Perform an environment step with the given action.
 
         Parameters
         ----------
@@ -104,13 +130,18 @@ class Env:
 
 
 class AutoQL:
-    """
-    AutoQL: A reinforcement learning agent using Q-learning with Epsilon-greedy policy.
+    """AutoQL: A reinforcement learning agent using Q-learning with Epsilon-greedy policy.
 
     This class implements a Q-learning agent with:
     - Epsilon-greedy policy for exploration
     - Replay buffer for experience replay
     - Automatic model version handling for TensorFlow
+
+    Notes
+    -----
+    The agent holds the environment and the Q-network supplied by the caller, so
+    it cannot be reconstructed from a path. Persist the ``tf.keras.Model`` with
+    its own ``save``/``load_model`` helpers and create the agent again.
     """
 
     def __init__(
@@ -119,7 +150,7 @@ class AutoQL:
         model: tf.keras.Model,
         maxlen: int = 2000,
     ) -> None:
-        """Initialize AutoQL agent
+        """Initialize AutoQL agent.
 
         Parameters
         ----------
@@ -128,7 +159,6 @@ class AutoQL:
         model : `tf.keras.Model`
             The Q-network model
         """
-
         self.env = env
         self.model = model
         self.maxlen = maxlen
@@ -137,8 +167,7 @@ class AutoQL:
     def epsilon_greedy_policy(
         self, state: np.ndarray, action: int, epsilon: float = 0.0
     ) -> Tuple[Any, int, float, Any, bool]:
-        """
-        Epsilon-greedy policy for action selection
+        """Epsilon-greedy policy for action selection.
 
         Parameters
         ----------
@@ -166,8 +195,7 @@ class AutoQL:
     def play_one_step(
         self, state: np.ndarray, action: int, epsilon: float
     ) -> Tuple[Any, int, float, Any, int]:
-        """
-        Perform one step in the environment and add experience to buffer
+        """Perform one step in the environment and add experience to buffer.
 
         Parameters
         ----------
@@ -204,14 +232,12 @@ class AutoQL:
 
     @tf.function
     def _training_step(self) -> float:
-        """
-        Perform one training step using experience replay
+        """Perform one training step using experience replay.
 
         Returns
         -------
         float : Training loss
         """
-
         batch_ = random.sample(self.replay_buffer, self.batch_size)
         states, actions, rewards, next_actions, dones = zip(*batch_)
         states = np.array(states).reshape(self.batch_size, -1)
@@ -253,7 +279,7 @@ class AutoQL:
         patience: int = 10,
         alpha: float = 0.01,
     ) -> None:
-        """Train the agent for a fixed number of episodes
+        """Train the agent for a fixed number of episodes.
 
         Parameters
         ----------
@@ -349,6 +375,7 @@ class AutoQL:
         self.model.set_weights(self.best_weights)
 
     def __str__(self) -> str:
+        """Return a human-readable string representation of the agent."""
         return (
             f"AutoQL (Env: {self.env.name}, Episodes: {self.num_episodes}, Steps: {self.num_steps})"
         )
