@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.tools.cat_embed API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Categorical embedding utilities for encoding discrete features.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.tools.cat_embed</code></h1>
 </header>
 <section id="section-intro">
+<p>Categorical embedding utilities for encoding discrete features.</p>
 </section>
 <section>
 </section>
@@ -48,7 +49,7 @@ el.replaceWith(d);
 <dl>
 <dt id="likelihood.tools.cat_embed.CategoricalEmbedder"><code class="flex name class">
 <span>class <span class="ident">CategoricalEmbedder</span></span>
-<span>(</span><span>embedding_dim=32)</span>
+<span>(</span><span>embedding_dim: int = 32)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -56,20 +57,21 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class CategoricalEmbedder:
-    def __init__(self, embedding_dim=32):
-        self.embedding_dim = embedding_dim
-        self.label_encoders = {}
-        self.embeddings = {}
+    &#34;&#34;&#34;Embeds categorical features into low-dimensional vectors.&#34;&#34;&#34;
 
-    def fit(self, df: pd.DataFrame, categorical_cols: List):
-        &#34;&#34;&#34;
-        Fit the embeddings on the given data.
+    def __init__(self, embedding_dim: int = 32) -&gt; None:
+        self.embedding_dim = embedding_dim
+        self.label_encoders: Dict[str, Any] = {}
+        self.embeddings: Dict[str, tf.Variable] = {}
+
+    def fit(self, df: pd.DataFrame, categorical_cols: List[str]) -&gt; None:
+        &#34;&#34;&#34;Fit the embeddings on the given data.
 
         Parameters
         ----------
         df : `pd.DataFrame`
             Pandas DataFrame containing the tabular data.
-        categorical_cols : `List`
+        categorical_cols : `List[str]`
             List of column names representing categorical features.
 
         Returns
@@ -95,9 +97,8 @@ el.replaceWith(d);
             embedding_matrix = np.random.rand(vocab_size, self.embedding_dim)
             self.embeddings[col] = tf.Variable(embedding_matrix, dtype=tf.float32)
 
-    def transform(self, df: pd.DataFrame, categorical_cols: List[str]):
-        &#34;&#34;&#34;
-        Transform the data using the fitted embeddings.
+    def transform(self, df: pd.DataFrame, categorical_cols: List[str]) -&gt; pd.DataFrame:
+        &#34;&#34;&#34;Transform the data using the fitted embeddings.
 
         Parameters
         ----------
@@ -110,7 +111,6 @@ el.replaceWith(d);
         -------
         Transformed Pandas DataFrame with original columns except `categorical_cols` replaced by their embedding representations.
         &#34;&#34;&#34;
-
         df_processed = df.copy()
 
         for col in categorical_cols:
@@ -138,9 +138,8 @@ el.replaceWith(d);
 
         return df_processed
 
-    def inverse_transform(self, df: pd.DataFrame, categorical_cols: List[str]):
-        &#34;&#34;&#34;
-        Inverse transform the data using the fitted embeddings.
+    def inverse_transform(self, df: pd.DataFrame, categorical_cols: List[str]) -&gt; pd.DataFrame:
+        &#34;&#34;&#34;Inverse transform the data using the fitted embeddings.
 
         Parameters
         ----------
@@ -153,7 +152,6 @@ el.replaceWith(d);
         -------
         Transformed Pandas DataFrame with original columns replaced by their categorical labels.
         &#34;&#34;&#34;
-
         df_processed = df.copy()
 
         for col in categorical_cols:
@@ -177,30 +175,26 @@ el.replaceWith(d);
 
         return df_processed
 
-    def save_embeddings(self, path: str):
-        &#34;&#34;&#34;
-        Save the embeddings to a directory.
+    def save_embeddings(self, path: str) -&gt; None:
+        &#34;&#34;&#34;Save the embeddings to a directory.
 
         Parameters
         ----------
         path : `str`
             Path to the directory where embeddings will be saved.
         &#34;&#34;&#34;
-
         os.makedirs(path, exist_ok=True)
         for col, embedding in self.embeddings.items():
             np.save(os.path.join(path, f&#34;{col}_embedding.npy&#34;), embedding.numpy())
 
-    def load_embeddings(self, path: str):
-        &#34;&#34;&#34;
-        Load the embeddings from a directory.
+    def load_embeddings(self, path: str) -&gt; None:
+        &#34;&#34;&#34;Load the embeddings from a directory.
 
         Parameters
         ----------
         path : `str`
             Path to the directory where embeddings are saved.
         &#34;&#34;&#34;
-
         for col in self.label_encoders.keys():
             embedding_path = os.path.join(path, f&#34;{col}_embedding.npy&#34;)
             if not os.path.exists(embedding_path):
@@ -208,26 +202,25 @@ el.replaceWith(d);
             embedding_matrix = np.load(embedding_path)
             self.embeddings[col] = tf.Variable(embedding_matrix, dtype=tf.float32)</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Embeds categorical features into low-dimensional vectors.</p></div>
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.tools.cat_embed.CategoricalEmbedder.fit"><code class="name flex">
-<span>def <span class="ident">fit</span></span>(<span>self, df: pandas.core.frame.DataFrame, categorical_cols: List)</span>
+<span>def <span class="ident">fit</span></span>(<span>self, df: pd.DataFrame, categorical_cols: List[str]) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def fit(self, df: pd.DataFrame, categorical_cols: List):
-    &#34;&#34;&#34;
-    Fit the embeddings on the given data.
+<pre><code class="python">def fit(self, df: pd.DataFrame, categorical_cols: List[str]) -&gt; None:
+    &#34;&#34;&#34;Fit the embeddings on the given data.
 
     Parameters
     ----------
     df : `pd.DataFrame`
         Pandas DataFrame containing the tabular data.
-    categorical_cols : `List`
+    categorical_cols : `List[str]`
         List of column names representing categorical features.
 
     Returns
@@ -258,23 +251,22 @@ el.replaceWith(d);
 <dl>
 <dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
 <dd>Pandas DataFrame containing the tabular data.</dd>
-<dt><strong><code>categorical_cols</code></strong> :&ensp;<code>List</code></dt>
+<dt><strong><code>categorical_cols</code></strong> :&ensp;<code>List[str]</code></dt>
 <dd>List of column names representing categorical features.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <p><code>None</code></p></div>
 </dd>
 <dt id="likelihood.tools.cat_embed.CategoricalEmbedder.inverse_transform"><code class="name flex">
-<span>def <span class="ident">inverse_transform</span></span>(<span>self, df: pandas.core.frame.DataFrame, categorical_cols: List[str])</span>
+<span>def <span class="ident">inverse_transform</span></span>(<span>self, df: pd.DataFrame, categorical_cols: List[str]) ‑> pandas.core.frame.DataFrame</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def inverse_transform(self, df: pd.DataFrame, categorical_cols: List[str]):
-    &#34;&#34;&#34;
-    Inverse transform the data using the fitted embeddings.
+<pre><code class="python">def inverse_transform(self, df: pd.DataFrame, categorical_cols: List[str]) -&gt; pd.DataFrame:
+    &#34;&#34;&#34;Inverse transform the data using the fitted embeddings.
 
     Parameters
     ----------
@@ -287,7 +279,6 @@ el.replaceWith(d);
     -------
     Transformed Pandas DataFrame with original columns replaced by their categorical labels.
     &#34;&#34;&#34;
-
     df_processed = df.copy()
 
     for col in categorical_cols:
@@ -323,23 +314,21 @@ el.replaceWith(d);
 <p>Transformed Pandas DataFrame with original columns replaced by their categorical labels.</p></div>
 </dd>
 <dt id="likelihood.tools.cat_embed.CategoricalEmbedder.load_embeddings"><code class="name flex">
-<span>def <span class="ident">load_embeddings</span></span>(<span>self, path: str)</span>
+<span>def <span class="ident">load_embeddings</span></span>(<span>self, path: str) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def load_embeddings(self, path: str):
-    &#34;&#34;&#34;
-    Load the embeddings from a directory.
+<pre><code class="python">def load_embeddings(self, path: str) -&gt; None:
+    &#34;&#34;&#34;Load the embeddings from a directory.
 
     Parameters
     ----------
     path : `str`
         Path to the directory where embeddings are saved.
     &#34;&#34;&#34;
-
     for col in self.label_encoders.keys():
         embedding_path = os.path.join(path, f&#34;{col}_embedding.npy&#34;)
         if not os.path.exists(embedding_path):
@@ -355,23 +344,21 @@ el.replaceWith(d);
 </dl></div>
 </dd>
 <dt id="likelihood.tools.cat_embed.CategoricalEmbedder.save_embeddings"><code class="name flex">
-<span>def <span class="ident">save_embeddings</span></span>(<span>self, path: str)</span>
+<span>def <span class="ident">save_embeddings</span></span>(<span>self, path: str) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def save_embeddings(self, path: str):
-    &#34;&#34;&#34;
-    Save the embeddings to a directory.
+<pre><code class="python">def save_embeddings(self, path: str) -&gt; None:
+    &#34;&#34;&#34;Save the embeddings to a directory.
 
     Parameters
     ----------
     path : `str`
         Path to the directory where embeddings will be saved.
     &#34;&#34;&#34;
-
     os.makedirs(path, exist_ok=True)
     for col, embedding in self.embeddings.items():
         np.save(os.path.join(path, f&#34;{col}_embedding.npy&#34;), embedding.numpy())</code></pre>
@@ -384,16 +371,15 @@ el.replaceWith(d);
 </dl></div>
 </dd>
 <dt id="likelihood.tools.cat_embed.CategoricalEmbedder.transform"><code class="name flex">
-<span>def <span class="ident">transform</span></span>(<span>self, df: pandas.core.frame.DataFrame, categorical_cols: List[str])</span>
+<span>def <span class="ident">transform</span></span>(<span>self, df: pd.DataFrame, categorical_cols: List[str]) ‑> pandas.core.frame.DataFrame</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def transform(self, df: pd.DataFrame, categorical_cols: List[str]):
-    &#34;&#34;&#34;
-    Transform the data using the fitted embeddings.
+<pre><code class="python">def transform(self, df: pd.DataFrame, categorical_cols: List[str]) -&gt; pd.DataFrame:
+    &#34;&#34;&#34;Transform the data using the fitted embeddings.
 
     Parameters
     ----------
@@ -406,7 +392,6 @@ el.replaceWith(d);
     -------
     Transformed Pandas DataFrame with original columns except `categorical_cols` replaced by their embedding representations.
     &#34;&#34;&#34;
-
     df_processed = df.copy()
 
     for col in categorical_cols:

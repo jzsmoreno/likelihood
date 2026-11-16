@@ -1,4 +1,6 @@
-import warnings
+"""Bandit model definitions."""
+
+from pathlib import Path
 from typing import List
 
 import torch
@@ -6,6 +8,31 @@ import torch.nn as nn
 
 
 class MultiBanditNet(nn.Module):
+    """A neural network for the multi-armed bandit problem with several options.
+
+    Parameters
+    ----------
+    state_dim : int
+        Dimensionality of the state (observation) vector.
+    num_options : int
+        Number of distinct options (or bandits) to choose between.
+    num_actions_per_option : int or List[int]
+        Number of actions available for a single option, or a list giving the
+        number of actions for each option individually.
+    num_neurons : int, default 128
+        Width of the hidden layers in every sub-network.
+    num_layers : int, default 1
+        Number of hidden layers in the action networks.
+    activation : str or nn.Module, default ``nn.SELU()``
+        Activation function applied between the linear layers. One of
+        ``"relu"``, ``"relu6"``, ``"rrelu"``, ``"selu"``,
+        ``"leaky_relu"``, ``"sigmoid"``, ``"tanh"``, ``"hardswish"``,
+        ``"gelu"``, ``"elu"``, ``"softplus"``, ``"softmax"`` or ``"identity"``.
+    dropout_rate : float, default 0.3
+        Dropout probability applied to the action networks when greater than
+        zero; the option and value networks are not dropped.
+    """
+
     def __init__(
         self,
         state_dim: int,
@@ -13,49 +40,139 @@ class MultiBanditNet(nn.Module):
         num_actions_per_option: int | List[int],
         num_neurons: int = 128,
         num_layers: int = 1,
-        activation: nn.Module = nn.ReLU(),
-    ):
+        activation: str | nn.Module = nn.SELU(),
+        dropout_rate: float = 0.3,
+    ) -> None:
         super(MultiBanditNet, self).__init__()
         self.state_dim = state_dim
         self.num_options = num_options
         self.num_actions_per_option = num_actions_per_option
         self.num_neurons = num_neurons
         self.num_layers = num_layers
-        self.activation = activation
+        self.activation = (
+            self._activation_module(activation) if isinstance(activation, str) else activation
+        )
+        self.dropout_rate = max(0.0, dropout_rate)
+
+        def build_action_network(num_actions: int) -> nn.Sequential:
+            layers = [nn.Linear(state_dim, self.num_neurons), self.activation]
+            for _ in range(max(0, self.num_layers - 1)):
+                if self.dropout_rate > 0:
+                    layers.extend(
+                        [
+                            nn.Dropout(self.dropout_rate),
+                            nn.Linear(self.num_neurons, self.num_neurons),
+                            self.activation,
+                        ]
+                    )
+                else:
+                    layers.extend([nn.Linear(self.num_neurons, self.num_neurons), self.activation])
+            layers.append(nn.Linear(self.num_neurons, num_actions))
+            return nn.Sequential(*layers)
+
+        # Low-level (action) Q-networks for each option with additional linear layers
+        self.action_networks = nn.ModuleList(
+            build_action_network(
+                num_actions_per_option[i]
+                if isinstance(num_actions_per_option, list)
+                else num_actions_per_option
+            )
+            for i in range(self.num_options)
+        )
+
+        def _dropout() -> nn.Module:
+            return nn.Dropout(self.dropout_rate) if self.dropout_rate > 0 else nn.Identity()
 
         self.option_network = nn.Sequential(
             nn.Linear(state_dim, self.num_neurons),
-            nn.ReLU(),
+            self.activation,
+            _dropout(),
             nn.Linear(
                 self.num_neurons, num_options
             ),  # Output a probability distribution over options
         )
 
-        # Low-level (action) Q-networks for each option with additional linear layers
-        self.action_networks = nn.ModuleList()
-        for i in range(num_options):
-            action_network_layers = [nn.Linear(state_dim, self.num_neurons), self.activation]
-            for _ in range(self.num_layers - 1):
-                action_network_layers.extend(
-                    [nn.Linear(self.num_neurons, self.num_neurons), self.activation]
-                )
-            num_actions = (
-                num_actions_per_option
-                if not isinstance(num_actions_per_option, list)
-                else num_actions_per_option[i]
-            )  # Output Q-values for each action in this option
-            action_network_layers.append(nn.Linear(self.num_neurons, num_actions))
-            self.action_networks.append(nn.Sequential(*action_network_layers))
-
         # Option termination network
         self.termination_network = nn.Sequential(
             nn.Linear(state_dim, self.num_neurons),
-            nn.ReLU(),
+            self.activation,
+            _dropout(),
             nn.Linear(self.num_neurons, 1),  # Single output for termination probability (0-1)
             nn.Sigmoid(),
         )
+        self.value_network = nn.Sequential(
+            nn.Linear(state_dim, self.num_neurons),
+            self.activation,
+            nn.Dropout(self.dropout_rate) if self.dropout_rate > 0 else nn.Identity(),
+            nn.Linear(self.num_neurons, 1),
+        )
+        self.num_actions = [net[-1].out_features for net in self.action_networks]
+        self.equal_action_sizes = len(set(self.num_actions)) == 1
+        self.max_num_actions = max(self.num_actions)
 
-    def forward(self, state: torch.Tensor, multiple_option: bool = False):
+    @classmethod
+    def _activation_module(cls, activation: str) -> nn.Module:
+        """Instantiate the activation module from its name.
+
+        The catalog exposes ``activation`` as a plain string (``"relu"``, ``"selu"``, ``"sigmoid"``,
+        ``"tanh"``, ``"leaky_relu"``); this maps the name to the matching :class:`torch.nn.Module`
+        subclass used inside the network.
+        """
+        name = str(activation).lower()
+        activations = {
+            "relu": nn.ReLU(),
+            "relu6": nn.ReLU6(),
+            "rrelu": nn.RReLU(),
+            "selu": nn.SELU(),
+            "leaky_relu": nn.LeakyReLU(),
+            "sigmoid": nn.Sigmoid(),
+            "tanh": nn.Tanh(),
+            "hardswish": nn.Hardswish(),
+            "gelu": nn.GELU(),
+            "elu": nn.ELU(),
+            "softplus": nn.Softplus(),
+            "softmax": nn.Softmax(dim=-1),
+            "identity": nn.Identity(),
+        }
+        if name not in activations:
+            raise ValueError(f"Unsupported activation: {activation!r}")
+        return activations[name]
+
+    def apply_initialization(self, method: str = "xavier_uniform") -> None:
+        """Apply a specific initialization method to all linear layers in the network.
+
+        Parameters
+        ----------
+        method : str, default "xavier_uniform"
+            The initialization method to use. Supported methods:
+            'xavier_uniform', 'xavier_normal', 'kaiming_uniform', 'kaiming_normal',
+            'orthogonal', 'uniform', 'normal', 'zeros', 'ones'
+        """
+        init_dispatch = {
+            "xavier_uniform": nn.init.xavier_uniform_,
+            "xavier_normal": nn.init.xavier_normal_,
+            "kaiming_uniform": nn.init.kaiming_uniform_,
+            "kaiming_normal": nn.init.kaiming_normal_,
+            "orthogonal": nn.init.orthogonal_,
+            "uniform": nn.init.uniform_,
+            "normal": nn.init.normal_,
+            "zeros": nn.init.zeros_,
+            "ones": nn.init.ones_,
+        }
+
+        if method not in init_dispatch:
+            raise ValueError(f"Unsupported initialization method: {method}")
+
+        # Iterates over all modules (including submodules) and initializes linear layers
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                init_dispatch[method](m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
+    def forward(
+        self, state: torch.Tensor, multiple_option: bool = False, temperature: float = 1.0
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Parameters
         ----------
@@ -63,6 +180,12 @@ class MultiBanditNet(nn.Module):
             Tensor of shape (batch_size, state_dim) or (state_dim,)
         multiple_option : bool, default False
             Whether the model should return probabilities for multiple options.
+        temperature : float, default 1.0
+            Temperature used to control the sharpness of the output probability
+            distribution. A value of ``1.0`` preserves the default behavior.
+            Values greater than ``1.0`` produce a softer (more uniform)
+            distribution, while values between ``0`` and ``1.0`` produce a
+            sharper (more peaked) distribution. Must be strictly positive.
 
         Returns
         -------
@@ -83,40 +206,104 @@ class MultiBanditNet(nn.Module):
             state = state.unsqueeze(0)
         batch_size = state.size(0)
 
-        # Option probabilities
         option_probs = torch.softmax(
-            self.option_network(state), dim=-1
+            self.option_network(state) / temperature, dim=-1
         )  # (batch_size, num_options)
 
+        device = state.device
+        num_options = len(self.action_networks)
+
         if multiple_option:
-            all_action_probs = [
-                torch.softmax(self.action_networks[i](state), dim=-1)  # (batch_size, num_actions)
-                for i in range(self.num_options)
-            ]
-            action_probs = torch.stack(all_action_probs, dim=1)
-            selected_actions = torch.argmax(action_probs, dim=-1)
+            action_probs = torch.zeros(batch_size, num_options, self.max_num_actions, device=device)
+            selected_actions = torch.zeros(batch_size, num_options, dtype=torch.long, device=device)
+
+            for i, net in enumerate(self.action_networks):
+                probs = torch.softmax(net(state) / temperature, dim=-1)
+                n_act = probs.size(-1)
+                action_probs[:, i, :n_act] = probs
+                selected_actions[:, i] = torch.argmax(probs, dim=-1)
+
             selected_options = torch.argmax(option_probs, dim=-1)
-            selected_action_probs = action_probs[torch.arange(batch_size), selected_options, :]
+
         else:
-            selected_options = torch.multinomial(option_probs, 1).squeeze(-1)  # (batch_size,)
-            action_probs = torch.stack(
-                [
-                    torch.softmax(
-                        self.action_networks[selected_options[i]](state[i].unsqueeze(0)), dim=-1
-                    ).squeeze(0)
-                    for i in range(batch_size)
-                ],
-                dim=0,
-            )  # (batch_size, num_actions)
-            selected_actions = torch.argmax(action_probs, dim=-1)
-            selected_action_probs = action_probs
+            selected_options = torch.multinomial(option_probs, 1).squeeze(-1)
+            action_probs = torch.zeros(batch_size, self.max_num_actions, device=device)
+            selected_actions = torch.zeros(batch_size, dtype=torch.long, device=device)
 
-        termination_prob = self.termination_network(state)  # (batch_size, 1)
+            for opt_idx in torch.unique(selected_options):
+                mask = selected_options == opt_idx
+                if mask.any():
+                    states_opt = state[mask]
+                    probs = torch.softmax(
+                        self.action_networks[opt_idx](states_opt) / temperature, dim=-1
+                    )
+                    n_act = probs.size(-1)
+                    action_probs[mask, :n_act] = probs
+                    selected_actions[mask] = torch.argmax(probs, dim=-1)
 
-        return (
-            option_probs,
-            selected_action_probs if not multiple_option else action_probs,
-            termination_prob,
-            selected_options,
-            selected_actions,
-        )
+        termination_prob = self.termination_network(state)
+
+        return option_probs, action_probs, termination_prob, selected_options, selected_actions
+
+    def save(self, path: str | Path = "./multibanditnet.pt") -> None:
+        """Serialize the network configuration and weights to ``path``.
+
+        The checkpoint stores the constructor arguments (including the
+        activation module) next to the ``state_dict``, so :meth:`load` can
+        rebuild the very same architecture without guessing it.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default="./multibanditnet.pt"
+            Destination file. Any extension accepted by :func:`torch.save`
+            works; ``.pt`` and ``.pth`` are the usual choices.
+        """
+        checkpoint = {
+            "format": "likelihood.models.deep.bandit.MultiBanditNet",
+            "version": 1,
+            "config": {
+                "state_dim": self.state_dim,
+                "num_options": self.num_options,
+                "num_actions_per_option": self.num_actions_per_option,
+                "num_neurons": self.num_neurons,
+                "num_layers": self.num_layers,
+                "activation": self.activation,
+                "dropout_rate": self.dropout_rate,
+            },
+            "state_dict": self.state_dict(),
+        }
+        torch.save(checkpoint, str(path))
+
+    @classmethod
+    def load(cls, path: str | Path = "./multibanditnet.pt") -> "MultiBanditNet":
+        """Rebuild a network saved with :meth:`save`.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default="./multibanditnet.pt"
+            Checkpoint written by :meth:`save`.
+
+        Returns
+        -------
+        MultiBanditNet
+            Network with the stored weights, in evaluation mode.
+
+        Raises
+        ------
+        ValueError
+            If the file is not a checkpoint written by :meth:`save`.
+
+        Notes
+        -----
+        Checkpoints are pickles, so only load files you trust.
+        """
+        try:
+            checkpoint = torch.load(str(path), map_location="cpu", weights_only=False)
+        except TypeError:  # torch < 1.13 has no ``weights_only`` argument
+            checkpoint = torch.load(str(path), map_location="cpu")
+        if not isinstance(checkpoint, dict) or "config" not in checkpoint:
+            raise ValueError(f"{str(path)!r} is not a MultiBanditNet checkpoint written by save()")
+        network = cls(**checkpoint["config"])
+        network.load_state_dict(checkpoint["state_dict"])
+        network.eval()
+        return network

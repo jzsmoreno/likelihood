@@ -1,0 +1,2738 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.10.0" />
+<title>likelihood.models.deep.autoencoders API documentation</title>
+<meta name="description" content="" />
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
+<link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js" integrity="sha256-Uv3H6lx7dJmRfRvH8TH6kJD1TSK1aFcwgx+mdg3epi8=" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => hljs.initHighlighting())</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>likelihood.models.deep.autoencoders</code></h1>
+</header>
+<section id="section-intro">
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">import logging
+import os
+from functools import partial
+from shutil import rmtree
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
+import pandas as pd
+
+os.environ[&#34;TF_CPP_MIN_LOG_LEVEL&#34;] = &#34;3&#34;
+logging.getLogger(&#34;tensorflow&#34;).setLevel(logging.ERROR)
+
+import os
+
+import keras_tuner
+
+os.environ[&#34;TF_CPP_MIN_LOG_LEVEL&#34;] = &#34;3&#34;
+
+import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+from tensorflow.keras.layers import InputLayer
+from tensorflow.keras.regularizers import l2
+
+from likelihood.tools import LoRALayer, OneHotEncoder, suppress_warnings
+
+tf.get_logger().setLevel(&#34;ERROR&#34;)
+
+
+class EarlyStopping:
+    def __init__(self, patience: int = 10, min_delta: float = 0.001) -&gt; None:
+        self.patience = patience
+        self.min_delta = min_delta
+        self.best_loss: float = np.inf
+        self.counter: int = 0
+        self.stop_training: bool = False
+
+    def __call__(self, current_loss: float) -&gt; None:
+        if self.best_loss - current_loss &gt; self.min_delta:
+            self.best_loss = current_loss
+            self.counter = 0
+        else:
+            self.counter += 1
+
+        if self.counter &gt;= self.patience:
+            self.stop_training = True
+
+
+def mse_loss(y_true: tf.Tensor, y_pred: tf.Tensor) -&gt; tf.Tensor:
+    &#34;&#34;&#34;
+    Mean squared error loss function.
+
+    Parameters
+    ----------
+    y_true : `tf.Tensor`
+        The true values.
+    y_pred : `tf.Tensor`
+        The predicted values.
+
+    Returns
+    -------
+    `tf.Tensor`
+    &#34;&#34;&#34;
+    return tf.reduce_mean(tf.square(y_true - y_pred))
+
+
+def kl_loss(mean: tf.Tensor, log_var: tf.Tensor) -&gt; tf.Tensor:
+    &#34;&#34;&#34;
+    Kullback-Leibler divergence loss function.
+
+    Parameters
+    ----------
+    mean : `tf.Tensor`
+        The mean of the distribution.
+    log_var : `tf.Tensor`
+        The log variance of the distribution.
+
+    Returns
+    -------
+    `tf.Tensor`
+    &#34;&#34;&#34;
+    return -0.5 * tf.reduce_mean(1 + log_var - tf.square(mean) - tf.exp(log_var))
+
+
+def vae_loss(
+    y_true: tf.Tensor, y_pred: tf.Tensor, mean: tf.Tensor, log_var: tf.Tensor
+) -&gt; tf.Tensor:
+    &#34;&#34;&#34;
+    Variational autoencoder loss function.
+
+    Parameters
+    ----------
+    y_true : `tf.Tensor`
+        The true values.
+    y_pred : `tf.Tensor`
+        The predicted values.
+    mean : `tf.Tensor`
+        The mean of the distribution.
+    log_var : `tf.Tensor`
+        The log variance of the distribution.
+
+    Returns
+    -------
+    `tf.Tensor`
+    &#34;&#34;&#34;
+    return mse_loss(y_true, y_pred) + kl_loss(mean, log_var)
+
+
+def sampling(mean: tf.Tensor, log_var: tf.Tensor, epsilon_value: float = 1e-8) -&gt; tf.Tensor:
+    &#34;&#34;&#34;
+    Samples from the distribution.
+
+    Parameters
+    ----------
+    mean : `tf.Tensor`
+        The mean of the distribution.
+    log_var : `tf.Tensor`
+        The log variance of the distribution.
+    epsilon_value : float
+        A small value to avoid numerical instability.
+
+    Returns
+    -------
+    `tf.Tensor`
+    &#34;&#34;&#34;
+    epsilon = tf.random.normal(shape=tf.shape(mean), mean=0.0, stddev=1.0)
+    stddev = tf.exp(0.5 * log_var) + epsilon_value
+    epsilon = tf.random.normal(shape=tf.shape(mean), mean=0.0, stddev=1.0)
+    return mean + stddev * epsilon
+
+
+def check_for_nans(tensors: List[tf.Tensor], name: str = &#34;Tensor&#34;) -&gt; bool:
+    for t in tensors:
+        if tf.reduce_any(tf.math.is_nan(t)) or tf.reduce_any(tf.math.is_inf(t)):
+            print(f&#34;Warning: {name} contains NaNs or Infs&#34;)
+            return True
+    return False
+
+
+def cal_loss_step(
+    batch: tf.Tensor,
+    encoder: tf.keras.Model,
+    decoder: tf.keras.Model,
+    vae_mode: bool = False,
+    training: bool = True,
+) -&gt; tf.Tensor:
+    &#34;&#34;&#34;Calculates the loss value on a batch of data.
+
+    Parameters
+    ----------
+    batch : `tf.Tensor`
+        The batch of data.
+    encoder : `tf.keras.Model`
+        The encoder model.
+    decoder : `tf.keras.Model`
+        The decoder model.
+    optimizer : `tf.keras.optimizers.Optimizer`
+        The optimizer to use.
+    vae_mode : `bool`
+        Whether to use variational autoencoder mode. Default is False.
+    training : `bool`
+        Whether the model is in training mode. Default is True.
+
+    Returns
+    -------
+    `tf.Tensor`
+        The loss value.
+    &#34;&#34;&#34;
+    if vae_mode:
+        mean, log_var = encoder(batch, training=training)
+        log_var = tf.clip_by_value(log_var, clip_value_min=1e-8, clip_value_max=tf.float32.max)
+        decoded = decoder(sampling(mean, log_var), training=training)
+        loss = vae_loss(batch, decoded, mean, log_var)
+    else:
+        encoded = encoder(batch, training=training)
+        decoded = decoder(encoded, training=training)
+        loss = mse_loss(batch, decoded)
+
+    return loss
+
+
+@tf.function
+def train_step(
+    batch: tf.Tensor,
+    encoder: tf.keras.Model,
+    decoder: tf.keras.Model,
+    optimizer: tf.keras.optimizers.Optimizer,
+    vae_mode: bool = False,
+) -&gt; tf.Tensor:
+    &#34;&#34;&#34;Trains the model on a batch of data.
+
+    Parameters
+    ----------
+    mean : `tf.Tensor`
+        The mean of the distribution.
+    log_var : `tf.Tensor`
+        The log variance of the distribution.
+    batch : `tf.Tensor`
+        The batch of data.
+    encoder : `tf.keras.Model`
+        The encoder model.
+    decoder : `tf.keras.Model`
+        The decoder model.
+    optimizer : `tf.keras.optimizers.Optimizer`
+        The optimizer to use.
+    vae_mode : `bool`
+        Whether to use variational autoencoder mode. Default is False.
+
+    Returns
+    -------
+    `tf.Tensor`
+        The loss value.
+    &#34;&#34;&#34;
+    optimizer.build(encoder.trainable_variables + decoder.trainable_variables)
+
+    with tf.GradientTape() as encoder_tape, tf.GradientTape() as decoder_tape:
+        loss = cal_loss_step(batch, encoder, decoder, vae_mode=vae_mode)
+
+    gradients_of_encoder = encoder_tape.gradient(loss, encoder.trainable_variables)
+    gradients_of_decoder = decoder_tape.gradient(loss, decoder.trainable_variables)
+
+    optimizer.apply_gradients(zip(gradients_of_encoder, encoder.trainable_variables))
+    optimizer.apply_gradients(zip(gradients_of_decoder, decoder.trainable_variables))
+
+    return loss
+
+
+@tf.keras.utils.register_keras_serializable(package=&#34;Custom&#34;, name=&#34;AutoClassifier&#34;)
+class AutoClassifier(tf.keras.Model):
+    &#34;&#34;&#34;
+    An auto-classifier model that automatically determines the best classification strategy based on the input data.
+
+    Parameters
+    ----------
+    input_shape_parm : `int`
+        The shape of the input data.
+    num_classes : `int`
+        The number of classes in the dataset.
+    units : `int`
+        The number of neurons in each hidden layer.
+    activation : `str`
+        The type of activation function to use for the neural network layers.
+
+    Keyword Arguments
+    -----------------
+    Additional keyword arguments to pass to the model.
+
+    classifier_activation : `str`
+        The activation function to use for the classifier layer. Default is `softmax`. If the activation function is not a classification function, the model can be used in regression problems.
+    num_layers : `int`
+        The number of hidden layers in the classifier. Default is 1.
+    dropout : `float`
+        The dropout rate to use in the classifier. Default is None.
+    l2_reg : `float`
+        The L2 regularization parameter. Default is 0.0.
+    vae_mode : `bool`
+        Whether to use variational autoencoder mode. Default is False.
+    vae_units : `int`
+        The number of units in the variational autoencoder. Default is 2.
+    lora_mode : `bool`
+        Whether to use LoRA layers. Default is False.
+    lora_rank : `int`
+        The rank of the LoRA layer. Default is 4.
+    &#34;&#34;&#34;
+
+    def __init__(
+        self,
+        input_shape_parm: int,
+        num_classes: int,
+        units: int,
+        activation: str,
+        **kwargs,
+    ) -&gt; None:
+        super(AutoClassifier, self).__init__()
+        self.input_shape_parm = input_shape_parm
+        self.num_classes = num_classes
+        self.units = units
+        self.activation = activation
+
+        self.encoder = None
+        self.decoder = None
+        self.classifier = None
+        self.classifier_activation: str = kwargs.get(&#34;classifier_activation&#34;, &#34;softmax&#34;)
+        self.num_layers: int = kwargs.get(&#34;num_layers&#34;, 1)
+        self.dropout: Optional[float] = kwargs.get(&#34;dropout&#34;, None)
+        self.l2_reg: float = kwargs.get(&#34;l2_reg&#34;, 0.0)
+        self.vae_mode: bool = kwargs.get(&#34;vae_mode&#34;, False)
+        self.vae_units: int = kwargs.get(&#34;vae_units&#34;, 2)
+        self.lora_mode: bool = kwargs.get(&#34;lora_mode&#34;, False)
+        self.lora_rank: int = kwargs.get(&#34;lora_rank&#34;, 4)
+
+    def build_encoder_decoder(self, input_shape: tuple) -&gt; None:
+        self.encoder = (
+            tf.keras.Sequential(
+                [
+                    tf.keras.layers.Dense(
+                        units=self.units,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                    tf.keras.layers.Dense(
+                        units=int(self.units / 2),
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                ],
+                name=&#34;encoder&#34;,
+            )
+            if not self.encoder
+            else self.encoder
+        )
+
+        self.decoder = (
+            tf.keras.Sequential(
+                [
+                    tf.keras.layers.Dense(
+                        units=self.units,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                    tf.keras.layers.Dense(
+                        units=self.input_shape_parm,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                ],
+                name=&#34;decoder&#34;,
+            )
+            if not self.decoder
+            else self.decoder
+        )
+
+    def build(self, input_shape: tuple) -&gt; None:
+        if self.vae_mode:
+            inputs = tf.keras.Input(shape=self.input_shape_parm, name=&#34;encoder_input&#34;)
+            x = tf.keras.layers.Dense(
+                units=self.units,
+                kernel_regularizer=l2(self.l2_reg),
+                kernel_initializer=&#34;he_normal&#34;,
+            )(inputs)
+            x = tf.keras.layers.BatchNormalization()(x)
+            x = tf.keras.layers.Activation(self.activation)(x)
+            x = tf.keras.layers.Dense(
+                units=int(self.units / 2),
+                kernel_regularizer=l2(self.l2_reg),
+                kernel_initializer=&#34;he_normal&#34;,
+                name=&#34;encoder_hidden&#34;,
+            )(x)
+            x = tf.keras.layers.BatchNormalization()(x)
+            x = tf.keras.layers.Activation(self.activation)(x)
+
+            mean = tf.keras.layers.Dense(2, name=&#34;mean&#34;)(x)
+            log_var = tf.keras.layers.Dense(2, name=&#34;log_var&#34;)(x)
+            log_var = tf.keras.layers.Lambda(lambda x: x + 1e-7)(log_var)
+
+            self.encoder = (
+                tf.keras.Model(inputs, [mean, log_var], name=&#34;vae_encoder&#34;)
+                if not self.encoder
+                else self.encoder
+            )
+            self.decoder = (
+                tf.keras.Sequential(
+                    [
+                        tf.keras.layers.Dense(
+                            units=self.units,
+                            kernel_regularizer=l2(self.l2_reg),
+                        ),
+                        tf.keras.layers.BatchNormalization(),
+                        tf.keras.layers.Activation(self.activation),
+                        tf.keras.layers.Dense(
+                            units=self.input_shape_parm,
+                            kernel_regularizer=l2(self.l2_reg),
+                        ),
+                        tf.keras.layers.BatchNormalization(),
+                        tf.keras.layers.Activation(self.activation),
+                    ],
+                    name=&#34;vae_decoder&#34;,
+                )
+                if not self.decoder
+                else self.decoder
+            )
+
+        else:
+            self.build_encoder_decoder(input_shape)
+
+        self.classifier = tf.keras.Sequential()
+        if self.num_layers &gt; 1 and not self.lora_mode:
+            for _ in range(self.num_layers - 1):
+                self.classifier.add(
+                    tf.keras.layers.Dense(
+                        units=self.units,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    )
+                )
+                if self.dropout:
+                    self.classifier.add(tf.keras.layers.Dropout(self.dropout))
+
+        elif self.lora_mode:
+            for _ in range(self.num_layers - 1):
+                self.classifier.add(
+                    LoRALayer(units=self.units, rank=self.lora_rank, name=f&#34;LoRA_{_}&#34;)
+                )
+                self.classifier.add(tf.keras.layers.Activation(self.activation))
+                if self.dropout:
+                    self.classifier.add(tf.keras.layers.Dropout(self.dropout))
+
+        self.classifier.add(
+            tf.keras.layers.Dense(
+                units=self.num_classes,
+                activation=self.classifier_activation,
+                kernel_regularizer=l2(self.l2_reg),
+            )
+        )
+
+    def train_encoder_decoder(
+        self,
+        data: Union[tf.data.Dataset, np.ndarray],
+        epochs: int,
+        batch_size: int,
+        validation_split: float = 0.2,
+        patience: int = 10,
+        **kwargs,
+    ) -&gt; None:
+        &#34;&#34;&#34;Trains the encoder and decoder on the input data.
+
+        Parameters
+        ----------
+        data : `tf.data.Dataset`, `np.ndarray`
+            The input data.
+        epochs : `int`
+            The number of epochs to train for.
+        batch_size : `int`
+            The batch size to use.
+        validation_split : `float`
+            The proportion of the dataset to use for validation. Default is 0.2.
+        patience : `int`
+            The number of epochs to wait before early stopping. Default is 10.
+
+        Keyword Arguments
+        -----------------
+        Additional keyword arguments to pass to the model.
+        &#34;&#34;&#34;
+        verbose = kwargs.get(&#34;verbose&#34;, True)
+        optimizer = kwargs.get(&#34;optimizer&#34;, tf.keras.optimizers.Adam())
+        dummy_input = tf.convert_to_tensor(tf.random.normal([1, self.input_shape_parm]))
+        self.build(dummy_input.shape)
+        if not self.vae_mode:
+            dummy_output = self.encoder(dummy_input)
+            self.decoder(dummy_output)
+        else:
+            mean, log_var = self.encoder(dummy_input)
+            dummy_output = sampling(mean, log_var)
+            self.decoder(dummy_output)
+
+        if isinstance(data, np.ndarray):
+            data = tf.data.Dataset.from_tensor_slices(data).batch(batch_size)
+            data = data.map(lambda x: tf.cast(x, tf.float32))
+
+        early_stopping = EarlyStopping(patience=patience)
+        train_batches = data.take(int((1 - validation_split) * len(data)))
+        val_batches = data.skip(int((1 - validation_split) * len(data)))
+        for epoch in range(epochs):
+            for train_batch, val_batch in zip(train_batches, val_batches):
+                loss_train = train_step(
+                    train_batch, self.encoder, self.decoder, optimizer, self.vae_mode
+                )
+                loss_val = cal_loss_step(
+                    val_batch, self.encoder, self.decoder, self.vae_mode, False
+                )
+
+            early_stopping(loss_train)
+
+            if early_stopping.stop_training:
+                print(f&#34;Early stopping triggered at epoch {epoch}.&#34;)
+                break
+
+            if epoch % 10 == 0 and verbose:
+                print(
+                    f&#34;Epoch {epoch}: Train Loss: {loss_train:.6f} Validation Loss: {loss_val:.6f}&#34;
+                )
+        self.freeze_encoder_decoder()
+
+    def call(self, x: tf.Tensor) -&gt; tf.Tensor:
+        if self.vae_mode:
+            mean, log_var = self.encoder(x)
+            encoded = sampling(mean, log_var)
+        else:
+            encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        combined = tf.concat([decoded, encoded], axis=1)
+        classification = self.classifier(combined)
+        return classification
+
+    def freeze_encoder_decoder(self) -&gt; None:
+        &#34;&#34;&#34;Freezes the encoder and decoder layers to prevent them from being updated during training.&#34;&#34;&#34;
+        for layer in self.encoder.layers:
+            layer.trainable = False
+        for layer in self.decoder.layers:
+            layer.trainable = False
+
+    def unfreeze_encoder_decoder(self) -&gt; None:
+        &#34;&#34;&#34;Unfreezes the encoder and decoder layers allowing them to be updated during training.&#34;&#34;&#34;
+        for layer in self.encoder.layers:
+            layer.trainable = True
+        for layer in self.decoder.layers:
+            layer.trainable = True
+
+    def set_encoder_decoder(self, source_model: &#34;AutoClassifier&#34;) -&gt; None:
+        &#34;&#34;&#34;Sets the encoder and decoder layers from another AutoClassifier instance,
+        ensuring compatibility in dimensions. Only works if vae_mode is False.
+
+        Parameters
+        ----------
+        source_model : AutoClassifier
+            The source model to copy the encoder and decoder layers from.
+
+        Raises
+        ------
+        ValueError
+            If the input shape or units of the source model do not match.
+        &#34;&#34;&#34;
+        if not isinstance(source_model, AutoClassifier):
+            raise ValueError(&#34;Source model must be an instance of AutoClassifier.&#34;)
+
+        if self.input_shape_parm != source_model.input_shape_parm:
+            raise ValueError(
+                f&#34;Incompatible input shape. Expected {self.input_shape_parm}, got {source_model.input_shape_parm}.&#34;
+            )
+        if self.units != source_model.units:
+            raise ValueError(
+                f&#34;Incompatible number of units. Expected {self.units}, got {source_model.units}.&#34;
+            )
+        self.encoder, self.decoder = tf.keras.Sequential(), tf.keras.Sequential()
+        for i, layer in enumerate(source_model.encoder.layers):
+            if isinstance(layer, tf.keras.layers.Dense):
+                dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
+                dense_layer = tf.keras.layers.Dense(
+                    units=layer.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                )
+                dense_layer.build(dummy_input.shape)
+                self.encoder.add(dense_layer)
+                self.encoder.layers[i].set_weights(layer.get_weights())
+            elif not isinstance(layer, InputLayer):
+                raise ValueError(f&#34;Layer type {type(layer)} not supported for copying.&#34;)
+
+        for i, layer in enumerate(source_model.decoder.layers):
+            if isinstance(layer, tf.keras.layers.Dense):
+                dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
+                dense_layer = tf.keras.layers.Dense(
+                    units=layer.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                )
+                dense_layer.build(dummy_input.shape)
+                self.decoder.add(dense_layer)
+                self.decoder.layers[i].set_weights(layer.get_weights())
+            elif not isinstance(layer, InputLayer):
+                raise ValueError(f&#34;Layer type {type(layer)} not supported for copying.&#34;)
+
+    def get_config(self) -&gt; Dict[str, Any]:
+        config = {
+            &#34;input_shape_parm&#34;: self.input_shape_parm,
+            &#34;num_classes&#34;: self.num_classes,
+            &#34;units&#34;: self.units,
+            &#34;activation&#34;: self.activation,
+            &#34;classifier_activation&#34;: self.classifier_activation,
+            &#34;num_layers&#34;: self.num_layers,
+            &#34;dropout&#34;: self.dropout,
+            &#34;l2_reg&#34;: self.l2_reg,
+            &#34;vae_mode&#34;: self.vae_mode,
+            &#34;vae_units&#34;: self.vae_units,
+            &#34;lora_mode&#34;: self.lora_mode,
+            &#34;lora_rank&#34;: self.lora_rank,
+        }
+        base_config = super(AutoClassifier, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -&gt; &#34;AutoClassifier&#34;:
+        return cls(
+            input_shape_parm=config[&#34;input_shape_parm&#34;],
+            num_classes=config[&#34;num_classes&#34;],
+            units=config[&#34;units&#34;],
+            activation=config[&#34;activation&#34;],
+            classifier_activation=config[&#34;classifier_activation&#34;],
+            num_layers=config[&#34;num_layers&#34;],
+            dropout=config[&#34;dropout&#34;],
+            l2_reg=config[&#34;l2_reg&#34;],
+            vae_mode=config[&#34;vae_mode&#34;],
+            vae_units=config[&#34;vae_units&#34;],
+            lora_mode=config[&#34;lora_mode&#34;],
+            lora_rank=config[&#34;lora_rank&#34;],
+        )
+
+
+def call_existing_code(
+    units: int,
+    activation: str,
+    threshold: float,
+    optimizer: str,
+    input_shape_parm: None | int = None,
+    num_classes: None | int = None,
+    num_layers: int = 1,
+    **kwargs,
+) -&gt; AutoClassifier:
+    &#34;&#34;&#34;
+    Calls an existing AutoClassifier instance.
+
+    Parameters
+    ----------
+    units : `int`
+        The number of neurons in each hidden layer.
+    activation : `str`
+        The type of activation function to use for the neural network layers.
+    threshold : `float`
+        The threshold for the classifier.
+    optimizer : `str`
+        The type of optimizer to use for the neural network layers.
+    input_shape_parm : `None` | `int`
+        The shape of the input data.
+    num_classes : `int`
+        The number of classes in the dataset.
+    num_layers : `int`
+        The number of hidden layers in the classifier. Default is 1.
+
+    Keyword Arguments
+    -----------------
+    vae_mode : `bool`
+        Whether to use variational autoencoder mode. Default is False.
+    vae_units : `int`
+        The number of units in the variational autoencoder. Default is 2.
+
+    Returns
+    -------
+    `AutoClassifier`
+        The AutoClassifier instance.
+    &#34;&#34;&#34;
+    dropout = kwargs.get(&#34;dropout&#34;, None)
+    l2_reg = kwargs.get(&#34;l2_reg&#34;, 0.0)
+    vae_mode = kwargs.get(&#34;vae_mode&#34;, False)
+    vae_units = kwargs.get(&#34;vae_units&#34;, 2)
+    model = AutoClassifier(
+        input_shape_parm=input_shape_parm,
+        num_classes=num_classes,
+        units=units,
+        activation=activation,
+        num_layers=num_layers,
+        dropout=dropout,
+        l2_reg=l2_reg,
+        vae_mode=vae_mode,
+        vae_units=vae_units,
+    )
+    model.compile(
+        optimizer=optimizer,
+        loss=tf.keras.losses.CategoricalCrossentropy(),
+        metrics=[tf.keras.metrics.F1Score(threshold=threshold)],
+    )
+    return model
+
+
+def build_model(
+    hp: keras_tuner.HyperParameters, input_shape_parm: None | int, num_classes: None | int, **kwargs
+) -&gt; AutoClassifier:
+    &#34;&#34;&#34;Builds a neural network model using Keras Tuner&#39;s search algorithm.
+
+    Parameters
+    ----------
+    hp : `keras_tuner.HyperParameters`
+        The hyperparameters to tune.
+    input_shape_parm : `None` | `int`
+        The shape of the input data.
+    num_classes : `int`
+        The number of classes in the dataset.
+
+    Keyword Arguments
+    -----------------
+    Additional keyword arguments to pass to the model.
+
+    hyperparameters : `dict`
+        The hyperparameters to set.
+
+    Returns
+    -------
+    `keras.Model`
+        The neural network model.
+    &#34;&#34;&#34;
+    hyperparameters = kwargs.get(&#34;hyperparameters&#34;, None)
+    hyperparameters_keys = hyperparameters.keys() if hyperparameters is not None else []
+
+    units = (
+        hp.Int(
+            &#34;units&#34;,
+            min_value=int(input_shape_parm * 0.2),
+            max_value=int(input_shape_parm * 1.5),
+            step=2,
+        )
+        if &#34;units&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;units&#34;, hyperparameters[&#34;units&#34;])
+            if isinstance(hyperparameters[&#34;units&#34;], list)
+            else hyperparameters[&#34;units&#34;]
+        )
+    )
+    activation = (
+        hp.Choice(&#34;activation&#34;, [&#34;sigmoid&#34;, &#34;relu&#34;, &#34;tanh&#34;, &#34;selu&#34;, &#34;softplus&#34;, &#34;softsign&#34;])
+        if &#34;activation&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;activation&#34;, hyperparameters[&#34;activation&#34;])
+            if isinstance(hyperparameters[&#34;activation&#34;], list)
+            else hyperparameters[&#34;activation&#34;]
+        )
+    )
+    optimizer = (
+        hp.Choice(&#34;optimizer&#34;, [&#34;sgd&#34;, &#34;adam&#34;, &#34;adadelta&#34;, &#34;rmsprop&#34;, &#34;adamax&#34;, &#34;adagrad&#34;])
+        if &#34;optimizer&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;optimizer&#34;, hyperparameters[&#34;optimizer&#34;])
+            if isinstance(hyperparameters[&#34;optimizer&#34;], list)
+            else hyperparameters[&#34;optimizer&#34;]
+        )
+    )
+    threshold = (
+        hp.Float(&#34;threshold&#34;, min_value=0.1, max_value=0.9, sampling=&#34;log&#34;)
+        if &#34;threshold&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;threshold&#34;, hyperparameters[&#34;threshold&#34;])
+            if isinstance(hyperparameters[&#34;threshold&#34;], list)
+            else hyperparameters[&#34;threshold&#34;]
+        )
+    )
+    num_layers = (
+        hp.Int(&#34;num_layers&#34;, min_value=1, max_value=10, step=1)
+        if &#34;num_layers&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;num_layers&#34;, hyperparameters[&#34;num_layers&#34;])
+            if isinstance(hyperparameters[&#34;num_layers&#34;], list)
+            else hyperparameters[&#34;num_layers&#34;]
+        )
+    )
+    dropout = (
+        hp.Float(&#34;dropout&#34;, min_value=0.1, max_value=0.9, sampling=&#34;log&#34;)
+        if &#34;dropout&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;dropout&#34;, hyperparameters[&#34;dropout&#34;])
+            if isinstance(hyperparameters[&#34;dropout&#34;], list)
+            else hyperparameters[&#34;dropout&#34;]
+        )
+    )
+    l2_reg = (
+        hp.Float(&#34;l2_reg&#34;, min_value=1e-6, max_value=0.1, sampling=&#34;log&#34;)
+        if &#34;l2_reg&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;l2_reg&#34;, hyperparameters[&#34;l2_reg&#34;])
+            if isinstance(hyperparameters[&#34;l2_reg&#34;], list)
+            else hyperparameters[&#34;l2_reg&#34;]
+        )
+    )
+    vae_mode = (
+        hp.Choice(&#34;vae_mode&#34;, [True, False])
+        if &#34;vae_mode&#34; not in hyperparameters_keys
+        else hyperparameters[&#34;vae_mode&#34;]
+    )
+
+    try:
+        vae_units = (
+            hp.Int(&#34;vae_units&#34;, min_value=2, max_value=10, step=1)
+            if (&#34;vae_units&#34; not in hyperparameters_keys) and vae_mode
+            else (
+                hp.Choice(&#34;vae_units&#34;, hyperparameters[&#34;vae_units&#34;])
+                if isinstance(hyperparameters[&#34;vae_units&#34;], list)
+                else hyperparameters[&#34;vae_units&#34;]
+            )
+        )
+    except KeyError:
+        vae_units = None
+
+    model = call_existing_code(
+        units=units,
+        activation=activation,
+        threshold=threshold,
+        optimizer=optimizer,
+        input_shape_parm=input_shape_parm,
+        num_classes=num_classes,
+        num_layers=num_layers,
+        dropout=dropout,
+        l2_reg=l2_reg,
+        vae_mode=vae_mode,
+        vae_units=vae_units,
+    )
+    return model
+
+
+@suppress_warnings
+def setup_model(
+    data: pd.DataFrame,
+    target: str,
+    epochs: int,
+    train_size: float = 0.7,
+    seed: None | int = None,
+    train_mode: bool = True,
+    filepath: str = &#34;./my_dir/best_model&#34;,
+    method: str = &#34;Hyperband&#34;,
+    **kwargs,
+) -&gt; Tuple[AutoClassifier, pd.DataFrame]:
+    &#34;&#34;&#34;Setup model for training and tuning.
+
+    Parameters
+    ----------
+    data : `pd.DataFrame`
+        The dataset to train the model on.
+    target : `str`
+        The name of the target column.
+    epochs : `int`
+        The number of epochs to train the model for.
+    train_size : `float`
+        The proportion of the dataset to use for training.
+    seed : `None` | `int`
+        The random seed to use for reproducibility.
+    train_mode : `bool`
+        Whether to train the model or not.
+    filepath : `str`
+        The path to save the best model to.
+    method : `str`
+        The method to use for hyperparameter tuning. Options are &#34;Hyperband&#34; and &#34;RandomSearch&#34;.
+
+    Keyword Arguments
+    -----------------
+    Additional keyword arguments to pass to the model.
+
+    max_trials : `int`
+        The maximum number of trials to perform.
+    directory : `str`
+        The directory to save the model to.
+    project_name : `str`
+        The name of the project.
+    objective : `str`
+        The objective to optimize.
+    verbose : `bool`
+        Whether to print verbose output.
+    hyperparameters : `dict`
+        The hyperparameters to set.
+
+    Returns
+    -------
+    model, hps : (`AutoClassifier`, `pd.DataFrame`)
+        The trained model and best hyperparameter results.
+    &#34;&#34;&#34;
+    max_trials = kwargs.get(&#34;max_trials&#34;, 10)
+    directory = kwargs.get(&#34;directory&#34;, &#34;./my_dir&#34;)
+    project_name = kwargs.get(&#34;project_name&#34;, &#34;get_best&#34;)
+    objective = kwargs.get(&#34;objective&#34;, &#34;val_loss&#34;)
+    verbose = kwargs.get(&#34;verbose&#34;, True)
+    hyperparameters = kwargs.get(&#34;hyperparameters&#34;, None)
+
+    X = data.drop(columns=target)
+    input_sample = X.sample(1)
+    y = data[target]
+    assert (
+        X.select_dtypes(include=[&#34;object&#34;]).empty == True
+    ), &#34;Categorical variables within the DataFrame must be encoded, this is done by using the DataFrameEncoder from likelihood.&#34;
+    validation_split = 1.0 - train_size
+
+    if train_mode:
+        try:
+            if (not os.path.exists(directory)) and directory != &#34;./&#34;:
+                os.makedirs(directory)
+            elif directory != &#34;./&#34;:
+                print(f&#34;Directory {directory} already exists, it will be deleted.&#34;)
+                rmtree(directory)
+                os.makedirs(directory)
+        except:
+            print(&#34;Warning: unable to create directory&#34;)
+
+        y_encoder = OneHotEncoder()
+        y = y_encoder.encode(y.to_list())
+        X = X.to_numpy()
+        input_sample = input_sample.to_numpy()
+        X = np.asarray(X).astype(np.float32)
+        input_sample = np.asarray(input_sample).astype(np.float32)
+        y = np.asarray(y).astype(np.float32)
+
+        input_shape_parm = X.shape[1]
+        num_classes = y.shape[1]
+        global build_model
+        build_model = partial(
+            build_model,
+            input_shape_parm=input_shape_parm,
+            num_classes=num_classes,
+            hyperparameters=hyperparameters,
+        )
+
+        if method == &#34;Hyperband&#34;:
+            tuner = keras_tuner.Hyperband(
+                hypermodel=build_model,
+                objective=objective,
+                max_epochs=epochs,
+                factor=3,
+                directory=directory,
+                project_name=project_name,
+                seed=seed,
+            )
+        elif method == &#34;RandomSearch&#34;:
+            tuner = keras_tuner.RandomSearch(
+                hypermodel=build_model,
+                objective=objective,
+                max_trials=max_trials,
+                directory=directory,
+                project_name=project_name,
+                seed=seed,
+            )
+
+        tuner.search(X, y, epochs=epochs, validation_split=validation_split, verbose=verbose)
+        models = tuner.get_best_models(num_models=2)
+        best_model = models[0]
+        best_model(input_sample)
+
+        best_model.save(filepath, save_format=&#34;tf&#34;)
+
+        if verbose:
+            tuner.results_summary()
+    else:
+        best_model = tf.keras.models.load_model(filepath)
+    best_hps = tuner.get_best_hyperparameters(1)[0].values
+    vae_mode = best_hps.get(&#34;vae_mode&#34;, hyperparameters.get(&#34;vae_mode&#34;, False))
+    best_hps[&#34;vae_units&#34;] = None if not vae_mode else best_hps[&#34;vae_units&#34;]
+
+    return best_model, pd.DataFrame(best_hps, index=[&#34;Value&#34;]).dropna(axis=1)</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="likelihood.models.deep.autoencoders.build_model"><code class="name flex">
+<span>def <span class="ident">build_model</span></span>(<span>hp: keras_tuner.src.engine.hyperparameters.hyperparameters.HyperParameters, input_shape_parm: None | int, num_classes: None | int, **kwargs) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Builds a neural network model using Keras Tuner's search algorithm.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>hp</code></strong> :&ensp;<code>keras_tuner.HyperParameters</code></dt>
+<dd>The hyperparameters to tune.</dd>
+<dt><strong><code>input_shape_parm</code></strong> :&ensp;<code>None` | `int</code></dt>
+<dd>The shape of the input data.</dd>
+<dt><strong><code>num_classes</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of classes in the dataset.</dd>
+</dl>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
+<p>Additional keyword arguments to pass to the model.</p>
+<p>hyperparameters : <code>dict</code>
+The hyperparameters to set.</p>
+<h2 id="returns">Returns</h2>
+<p><code>keras.Model</code>
+The neural network model.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def build_model(
+    hp: keras_tuner.HyperParameters, input_shape_parm: None | int, num_classes: None | int, **kwargs
+) -&gt; AutoClassifier:
+    &#34;&#34;&#34;Builds a neural network model using Keras Tuner&#39;s search algorithm.
+
+    Parameters
+    ----------
+    hp : `keras_tuner.HyperParameters`
+        The hyperparameters to tune.
+    input_shape_parm : `None` | `int`
+        The shape of the input data.
+    num_classes : `int`
+        The number of classes in the dataset.
+
+    Keyword Arguments
+    -----------------
+    Additional keyword arguments to pass to the model.
+
+    hyperparameters : `dict`
+        The hyperparameters to set.
+
+    Returns
+    -------
+    `keras.Model`
+        The neural network model.
+    &#34;&#34;&#34;
+    hyperparameters = kwargs.get(&#34;hyperparameters&#34;, None)
+    hyperparameters_keys = hyperparameters.keys() if hyperparameters is not None else []
+
+    units = (
+        hp.Int(
+            &#34;units&#34;,
+            min_value=int(input_shape_parm * 0.2),
+            max_value=int(input_shape_parm * 1.5),
+            step=2,
+        )
+        if &#34;units&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;units&#34;, hyperparameters[&#34;units&#34;])
+            if isinstance(hyperparameters[&#34;units&#34;], list)
+            else hyperparameters[&#34;units&#34;]
+        )
+    )
+    activation = (
+        hp.Choice(&#34;activation&#34;, [&#34;sigmoid&#34;, &#34;relu&#34;, &#34;tanh&#34;, &#34;selu&#34;, &#34;softplus&#34;, &#34;softsign&#34;])
+        if &#34;activation&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;activation&#34;, hyperparameters[&#34;activation&#34;])
+            if isinstance(hyperparameters[&#34;activation&#34;], list)
+            else hyperparameters[&#34;activation&#34;]
+        )
+    )
+    optimizer = (
+        hp.Choice(&#34;optimizer&#34;, [&#34;sgd&#34;, &#34;adam&#34;, &#34;adadelta&#34;, &#34;rmsprop&#34;, &#34;adamax&#34;, &#34;adagrad&#34;])
+        if &#34;optimizer&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;optimizer&#34;, hyperparameters[&#34;optimizer&#34;])
+            if isinstance(hyperparameters[&#34;optimizer&#34;], list)
+            else hyperparameters[&#34;optimizer&#34;]
+        )
+    )
+    threshold = (
+        hp.Float(&#34;threshold&#34;, min_value=0.1, max_value=0.9, sampling=&#34;log&#34;)
+        if &#34;threshold&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;threshold&#34;, hyperparameters[&#34;threshold&#34;])
+            if isinstance(hyperparameters[&#34;threshold&#34;], list)
+            else hyperparameters[&#34;threshold&#34;]
+        )
+    )
+    num_layers = (
+        hp.Int(&#34;num_layers&#34;, min_value=1, max_value=10, step=1)
+        if &#34;num_layers&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;num_layers&#34;, hyperparameters[&#34;num_layers&#34;])
+            if isinstance(hyperparameters[&#34;num_layers&#34;], list)
+            else hyperparameters[&#34;num_layers&#34;]
+        )
+    )
+    dropout = (
+        hp.Float(&#34;dropout&#34;, min_value=0.1, max_value=0.9, sampling=&#34;log&#34;)
+        if &#34;dropout&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;dropout&#34;, hyperparameters[&#34;dropout&#34;])
+            if isinstance(hyperparameters[&#34;dropout&#34;], list)
+            else hyperparameters[&#34;dropout&#34;]
+        )
+    )
+    l2_reg = (
+        hp.Float(&#34;l2_reg&#34;, min_value=1e-6, max_value=0.1, sampling=&#34;log&#34;)
+        if &#34;l2_reg&#34; not in hyperparameters_keys
+        else (
+            hp.Choice(&#34;l2_reg&#34;, hyperparameters[&#34;l2_reg&#34;])
+            if isinstance(hyperparameters[&#34;l2_reg&#34;], list)
+            else hyperparameters[&#34;l2_reg&#34;]
+        )
+    )
+    vae_mode = (
+        hp.Choice(&#34;vae_mode&#34;, [True, False])
+        if &#34;vae_mode&#34; not in hyperparameters_keys
+        else hyperparameters[&#34;vae_mode&#34;]
+    )
+
+    try:
+        vae_units = (
+            hp.Int(&#34;vae_units&#34;, min_value=2, max_value=10, step=1)
+            if (&#34;vae_units&#34; not in hyperparameters_keys) and vae_mode
+            else (
+                hp.Choice(&#34;vae_units&#34;, hyperparameters[&#34;vae_units&#34;])
+                if isinstance(hyperparameters[&#34;vae_units&#34;], list)
+                else hyperparameters[&#34;vae_units&#34;]
+            )
+        )
+    except KeyError:
+        vae_units = None
+
+    model = call_existing_code(
+        units=units,
+        activation=activation,
+        threshold=threshold,
+        optimizer=optimizer,
+        input_shape_parm=input_shape_parm,
+        num_classes=num_classes,
+        num_layers=num_layers,
+        dropout=dropout,
+        l2_reg=l2_reg,
+        vae_mode=vae_mode,
+        vae_units=vae_units,
+    )
+    return model</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.cal_loss_step"><code class="name flex">
+<span>def <span class="ident">cal_loss_step</span></span>(<span>batch: tensorflow.python.framework.tensor.Tensor, encoder: keras.src.engine.training.Model, decoder: keras.src.engine.training.Model, vae_mode: bool = False, training: bool = True) ‑> tensorflow.python.framework.tensor.Tensor</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Calculates the loss value on a batch of data.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>batch</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>The batch of data.</dd>
+<dt><strong><code>encoder</code></strong> :&ensp;<code>tf.keras.Model</code></dt>
+<dd>The encoder model.</dd>
+<dt><strong><code>decoder</code></strong> :&ensp;<code>tf.keras.Model</code></dt>
+<dd>The decoder model.</dd>
+<dt><strong><code>optimizer</code></strong> :&ensp;<code>tf.keras.optimizers.Optimizer</code></dt>
+<dd>The optimizer to use.</dd>
+<dt><strong><code>vae_mode</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether to use variational autoencoder mode. Default is False.</dd>
+<dt><strong><code>training</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether the model is in training mode. Default is True.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>tf.Tensor</code>
+The loss value.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def cal_loss_step(
+    batch: tf.Tensor,
+    encoder: tf.keras.Model,
+    decoder: tf.keras.Model,
+    vae_mode: bool = False,
+    training: bool = True,
+) -&gt; tf.Tensor:
+    &#34;&#34;&#34;Calculates the loss value on a batch of data.
+
+    Parameters
+    ----------
+    batch : `tf.Tensor`
+        The batch of data.
+    encoder : `tf.keras.Model`
+        The encoder model.
+    decoder : `tf.keras.Model`
+        The decoder model.
+    optimizer : `tf.keras.optimizers.Optimizer`
+        The optimizer to use.
+    vae_mode : `bool`
+        Whether to use variational autoencoder mode. Default is False.
+    training : `bool`
+        Whether the model is in training mode. Default is True.
+
+    Returns
+    -------
+    `tf.Tensor`
+        The loss value.
+    &#34;&#34;&#34;
+    if vae_mode:
+        mean, log_var = encoder(batch, training=training)
+        log_var = tf.clip_by_value(log_var, clip_value_min=1e-8, clip_value_max=tf.float32.max)
+        decoded = decoder(sampling(mean, log_var), training=training)
+        loss = vae_loss(batch, decoded, mean, log_var)
+    else:
+        encoded = encoder(batch, training=training)
+        decoded = decoder(encoded, training=training)
+        loss = mse_loss(batch, decoded)
+
+    return loss</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.call_existing_code"><code class="name flex">
+<span>def <span class="ident">call_existing_code</span></span>(<span>units: int, activation: str, threshold: float, optimizer: str, input_shape_parm: None | int = None, num_classes: None | int = None, num_layers: int = 1, **kwargs) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Calls an existing AutoClassifier instance.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>units</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of neurons in each hidden layer.</dd>
+<dt><strong><code>activation</code></strong> :&ensp;<code>str</code></dt>
+<dd>The type of activation function to use for the neural network layers.</dd>
+<dt><strong><code>threshold</code></strong> :&ensp;<code>float</code></dt>
+<dd>The threshold for the classifier.</dd>
+<dt><strong><code>optimizer</code></strong> :&ensp;<code>str</code></dt>
+<dd>The type of optimizer to use for the neural network layers.</dd>
+<dt><strong><code>input_shape_parm</code></strong> :&ensp;<code>None` | `int</code></dt>
+<dd>The shape of the input data.</dd>
+<dt><strong><code>num_classes</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of classes in the dataset.</dd>
+<dt><strong><code>num_layers</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of hidden layers in the classifier. Default is 1.</dd>
+</dl>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
+<p>vae_mode : <code>bool</code>
+Whether to use variational autoencoder mode. Default is False.
+vae_units : <code>int</code>
+The number of units in the variational autoencoder. Default is 2.</p>
+<h2 id="returns">Returns</h2>
+<p><code><a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></code>
+The AutoClassifier instance.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def call_existing_code(
+    units: int,
+    activation: str,
+    threshold: float,
+    optimizer: str,
+    input_shape_parm: None | int = None,
+    num_classes: None | int = None,
+    num_layers: int = 1,
+    **kwargs,
+) -&gt; AutoClassifier:
+    &#34;&#34;&#34;
+    Calls an existing AutoClassifier instance.
+
+    Parameters
+    ----------
+    units : `int`
+        The number of neurons in each hidden layer.
+    activation : `str`
+        The type of activation function to use for the neural network layers.
+    threshold : `float`
+        The threshold for the classifier.
+    optimizer : `str`
+        The type of optimizer to use for the neural network layers.
+    input_shape_parm : `None` | `int`
+        The shape of the input data.
+    num_classes : `int`
+        The number of classes in the dataset.
+    num_layers : `int`
+        The number of hidden layers in the classifier. Default is 1.
+
+    Keyword Arguments
+    -----------------
+    vae_mode : `bool`
+        Whether to use variational autoencoder mode. Default is False.
+    vae_units : `int`
+        The number of units in the variational autoencoder. Default is 2.
+
+    Returns
+    -------
+    `AutoClassifier`
+        The AutoClassifier instance.
+    &#34;&#34;&#34;
+    dropout = kwargs.get(&#34;dropout&#34;, None)
+    l2_reg = kwargs.get(&#34;l2_reg&#34;, 0.0)
+    vae_mode = kwargs.get(&#34;vae_mode&#34;, False)
+    vae_units = kwargs.get(&#34;vae_units&#34;, 2)
+    model = AutoClassifier(
+        input_shape_parm=input_shape_parm,
+        num_classes=num_classes,
+        units=units,
+        activation=activation,
+        num_layers=num_layers,
+        dropout=dropout,
+        l2_reg=l2_reg,
+        vae_mode=vae_mode,
+        vae_units=vae_units,
+    )
+    model.compile(
+        optimizer=optimizer,
+        loss=tf.keras.losses.CategoricalCrossentropy(),
+        metrics=[tf.keras.metrics.F1Score(threshold=threshold)],
+    )
+    return model</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.check_for_nans"><code class="name flex">
+<span>def <span class="ident">check_for_nans</span></span>(<span>tensors: List[tensorflow.python.framework.tensor.Tensor], name: str = 'Tensor') ‑> bool</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_for_nans(tensors: List[tf.Tensor], name: str = &#34;Tensor&#34;) -&gt; bool:
+    for t in tensors:
+        if tf.reduce_any(tf.math.is_nan(t)) or tf.reduce_any(tf.math.is_inf(t)):
+            print(f&#34;Warning: {name} contains NaNs or Infs&#34;)
+            return True
+    return False</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.kl_loss"><code class="name flex">
+<span>def <span class="ident">kl_loss</span></span>(<span>mean: tensorflow.python.framework.tensor.Tensor, log_var: tensorflow.python.framework.tensor.Tensor) ‑> tensorflow.python.framework.tensor.Tensor</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Kullback-Leibler divergence loss function.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>mean</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>The mean of the distribution.</dd>
+<dt><strong><code>log_var</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>The log variance of the distribution.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>tf.Tensor</code></p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def kl_loss(mean: tf.Tensor, log_var: tf.Tensor) -&gt; tf.Tensor:
+    &#34;&#34;&#34;
+    Kullback-Leibler divergence loss function.
+
+    Parameters
+    ----------
+    mean : `tf.Tensor`
+        The mean of the distribution.
+    log_var : `tf.Tensor`
+        The log variance of the distribution.
+
+    Returns
+    -------
+    `tf.Tensor`
+    &#34;&#34;&#34;
+    return -0.5 * tf.reduce_mean(1 + log_var - tf.square(mean) - tf.exp(log_var))</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.mse_loss"><code class="name flex">
+<span>def <span class="ident">mse_loss</span></span>(<span>y_true: tensorflow.python.framework.tensor.Tensor, y_pred: tensorflow.python.framework.tensor.Tensor) ‑> tensorflow.python.framework.tensor.Tensor</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Mean squared error loss function.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>y_true</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>The true values.</dd>
+<dt><strong><code>y_pred</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>The predicted values.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>tf.Tensor</code></p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def mse_loss(y_true: tf.Tensor, y_pred: tf.Tensor) -&gt; tf.Tensor:
+    &#34;&#34;&#34;
+    Mean squared error loss function.
+
+    Parameters
+    ----------
+    y_true : `tf.Tensor`
+        The true values.
+    y_pred : `tf.Tensor`
+        The predicted values.
+
+    Returns
+    -------
+    `tf.Tensor`
+    &#34;&#34;&#34;
+    return tf.reduce_mean(tf.square(y_true - y_pred))</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.sampling"><code class="name flex">
+<span>def <span class="ident">sampling</span></span>(<span>mean: tensorflow.python.framework.tensor.Tensor, log_var: tensorflow.python.framework.tensor.Tensor, epsilon_value: float = 1e-08) ‑> tensorflow.python.framework.tensor.Tensor</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Samples from the distribution.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>mean</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>The mean of the distribution.</dd>
+<dt><strong><code>log_var</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>The log variance of the distribution.</dd>
+<dt><strong><code>epsilon_value</code></strong> :&ensp;<code>float</code></dt>
+<dd>A small value to avoid numerical instability.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>tf.Tensor</code></p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def sampling(mean: tf.Tensor, log_var: tf.Tensor, epsilon_value: float = 1e-8) -&gt; tf.Tensor:
+    &#34;&#34;&#34;
+    Samples from the distribution.
+
+    Parameters
+    ----------
+    mean : `tf.Tensor`
+        The mean of the distribution.
+    log_var : `tf.Tensor`
+        The log variance of the distribution.
+    epsilon_value : float
+        A small value to avoid numerical instability.
+
+    Returns
+    -------
+    `tf.Tensor`
+    &#34;&#34;&#34;
+    epsilon = tf.random.normal(shape=tf.shape(mean), mean=0.0, stddev=1.0)
+    stddev = tf.exp(0.5 * log_var) + epsilon_value
+    epsilon = tf.random.normal(shape=tf.shape(mean), mean=0.0, stddev=1.0)
+    return mean + stddev * epsilon</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.setup_model"><code class="name flex">
+<span>def <span class="ident">setup_model</span></span>(<span>data: pandas.core.frame.DataFrame, target: str, epochs: int, train_size: float = 0.7, seed: None | int = None, train_mode: bool = True, filepath: str = './my_dir/best_model', method: str = 'Hyperband', **kwargs) ‑> Tuple[<a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a>, pandas.core.frame.DataFrame]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Setup model for training and tuning.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>data</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>The dataset to train the model on.</dd>
+<dt><strong><code>target</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the target column.</dd>
+<dt><strong><code>epochs</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of epochs to train the model for.</dd>
+<dt><strong><code>train_size</code></strong> :&ensp;<code>float</code></dt>
+<dd>The proportion of the dataset to use for training.</dd>
+<dt><strong><code>seed</code></strong> :&ensp;<code>None` | `int</code></dt>
+<dd>The random seed to use for reproducibility.</dd>
+<dt><strong><code>train_mode</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether to train the model or not.</dd>
+<dt><strong><code>filepath</code></strong> :&ensp;<code>str</code></dt>
+<dd>The path to save the best model to.</dd>
+<dt><strong><code>method</code></strong> :&ensp;<code>str</code></dt>
+<dd>The method to use for hyperparameter tuning. Options are "Hyperband" and "RandomSearch".</dd>
+</dl>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
+<p>Additional keyword arguments to pass to the model.</p>
+<p>max_trials : <code>int</code>
+The maximum number of trials to perform.
+directory : <code>str</code>
+The directory to save the model to.
+project_name : <code>str</code>
+The name of the project.
+objective : <code>str</code>
+The objective to optimize.
+verbose : <code>bool</code>
+Whether to print verbose output.
+hyperparameters : <code>dict</code>
+The hyperparameters to set.</p>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>model</code></strong>, <strong><code>hps</code></strong> :&ensp;<code>(</code>AutoClassifier<code>, </code>pd.DataFrame<code>)</code></dt>
+<dd>The trained model and best hyperparameter results.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@suppress_warnings
+def setup_model(
+    data: pd.DataFrame,
+    target: str,
+    epochs: int,
+    train_size: float = 0.7,
+    seed: None | int = None,
+    train_mode: bool = True,
+    filepath: str = &#34;./my_dir/best_model&#34;,
+    method: str = &#34;Hyperband&#34;,
+    **kwargs,
+) -&gt; Tuple[AutoClassifier, pd.DataFrame]:
+    &#34;&#34;&#34;Setup model for training and tuning.
+
+    Parameters
+    ----------
+    data : `pd.DataFrame`
+        The dataset to train the model on.
+    target : `str`
+        The name of the target column.
+    epochs : `int`
+        The number of epochs to train the model for.
+    train_size : `float`
+        The proportion of the dataset to use for training.
+    seed : `None` | `int`
+        The random seed to use for reproducibility.
+    train_mode : `bool`
+        Whether to train the model or not.
+    filepath : `str`
+        The path to save the best model to.
+    method : `str`
+        The method to use for hyperparameter tuning. Options are &#34;Hyperband&#34; and &#34;RandomSearch&#34;.
+
+    Keyword Arguments
+    -----------------
+    Additional keyword arguments to pass to the model.
+
+    max_trials : `int`
+        The maximum number of trials to perform.
+    directory : `str`
+        The directory to save the model to.
+    project_name : `str`
+        The name of the project.
+    objective : `str`
+        The objective to optimize.
+    verbose : `bool`
+        Whether to print verbose output.
+    hyperparameters : `dict`
+        The hyperparameters to set.
+
+    Returns
+    -------
+    model, hps : (`AutoClassifier`, `pd.DataFrame`)
+        The trained model and best hyperparameter results.
+    &#34;&#34;&#34;
+    max_trials = kwargs.get(&#34;max_trials&#34;, 10)
+    directory = kwargs.get(&#34;directory&#34;, &#34;./my_dir&#34;)
+    project_name = kwargs.get(&#34;project_name&#34;, &#34;get_best&#34;)
+    objective = kwargs.get(&#34;objective&#34;, &#34;val_loss&#34;)
+    verbose = kwargs.get(&#34;verbose&#34;, True)
+    hyperparameters = kwargs.get(&#34;hyperparameters&#34;, None)
+
+    X = data.drop(columns=target)
+    input_sample = X.sample(1)
+    y = data[target]
+    assert (
+        X.select_dtypes(include=[&#34;object&#34;]).empty == True
+    ), &#34;Categorical variables within the DataFrame must be encoded, this is done by using the DataFrameEncoder from likelihood.&#34;
+    validation_split = 1.0 - train_size
+
+    if train_mode:
+        try:
+            if (not os.path.exists(directory)) and directory != &#34;./&#34;:
+                os.makedirs(directory)
+            elif directory != &#34;./&#34;:
+                print(f&#34;Directory {directory} already exists, it will be deleted.&#34;)
+                rmtree(directory)
+                os.makedirs(directory)
+        except:
+            print(&#34;Warning: unable to create directory&#34;)
+
+        y_encoder = OneHotEncoder()
+        y = y_encoder.encode(y.to_list())
+        X = X.to_numpy()
+        input_sample = input_sample.to_numpy()
+        X = np.asarray(X).astype(np.float32)
+        input_sample = np.asarray(input_sample).astype(np.float32)
+        y = np.asarray(y).astype(np.float32)
+
+        input_shape_parm = X.shape[1]
+        num_classes = y.shape[1]
+        global build_model
+        build_model = partial(
+            build_model,
+            input_shape_parm=input_shape_parm,
+            num_classes=num_classes,
+            hyperparameters=hyperparameters,
+        )
+
+        if method == &#34;Hyperband&#34;:
+            tuner = keras_tuner.Hyperband(
+                hypermodel=build_model,
+                objective=objective,
+                max_epochs=epochs,
+                factor=3,
+                directory=directory,
+                project_name=project_name,
+                seed=seed,
+            )
+        elif method == &#34;RandomSearch&#34;:
+            tuner = keras_tuner.RandomSearch(
+                hypermodel=build_model,
+                objective=objective,
+                max_trials=max_trials,
+                directory=directory,
+                project_name=project_name,
+                seed=seed,
+            )
+
+        tuner.search(X, y, epochs=epochs, validation_split=validation_split, verbose=verbose)
+        models = tuner.get_best_models(num_models=2)
+        best_model = models[0]
+        best_model(input_sample)
+
+        best_model.save(filepath, save_format=&#34;tf&#34;)
+
+        if verbose:
+            tuner.results_summary()
+    else:
+        best_model = tf.keras.models.load_model(filepath)
+    best_hps = tuner.get_best_hyperparameters(1)[0].values
+    vae_mode = best_hps.get(&#34;vae_mode&#34;, hyperparameters.get(&#34;vae_mode&#34;, False))
+    best_hps[&#34;vae_units&#34;] = None if not vae_mode else best_hps[&#34;vae_units&#34;]
+
+    return best_model, pd.DataFrame(best_hps, index=[&#34;Value&#34;]).dropna(axis=1)</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.train_step"><code class="name flex">
+<span>def <span class="ident">train_step</span></span>(<span>batch: tensorflow.python.framework.tensor.Tensor, encoder: keras.src.engine.training.Model, decoder: keras.src.engine.training.Model, optimizer: keras.src.optimizers.optimizer.Optimizer, vae_mode: bool = False) ‑> tensorflow.python.framework.tensor.Tensor</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Trains the model on a batch of data.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>mean</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>The mean of the distribution.</dd>
+<dt><strong><code>log_var</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>The log variance of the distribution.</dd>
+<dt><strong><code>batch</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>The batch of data.</dd>
+<dt><strong><code>encoder</code></strong> :&ensp;<code>tf.keras.Model</code></dt>
+<dd>The encoder model.</dd>
+<dt><strong><code>decoder</code></strong> :&ensp;<code>tf.keras.Model</code></dt>
+<dd>The decoder model.</dd>
+<dt><strong><code>optimizer</code></strong> :&ensp;<code>tf.keras.optimizers.Optimizer</code></dt>
+<dd>The optimizer to use.</dd>
+<dt><strong><code>vae_mode</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether to use variational autoencoder mode. Default is False.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>tf.Tensor</code>
+The loss value.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@tf.function
+def train_step(
+    batch: tf.Tensor,
+    encoder: tf.keras.Model,
+    decoder: tf.keras.Model,
+    optimizer: tf.keras.optimizers.Optimizer,
+    vae_mode: bool = False,
+) -&gt; tf.Tensor:
+    &#34;&#34;&#34;Trains the model on a batch of data.
+
+    Parameters
+    ----------
+    mean : `tf.Tensor`
+        The mean of the distribution.
+    log_var : `tf.Tensor`
+        The log variance of the distribution.
+    batch : `tf.Tensor`
+        The batch of data.
+    encoder : `tf.keras.Model`
+        The encoder model.
+    decoder : `tf.keras.Model`
+        The decoder model.
+    optimizer : `tf.keras.optimizers.Optimizer`
+        The optimizer to use.
+    vae_mode : `bool`
+        Whether to use variational autoencoder mode. Default is False.
+
+    Returns
+    -------
+    `tf.Tensor`
+        The loss value.
+    &#34;&#34;&#34;
+    optimizer.build(encoder.trainable_variables + decoder.trainable_variables)
+
+    with tf.GradientTape() as encoder_tape, tf.GradientTape() as decoder_tape:
+        loss = cal_loss_step(batch, encoder, decoder, vae_mode=vae_mode)
+
+    gradients_of_encoder = encoder_tape.gradient(loss, encoder.trainable_variables)
+    gradients_of_decoder = decoder_tape.gradient(loss, decoder.trainable_variables)
+
+    optimizer.apply_gradients(zip(gradients_of_encoder, encoder.trainable_variables))
+    optimizer.apply_gradients(zip(gradients_of_decoder, decoder.trainable_variables))
+
+    return loss</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.vae_loss"><code class="name flex">
+<span>def <span class="ident">vae_loss</span></span>(<span>y_true: tensorflow.python.framework.tensor.Tensor, y_pred: tensorflow.python.framework.tensor.Tensor, mean: tensorflow.python.framework.tensor.Tensor, log_var: tensorflow.python.framework.tensor.Tensor) ‑> tensorflow.python.framework.tensor.Tensor</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Variational autoencoder loss function.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>y_true</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>The true values.</dd>
+<dt><strong><code>y_pred</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>The predicted values.</dd>
+<dt><strong><code>mean</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>The mean of the distribution.</dd>
+<dt><strong><code>log_var</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>The log variance of the distribution.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>tf.Tensor</code></p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def vae_loss(
+    y_true: tf.Tensor, y_pred: tf.Tensor, mean: tf.Tensor, log_var: tf.Tensor
+) -&gt; tf.Tensor:
+    &#34;&#34;&#34;
+    Variational autoencoder loss function.
+
+    Parameters
+    ----------
+    y_true : `tf.Tensor`
+        The true values.
+    y_pred : `tf.Tensor`
+        The predicted values.
+    mean : `tf.Tensor`
+        The mean of the distribution.
+    log_var : `tf.Tensor`
+        The log variance of the distribution.
+
+    Returns
+    -------
+    `tf.Tensor`
+    &#34;&#34;&#34;
+    return mse_loss(y_true, y_pred) + kl_loss(mean, log_var)</code></pre>
+</details>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier"><code class="flex name class">
+<span>class <span class="ident">AutoClassifier</span></span>
+<span>(</span><span>input_shape_parm: int, num_classes: int, units: int, activation: str, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>An auto-classifier model that automatically determines the best classification strategy based on the input data.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>input_shape_parm</code></strong> :&ensp;<code>int</code></dt>
+<dd>The shape of the input data.</dd>
+<dt><strong><code>num_classes</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of classes in the dataset.</dd>
+<dt><strong><code>units</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of neurons in each hidden layer.</dd>
+<dt><strong><code>activation</code></strong> :&ensp;<code>str</code></dt>
+<dd>The type of activation function to use for the neural network layers.</dd>
+</dl>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
+<p>Additional keyword arguments to pass to the model.</p>
+<p>classifier_activation : <code>str</code>
+The activation function to use for the classifier layer. Default is <code>softmax</code>. If the activation function is not a classification function, the model can be used in regression problems.
+num_layers : <code>int</code>
+The number of hidden layers in the classifier. Default is 1.
+dropout : <code>float</code>
+The dropout rate to use in the classifier. Default is None.
+l2_reg : <code>float</code>
+The L2 regularization parameter. Default is 0.0.
+vae_mode : <code>bool</code>
+Whether to use variational autoencoder mode. Default is False.
+vae_units : <code>int</code>
+The number of units in the variational autoencoder. Default is 2.
+lora_mode : <code>bool</code>
+Whether to use LoRA layers. Default is False.
+lora_rank : <code>int</code>
+The rank of the LoRA layer. Default is 4.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@tf.keras.utils.register_keras_serializable(package=&#34;Custom&#34;, name=&#34;AutoClassifier&#34;)
+class AutoClassifier(tf.keras.Model):
+    &#34;&#34;&#34;
+    An auto-classifier model that automatically determines the best classification strategy based on the input data.
+
+    Parameters
+    ----------
+    input_shape_parm : `int`
+        The shape of the input data.
+    num_classes : `int`
+        The number of classes in the dataset.
+    units : `int`
+        The number of neurons in each hidden layer.
+    activation : `str`
+        The type of activation function to use for the neural network layers.
+
+    Keyword Arguments
+    -----------------
+    Additional keyword arguments to pass to the model.
+
+    classifier_activation : `str`
+        The activation function to use for the classifier layer. Default is `softmax`. If the activation function is not a classification function, the model can be used in regression problems.
+    num_layers : `int`
+        The number of hidden layers in the classifier. Default is 1.
+    dropout : `float`
+        The dropout rate to use in the classifier. Default is None.
+    l2_reg : `float`
+        The L2 regularization parameter. Default is 0.0.
+    vae_mode : `bool`
+        Whether to use variational autoencoder mode. Default is False.
+    vae_units : `int`
+        The number of units in the variational autoencoder. Default is 2.
+    lora_mode : `bool`
+        Whether to use LoRA layers. Default is False.
+    lora_rank : `int`
+        The rank of the LoRA layer. Default is 4.
+    &#34;&#34;&#34;
+
+    def __init__(
+        self,
+        input_shape_parm: int,
+        num_classes: int,
+        units: int,
+        activation: str,
+        **kwargs,
+    ) -&gt; None:
+        super(AutoClassifier, self).__init__()
+        self.input_shape_parm = input_shape_parm
+        self.num_classes = num_classes
+        self.units = units
+        self.activation = activation
+
+        self.encoder = None
+        self.decoder = None
+        self.classifier = None
+        self.classifier_activation: str = kwargs.get(&#34;classifier_activation&#34;, &#34;softmax&#34;)
+        self.num_layers: int = kwargs.get(&#34;num_layers&#34;, 1)
+        self.dropout: Optional[float] = kwargs.get(&#34;dropout&#34;, None)
+        self.l2_reg: float = kwargs.get(&#34;l2_reg&#34;, 0.0)
+        self.vae_mode: bool = kwargs.get(&#34;vae_mode&#34;, False)
+        self.vae_units: int = kwargs.get(&#34;vae_units&#34;, 2)
+        self.lora_mode: bool = kwargs.get(&#34;lora_mode&#34;, False)
+        self.lora_rank: int = kwargs.get(&#34;lora_rank&#34;, 4)
+
+    def build_encoder_decoder(self, input_shape: tuple) -&gt; None:
+        self.encoder = (
+            tf.keras.Sequential(
+                [
+                    tf.keras.layers.Dense(
+                        units=self.units,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                    tf.keras.layers.Dense(
+                        units=int(self.units / 2),
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                ],
+                name=&#34;encoder&#34;,
+            )
+            if not self.encoder
+            else self.encoder
+        )
+
+        self.decoder = (
+            tf.keras.Sequential(
+                [
+                    tf.keras.layers.Dense(
+                        units=self.units,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                    tf.keras.layers.Dense(
+                        units=self.input_shape_parm,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                ],
+                name=&#34;decoder&#34;,
+            )
+            if not self.decoder
+            else self.decoder
+        )
+
+    def build(self, input_shape: tuple) -&gt; None:
+        if self.vae_mode:
+            inputs = tf.keras.Input(shape=self.input_shape_parm, name=&#34;encoder_input&#34;)
+            x = tf.keras.layers.Dense(
+                units=self.units,
+                kernel_regularizer=l2(self.l2_reg),
+                kernel_initializer=&#34;he_normal&#34;,
+            )(inputs)
+            x = tf.keras.layers.BatchNormalization()(x)
+            x = tf.keras.layers.Activation(self.activation)(x)
+            x = tf.keras.layers.Dense(
+                units=int(self.units / 2),
+                kernel_regularizer=l2(self.l2_reg),
+                kernel_initializer=&#34;he_normal&#34;,
+                name=&#34;encoder_hidden&#34;,
+            )(x)
+            x = tf.keras.layers.BatchNormalization()(x)
+            x = tf.keras.layers.Activation(self.activation)(x)
+
+            mean = tf.keras.layers.Dense(2, name=&#34;mean&#34;)(x)
+            log_var = tf.keras.layers.Dense(2, name=&#34;log_var&#34;)(x)
+            log_var = tf.keras.layers.Lambda(lambda x: x + 1e-7)(log_var)
+
+            self.encoder = (
+                tf.keras.Model(inputs, [mean, log_var], name=&#34;vae_encoder&#34;)
+                if not self.encoder
+                else self.encoder
+            )
+            self.decoder = (
+                tf.keras.Sequential(
+                    [
+                        tf.keras.layers.Dense(
+                            units=self.units,
+                            kernel_regularizer=l2(self.l2_reg),
+                        ),
+                        tf.keras.layers.BatchNormalization(),
+                        tf.keras.layers.Activation(self.activation),
+                        tf.keras.layers.Dense(
+                            units=self.input_shape_parm,
+                            kernel_regularizer=l2(self.l2_reg),
+                        ),
+                        tf.keras.layers.BatchNormalization(),
+                        tf.keras.layers.Activation(self.activation),
+                    ],
+                    name=&#34;vae_decoder&#34;,
+                )
+                if not self.decoder
+                else self.decoder
+            )
+
+        else:
+            self.build_encoder_decoder(input_shape)
+
+        self.classifier = tf.keras.Sequential()
+        if self.num_layers &gt; 1 and not self.lora_mode:
+            for _ in range(self.num_layers - 1):
+                self.classifier.add(
+                    tf.keras.layers.Dense(
+                        units=self.units,
+                        activation=self.activation,
+                        kernel_regularizer=l2(self.l2_reg),
+                    )
+                )
+                if self.dropout:
+                    self.classifier.add(tf.keras.layers.Dropout(self.dropout))
+
+        elif self.lora_mode:
+            for _ in range(self.num_layers - 1):
+                self.classifier.add(
+                    LoRALayer(units=self.units, rank=self.lora_rank, name=f&#34;LoRA_{_}&#34;)
+                )
+                self.classifier.add(tf.keras.layers.Activation(self.activation))
+                if self.dropout:
+                    self.classifier.add(tf.keras.layers.Dropout(self.dropout))
+
+        self.classifier.add(
+            tf.keras.layers.Dense(
+                units=self.num_classes,
+                activation=self.classifier_activation,
+                kernel_regularizer=l2(self.l2_reg),
+            )
+        )
+
+    def train_encoder_decoder(
+        self,
+        data: Union[tf.data.Dataset, np.ndarray],
+        epochs: int,
+        batch_size: int,
+        validation_split: float = 0.2,
+        patience: int = 10,
+        **kwargs,
+    ) -&gt; None:
+        &#34;&#34;&#34;Trains the encoder and decoder on the input data.
+
+        Parameters
+        ----------
+        data : `tf.data.Dataset`, `np.ndarray`
+            The input data.
+        epochs : `int`
+            The number of epochs to train for.
+        batch_size : `int`
+            The batch size to use.
+        validation_split : `float`
+            The proportion of the dataset to use for validation. Default is 0.2.
+        patience : `int`
+            The number of epochs to wait before early stopping. Default is 10.
+
+        Keyword Arguments
+        -----------------
+        Additional keyword arguments to pass to the model.
+        &#34;&#34;&#34;
+        verbose = kwargs.get(&#34;verbose&#34;, True)
+        optimizer = kwargs.get(&#34;optimizer&#34;, tf.keras.optimizers.Adam())
+        dummy_input = tf.convert_to_tensor(tf.random.normal([1, self.input_shape_parm]))
+        self.build(dummy_input.shape)
+        if not self.vae_mode:
+            dummy_output = self.encoder(dummy_input)
+            self.decoder(dummy_output)
+        else:
+            mean, log_var = self.encoder(dummy_input)
+            dummy_output = sampling(mean, log_var)
+            self.decoder(dummy_output)
+
+        if isinstance(data, np.ndarray):
+            data = tf.data.Dataset.from_tensor_slices(data).batch(batch_size)
+            data = data.map(lambda x: tf.cast(x, tf.float32))
+
+        early_stopping = EarlyStopping(patience=patience)
+        train_batches = data.take(int((1 - validation_split) * len(data)))
+        val_batches = data.skip(int((1 - validation_split) * len(data)))
+        for epoch in range(epochs):
+            for train_batch, val_batch in zip(train_batches, val_batches):
+                loss_train = train_step(
+                    train_batch, self.encoder, self.decoder, optimizer, self.vae_mode
+                )
+                loss_val = cal_loss_step(
+                    val_batch, self.encoder, self.decoder, self.vae_mode, False
+                )
+
+            early_stopping(loss_train)
+
+            if early_stopping.stop_training:
+                print(f&#34;Early stopping triggered at epoch {epoch}.&#34;)
+                break
+
+            if epoch % 10 == 0 and verbose:
+                print(
+                    f&#34;Epoch {epoch}: Train Loss: {loss_train:.6f} Validation Loss: {loss_val:.6f}&#34;
+                )
+        self.freeze_encoder_decoder()
+
+    def call(self, x: tf.Tensor) -&gt; tf.Tensor:
+        if self.vae_mode:
+            mean, log_var = self.encoder(x)
+            encoded = sampling(mean, log_var)
+        else:
+            encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        combined = tf.concat([decoded, encoded], axis=1)
+        classification = self.classifier(combined)
+        return classification
+
+    def freeze_encoder_decoder(self) -&gt; None:
+        &#34;&#34;&#34;Freezes the encoder and decoder layers to prevent them from being updated during training.&#34;&#34;&#34;
+        for layer in self.encoder.layers:
+            layer.trainable = False
+        for layer in self.decoder.layers:
+            layer.trainable = False
+
+    def unfreeze_encoder_decoder(self) -&gt; None:
+        &#34;&#34;&#34;Unfreezes the encoder and decoder layers allowing them to be updated during training.&#34;&#34;&#34;
+        for layer in self.encoder.layers:
+            layer.trainable = True
+        for layer in self.decoder.layers:
+            layer.trainable = True
+
+    def set_encoder_decoder(self, source_model: &#34;AutoClassifier&#34;) -&gt; None:
+        &#34;&#34;&#34;Sets the encoder and decoder layers from another AutoClassifier instance,
+        ensuring compatibility in dimensions. Only works if vae_mode is False.
+
+        Parameters
+        ----------
+        source_model : AutoClassifier
+            The source model to copy the encoder and decoder layers from.
+
+        Raises
+        ------
+        ValueError
+            If the input shape or units of the source model do not match.
+        &#34;&#34;&#34;
+        if not isinstance(source_model, AutoClassifier):
+            raise ValueError(&#34;Source model must be an instance of AutoClassifier.&#34;)
+
+        if self.input_shape_parm != source_model.input_shape_parm:
+            raise ValueError(
+                f&#34;Incompatible input shape. Expected {self.input_shape_parm}, got {source_model.input_shape_parm}.&#34;
+            )
+        if self.units != source_model.units:
+            raise ValueError(
+                f&#34;Incompatible number of units. Expected {self.units}, got {source_model.units}.&#34;
+            )
+        self.encoder, self.decoder = tf.keras.Sequential(), tf.keras.Sequential()
+        for i, layer in enumerate(source_model.encoder.layers):
+            if isinstance(layer, tf.keras.layers.Dense):
+                dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
+                dense_layer = tf.keras.layers.Dense(
+                    units=layer.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                )
+                dense_layer.build(dummy_input.shape)
+                self.encoder.add(dense_layer)
+                self.encoder.layers[i].set_weights(layer.get_weights())
+            elif not isinstance(layer, InputLayer):
+                raise ValueError(f&#34;Layer type {type(layer)} not supported for copying.&#34;)
+
+        for i, layer in enumerate(source_model.decoder.layers):
+            if isinstance(layer, tf.keras.layers.Dense):
+                dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
+                dense_layer = tf.keras.layers.Dense(
+                    units=layer.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                )
+                dense_layer.build(dummy_input.shape)
+                self.decoder.add(dense_layer)
+                self.decoder.layers[i].set_weights(layer.get_weights())
+            elif not isinstance(layer, InputLayer):
+                raise ValueError(f&#34;Layer type {type(layer)} not supported for copying.&#34;)
+
+    def get_config(self) -&gt; Dict[str, Any]:
+        config = {
+            &#34;input_shape_parm&#34;: self.input_shape_parm,
+            &#34;num_classes&#34;: self.num_classes,
+            &#34;units&#34;: self.units,
+            &#34;activation&#34;: self.activation,
+            &#34;classifier_activation&#34;: self.classifier_activation,
+            &#34;num_layers&#34;: self.num_layers,
+            &#34;dropout&#34;: self.dropout,
+            &#34;l2_reg&#34;: self.l2_reg,
+            &#34;vae_mode&#34;: self.vae_mode,
+            &#34;vae_units&#34;: self.vae_units,
+            &#34;lora_mode&#34;: self.lora_mode,
+            &#34;lora_rank&#34;: self.lora_rank,
+        }
+        base_config = super(AutoClassifier, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -&gt; &#34;AutoClassifier&#34;:
+        return cls(
+            input_shape_parm=config[&#34;input_shape_parm&#34;],
+            num_classes=config[&#34;num_classes&#34;],
+            units=config[&#34;units&#34;],
+            activation=config[&#34;activation&#34;],
+            classifier_activation=config[&#34;classifier_activation&#34;],
+            num_layers=config[&#34;num_layers&#34;],
+            dropout=config[&#34;dropout&#34;],
+            l2_reg=config[&#34;l2_reg&#34;],
+            vae_mode=config[&#34;vae_mode&#34;],
+            vae_units=config[&#34;vae_units&#34;],
+            lora_mode=config[&#34;lora_mode&#34;],
+            lora_rank=config[&#34;lora_rank&#34;],
+        )</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>keras.src.engine.training.Model</li>
+<li>keras.src.engine.base_layer.Layer</li>
+<li>tensorflow.python.module.module.Module</li>
+<li>tensorflow.python.trackable.autotrackable.AutoTrackable</li>
+<li>tensorflow.python.trackable.base.Trackable</li>
+<li>keras.src.utils.version_utils.LayerVersionSelector</li>
+<li>keras.src.utils.version_utils.ModelVersionSelector</li>
+</ul>
+<h3>Static methods</h3>
+<dl>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.from_config"><code class="name flex">
+<span>def <span class="ident">from_config</span></span>(<span>config: Dict[str, Any]) ‑> <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Creates a layer from its config.</p>
+<p>This method is the reverse of <code>get_config</code>,
+capable of instantiating the same layer from the config
+dictionary. It does not handle layer connectivity
+(handled by Network), nor weights (handled by <code>set_weights</code>).</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>config</code></strong></dt>
+<dd>A Python dictionary, typically the
+output of get_config.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>A layer instance.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def from_config(cls, config: Dict[str, Any]) -&gt; &#34;AutoClassifier&#34;:
+    return cls(
+        input_shape_parm=config[&#34;input_shape_parm&#34;],
+        num_classes=config[&#34;num_classes&#34;],
+        units=config[&#34;units&#34;],
+        activation=config[&#34;activation&#34;],
+        classifier_activation=config[&#34;classifier_activation&#34;],
+        num_layers=config[&#34;num_layers&#34;],
+        dropout=config[&#34;dropout&#34;],
+        l2_reg=config[&#34;l2_reg&#34;],
+        vae_mode=config[&#34;vae_mode&#34;],
+        vae_units=config[&#34;vae_units&#34;],
+        lora_mode=config[&#34;lora_mode&#34;],
+        lora_rank=config[&#34;lora_rank&#34;],
+    )</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.build"><code class="name flex">
+<span>def <span class="ident">build</span></span>(<span>self, input_shape: tuple) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Builds the model based on input shapes received.</p>
+<p>This is to be used for subclassed models, which do not know at
+instantiation time what their inputs look like.</p>
+<p>This method only exists for users who want to call <code>model.build()</code> in a
+standalone way (as a substitute for calling the model on real data to
+build it). It will never be called by the framework (and thus it will
+never throw unexpected errors in an unrelated workflow).</p>
+<p>Args:
+input_shape: Single tuple, <code>TensorShape</code> instance, or list/dict of
+shapes, where shapes are tuples, integers, or <code>TensorShape</code>
+instances.</p>
+<h2 id="raises">Raises</h2>
+<p>ValueError:
+1. In case of invalid user-provided data (not of type tuple,
+list, <code>TensorShape</code>, or dict).
+2. If the model requires call arguments that are agnostic
+to the input shapes (positional or keyword arg in call
+signature).
+3. If not all layers were properly built.
+4. If float type inputs are not supported within the layers.</p>
+<p>In each of these cases, the user should build their model by calling
+it on real tensor data.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def build(self, input_shape: tuple) -&gt; None:
+    if self.vae_mode:
+        inputs = tf.keras.Input(shape=self.input_shape_parm, name=&#34;encoder_input&#34;)
+        x = tf.keras.layers.Dense(
+            units=self.units,
+            kernel_regularizer=l2(self.l2_reg),
+            kernel_initializer=&#34;he_normal&#34;,
+        )(inputs)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation(self.activation)(x)
+        x = tf.keras.layers.Dense(
+            units=int(self.units / 2),
+            kernel_regularizer=l2(self.l2_reg),
+            kernel_initializer=&#34;he_normal&#34;,
+            name=&#34;encoder_hidden&#34;,
+        )(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation(self.activation)(x)
+
+        mean = tf.keras.layers.Dense(2, name=&#34;mean&#34;)(x)
+        log_var = tf.keras.layers.Dense(2, name=&#34;log_var&#34;)(x)
+        log_var = tf.keras.layers.Lambda(lambda x: x + 1e-7)(log_var)
+
+        self.encoder = (
+            tf.keras.Model(inputs, [mean, log_var], name=&#34;vae_encoder&#34;)
+            if not self.encoder
+            else self.encoder
+        )
+        self.decoder = (
+            tf.keras.Sequential(
+                [
+                    tf.keras.layers.Dense(
+                        units=self.units,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                    tf.keras.layers.BatchNormalization(),
+                    tf.keras.layers.Activation(self.activation),
+                    tf.keras.layers.Dense(
+                        units=self.input_shape_parm,
+                        kernel_regularizer=l2(self.l2_reg),
+                    ),
+                    tf.keras.layers.BatchNormalization(),
+                    tf.keras.layers.Activation(self.activation),
+                ],
+                name=&#34;vae_decoder&#34;,
+            )
+            if not self.decoder
+            else self.decoder
+        )
+
+    else:
+        self.build_encoder_decoder(input_shape)
+
+    self.classifier = tf.keras.Sequential()
+    if self.num_layers &gt; 1 and not self.lora_mode:
+        for _ in range(self.num_layers - 1):
+            self.classifier.add(
+                tf.keras.layers.Dense(
+                    units=self.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                )
+            )
+            if self.dropout:
+                self.classifier.add(tf.keras.layers.Dropout(self.dropout))
+
+    elif self.lora_mode:
+        for _ in range(self.num_layers - 1):
+            self.classifier.add(
+                LoRALayer(units=self.units, rank=self.lora_rank, name=f&#34;LoRA_{_}&#34;)
+            )
+            self.classifier.add(tf.keras.layers.Activation(self.activation))
+            if self.dropout:
+                self.classifier.add(tf.keras.layers.Dropout(self.dropout))
+
+    self.classifier.add(
+        tf.keras.layers.Dense(
+            units=self.num_classes,
+            activation=self.classifier_activation,
+            kernel_regularizer=l2(self.l2_reg),
+        )
+    )</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.build_encoder_decoder"><code class="name flex">
+<span>def <span class="ident">build_encoder_decoder</span></span>(<span>self, input_shape: tuple) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def build_encoder_decoder(self, input_shape: tuple) -&gt; None:
+    self.encoder = (
+        tf.keras.Sequential(
+            [
+                tf.keras.layers.Dense(
+                    units=self.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                ),
+                tf.keras.layers.Dense(
+                    units=int(self.units / 2),
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                ),
+            ],
+            name=&#34;encoder&#34;,
+        )
+        if not self.encoder
+        else self.encoder
+    )
+
+    self.decoder = (
+        tf.keras.Sequential(
+            [
+                tf.keras.layers.Dense(
+                    units=self.units,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                ),
+                tf.keras.layers.Dense(
+                    units=self.input_shape_parm,
+                    activation=self.activation,
+                    kernel_regularizer=l2(self.l2_reg),
+                ),
+            ],
+            name=&#34;decoder&#34;,
+        )
+        if not self.decoder
+        else self.decoder
+    )</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.call"><code class="name flex">
+<span>def <span class="ident">call</span></span>(<span>self, x: tensorflow.python.framework.tensor.Tensor) ‑> tensorflow.python.framework.tensor.Tensor</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Calls the model on new inputs and returns the outputs as tensors.</p>
+<p>In this case <code>call()</code> just reapplies
+all ops in the graph to the new inputs
+(e.g. build a new computational graph from the provided inputs).</p>
+<p>Note: This method should not be called directly. It is only meant to be
+overridden when subclassing <code>tf.keras.Model</code>.
+To call a model on an input, always use the <code>__call__()</code> method,
+i.e. <code>model(inputs)</code>, which relies on the underlying <code>call()</code> method.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>inputs</code></strong></dt>
+<dd>Input tensor, or dict/list/tuple of input tensors.</dd>
+<dt><strong><code>training</code></strong></dt>
+<dd>Boolean or boolean scalar tensor, indicating whether to
+run the <code>Network</code> in training mode or inference mode.</dd>
+<dt><strong><code>mask</code></strong></dt>
+<dd>A mask or list of masks. A mask can be either a boolean tensor
+or None (no mask). For more details, check the guide
+<a href="https://www.tensorflow.org/guide/keras/masking_and_padding">here</a>.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>A tensor if there is a single output, or
+a list of tensors if there are more than one outputs.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def call(self, x: tf.Tensor) -&gt; tf.Tensor:
+    if self.vae_mode:
+        mean, log_var = self.encoder(x)
+        encoded = sampling(mean, log_var)
+    else:
+        encoded = self.encoder(x)
+    decoded = self.decoder(encoded)
+    combined = tf.concat([decoded, encoded], axis=1)
+    classification = self.classifier(combined)
+    return classification</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.freeze_encoder_decoder"><code class="name flex">
+<span>def <span class="ident">freeze_encoder_decoder</span></span>(<span>self) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Freezes the encoder and decoder layers to prevent them from being updated during training.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def freeze_encoder_decoder(self) -&gt; None:
+    &#34;&#34;&#34;Freezes the encoder and decoder layers to prevent them from being updated during training.&#34;&#34;&#34;
+    for layer in self.encoder.layers:
+        layer.trainable = False
+    for layer in self.decoder.layers:
+        layer.trainable = False</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.get_config"><code class="name flex">
+<span>def <span class="ident">get_config</span></span>(<span>self) ‑> Dict[str, Any]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Returns the config of the <code>Model</code>.</p>
+<p>Config is a Python dictionary (serializable) containing the
+configuration of an object, which in this case is a <code>Model</code>. This allows
+the <code>Model</code> to be be reinstantiated later (without its trained weights)
+from this configuration.</p>
+<p>Note that <code>get_config()</code> does not guarantee to return a fresh copy of
+dict every time it is called. The callers should make a copy of the
+returned dict if they want to modify it.</p>
+<p>Developers of subclassed <code>Model</code> are advised to override this method,
+and continue to update the dict from <code>super(MyModel, self).get_config()</code>
+to provide the proper configuration of this <code>Model</code>. The default config
+will return config dict for init parameters if they are basic types.
+Raises <code>NotImplementedError</code> when in cases where a custom
+<code>get_config()</code> implementation is required for the subclassed model.</p>
+<h2 id="returns">Returns</h2>
+<p>Python dictionary containing the configuration of this <code>Model</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_config(self) -&gt; Dict[str, Any]:
+    config = {
+        &#34;input_shape_parm&#34;: self.input_shape_parm,
+        &#34;num_classes&#34;: self.num_classes,
+        &#34;units&#34;: self.units,
+        &#34;activation&#34;: self.activation,
+        &#34;classifier_activation&#34;: self.classifier_activation,
+        &#34;num_layers&#34;: self.num_layers,
+        &#34;dropout&#34;: self.dropout,
+        &#34;l2_reg&#34;: self.l2_reg,
+        &#34;vae_mode&#34;: self.vae_mode,
+        &#34;vae_units&#34;: self.vae_units,
+        &#34;lora_mode&#34;: self.lora_mode,
+        &#34;lora_rank&#34;: self.lora_rank,
+    }
+    base_config = super(AutoClassifier, self).get_config()
+    return dict(list(base_config.items()) + list(config.items()))</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.set_encoder_decoder"><code class="name flex">
+<span>def <span class="ident">set_encoder_decoder</span></span>(<span>self, source_model: <a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a>) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Sets the encoder and decoder layers from another AutoClassifier instance,
+ensuring compatibility in dimensions. Only works if vae_mode is False.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>source_model</code></strong> :&ensp;<code><a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></code></dt>
+<dd>The source model to copy the encoder and decoder layers from.</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>ValueError</code></dt>
+<dd>If the input shape or units of the source model do not match.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_encoder_decoder(self, source_model: &#34;AutoClassifier&#34;) -&gt; None:
+    &#34;&#34;&#34;Sets the encoder and decoder layers from another AutoClassifier instance,
+    ensuring compatibility in dimensions. Only works if vae_mode is False.
+
+    Parameters
+    ----------
+    source_model : AutoClassifier
+        The source model to copy the encoder and decoder layers from.
+
+    Raises
+    ------
+    ValueError
+        If the input shape or units of the source model do not match.
+    &#34;&#34;&#34;
+    if not isinstance(source_model, AutoClassifier):
+        raise ValueError(&#34;Source model must be an instance of AutoClassifier.&#34;)
+
+    if self.input_shape_parm != source_model.input_shape_parm:
+        raise ValueError(
+            f&#34;Incompatible input shape. Expected {self.input_shape_parm}, got {source_model.input_shape_parm}.&#34;
+        )
+    if self.units != source_model.units:
+        raise ValueError(
+            f&#34;Incompatible number of units. Expected {self.units}, got {source_model.units}.&#34;
+        )
+    self.encoder, self.decoder = tf.keras.Sequential(), tf.keras.Sequential()
+    for i, layer in enumerate(source_model.encoder.layers):
+        if isinstance(layer, tf.keras.layers.Dense):
+            dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
+            dense_layer = tf.keras.layers.Dense(
+                units=layer.units,
+                activation=self.activation,
+                kernel_regularizer=l2(self.l2_reg),
+            )
+            dense_layer.build(dummy_input.shape)
+            self.encoder.add(dense_layer)
+            self.encoder.layers[i].set_weights(layer.get_weights())
+        elif not isinstance(layer, InputLayer):
+            raise ValueError(f&#34;Layer type {type(layer)} not supported for copying.&#34;)
+
+    for i, layer in enumerate(source_model.decoder.layers):
+        if isinstance(layer, tf.keras.layers.Dense):
+            dummy_input = tf.convert_to_tensor(tf.random.normal([1, layer.input_shape[1]]))
+            dense_layer = tf.keras.layers.Dense(
+                units=layer.units,
+                activation=self.activation,
+                kernel_regularizer=l2(self.l2_reg),
+            )
+            dense_layer.build(dummy_input.shape)
+            self.decoder.add(dense_layer)
+            self.decoder.layers[i].set_weights(layer.get_weights())
+        elif not isinstance(layer, InputLayer):
+            raise ValueError(f&#34;Layer type {type(layer)} not supported for copying.&#34;)</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.train_encoder_decoder"><code class="name flex">
+<span>def <span class="ident">train_encoder_decoder</span></span>(<span>self, data: Union[tensorflow.python.data.ops.dataset_ops.DatasetV2, numpy.ndarray], epochs: int, batch_size: int, validation_split: float = 0.2, patience: int = 10, **kwargs) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Trains the encoder and decoder on the input data.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>data</code></strong> :&ensp;<code>tf.data.Dataset<code>,</code>np.ndarray</code></dt>
+<dd>The input data.</dd>
+<dt><strong><code>epochs</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of epochs to train for.</dd>
+<dt><strong><code>batch_size</code></strong> :&ensp;<code>int</code></dt>
+<dd>The batch size to use.</dd>
+<dt><strong><code>validation_split</code></strong> :&ensp;<code>float</code></dt>
+<dd>The proportion of the dataset to use for validation. Default is 0.2.</dd>
+<dt><strong><code>patience</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of epochs to wait before early stopping. Default is 10.</dd>
+</dl>
+<h2 id="keyword-arguments">Keyword Arguments</h2>
+<p>Additional keyword arguments to pass to the model.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def train_encoder_decoder(
+    self,
+    data: Union[tf.data.Dataset, np.ndarray],
+    epochs: int,
+    batch_size: int,
+    validation_split: float = 0.2,
+    patience: int = 10,
+    **kwargs,
+) -&gt; None:
+    &#34;&#34;&#34;Trains the encoder and decoder on the input data.
+
+    Parameters
+    ----------
+    data : `tf.data.Dataset`, `np.ndarray`
+        The input data.
+    epochs : `int`
+        The number of epochs to train for.
+    batch_size : `int`
+        The batch size to use.
+    validation_split : `float`
+        The proportion of the dataset to use for validation. Default is 0.2.
+    patience : `int`
+        The number of epochs to wait before early stopping. Default is 10.
+
+    Keyword Arguments
+    -----------------
+    Additional keyword arguments to pass to the model.
+    &#34;&#34;&#34;
+    verbose = kwargs.get(&#34;verbose&#34;, True)
+    optimizer = kwargs.get(&#34;optimizer&#34;, tf.keras.optimizers.Adam())
+    dummy_input = tf.convert_to_tensor(tf.random.normal([1, self.input_shape_parm]))
+    self.build(dummy_input.shape)
+    if not self.vae_mode:
+        dummy_output = self.encoder(dummy_input)
+        self.decoder(dummy_output)
+    else:
+        mean, log_var = self.encoder(dummy_input)
+        dummy_output = sampling(mean, log_var)
+        self.decoder(dummy_output)
+
+    if isinstance(data, np.ndarray):
+        data = tf.data.Dataset.from_tensor_slices(data).batch(batch_size)
+        data = data.map(lambda x: tf.cast(x, tf.float32))
+
+    early_stopping = EarlyStopping(patience=patience)
+    train_batches = data.take(int((1 - validation_split) * len(data)))
+    val_batches = data.skip(int((1 - validation_split) * len(data)))
+    for epoch in range(epochs):
+        for train_batch, val_batch in zip(train_batches, val_batches):
+            loss_train = train_step(
+                train_batch, self.encoder, self.decoder, optimizer, self.vae_mode
+            )
+            loss_val = cal_loss_step(
+                val_batch, self.encoder, self.decoder, self.vae_mode, False
+            )
+
+        early_stopping(loss_train)
+
+        if early_stopping.stop_training:
+            print(f&#34;Early stopping triggered at epoch {epoch}.&#34;)
+            break
+
+        if epoch % 10 == 0 and verbose:
+            print(
+                f&#34;Epoch {epoch}: Train Loss: {loss_train:.6f} Validation Loss: {loss_val:.6f}&#34;
+            )
+    self.freeze_encoder_decoder()</code></pre>
+</details>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.AutoClassifier.unfreeze_encoder_decoder"><code class="name flex">
+<span>def <span class="ident">unfreeze_encoder_decoder</span></span>(<span>self) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Unfreezes the encoder and decoder layers allowing them to be updated during training.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def unfreeze_encoder_decoder(self) -&gt; None:
+    &#34;&#34;&#34;Unfreezes the encoder and decoder layers allowing them to be updated during training.&#34;&#34;&#34;
+    for layer in self.encoder.layers:
+        layer.trainable = True
+    for layer in self.decoder.layers:
+        layer.trainable = True</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="likelihood.models.deep.autoencoders.EarlyStopping"><code class="flex name class">
+<span>class <span class="ident">EarlyStopping</span></span>
+<span>(</span><span>patience: int = 10, min_delta: float = 0.001)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class EarlyStopping:
+    def __init__(self, patience: int = 10, min_delta: float = 0.001) -&gt; None:
+        self.patience = patience
+        self.min_delta = min_delta
+        self.best_loss: float = np.inf
+        self.counter: int = 0
+        self.stop_training: bool = False
+
+    def __call__(self, current_loss: float) -&gt; None:
+        if self.best_loss - current_loss &gt; self.min_delta:
+            self.best_loss = current_loss
+            self.counter = 0
+        else:
+            self.counter += 1
+
+        if self.counter &gt;= self.patience:
+            self.stop_training = True</code></pre>
+</details>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="likelihood.models.deep" href="index.html">likelihood.models.deep</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="two-column">
+<li><code><a title="likelihood.models.deep.autoencoders.build_model" href="#likelihood.models.deep.autoencoders.build_model">build_model</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.cal_loss_step" href="#likelihood.models.deep.autoencoders.cal_loss_step">cal_loss_step</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.call_existing_code" href="#likelihood.models.deep.autoencoders.call_existing_code">call_existing_code</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.check_for_nans" href="#likelihood.models.deep.autoencoders.check_for_nans">check_for_nans</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.kl_loss" href="#likelihood.models.deep.autoencoders.kl_loss">kl_loss</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.mse_loss" href="#likelihood.models.deep.autoencoders.mse_loss">mse_loss</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.sampling" href="#likelihood.models.deep.autoencoders.sampling">sampling</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.setup_model" href="#likelihood.models.deep.autoencoders.setup_model">setup_model</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.train_step" href="#likelihood.models.deep.autoencoders.train_step">train_step</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.vae_loss" href="#likelihood.models.deep.autoencoders.vae_loss">vae_loss</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="likelihood.models.deep.autoencoders.AutoClassifier" href="#likelihood.models.deep.autoencoders.AutoClassifier">AutoClassifier</a></code></h4>
+<ul class="">
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.build" href="#likelihood.models.deep.autoencoders.AutoClassifier.build">build</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.build_encoder_decoder" href="#likelihood.models.deep.autoencoders.AutoClassifier.build_encoder_decoder">build_encoder_decoder</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.call" href="#likelihood.models.deep.autoencoders.AutoClassifier.call">call</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.freeze_encoder_decoder" href="#likelihood.models.deep.autoencoders.AutoClassifier.freeze_encoder_decoder">freeze_encoder_decoder</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.from_config" href="#likelihood.models.deep.autoencoders.AutoClassifier.from_config">from_config</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.get_config" href="#likelihood.models.deep.autoencoders.AutoClassifier.get_config">get_config</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.set_encoder_decoder" href="#likelihood.models.deep.autoencoders.AutoClassifier.set_encoder_decoder">set_encoder_decoder</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.train_encoder_decoder" href="#likelihood.models.deep.autoencoders.AutoClassifier.train_encoder_decoder">train_encoder_decoder</a></code></li>
+<li><code><a title="likelihood.models.deep.autoencoders.AutoClassifier.unfreeze_encoder_decoder" href="#likelihood.models.deep.autoencoders.AutoClassifier.unfreeze_encoder_decoder">unfreeze_encoder_decoder</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="likelihood.models.deep.autoencoders.EarlyStopping" href="#likelihood.models.deep.autoencoders.EarlyStopping">EarlyStopping</a></code></h4>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.10.0</a>.</p>
+</footer>
+</body>
+</html>

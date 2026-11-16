@@ -1,3 +1,5 @@
+"""Simulation utilities for generating synthetic datasets and quartile categories."""
+
 import pickle
 from typing import Dict, List, Tuple, Union
 
@@ -16,6 +18,32 @@ else:
 
 # --------------------------------------------------------------------------------------------------------------------------------------
 def categories_by_quartile(df: DataFrame, column: str) -> Tuple[str, str]:
+    """Identify the least and most frequent categories in a column based on quartiles.
+
+    This function analyzes the frequency distribution of values in a specified column
+    and identifies the least frequently occurring category (based on Q1) and the most
+    frequently occurring category (based on Q3).
+
+    Parameters
+    ----------
+    df : DataFrame
+        A pandas DataFrame containing the data to analyze.
+    column : str
+        The name of the column to analyze for category frequency.
+
+    Returns
+    -------
+    Tuple[str, str]
+        A tuple containing two strings:
+        - The least frequent category (minimum value in freq, or None if empty)
+        - The most frequent category (maximum value in freq, or None if empty)
+
+    Notes
+    -----
+    Categories are determined by their occurrence frequency within the column.
+    The least frequent category is identified as any value below the 25th percentile
+    of frequencies, while the most frequent is above the 75th percentile.
+    """
     freq = df[column].value_counts()
 
     q1 = freq.quantile(0.25)
@@ -31,9 +59,8 @@ def categories_by_quartile(df: DataFrame, column: str) -> Tuple[str, str]:
 
 
 class SimulationEngine(FeatureSelection):
-    """
-    This class implements a predictive model that utilizes multiple linear regression for numerical target variables
-    and multiple logistic regression for categorical target variables.
+    """This class implements a predictive model that utilizes multiple linear regression for
+    numerical target variables and multiple logistic regression for categorical target variables.
 
     The class provides methods for training the model on a given dataset, making predictions,
     and evaluating the model's performance.
@@ -53,7 +80,7 @@ class SimulationEngine(FeatureSelection):
     for both numerical and categorical outcomes efficiently.
     """
 
-    def __init__(self, use_scaler: bool = False, **kwargs):
+    def __init__(self, use_scaler: bool = False, **kwargs) -> None:
         self.df = pd.DataFrame()
         self.n_importances = None
         self.use_scaler = use_scaler
@@ -62,6 +89,20 @@ class SimulationEngine(FeatureSelection):
         super().__init__(**kwargs)
 
     def predict(self, df: DataFrame, column: str) -> np.ndarray | list:
+        """Predict values for the given column using the trained simulation engine.
+
+        Parameters
+        ----------
+        df : DataFrame
+            Input data frame containing the features.
+        column : str
+            The column name to predict.
+
+        Returns
+        -------
+        np.ndarray | list
+            Predicted values.
+        """
         w, quick_encoder, names_cols, dfe, numeric_dict = self.w_dict[column]
 
         df = df[names_cols].copy()
@@ -111,6 +152,17 @@ class SimulationEngine(FeatureSelection):
         return dict(zip(keys, values))
 
     def fit(self, df: DataFrame, n_importances: int, **kwargs) -> None:
+        """Fit the simulation engine to the provided dataset.
+
+        Parameters
+        ----------
+        df : DataFrame
+            The input data frame containing the features.
+        n_importances : int
+            The number of importances to consider.
+        **kwargs : dict
+            Additional keyword arguments for fitting.
+        """
         self.df = df
         self.n_importances = n_importances
         self.get_digraph(self.df, self.n_importances, self.use_scaler)
@@ -146,6 +198,32 @@ class SimulationEngine(FeatureSelection):
             )
 
     def get_proba(self, value: Union[Union[float, int], str] | list, colname: str) -> List[float]:
+        """Calculate probability values for given inputs based on the trained simulation engine.
+
+        This method computes probabilities for single or multiple input values using either
+        cumulative distribution functions (for numerical data) or frequency dictionaries
+        (for categorical data).
+
+        Parameters
+        ----------
+        value : Union[Union[float, int], str] | list
+            The input value(s) to calculate probabilities for. Can be a single numeric
+            value, string, or a list of values.
+        colname : str
+            The name of the column/key used to look up probability calculations in the
+            trained model.
+
+        Returns
+        -------
+        List[float]
+            A list of probability values corresponding to each input value. For numerical
+            inputs, probabilities are calculated using cumulative distribution functions.
+            For categorical inputs, probabilities are retrieved from frequency dictionaries.
+
+        Notes
+        -----
+        This method requires that the simulation engine has been trained using fit().
+        """
         value = (
             value
             if isinstance(value, list)
@@ -162,6 +240,20 @@ class SimulationEngine(FeatureSelection):
         ]
 
     def pred_outliers(self, value: Union[Union[float, int], str] | list, colname: str) -> List[str]:
+        """Determine if values are outliers based on probability thresholds.
+
+        Parameters
+        ----------
+        value : Union[Union[float, int], str] | list
+            The input value(s) to evaluate.
+        colname : str
+            The column name associated with the input.
+
+        Returns
+        -------
+        List[str]
+            List of labels indicating "inlier" or "outlier" for each input.
+        """
         return [
             (
                 "inlier"
@@ -181,8 +273,7 @@ class SimulationEngine(FeatureSelection):
         return df
 
     def save(self, filename: str = "./simulation_model") -> None:
-        """
-        Save the state of the SimulationEngine to a file.
+        """Save the state of the SimulationEngine to a file.
 
         Parameters
         ----------
@@ -194,9 +285,8 @@ class SimulationEngine(FeatureSelection):
             pickle.dump(self, f)
 
     @staticmethod
-    def load(filename: str = "./simulation_model"):
-        """
-        Load the state of a SimulationEngine from a file.
+    def load(filename: str = "./simulation_model") -> "SimulationEngine":
+        """Load the state of a SimulationEngine from a file.
 
         Parameters
         ----------

@@ -38,7 +38,11 @@ jobs:
         run: |
           if ($env:RUNNER_OS -eq "Windows") {
             # Use the pythonLocation environment variable set by setup-python
-            $python_path = "C:\\hostedtoolcache\\windows\\Python\\3.10.11\\x64\\python.EXE"
+            if ($env:PROCESSOR_ARCHITECTURE -eq "AMD64" -or $env:PROCESSOR_ARCHITECTURE -eq "x86_64") {
+              $python_path = "C:\\hostedtoolcache\\windows\\Python\\3.10.11\\x64\\python.EXE"
+            } elseif ($env:PROCESSOR_ARCHITECTURE -eq "x86") {
+              $python_path = "C:\\hostedtoolcache\\windows\\Python\\3.10.11\\x86\\python.EXE"
+            }
             
             # Check if pythonPath is valid
             if (-not $python_path) {
@@ -61,9 +65,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install cibuildwheel setuptools-rust
 
-      - name: Skip Windows 32-bit build
-        run: echo "CIBW_SKIP=*-win32" >> $GITHUB_ENV
-
       - name: Skip musllinux build
         run: echo "CIBW_SKIP=cp*-musllinux_*" >> $GITHUB_ENV
 
@@ -73,6 +74,8 @@ jobs:
             curl https://sh.rustup.rs -sSf | sh -s -- -y
             rustup update stable
             if [ "$RUNNER_OS" == "Windows" ]; then
+              rustup target add x86_64-pc-windows-msvc
+              rustup target add i686-pc-windows-msvc
               echo "C:\\Users\\runneradmin\\.cargo\\bin" >> $GITHUB_ENV
             else
               . "$HOME/.cargo/env"
@@ -80,7 +83,7 @@ jobs:
             rustc --version
           CIBW_ENVIRONMENT: "PATH=$HOME/.cargo/bin:$PATH"
           CIBW_OUTPUT_DIR: dist
-          CIBW_ARCHS_WINDOWS: AMD64
+          CIBW_ARCHS_WINDOWS: x86_64,i686
         run: |
           echo "Starting cibuildwheel..."
           cibuildwheel --output-dir dist

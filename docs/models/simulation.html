@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.models.simulation API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Simulation utilities for generating synthetic datasets and quartile categories.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.models.simulation</code></h1>
 </header>
 <section id="section-intro">
+<p>Simulation utilities for generating synthetic datasets and quartile categories.</p>
 </section>
 <section>
 </section>
@@ -53,6 +54,32 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def categories_by_quartile(df: DataFrame, column: str) -&gt; Tuple[str, str]:
+    &#34;&#34;&#34;Identify the least and most frequent categories in a column based on quartiles.
+
+    This function analyzes the frequency distribution of values in a specified column
+    and identifies the least frequently occurring category (based on Q1) and the most
+    frequently occurring category (based on Q3).
+
+    Parameters
+    ----------
+    df : DataFrame
+        A pandas DataFrame containing the data to analyze.
+    column : str
+        The name of the column to analyze for category frequency.
+
+    Returns
+    -------
+    Tuple[str, str]
+        A tuple containing two strings:
+        - The least frequent category (minimum value in freq, or None if empty)
+        - The most frequent category (maximum value in freq, or None if empty)
+
+    Notes
+    -----
+    Categories are determined by their occurrence frequency within the column.
+    The least frequent category is identified as any value below the 25th percentile
+    of frequencies, while the most frequent is above the 75th percentile.
+    &#34;&#34;&#34;
     freq = df[column].value_counts()
 
     q1 = freq.quantile(0.25)
@@ -66,7 +93,28 @@ el.replaceWith(d);
 
     return least_frequent_category, most_frequent_category</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Identify the least and most frequent categories in a column based on quartiles.</p>
+<p>This function analyzes the frequency distribution of values in a specified column
+and identifies the least frequently occurring category (based on Q1) and the most
+frequently occurring category (based on Q3).</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dd>A pandas DataFrame containing the data to analyze.</dd>
+<dt><strong><code>column</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the column to analyze for category frequency.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>Tuple[str, str]</code></dt>
+<dd>A tuple containing two strings:
+- The least frequent category (minimum value in freq, or None if empty)
+- The most frequent category (maximum value in freq, or None if empty)</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>Categories are determined by their occurrence frequency within the column.
+The least frequent category is identified as any value below the 25th percentile
+of frequencies, while the most frequent is above the 75th percentile.</p></div>
 </dd>
 </dl>
 </section>
@@ -83,9 +131,8 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class SimulationEngine(FeatureSelection):
-    &#34;&#34;&#34;
-    This class implements a predictive model that utilizes multiple linear regression for numerical target variables
-    and multiple logistic regression for categorical target variables.
+    &#34;&#34;&#34;This class implements a predictive model that utilizes multiple linear regression for
+    numerical target variables and multiple logistic regression for categorical target variables.
 
     The class provides methods for training the model on a given dataset, making predictions,
     and evaluating the model&#39;s performance.
@@ -105,7 +152,7 @@ el.replaceWith(d);
     for both numerical and categorical outcomes efficiently.
     &#34;&#34;&#34;
 
-    def __init__(self, use_scaler: bool = False, **kwargs):
+    def __init__(self, use_scaler: bool = False, **kwargs) -&gt; None:
         self.df = pd.DataFrame()
         self.n_importances = None
         self.use_scaler = use_scaler
@@ -114,6 +161,20 @@ el.replaceWith(d);
         super().__init__(**kwargs)
 
     def predict(self, df: DataFrame, column: str) -&gt; np.ndarray | list:
+        &#34;&#34;&#34;Predict values for the given column using the trained simulation engine.
+
+        Parameters
+        ----------
+        df : DataFrame
+            Input data frame containing the features.
+        column : str
+            The column name to predict.
+
+        Returns
+        -------
+        np.ndarray | list
+            Predicted values.
+        &#34;&#34;&#34;
         w, quick_encoder, names_cols, dfe, numeric_dict = self.w_dict[column]
 
         df = df[names_cols].copy()
@@ -163,6 +224,17 @@ el.replaceWith(d);
         return dict(zip(keys, values))
 
     def fit(self, df: DataFrame, n_importances: int, **kwargs) -&gt; None:
+        &#34;&#34;&#34;Fit the simulation engine to the provided dataset.
+
+        Parameters
+        ----------
+        df : DataFrame
+            The input data frame containing the features.
+        n_importances : int
+            The number of importances to consider.
+        **kwargs : dict
+            Additional keyword arguments for fitting.
+        &#34;&#34;&#34;
         self.df = df
         self.n_importances = n_importances
         self.get_digraph(self.df, self.n_importances, self.use_scaler)
@@ -198,6 +270,32 @@ el.replaceWith(d);
             )
 
     def get_proba(self, value: Union[Union[float, int], str] | list, colname: str) -&gt; List[float]:
+        &#34;&#34;&#34;Calculate probability values for given inputs based on the trained simulation engine.
+
+        This method computes probabilities for single or multiple input values using either
+        cumulative distribution functions (for numerical data) or frequency dictionaries
+        (for categorical data).
+
+        Parameters
+        ----------
+        value : Union[Union[float, int], str] | list
+            The input value(s) to calculate probabilities for. Can be a single numeric
+            value, string, or a list of values.
+        colname : str
+            The name of the column/key used to look up probability calculations in the
+            trained model.
+
+        Returns
+        -------
+        List[float]
+            A list of probability values corresponding to each input value. For numerical
+            inputs, probabilities are calculated using cumulative distribution functions.
+            For categorical inputs, probabilities are retrieved from frequency dictionaries.
+
+        Notes
+        -----
+        This method requires that the simulation engine has been trained using fit().
+        &#34;&#34;&#34;
         value = (
             value
             if isinstance(value, list)
@@ -214,6 +312,20 @@ el.replaceWith(d);
         ]
 
     def pred_outliers(self, value: Union[Union[float, int], str] | list, colname: str) -&gt; List[str]:
+        &#34;&#34;&#34;Determine if values are outliers based on probability thresholds.
+
+        Parameters
+        ----------
+        value : Union[Union[float, int], str] | list
+            The input value(s) to evaluate.
+        colname : str
+            The column name associated with the input.
+
+        Returns
+        -------
+        List[str]
+            List of labels indicating &#34;inlier&#34; or &#34;outlier&#34; for each input.
+        &#34;&#34;&#34;
         return [
             (
                 &#34;inlier&#34;
@@ -233,8 +345,7 @@ el.replaceWith(d);
         return df
 
     def save(self, filename: str = &#34;./simulation_model&#34;) -&gt; None:
-        &#34;&#34;&#34;
-        Save the state of the SimulationEngine to a file.
+        &#34;&#34;&#34;Save the state of the SimulationEngine to a file.
 
         Parameters
         ----------
@@ -246,9 +357,8 @@ el.replaceWith(d);
             pickle.dump(self, f)
 
     @staticmethod
-    def load(filename: str = &#34;./simulation_model&#34;):
-        &#34;&#34;&#34;
-        Load the state of a SimulationEngine from a file.
+    def load(filename: str = &#34;./simulation_model&#34;) -&gt; &#34;SimulationEngine&#34;:
+        &#34;&#34;&#34;Load the state of a SimulationEngine from a file.
 
         Parameters
         ----------
@@ -264,8 +374,8 @@ el.replaceWith(d);
         with open(filename, &#34;rb&#34;) as f:
             return pickle.load(f)</code></pre>
 </details>
-<div class="desc"><p>This class implements a predictive model that utilizes multiple linear regression for numerical target variables
-and multiple logistic regression for categorical target variables.</p>
+<div class="desc"><p>This class implements a predictive model that utilizes multiple linear regression for
+numerical target variables and multiple logistic regression for categorical target variables.</p>
 <p>The class provides methods for training the model on a given dataset, making predictions,
 and evaluating the model's performance.</p>
 <p>Key features:
@@ -279,7 +389,8 @@ and evaluating the model's performance.</p>
 - Evaluate the model using built-in metrics for accuracy and error.</p>
 <p>This class is suitable for applications in data analysis and machine learning, enabling users to leverage regression techniques
 for both numerical and categorical outcomes efficiently.</p>
-<p>The initializer of the class. The initial parameter is a list of strings with variables to discard.</p></div>
+<p>Initialize the class .</p>
+<p>The initial parameter is a list of strings with variables to discard.</p></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li><a title="likelihood.tools.tools.FeatureSelection" href="../tools/tools.html#likelihood.tools.tools.FeatureSelection">FeatureSelection</a></li>
@@ -287,7 +398,7 @@ for both numerical and categorical outcomes efficiently.</p>
 <h3>Static methods</h3>
 <dl>
 <dt id="likelihood.models.simulation.SimulationEngine.load"><code class="name flex">
-<span>def <span class="ident">load</span></span>(<span>filename: str = './simulation_model')</span>
+<span>def <span class="ident">load</span></span>(<span>filename: str = './simulation_model') ‑> <a title="likelihood.models.simulation.SimulationEngine" href="#likelihood.models.simulation.SimulationEngine">SimulationEngine</a></span>
 </code></dt>
 <dd>
 <details class="source">
@@ -295,9 +406,8 @@ for both numerical and categorical outcomes efficiently.</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@staticmethod
-def load(filename: str = &#34;./simulation_model&#34;):
-    &#34;&#34;&#34;
-    Load the state of a SimulationEngine from a file.
+def load(filename: str = &#34;./simulation_model&#34;) -&gt; &#34;SimulationEngine&#34;:
+    &#34;&#34;&#34;Load the state of a SimulationEngine from a file.
 
     Parameters
     ----------
@@ -337,6 +447,17 @@ def load(filename: str = &#34;./simulation_model&#34;):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def fit(self, df: DataFrame, n_importances: int, **kwargs) -&gt; None:
+    &#34;&#34;&#34;Fit the simulation engine to the provided dataset.
+
+    Parameters
+    ----------
+    df : DataFrame
+        The input data frame containing the features.
+    n_importances : int
+        The number of importances to consider.
+    **kwargs : dict
+        Additional keyword arguments for fitting.
+    &#34;&#34;&#34;
     self.df = df
     self.n_importances = n_importances
     self.get_digraph(self.df, self.n_importances, self.use_scaler)
@@ -371,7 +492,16 @@ def load(filename: str = &#34;./simulation_model&#34;):
             f(upper_limit) if f else upper_limit,
         )</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Fit the simulation engine to the provided dataset.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dd>The input data frame containing the features.</dd>
+<dt><strong><code>n_importances</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of importances to consider.</dd>
+<dt><strong><code>**kwargs</code></strong> :&ensp;<code>dict</code></dt>
+<dd>Additional keyword arguments for fitting.</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.simulation.SimulationEngine.get_proba"><code class="name flex">
 <span>def <span class="ident">get_proba</span></span>(<span>self, value: float | int | str | list, colname: str) ‑> List[float]</span>
@@ -382,6 +512,32 @@ def load(filename: str = &#34;./simulation_model&#34;):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_proba(self, value: Union[Union[float, int], str] | list, colname: str) -&gt; List[float]:
+    &#34;&#34;&#34;Calculate probability values for given inputs based on the trained simulation engine.
+
+    This method computes probabilities for single or multiple input values using either
+    cumulative distribution functions (for numerical data) or frequency dictionaries
+    (for categorical data).
+
+    Parameters
+    ----------
+    value : Union[Union[float, int], str] | list
+        The input value(s) to calculate probabilities for. Can be a single numeric
+        value, string, or a list of values.
+    colname : str
+        The name of the column/key used to look up probability calculations in the
+        trained model.
+
+    Returns
+    -------
+    List[float]
+        A list of probability values corresponding to each input value. For numerical
+        inputs, probabilities are calculated using cumulative distribution functions.
+        For categorical inputs, probabilities are retrieved from frequency dictionaries.
+
+    Notes
+    -----
+    This method requires that the simulation engine has been trained using fit().
+    &#34;&#34;&#34;
     value = (
         value
         if isinstance(value, list)
@@ -397,7 +553,28 @@ def load(filename: str = &#34;./simulation_model&#34;):
         for val in value
     ]</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Calculate probability values for given inputs based on the trained simulation engine.</p>
+<p>This method computes probabilities for single or multiple input values using either
+cumulative distribution functions (for numerical data) or frequency dictionaries
+(for categorical data).</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>value</code></strong> :&ensp;<code>Union[Union[float, int], str] | list</code></dt>
+<dd>The input value(s) to calculate probabilities for. Can be a single numeric
+value, string, or a list of values.</dd>
+<dt><strong><code>colname</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the column/key used to look up probability calculations in the
+trained model.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>List[float]</code></dt>
+<dd>A list of probability values corresponding to each input value. For numerical
+inputs, probabilities are calculated using cumulative distribution functions.
+For categorical inputs, probabilities are retrieved from frequency dictionaries.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>This method requires that the simulation engine has been trained using fit().</p></div>
 </dd>
 <dt id="likelihood.models.simulation.SimulationEngine.pred_outliers"><code class="name flex">
 <span>def <span class="ident">pred_outliers</span></span>(<span>self, value: float | int | str | list, colname: str) ‑> List[str]</span>
@@ -408,6 +585,20 @@ def load(filename: str = &#34;./simulation_model&#34;):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def pred_outliers(self, value: Union[Union[float, int], str] | list, colname: str) -&gt; List[str]:
+    &#34;&#34;&#34;Determine if values are outliers based on probability thresholds.
+
+    Parameters
+    ----------
+    value : Union[Union[float, int], str] | list
+        The input value(s) to evaluate.
+    colname : str
+        The column name associated with the input.
+
+    Returns
+    -------
+    List[str]
+        List of labels indicating &#34;inlier&#34; or &#34;outlier&#34; for each input.
+    &#34;&#34;&#34;
     return [
         (
             &#34;inlier&#34;
@@ -417,7 +608,19 @@ def load(filename: str = &#34;./simulation_model&#34;):
         for val in self.get_proba(value, colname)
     ]</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Determine if values are outliers based on probability thresholds.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>value</code></strong> :&ensp;<code>Union[Union[float, int], str] | list</code></dt>
+<dd>The input value(s) to evaluate.</dd>
+<dt><strong><code>colname</code></strong> :&ensp;<code>str</code></dt>
+<dd>The column name associated with the input.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>List[str]</code></dt>
+<dd>List of labels indicating "inlier" or "outlier" for each input.</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.simulation.SimulationEngine.predict"><code class="name flex">
 <span>def <span class="ident">predict</span></span>(<span>self, df: pandas.core.frame.DataFrame, column: str) ‑> numpy.ndarray | list</span>
@@ -428,6 +631,20 @@ def load(filename: str = &#34;./simulation_model&#34;):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def predict(self, df: DataFrame, column: str) -&gt; np.ndarray | list:
+    &#34;&#34;&#34;Predict values for the given column using the trained simulation engine.
+
+    Parameters
+    ----------
+    df : DataFrame
+        Input data frame containing the features.
+    column : str
+        The column name to predict.
+
+    Returns
+    -------
+    np.ndarray | list
+        Predicted values.
+    &#34;&#34;&#34;
     w, quick_encoder, names_cols, dfe, numeric_dict = self.w_dict[column]
 
     df = df[names_cols].copy()
@@ -466,7 +683,19 @@ def load(filename: str = &#34;./simulation_model&#34;):
 
     return y[:]</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Predict values for the given column using the trained simulation engine.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>df</code></strong> :&ensp;<code>DataFrame</code></dt>
+<dd>Input data frame containing the features.</dd>
+<dt><strong><code>column</code></strong> :&ensp;<code>str</code></dt>
+<dd>The column name to predict.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>np.ndarray | list</code></dt>
+<dd>Predicted values.</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.simulation.SimulationEngine.save"><code class="name flex">
 <span>def <span class="ident">save</span></span>(<span>self, filename: str = './simulation_model') ‑> None</span>
@@ -477,8 +706,7 @@ def load(filename: str = &#34;./simulation_model&#34;):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def save(self, filename: str = &#34;./simulation_model&#34;) -&gt; None:
-    &#34;&#34;&#34;
-    Save the state of the SimulationEngine to a file.
+    &#34;&#34;&#34;Save the state of the SimulationEngine to a file.
 
     Parameters
     ----------

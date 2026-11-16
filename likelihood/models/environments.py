@@ -1,27 +1,92 @@
-from collections import defaultdict
+"""RL environment and action-space definitions."""
+
+import pickle
+import random
+from collections import OrderedDict, defaultdict
 from itertools import chain
-from typing import Any, Dict, List, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 from scipy.spatial import KDTree
 
 
-def flatten_chain(matrix):
+def flatten_chain(matrix: List[List[Any]]) -> List[Any]:
+    """Flatten a chain of lists into a single list.
+
+    Parameters
+    ----------
+    matrix : List[List[Any]]
+        A list of lists to be flattened.
+
+    Returns
+    -------
+    List[Any]
+        A single list containing all elements from the nested lists.
+    """
     return list(chain.from_iterable(matrix))
 
 
 class ActionSpace:
-    def __init__(self, num_actions):
+    """Action space representing a discrete set of actions.
+
+    Parameters
+    ----------
+    num_actions : int
+        The number of possible actions.
+    """
+
+    def __init__(self, num_actions: int) -> None:
         self._num_actions = num_actions
 
     @property
-    def n(self):
+    def n(self) -> int:
+        """The number of actions in the space."""
         return self._num_actions
+
+    def save(self, path: str | Path = "./action_space.pkl") -> None:
+        """Serialize the action space to disk using pickle.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default="./action_space.pkl"
+            Destination file.
+        """
+        with Path(path).open("wb") as file:
+            pickle.dump(self, file)
+
+    @classmethod
+    def load(cls, path: str | Path = "./action_space.pkl") -> "ActionSpace":
+        """Restore an action space saved with :meth:`save`.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default="./action_space.pkl"
+            Checkpoint written by :meth:`save`.
+
+        Returns
+        -------
+        ActionSpace
+            Action space with the stored number of actions.
+
+        Raises
+        ------
+        TypeError
+            If the pickle does not contain an :class:`ActionSpace` instance.
+
+        Notes
+        -----
+        Checkpoints are pickles, so only load files you trust.
+        """
+        with Path(path).open("rb") as file:
+            space = pickle.load(file)
+        if not isinstance(space, cls):
+            raise TypeError(f"{str(path)!r} does not contain an ActionSpace instance")
+        return space
 
 
 class OptionCriticEnv:
-    """
-    An environment for Option Critic reinforcement learning that processes a dataset of episodes.
+    """An environment for Option Critic reinforcement learning that processes a dataset of episodes.
 
     Attributes
     ----------
@@ -43,14 +108,21 @@ class OptionCriticEnv:
         Current episode index being processed
     current_state : `np.ndarray`
         Current state observation in the environment
+    epsilon : `float`
+        Probability of choosing the reward from the nearest state. By default it is set to `0.1`.
+
+    Notes
+    -----
+    The environment is a simulator derived from the episode dataset (it builds
+    spatial indexes over the transitions), so it is rebuilt from that dataset
+    instead of being checkpointed as a model artifact.
     """
 
     def __init__(
         self,
         episodes: Dict[int, Dict[str, List]],
-    ):
-        """
-        Initializes the OptionCriticEnv with a dataset of episodes.
+    ) -> None:
+        """Initialize the OptionCriticEnv with a dataset of episodes.
 
         Parameters
         ----------
@@ -120,19 +192,21 @@ class OptionCriticEnv:
                 ].add(tuple(actions[i]) if isinstance(actions[i], list) else actions[i])
 
         check_type = list(set([key for key in self.actions_by_option.keys()]))
-        keys_actions_by_option = list(self.actions_by_option.keys())
+        keys_actions_by_option = list(sorted(self.actions_by_option.keys(), reverse=True))
         actions = self.actions_by_option[keys_actions_by_option[0]]
 
         self.unique_actions_count = [
             len(
-                set(
-                    flatten_chain(
-                        [
-                            list(action)
-                            for action in self.actions_by_option.get(
-                                keys_actions_by_option[i], set()
-                            )
-                        ]
+                list(
+                    OrderedDict.fromkeys(
+                        flatten_chain(
+                            [
+                                list(action)
+                                for action in self.actions_by_option.get(
+                                    keys_actions_by_option[i], set()
+                                )
+                            ]
+                        )
                     )
                 )
                 if isinstance(keys_actions_by_option[i], tuple)
@@ -151,12 +225,29 @@ class OptionCriticEnv:
         )
         self.kdtree = KDTree(next_states)
         self.trans_list = list(self.state_action_option_to_transition.values())
+        self.stats = 0.0
+        self.count_step_found = 0
+        self.count_step_nearest = 0
+        self.threshold = 0.5
+        self.rate = 0.1
+        self.epsilon = 0.1
+        self.states = np.array(
+            [
+                self.state_action_option_to_transition[k]["next_state"]
+                for k in self.state_action_option_to_transition
+            ]
+        )
+        self.std_per_dim = np.std(states, axis=0)
 
     def _make_transition_key(
-        self, state, option: int | list[int], action: int | list[int], decimals=6
-    ) -> tuple:
+        self,
+        state: List[float],
+        option: Union[int, List[int]],
+        action: Union[int, List[int]],
+        decimals: int = 6,
+    ) -> Tuple:
         """
-        Builds a canonical transition key:
+        Build a canonical transition key.
         ((state_tuple), option(s)..., action(s)...)
         """
         state_key = tuple(round(float(x), decimals) for x in state)
@@ -167,9 +258,15 @@ class OptionCriticEnv:
         else:
             return (state_key, int(option), int(action))
 
+    def _check_condition(self, value: float, other: float) -> float:
+        if other < self.threshold:
+            increment = self.rate * (self.threshold - other)
+            value += increment
+            value = min(value, 1.0)
+        return value
+
     def reset(self) -> tuple[np.ndarray, dict]:
-        """
-        Resets the environment to a random episode and returns the initial state.
+        """Reset the environment to a random episode and returns the initial state.
 
         Returns
         -------
@@ -178,6 +275,8 @@ class OptionCriticEnv:
         info : `Dict`
             Empty dictionary (no additional information)
         """
+        self.count_step_found = 0
+        self.count_step_nearest = 0
         episode_id = np.random.choice(list(self.episodes.keys()))
         self.idx_episode = episode_id
         self.current_state = self.episodes[episode_id]["state"][0]
@@ -186,8 +285,8 @@ class OptionCriticEnv:
     def step(
         self, action: int | List[int], option: int | List[int]
     ) -> tuple[np.ndarray, float, bool, bool, dict]:
-        """
-        Takes an action with a specific option and returns the next state, reward, and termination status.
+        """Take an action with a specific option and returns the next state, reward, and
+        termination status.
 
         Parameters
         ----------
@@ -218,22 +317,49 @@ class OptionCriticEnv:
             option,
             action,
         )
+        self.stats = round(
+            self.count_step_found
+            / (
+                (self.count_step_found + self.count_step_nearest)
+                if (self.count_step_found + self.count_step_nearest) > 0.0
+                else 1.0
+            ),
+            6,
+        )
 
         if key in self.state_action_option_to_transition:
+            self.count_step_found += 1
             trans = self.state_action_option_to_transition[key]
             self.current_state = trans["next_state"]
             return trans["next_state"].copy(), trans["reward"], trans["done"], True, {}
         else:
             # Query KD-tree for nearest neighbor
+            self.count_step_nearest += 1
             distance, idx = self.kdtree.query(self.current_state)
             closest_trans = self.trans_list[idx]
             closest_state = closest_trans["next_state"]
+            closest_reward = closest_trans["reward"]
+            closest_reward_prob = random.random()
+            self.epsilon = self._check_condition(self.epsilon, self.stats)
+            if np.array_equal(self.current_state, closest_state):
+                if self.count_step_nearest > 1:
+                    done = True
+                    reward = -1.0
+                else:
+                    done = False
+                    reward = 0.0
+                    closest_state = closest_state + np.random.normal(
+                        0, self.std_per_dim, size=closest_state.shape
+                    )
+            else:
+                done = False
+                reward = 0.0
 
             self.current_state = closest_state.copy()
             return (
                 closest_state.copy(),
-                closest_trans.get("reward", 0.0),
-                closest_trans.get("done", False),
+                reward if closest_reward_prob < self.epsilon else closest_reward,
+                done if done else closest_trans.get("done", False),
                 False,
                 {},
             )

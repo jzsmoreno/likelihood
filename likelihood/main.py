@@ -1,4 +1,8 @@
-from typing import Callable, List, Tuple
+"""Module for core likelihood computations, including data preprocessing, model fitting, and
+analysis utilities.
+"""
+
+from typing import Callable, List, Optional, Tuple
 
 import corner
 import matplotlib.pyplot as plt
@@ -6,7 +10,7 @@ import numpy as np
 
 
 def lnprior(theta: np.ndarray, conditions: List[Tuple[float, float]]) -> float:
-    """Computes the prior probability.
+    """Compute the prior probability.
 
     Parameters
     ----------
@@ -40,7 +44,7 @@ def fun_like(
     conditions: List[Tuple[float, float]] = None,
     var2: float = 1.0,
 ) -> float:
-    """Computes the likelihood.
+    """Compute the likelihood.
 
     Parameters
     ----------
@@ -83,7 +87,7 @@ def fun_like(
 
 
 def update_theta(theta: np.ndarray, d: float) -> np.ndarray:
-    """Updates the theta parameters.
+    """Update the theta parameters.
 
     Parameters
     ----------
@@ -97,7 +101,7 @@ def update_theta(theta: np.ndarray, d: float) -> np.ndarray:
     theta_new : `np.array`
         An ndarray with the updated theta values.
     """
-    return np.random.normal(theta, d / 2.0)
+    return theta + np.random.normal(0.0, d / 2.0)
 
 
 def walk(
@@ -105,14 +109,14 @@ def walk(
     y: np.ndarray,
     model: Callable,
     theta: np.ndarray,
-    conditions: List[Tuple[float, float]] = None,
+    conditions: Optional[List[Tuple[float, float]]] = None,
     var2: float = 0.01,
     mov: int = 100,
     d: float = 1.0,
     tol: float = 1e-4,
     mode: bool = True,
-):
-    """Executes the walker implementation.
+) -> Tuple[np.ndarray, List[np.ndarray], float]:
+    """Execute the walker implementation.
 
     Parameters
     ----------
@@ -161,7 +165,9 @@ def walk(
         if y0 <= tol or y1 <= tol:
             if mode:
                 print("Goal reached!")
-            return (theta_new, nwalk, y1) if y1 <= tol else (theta, nwalk, y0)
+            if y1 <= tol:
+                return (theta_new, nwalk, y1)
+            return (theta, nwalk, y0)
 
         if y1 >= y0:
             ratio = y0 / y1
@@ -186,15 +192,15 @@ def walkers(
     y: np.ndarray,
     model: Callable,
     theta: np.ndarray,
-    conditions: List[Tuple[float, float]] = None,
+    conditions: Optional[List[Tuple[float, float]]] = None,
     var2: float = 0.01,
     mov: int = 100,
     d: float = 1.0,
     tol: float = 1e-4,
     mode: bool = False,
     figname: str = "fig_out.png",
-):
-    """Executes multiple walkers.
+) -> Tuple[List[np.ndarray], List[float]]:
+    """Execute multiple walkers.
 
     Parameters
     ----------
@@ -256,18 +262,34 @@ def walkers(
     if figname:
         plt.show()
 
-    if len(theta) == 2 and figname:
-        corner.hist2d(
-            nwalk[:, 0],
-            nwalk[:, 1],
-            range=None,
-            bins=18,
-            smooth=True,
-            plot_datapoints=True,
-            plot_density=True,
-        )
-        plt.ylabel("$\\theta_{1}$")
-        plt.xlabel("$\\theta_{0}$")
-        plt.savefig(f"theta_{figname}", dpi=300, transparent=True)
+    if figname:
+        n_params = len(theta)
+
+        if n_params == 2:
+            corner.hist2d(
+                nwalk[:, 0],
+                nwalk[:, 1],
+                range=None,
+                bins=18,
+                smooth=True,
+                plot_datapoints=True,
+                plot_density=True,
+            )
+            plt.ylabel("$\\theta_{1}$")
+            plt.xlabel("$\\theta_{0}$")
+            plt.savefig(f"theta_{figname}", dpi=300, transparent=True)
+        elif n_params > 2:
+            param_names = [f"$\\theta _{i}$" for i in range(n_params)]
+            corner.corner(
+                nwalk,
+                labels=param_names,
+                bins=18,
+                smooth=True,
+                plot_datapoints=True,
+                plot_density=True,
+                max_n_ticks=3,
+                hist2d_kwargs={"smooth": True},
+            )
+            plt.savefig(f"theta_{figname}", dpi=300, transparent=True)
 
     return par, error

@@ -1,19 +1,31 @@
+"""Neural network building blocks for graph-based learning.
+
+This module provides adjacency-matrix construction from tabular data and the vanilla graph neural
+network stack (:class:`Data`, :class:`VanillaGNNLayer`, :class:`VanillaGNN`) used to model node
+features over a graph adjacency matrix.
+"""
+
 import logging
 import os
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
+import os
 from multiprocessing import Pool, cpu_count
-from typing import List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.get_logger().setLevel("ERROR")
 from IPython.display import clear_output
 from sklearn.metrics import f1_score
 
-tf.get_logger().setLevel("ERROR")
 
 from likelihood import rust_py_integration
 from likelihood.tools import LoRALayer
@@ -49,7 +61,27 @@ def compare_similarity_np(arr1: np.ndarray, arr2: np.ndarray, threshold: float =
     return np.count_nonzero(similarity)
 
 
-def compare_pair(pair, data, similarity, threshold):
+def compare_pair(
+    pair: Tuple[int, int], data: np.ndarray, similarity: int, threshold: float
+) -> Tuple[int, int, int]:
+    """Compare two rows of the data and return their pairwise similarity.
+
+    Parameters
+    ----------
+    pair : `Tuple[int, int]`
+        Indices of the two rows to compare.
+    data : `np.ndarray`
+        The data matrix whose rows are compared.
+    similarity : `int`
+        The minimum number of matching features required for a match.
+    threshold : `float`
+        The similarity threshold used in the comparison.
+
+    Returns
+    -------
+    `Tuple[int, int, int]`
+        The indices and a boolean flag indicating whether the rows match.
+    """
     i, j = pair
     sim = compare_similarity_np(data[i], data[j], threshold=threshold)
     return (i, j, 1 if sim >= similarity else 0)
@@ -58,8 +90,7 @@ def compare_pair(pair, data, similarity, threshold):
 def cal_adjacency_matrix(
     df: pd.DataFrame, exclude_subset: List[str] = [], sparse: bool = True, **kwargs
 ) -> Tuple[dict, np.ndarray]:
-    """
-    Calculates the adjacency matrix for a given DataFrame using parallel processing.
+    """Calculate the adjacency matrix for a given DataFrame using parallel processing.
 
     Parameters
     ----------
@@ -103,7 +134,7 @@ def cal_adjacency_matrix(
 
     adj_dict = {i: data[i].tolist() for i in range(n)}
 
-    def pair_generator():
+    def pair_generator() -> None:
         for i in range(n):
             for j in range(i, n):
                 yield (i, j)
@@ -133,13 +164,27 @@ def cal_adjacency_matrix(
 
 
 class Data:
+    """Container for node features and the graph adjacency matrix.
+
+    Parameters
+    ----------
+    df : `pd.DataFrame`
+        The input DataFrame containing the features.
+    target : `str`, `optional`
+        The name of the target column to drop from the features.
+    exclude_subset : `List[str]`
+        The list of features to exclude from the calculation.
+    **kwargs : `dict`
+        Additional keyword arguments passed to :func:`cal_adjacency_matrix`.
+    """
+
     def __init__(
         self,
         df: pd.DataFrame,
         target: str | None = None,
         exclude_subset: List[str] = [],
         **kwargs,
-    ):
+    ) -> None:
         sparse = kwargs.get("sparse", True)
         threshold = kwargs.get("threshold", 0.05)
         _, adjacency = cal_adjacency_matrix(
@@ -159,14 +204,48 @@ class Data:
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="VanillaGNNLayer")
 class VanillaGNNLayer(tf.keras.layers.Layer):
-    def __init__(self, dim_in, dim_out, rank=None, kernel_initializer="glorot_uniform", **kwargs):
+    """A vanilla graph neural network layer.
+
+    Parameters
+    ----------
+    dim_in : `int`
+        The number of input features.
+    dim_out : `int`
+        The number of output features.
+    rank : `int`, `optional`
+        The rank for the LoRA adapter. ``None`` disables LoRA.
+    kernel_initializer : `str`
+        The kernel initializer for the dense layer.
+    **kwargs : `dict`
+        Additional keyword arguments passed to :class:`tf.keras.layers.Layer`.
+    """
+
+    def __init__(
+        self,
+        dim_in: int,
+        dim_out: int,
+        rank: int = None,
+        kernel_initializer: str = "glorot_uniform",
+        **kwargs,
+    ) -> None:
         super(VanillaGNNLayer, self).__init__(**kwargs)
         self.dim_out = dim_out
         self.rank = rank
         self.kernel_initializer = kernel_initializer
         self.linear = None
 
-    def build(self, input_shape):
+    def build(self, input_shape: Tuple[int, ...]) -> None:
+        """Build the layer architecture based on the rank.
+
+        Parameters
+        ----------
+        input_shape : `Tuple[int, ...]`
+            The shape of the input tensors.
+
+        Returns
+        -------
+        None
+        """
         if self.rank:
             self.linear = LoRALayer(self.dim_out, rank=self.rank)
         else:
@@ -175,12 +254,34 @@ class VanillaGNNLayer(tf.keras.layers.Layer):
             )
         super(VanillaGNNLayer, self).build(input_shape)
 
-    def call(self, x, adjacency):
+    def call(self, x: np.ndarray, adjacency: tf.SparseTensor) -> np.ndarray:
+        """Forward pass of the layer over the graph.
+
+        Parameters
+        ----------
+        x : `np.ndarray`
+            The input node features.
+        adjacency : `tf.SparseTensor`
+            The graph adjacency matrix.
+
+        Returns
+        -------
+        `np.ndarray`
+            The layer output.
+        """
         x = self.linear(x)
         x = tf.sparse.sparse_dense_matmul(adjacency, x)
         return x
 
-    def get_config(self):
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration dictionary for serialization.
+
+        Returns
+        -------
+        `Dict[str, Any]`
+            The configuration dictionary containing layer parameters including
+            ``dim_out``, ``rank``, and ``kernel_initializer``.
+        """
         config = super(VanillaGNNLayer, self).get_config()
         config.update(
             {
@@ -198,7 +299,23 @@ class VanillaGNNLayer(tf.keras.layers.Layer):
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="VanillaGNN")
 class VanillaGNN(tf.keras.Model):
-    def __init__(self, dim_in, dim_h, dim_out, rank=2, **kwargs):
+    """A vanilla graph neural network model.
+
+    Parameters
+    ----------
+    dim_in : `int`
+        The number of input features.
+    dim_h : `int`
+        The number of hidden features.
+    dim_out : `int`
+        The number of output features.
+    rank : `int`
+        The rank for the LoRA adapter.
+    **kwargs : `dict`
+        Additional keyword arguments passed to :class:`tf.keras.Model`.
+    """
+
+    def __init__(self, dim_in: int, dim_h: int, dim_out: int, rank: int = 2, **kwargs) -> None:
         super(VanillaGNN, self).__init__(**kwargs)
         self.dim_in = dim_in
         self.dim_h = dim_h
@@ -209,22 +326,82 @@ class VanillaGNN(tf.keras.Model):
         self.gnn2 = VanillaGNNLayer(self.dim_h, self.dim_h, self.rank)
         self.gnn3 = VanillaGNNLayer(self.dim_h, self.dim_out, None)
 
-    def call(self, x, adjacency):
+    def call(self, x: np.ndarray, adjacency: tf.SparseTensor) -> np.ndarray:
+        """Forward pass over the vanilla GNN.
+
+        Parameters
+        ----------
+        x : `np.ndarray`
+            The node feature matrix.
+        adjacency : `tf.SparseTensor`
+            The graph adjacency matrix.
+
+        Returns
+        -------
+        `np.ndarray`
+            The model output.
+        """
         h = self.gnn1(x, adjacency)
         h = tf.nn.tanh(h)
         h = self.gnn2(h, adjacency)
         h = self.gnn3(h, adjacency)
         return tf.nn.softmax(h, axis=1)
 
-    def f1_macro(self, y_true, y_pred):
+    def f1_macro(self, y_true: np.ndarray, y_pred: np.ndarray) -> float:
+        """Compute the macro-averaged F1 score.
+
+        Parameters
+        ----------
+        y_true : `np.ndarray`
+            The ground-truth labels.
+        y_pred : `np.ndarray`
+            The predicted labels.
+
+        Returns
+        -------
+        `float`
+            The macro-averaged F1 score.
+        """
         return f1_score(y_true, y_pred, average="macro")
 
-    def compute_f1_score(self, logits, labels):
+    def compute_f1_score(self, logits: tf.Tensor, labels: tf.Tensor) -> float:
+        """Compute the F1 score from model logits.
+
+        Parameters
+        ----------
+        logits : `tf.Tensor`
+            The model logits.
+        labels : `tf.Tensor`
+            The ground-truth labels.
+
+        Returns
+        -------
+        `float`
+            The macro-averaged F1 score.
+        """
         predictions = tf.argmax(logits, axis=1, output_type=tf.int32)
         true_labels = tf.cast(labels, tf.int32)
         return self.f1_macro(true_labels.numpy(), predictions.numpy())
 
-    def evaluate(self, x, adjacency, y):
+    def evaluate(
+        self, x: np.ndarray, adjacency: tf.SparseTensor, y: np.ndarray
+    ) -> Tuple[float, float]:
+        """Evaluate the model on the given inputs.
+
+        Parameters
+        ----------
+        x : `np.ndarray`
+            The node feature matrix.
+        adjacency : `tf.SparseTensor`
+            The graph adjacency matrix.
+        y : `np.ndarray`
+            The ground-truth labels.
+
+        Returns
+        -------
+        `Tuple[float, float]`
+            The mean loss and the F1 score.
+        """
         y = tf.cast(y, tf.int32)
         out = self(x, adjacency)
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=out)
@@ -232,16 +409,48 @@ class VanillaGNN(tf.keras.Model):
         f1 = round(self.compute_f1_score(out, y), 4)
         return loss.numpy(), f1
 
-    def test(self, data):
+    def test(self, data: Data) -> float:
+        """Evaluate the model on the test split of the data.
+
+        Parameters
+        ----------
+        data : `Data`
+            The dataset containing the test split.
+
+        Returns
+        -------
+        `float`
+            The macro-averaged F1 score on the test split.
+        """
         out = self(data.x, data.adjacency)
         test_f1 = self.compute_f1_score(out, data.y)
         return round(test_f1, 4)
 
-    def predict(self, data):
+    def predict(self, data: Data) -> np.ndarray:
+        """Predict the labels for the test split of the data.
+
+        Parameters
+        ----------
+        data : `Data`
+            The dataset containing the test split.
+
+        Returns
+        -------
+        `np.ndarray`
+            The predicted labels for the test split.
+        """
         out = self(data.x, data.adjacency)
         return tf.argmax(out, axis=1, output_type=tf.int32).numpy()
 
-    def get_config(self):
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration dictionary for serialization.
+
+        Returns
+        -------
+        `Dict[str, Any]`
+            The configuration dictionary containing model parameters including
+            ``dim_in``, ``dim_h``, ``dim_out``, and ``rank``.
+        """
         config = {
             "dim_in": self.dim_in,
             "dim_h": self.dim_h,
@@ -252,7 +461,19 @@ class VanillaGNN(tf.keras.Model):
         return dict(list(base_config.items()) + list(config.items()))
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config: Dict[str, Any]) -> "VanillaGNN":
+        """Create a VanillaGNN instance from a configuration dictionary.
+
+        Parameters
+        ----------
+        config : `Dict[str, Any]`
+            The configuration dictionary containing model parameters.
+
+        Returns
+        -------
+        `VanillaGNN`
+            An instance of VanillaGNN initialized with the given configuration.
+        """
         return cls(
             dim_in=config["dim_in"],
             dim_h=config["dim_h"],
@@ -261,7 +482,31 @@ class VanillaGNN(tf.keras.Model):
         )
 
     @tf.function
-    def train_step(self, batch_x, batch_adjacency, batch_y, optimizer):
+    def train_step(
+        self,
+        batch_x: np.ndarray,
+        batch_adjacency: tf.SparseTensor,
+        batch_y: np.ndarray,
+        optimizer: tf.keras.optimizers.Optimizer,
+    ) -> tf.Tensor:
+        """Perform a single training step.
+
+        Parameters
+        ----------
+        batch_x : `np.ndarray`
+            The batch of node features.
+        batch_adjacency : `tf.SparseTensor`
+            The batch of adjacency matrices.
+        batch_y : `np.ndarray`
+            The batch of labels.
+        optimizer : `tf.keras.optimizers.Optimizer`
+            The optimizer used to update the model weights.
+
+        Returns
+        -------
+        `tf.Tensor`
+            The computed loss.
+        """
         with tf.GradientTape() as tape:
             out = self(batch_x, batch_adjacency)
             loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=batch_y, logits=out)
@@ -270,7 +515,34 @@ class VanillaGNN(tf.keras.Model):
         optimizer.apply_gradients(zip(gradients, self.trainable_variables))
         return loss
 
-    def fit(self, data, epochs, batch_size, test_size=0.2, optimizer="adam"):
+    def fit(
+        self,
+        data: Data,
+        epochs: int,
+        batch_size: int,
+        test_size: float = 0.2,
+        optimizer: str = "adam",
+    ) -> Tuple[List[float], List[float], List[float], List[float]]:
+        """Fit the model to the data.
+
+        Parameters
+        ----------
+        data : `Data`
+            The dataset used for training.
+        epochs : `int`
+            The number of training epochs.
+        batch_size : `int`
+            The batch size.
+        test_size : `float`
+            The proportion of the data to use for testing.
+        optimizer : `str`
+            The name of the optimizer to use.
+
+        Returns
+        -------
+        `Tuple[List[float], List[float], List[float], List[float]]`
+            The training and validation losses and F1 scores.
+        """
         optimizers = {
             "sgd": tf.keras.optimizers.SGD(),
             "adam": tf.keras.optimizers.Adam(),

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.tools.models_tools API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Utility tools for machine-learning models, model suppression, and LoRA layer management.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.tools.models_tools</code></h1>
 </header>
 <section id="section-intro">
+<p>Utility tools for machine-learning models, model suppression, and LoRA layer management.</p>
 </section>
 <section>
 </section>
@@ -45,14 +46,44 @@ el.replaceWith(d);
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.tools.models_tools.apply_lora"><code class="name flex">
-<span>def <span class="ident">apply_lora</span></span>(<span>model, rank=4)</span>
+<span>def <span class="ident">apply_lora</span></span>(<span>model: keras.src.models.model.Model, rank: int = 4) ‑> keras.src.models.model.Model</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def apply_lora(model, rank=4):
+<pre><code class="python">def apply_lora(
+    model: tf.keras.Model,
+    rank: int = 4,
+) -&gt; tf.keras.Model:
+    &#34;&#34;&#34;Apply LoRA (Low-Rank Adaptation) to Dense layers in a Keras model.
+
+    This function creates a new model with LoRA layers applied to all Dense layers
+    in the original model. LoRA is a parameter-efficient fine-tuning method that
+    decomposes weight matrices into two lower-rank matrices.
+
+    Parameters
+    ----------
+    model : tf.keras.Model
+        The original Keras model to apply LoRA to. All Dense layers will have
+        LoRA applied.
+    rank : int, optional
+        The rank parameter for LoRA decomposition (default is 4). This determines
+        the dimensionality of the low-rank approximation.
+
+    Returns
+    -------
+    tf.keras.Model
+        A new Keras model with LoRA layers applied to all Dense layers.
+
+    Notes
+    -----
+    For each Dense layer in the original model, a corresponding LoRALayer is inserted
+    that computes: output = inputs @ W_original + (inputs @ A @ B) where A and B are
+    low-rank matrices. The rank parameter controls the trade-off between model size
+    and adaptation capacity.
+    &#34;&#34;&#34;
     inputs = tf.keras.Input(shape=model.input_shape[1:])
     x = inputs
 
@@ -65,7 +96,29 @@ el.replaceWith(d);
     new_model = tf.keras.Model(inputs=inputs, outputs=x)
     return new_model</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Apply LoRA (Low-Rank Adaptation) to Dense layers in a Keras model.</p>
+<p>This function creates a new model with LoRA layers applied to all Dense layers
+in the original model. LoRA is a parameter-efficient fine-tuning method that
+decomposes weight matrices into two lower-rank matrices.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>model</code></strong> :&ensp;<code>tf.keras.Model</code></dt>
+<dd>The original Keras model to apply LoRA to. All Dense layers will have
+LoRA applied.</dd>
+<dt><strong><code>rank</code></strong> :&ensp;<code>int</code>, optional</dt>
+<dd>The rank parameter for LoRA decomposition (default is 4). This determines
+the dimensionality of the low-rank approximation.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>tf.keras.Model</code></dt>
+<dd>A new Keras model with LoRA layers applied to all Dense layers.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>For each Dense layer in the original model, a corresponding LoRALayer is inserted
+that computes: output = inputs @ W_original + (inputs @ A @ B) where A and B are
+low-rank matrices. The rank parameter controls the trade-off between model size
+and adaptation capacity.</p></div>
 </dd>
 <dt id="likelihood.tools.models_tools.collect_experience"><code class="name flex">
 <span>def <span class="ident">collect_experience</span></span>(<span>env: Any,<br>model: torch.nn.modules.module.Module,<br>gamma: float = 0.99,<br>lambda_parameter: float = 0.95,<br>penalty_for_done_state: float = -1.0,<br>tolerance: int = inf,<br>verbose: bool = False) ‑> tuple[typing.List[tuple], typing.List[float], typing.List[float], typing.List[float]]</span>
@@ -161,47 +214,50 @@ el.replaceWith(d);
 
     returns = []
     advantages = []
-    G = 0
     delta = 0
+    gae = 0.0
+    G = 0.0
+
     for t in reversed(range(len(trajectory))):
         state, selected_option, action, reward, next_state, terminate, done = trajectory[t]
 
+        # Current state value: V(s_t)
         state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
-        _, action_probs, _, _, _ = model(state_tensor, multiple_option)
 
-        if t == len(trajectory) - 1:
-            G = reward
-            adv = 0
-            selected_probs = get_selected_probs(action_probs, action)
-            if isinstance(selected_probs, list):
-                adv = sum([G - p for p in selected_probs])
-            else:
-                adv = G - selected_probs
-            advantages.insert(0, adv)
+        with torch.no_grad():
+            value = model.value_network(state_tensor)
+
+        value = value.squeeze().item()
+
+        # Next state value: V(s_{t+1})
+        if done:
+            next_value = 0.0
         else:
             next_state_tensor = (
                 torch.tensor(next_state, dtype=torch.float32).unsqueeze(0).to(device)
             )
-            _, next_action_probs, _, _, _ = model(next_state_tensor, multiple_option)
 
-            selected_probs = get_selected_probs(action_probs, action)
-            next_selected_probs = get_selected_probs(next_action_probs, action)
+            with torch.no_grad():
+                next_value = model.value_network(next_state_tensor)
 
-            if isinstance(selected_probs, list):
-                reward_tensor = torch.tensor([reward] * len(action), dtype=torch.float32).to(device)
-                np_tensor = torch.tensor(next_selected_probs, dtype=torch.float32).to(device)
-                sp_tensor = torch.tensor(selected_probs, dtype=torch.float32).to(device)
-                deltas = reward_tensor + gamma * np_tensor - sp_tensor
-                delta = torch.mean(deltas).item()
-            else:
-                delta = reward + gamma * next_selected_probs - selected_probs
+            next_value = next_value.squeeze().item()
 
-            G = reward + gamma * G
-            advantages.insert(
-                0, delta + gamma * lambda_parameter * advantages[0] if advantages else delta
-            )
-
+        # Discounted return:
+        # G_t = r_t + gamma * G_{t+1}
+        G = reward + gamma * G
         returns.insert(0, G)
+
+        # TD error:
+        # delta_t = r_t + gamma * V(s_{t+1}) - V(s_t)
+        # For terminal states:
+        # delta_t = r_t - V(s_t)
+        delta = reward + gamma * next_value * (1.0 - float(done)) - value
+
+        # Generalized Advantage Estimation:
+        # A_t = delta_t + gamma * lambda * A_{t+1}
+        gae = delta + gamma * lambda_parameter * gae
+
+        advantages.insert(0, gae)
 
     return trajectory, returns, advantages, old_probs</code></pre>
 </details>
@@ -240,8 +296,8 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_selected_probs(action_probs: torch.Tensor, action: torch.Tensor | int):
-    &#34;&#34;&#34;
-    Retrieves the probabilities of selected actions from a single-batch action probability distribution.
+    &#34;&#34;&#34;Retrieve the probabilities of selected actions from a single-batch action probability
+    distribution.
 
     Parameters
     ----------
@@ -261,7 +317,8 @@ el.replaceWith(d);
     selected_probs = action_probs.squeeze(0).gather(1, action.unsqueeze(1)).squeeze(-1)
     return selected_probs.tolist()</code></pre>
 </details>
-<div class="desc"><p>Retrieves the probabilities of selected actions from a single-batch action probability distribution.</p>
+<div class="desc"><p>Retrieve the probabilities of selected actions from a single-batch action probability
+distribution.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>action_probs</code></strong> :&ensp;<code>torch.Tensor</code></dt>
@@ -284,8 +341,8 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -&gt; pd.DataFrame:
-    &#34;&#34;&#34;
-    Calculate various graph metrics based on the given adjacency matrix and return them in a single DataFrame.
+    &#34;&#34;&#34;Calculate various graph metrics based on the given adjacency matrix and return them in a
+    single DataFrame.
 
     Parameters
     ----------
@@ -341,7 +398,8 @@ el.replaceWith(d);
 
     return metrics_df</code></pre>
 </details>
-<div class="desc"><p>Calculate various graph metrics based on the given adjacency matrix and return them in a single DataFrame.</p>
+<div class="desc"><p>Calculate various graph metrics based on the given adjacency matrix and return them in a
+single DataFrame.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>adj_matrix</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -365,7 +423,7 @@ el.replaceWith(d);
 <p>The returned DataFrame will have one row for each node and one column for each of the computed metrics.</p></div>
 </dd>
 <dt id="likelihood.tools.models_tools.ppo_loss"><code class="name flex">
-<span>def <span class="ident">ppo_loss</span></span>(<span>advantages: torch.Tensor,<br>old_action_probs: torch.Tensor,<br>action_probs: torch.Tensor,<br>epsilon: float = 0.2)</span>
+<span>def <span class="ident">ppo_loss</span></span>(<span>advantages: torch.Tensor,<br>old_action_probs: torch.Tensor,<br>action_probs: torch.Tensor,<br>epsilon: float = 0.2) ‑> torch.Tensor</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -377,8 +435,8 @@ el.replaceWith(d);
     old_action_probs: torch.Tensor,
     action_probs: torch.Tensor,
     epsilon: float = 0.2,
-):
-    &#34;&#34;&#34;Computes the Proximal Policy Optimization (PPO) loss using the clipped objective.
+) -&gt; torch.Tensor:
+    &#34;&#34;&#34;Compute the Proximal Policy Optimization (PPO) loss using the clipped objective.
 
     Parameters
     ----------
@@ -396,7 +454,6 @@ el.replaceWith(d);
     loss : `torch.Tensor`
         The PPO loss, averaged across the batch of samples. The loss is computed using the clipped objective to penalize large policy updates.
     &#34;&#34;&#34;
-
     if advantages.dim() == 1:
         advantages = advantages.unsqueeze(-1)
     action_probs = action_probs.view(old_action_probs.shape)
@@ -411,7 +468,7 @@ el.replaceWith(d);
 
     return loss.mean()</code></pre>
 </details>
-<div class="desc"><p>Computes the Proximal Policy Optimization (PPO) loss using the clipped objective.</p>
+<div class="desc"><p>Compute the Proximal Policy Optimization (PPO) loss using the clipped objective.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>advantages</code></strong> :&ensp;<code>torch.Tensor</code></dt>
@@ -430,14 +487,55 @@ el.replaceWith(d);
 </dl></div>
 </dd>
 <dt id="likelihood.tools.models_tools.print_trajectory_info"><code class="name flex">
-<span>def <span class="ident">print_trajectory_info</span></span>(<span>state, selected_option, action, reward, next_state, terminate, done)</span>
+<span>def <span class="ident">print_trajectory_info</span></span>(<span>state: Any,<br>selected_option: Any,<br>action: Any,<br>reward: Any,<br>next_state: Any,<br>terminate: bool,<br>done: bool) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def print_trajectory_info(state, selected_option, action, reward, next_state, terminate, done):
+<pre><code class="python">def print_trajectory_info(
+    state: Any,
+    selected_option: Any,
+    action: Any,
+    reward: Any,
+    next_state: Any,
+    terminate: bool,
+    done: bool,
+) -&gt; None:
+    &#34;&#34;&#34;Print trajectory information for reinforcement learning episodes.
+
+    This function displays formatted information about a single transition in a
+    reinforcement learning episode, including state, action, reward, and termination
+    status.
+
+    Parameters
+    ----------
+    state : Any
+        The initial state before the action was taken.
+    selected_option : Any
+        The option or decision selected at the given state.
+    action : Any
+        The action executed in the environment.
+    reward : Any
+        The reward received after executing the action.
+    next_state : Any
+        The resulting state after executing the action.
+    terminate : bool
+        Whether the episode has terminated.
+    done : bool
+        Additional flag indicating if the episode is complete.
+
+    Returns
+    -------
+    None
+        This function prints information to stdout but does not return a value.
+
+    Notes
+    -----
+    The output is formatted with separators for readability and includes all key
+    components of a reinforcement learning transition tuple (s, a, r, s&#39;, done).
+    &#34;&#34;&#34;
     print(&#34;=&#34; * 50)
     print(&#34;TRAJECTORY INFO&#34;.center(50, &#34;=&#34;))
     print(&#34;=&#34; * 50)
@@ -450,7 +548,35 @@ el.replaceWith(d);
     print(f&#34;Done: {done}&#34;)
     print(&#34;=&#34; * 50)</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Print trajectory information for reinforcement learning episodes.</p>
+<p>This function displays formatted information about a single transition in a
+reinforcement learning episode, including state, action, reward, and termination
+status.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>state</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The initial state before the action was taken.</dd>
+<dt><strong><code>selected_option</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The option or decision selected at the given state.</dd>
+<dt><strong><code>action</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The action executed in the environment.</dd>
+<dt><strong><code>reward</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The reward received after executing the action.</dd>
+<dt><strong><code>next_state</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The resulting state after executing the action.</dd>
+<dt><strong><code>terminate</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether the episode has terminated.</dd>
+<dt><strong><code>done</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Additional flag indicating if the episode is complete.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>None</code></dt>
+<dd>This function prints information to stdout but does not return a value.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>The output is formatted with separators for readability and includes all key
+components of a reinforcement learning transition tuple (s, a, r, s', done).</p></div>
 </dd>
 <dt id="likelihood.tools.models_tools.remove_collinearity"><code class="name flex">
 <span>def <span class="ident">remove_collinearity</span></span>(<span>df: pandas.core.frame.DataFrame, threshold: float = 0.9)</span>
@@ -461,8 +587,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def remove_collinearity(df: pd.DataFrame, threshold: float = 0.9):
-    &#34;&#34;&#34;
-    Removes highly collinear features from the DataFrame based on a correlation threshold.
+    &#34;&#34;&#34;Remove highly collinear features from the DataFrame based on a correlation threshold.
 
     This function calculates the correlation matrix of the DataFrame and removes columns
     that are highly correlated with any other column in the DataFrame. It uses an absolute
@@ -489,7 +614,7 @@ el.replaceWith(d);
 
     return df_reduced</code></pre>
 </details>
-<div class="desc"><p>Removes highly collinear features from the DataFrame based on a correlation threshold.</p>
+<div class="desc"><p>Remove highly collinear features from the DataFrame based on a correlation threshold.</p>
 <p>This function calculates the correlation matrix of the DataFrame and removes columns
 that are highly correlated with any other column in the DataFrame. It uses an absolute
 correlation value greater than the specified threshold to identify which columns to drop.</p>
@@ -507,23 +632,68 @@ correlation value greater than the specified threshold to identify which columns
 </dl></div>
 </dd>
 <dt id="likelihood.tools.models_tools.suppress_warnings"><code class="name flex">
-<span>def <span class="ident">suppress_warnings</span></span>(<span>func)</span>
+<span>def <span class="ident">suppress_warnings</span></span>(<span>func: Callable[..., Any]) ‑> Callable[..., Any]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def suppress_warnings(func):
+<pre><code class="python">def suppress_warnings(
+    func: Callable[..., Any],
+) -&gt; Callable[..., Any]:
+    &#34;&#34;&#34;Create a decorator that suppresses warnings raised by the decorated function.
+
+    This decorator wraps a function and catches all warnings within its execution,
+    effectively silencing any warning messages that would otherwise be displayed.
+
+    Parameters
+    ----------
+    func : Callable[..., Any]
+        The function to wrap with warning suppression.
+
+    Returns
+    -------
+    Callable[..., Any]
+        A wrapped version of the original function that executes without raising warnings.
+
+    Examples
+    --------
+    &gt;&gt;&gt; @suppress_warnings
+    ... def risky_function():
+    ...     import warnings
+    ...     warnings.warn(&#34;This is a warning&#34;)
+    &gt;&gt;&gt; risky_function()  # No warning will be displayed
+    &#34;&#34;&#34;
+
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any):
         with warnings.catch_warnings():
             warnings.simplefilter(&#34;ignore&#34;)
             return func(*args, **kwargs)
 
     return wrapper</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Create a decorator that suppresses warnings raised by the decorated function.</p>
+<p>This decorator wraps a function and catches all warnings within its execution,
+effectively silencing any warning messages that would otherwise be displayed.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>func</code></strong> :&ensp;<code>Callable[&hellip;, Any]</code></dt>
+<dd>The function to wrap with warning suppression.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>Callable[&hellip;, Any]</code></dt>
+<dd>A wrapped version of the original function that executes without raising warnings.</dd>
+</dl>
+<h2 id="examples">Examples</h2>
+<pre><code class="language-python-repl">&gt;&gt;&gt; @suppress_warnings
+... def risky_function():
+...     import warnings
+...     warnings.warn(&quot;This is a warning&quot;)
+&gt;&gt;&gt; risky_function()  # No warning will be displayed
+</code></pre></div>
 </dd>
 <dt id="likelihood.tools.models_tools.train_and_insights"><code class="name flex">
 <span>def <span class="ident">train_and_insights</span></span>(<span>x_data: numpy.ndarray,<br>y_act: numpy.ndarray,<br>model: keras.src.models.model.Model,<br>patience: int = 3,<br>reg: bool = False,<br>frac: float = 1.0,<br>**kwargs: Dict | None) ‑> keras.src.models.model.Model</span>
@@ -542,8 +712,7 @@ correlation value greater than the specified threshold to identify which columns
     frac: float = 1.0,
     **kwargs: Optional[Dict],
 ) -&gt; tf.keras.Model:
-    &#34;&#34;&#34;
-    Train a Keras model and provide insights on the training and validation metrics.
+    &#34;&#34;&#34;Train a Keras model and provide insights on the training and validation metrics.
 
     Parameters
     ----------
@@ -632,7 +801,7 @@ correlation value greater than the specified threshold to identify which columns
 The trained model after fitting.</p></div>
 </dd>
 <dt id="likelihood.tools.models_tools.train_model_with_episodes"><code class="name flex">
-<span>def <span class="ident">train_model_with_episodes</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_episodes: int,<br>episode_patience: int = 5,<br>**kwargs)</span>
+<span>def <span class="ident">train_model_with_episodes</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_episodes: int,<br>episode_patience: int = 1,<br>mode: str = 'ppo_mode',<br>**kwargs: Any) ‑> Tuple[torch.nn.modules.module.Module, float]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -644,9 +813,10 @@ The trained model after fitting.</p></div>
     optimizer: torch.optim.Optimizer,
     env: Any,
     num_episodes: int,
-    episode_patience: int = 5,
-    **kwargs,
-):
+    episode_patience: int = 1,
+    mode: str = &#34;ppo_mode&#34;,
+    **kwargs: Any,
+) -&gt; Tuple[torch.nn.Module, float]:
     &#34;&#34;&#34;Trains a model via reinforcement learning episodes.
 
     Parameters
@@ -659,6 +829,13 @@ The trained model after fitting.</p></div>
         The environment used for the episodes.
     num_episodes : `int`
         The number of episodes to train.
+    episode_patience : `int`, optional, default=1
+        Number of episodes without improvement before early stopping.
+    mode : `str`, optional, default=&#39;ppo_mode&#39;
+        Training algorithm to use.  Must be one of:
+
+        - ``&#39;ppo_mode&#39;`` – Proximal Policy Optimisation.
+        - ``&#39;grpo_mode&#39;`` – Group Relative Policy Optimisation.
 
     Keyword Arguments
     -----------------
@@ -674,8 +851,18 @@ The trained model after fitting.</p></div>
         Target device (e.g., &#34;cpu&#34; or &#34;cuda&#34;).
     beta : `float`
         Critic learning rate hyperparameter.
+    beta_kl : `float`
+        KL-divergence penalty coefficient (GRPO mode only).
+    group_size : `int`
+        Number of trajectories per group (GRPO mode only).
     patience : `int`
         Early stopping patience in epochs.
+    epsilon_start : `float`, default 1.0
+        Initial exploration probability.
+    epsilon_end : `float`, default 0.05
+        Minimum exploration probability after decay.
+    epsilon_decay : `float`, default 0.99
+        Exponential decay rate for epsilon per episode.
 
     Returns
     -------
@@ -684,14 +871,18 @@ The trained model after fitting.</p></div>
     best_loss_so_far : `float`
         The best loss value observed during training.
     &#34;&#34;&#34;
+    epsilon_start = kwargs.pop(&#34;epsilon_start&#34;, 1.0)
+    epsilon_end = kwargs.pop(&#34;epsilon_end&#34;, 0.05)
+    epsilon_decay = kwargs.pop(&#34;epsilon_decay&#34;, 0.99)
+
     previous_weights = model.state_dict()
     best_loss_so_far = float(&#34;inf&#34;)
     loss_window = []
     average_loss = 0.0
     no_improvement_count = 0
 
-    print(f&#34;{&#39;Episode&#39;:&lt;12} {&#39;Loss&#39;:&lt;8} {&#39;Best Loss&#39;:&lt;17} {&#39;Status&#39;:&lt;15} {&#39;Avg Loss&#39;:&lt;4}&#34;)
-    print(&#34;=&#34; * 70)
+    print(f&#34;{&#39;Episode&#39;:&lt;12} {&#39;Loss&#39;:&lt;8} {&#39;Best Loss&#39;:&lt;17} {&#39;Status&#39;:&lt;20} {&#39;Avg Loss&#39;:&lt;10} ε&#34;)
+    print(&#34;=&#34; * 85)
 
     NEW_BEST_COLOR = &#34;\033[92m&#34;
     REVERT_COLOR = &#34;\033[91m&#34;
@@ -699,25 +890,37 @@ The trained model after fitting.</p></div>
     advantages_per_episode = []
 
     for episode in range(num_episodes):
-        model, loss, advantages = train_option_critic(model, optimizer, env, **kwargs)
+        model, loss, advantages = train_option_critic(model, optimizer, env, mode=mode, **kwargs)
         advantages_per_episode.extend(advantages)
 
         loss_window.append(loss)
         average_loss = sum(loss_window) / len(loss_window)
 
-        if loss &lt; best_loss_so_far:
-            best_loss_so_far = loss
-            previous_weights = model.state_dict()
-            no_improvement_count = 0
-            status = f&#34;{NEW_BEST_COLOR}Updated{RESET_COLOR}&#34;
+        epsilon = epsilon_end + (epsilon_start - epsilon_end) * (epsilon_decay**episode)
+
+        # Epsilon-greedy decision logic for weight updates
+        if np.random.random() &lt; epsilon:
+            # Exploration phase: randomly accept or reject the new weights
+            if np.random.random() &lt; 0.5:
+                previous_weights = model.state_dict()
+                status = f&#34;{NEW_BEST_COLOR}Updated{RESET_COLOR}&#34;
+            else:
+                status = f&#34;{REVERT_COLOR}No Improvement{RESET_COLOR}&#34;
         else:
-            model.load_state_dict(previous_weights)
-            no_improvement_count += 1
-            status = f&#34;{REVERT_COLOR}No Improvement{RESET_COLOR}&#34;
+            # Exploitation phase: greedy decision based on loss improvement
+            if loss &lt; best_loss_so_far:
+                best_loss_so_far = loss
+                previous_weights = model.state_dict()
+                no_improvement_count = 0
+                status = f&#34;{NEW_BEST_COLOR}Updated{RESET_COLOR}&#34;
+            else:
+                model.load_state_dict(previous_weights)
+                no_improvement_count += 1
+                status = f&#34;{REVERT_COLOR}No Improvement{RESET_COLOR}&#34;
         print(
-            f&#34;{episode + 1:&lt;8} {loss:&lt;12.4f} {best_loss_so_far:&lt;15.4f} {status:&lt;25} {average_loss:&lt;12.4f}&#34;
+            f&#34;{episode + 1:&lt;8} {loss:&lt;12.4f} {best_loss_so_far:&lt;15.4f} {status:&lt;30} {average_loss:&lt;10.4f} {epsilon:.3f}&#34;
         )
-        print(&#34;=&#34; * 70)
+        print(&#34;=&#34; * 85)
 
         if no_improvement_count &gt;= episode_patience:
             print(f&#34;\nNo improvement for {episode_patience} episodes. Stopping early.&#34;)
@@ -732,6 +935,16 @@ The trained model after fitting.</p></div>
         marker=None,
         markersize=6,
         color=sns.color_palette(&#34;deep&#34;)[0],
+        linestyle=&#34;-&#34;,
+        linewidth=2,
+    )
+    smoothed = cal_average(np.array(advantages_per_episode), alpha=0.1)
+    plt.plot(
+        range(len(smoothed)),
+        smoothed,
+        marker=None,
+        markersize=6,
+        color=sns.color_palette(&#34;deep&#34;)[1],
         linestyle=&#34;-&#34;,
         linewidth=2,
     )
@@ -756,6 +969,17 @@ The trained model after fitting.</p></div>
 <dd>The environment used for the episodes.</dd>
 <dt><strong><code>num_episodes</code></strong> :&ensp;<code>int</code></dt>
 <dd>The number of episodes to train.</dd>
+<dt><strong><code>episode_patience</code></strong> :&ensp;<code>int</code>, optional, default=<code>1</code></dt>
+<dd>Number of episodes without improvement before early stopping.</dd>
+<dt><strong><code>mode</code></strong> :&ensp;<code>str</code>, optional, default=<code>'ppo_mode'</code></dt>
+<dd>
+<p>Training algorithm to use.
+Must be one of:</p>
+<ul>
+<li><code>'ppo_mode'</code> – Proximal Policy Optimisation.</li>
+<li><code>'grpo_mode'</code> – Group Relative Policy Optimisation.</li>
+</ul>
+</dd>
 </dl>
 <h2 id="keyword-arguments">Keyword Arguments</h2>
 <p>Additional keyword arguments passed to the <code><a title="likelihood.tools.models_tools.train_option_critic" href="#likelihood.tools.models_tools.train_option_critic">train_option_critic()</a></code> function.</p>
@@ -769,8 +993,18 @@ device : <code>str</code>
 Target device (e.g., "cpu" or "cuda").
 beta : <code>float</code>
 Critic learning rate hyperparameter.
+beta_kl : <code>float</code>
+KL-divergence penalty coefficient (GRPO mode only).
+group_size : <code>int</code>
+Number of trajectories per group (GRPO mode only).
 patience : <code>int</code>
-Early stopping patience in epochs.</p>
+Early stopping patience in epochs.
+epsilon_start : <code>float</code>, default 1.0
+Initial exploration probability.
+epsilon_end : <code>float</code>, default 0.05
+Minimum exploration probability after decay.
+epsilon_decay : <code>float</code>, default 0.99
+Exponential decay rate for epsilon per episode.</p>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><strong><code>model</code></strong> :&ensp;<code>torch.nn.Module</code></dt>
@@ -780,7 +1014,7 @@ Early stopping patience in epochs.</p>
 </dl></div>
 </dd>
 <dt id="likelihood.tools.models_tools.train_option_critic"><code class="name flex">
-<span>def <span class="ident">train_option_critic</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_epochs: int = 1000,<br>batch_size: int = 32,<br>device: str = 'cpu',<br>beta: float = 0.01,<br>epsilon: float = 0.2,<br>patience: int = 15,<br>verbose: bool = False,<br>**kwargs) ‑> tuple[torch.nn.modules.module.Module, float]</span>
+<span>def <span class="ident">train_option_critic</span></span>(<span>model: torch.nn.modules.module.Module,<br>optimizer: torch.optim.optimizer.Optimizer,<br>env: Any,<br>num_epochs: int = 1000,<br>batch_size: int = 32,<br>device: str = 'cpu',<br>beta: float = 0.01,<br>value_coef: float = 0.5,<br>epsilon: float = 0.2,<br>patience: int = 15,<br>verbose: bool = False,<br>mode: str = 'ppo_mode',<br>beta_kl: float = 0.04,<br>group_size: int = 4,<br>**kwargs) ‑> tuple[torch.nn.modules.module.Module, float]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -795,9 +1029,13 @@ Early stopping patience in epochs.</p>
     batch_size: int = 32,
     device: str = &#34;cpu&#34;,
     beta: float = 1e-2,
+    value_coef: float = 0.5,
     epsilon: float = 0.2,
     patience: int = 15,
     verbose: bool = False,
+    mode: str = &#34;ppo_mode&#34;,
+    beta_kl: float = 0.04,
+    group_size: int = 4,
     **kwargs,
 ) -&gt; tuple[torch.nn.Module, float]:
     &#34;&#34;&#34;Trains an option critic model with the provided environment and hyperparameters.
@@ -817,11 +1055,28 @@ Early stopping patience in epochs.</p>
     device : `str`
         Target device (e.g., &#34;cpu&#34; or &#34;cuda&#34;).
     beta : `float`
-        Critic learning rate hyperparameter.
+        Critic learning rate hyperparameter (entropy coefficient in PPO mode,
+        entropy coefficient in GRPO mode).
+    value_coef : `float`
+        Coefficient weighting the value-function loss (used only in
+        ``&#39;ppo_mode&#39;``).
     epsilon : `float`, optional, default=0.2
-        The clipping parameter that limits how much the policy can change between updates.
+        The clipping parameter that limits how much the policy can change
+        between updates.
     patience : `int`
         Early stopping patience in epochs.
+    mode : `str`, optional, default=&#39;ppo_mode&#39;
+        Training algorithm to use.  Must be one of:
+
+        - ``&#39;ppo_mode&#39;`` – Proximal Policy Optimisation (value‑function
+          based advantages with GAE).
+        - ``&#39;grpo_mode&#39;`` – Group Relative Policy Optimisation (group‑
+          normalised advantages with KL penalty; critic‑free).
+    beta_kl : `float`, optional, default=0.04
+        KL‑divergence penalty coefficient.  Only used in ``&#39;grpo_mode&#39;``.
+    group_size : `int`, optional, default=4
+        Number of trajectories collected per group in ``&#39;grpo_mode&#39;``.
+        Advantages are normalised within each group.
 
     Returns
     -------
@@ -830,6 +1085,9 @@ Early stopping patience in epochs.</p>
     avg_epoch_loss : `float`
         Average loss per epoch over training.
     &#34;&#34;&#34;
+    if mode not in (&#34;ppo_mode&#34;, &#34;grpo_mode&#34;):
+        raise ValueError(f&#34;mode must be &#39;ppo_mode&#39; or &#39;grpo_mode&#39;, got &#39;{mode}&#39;&#34;)
+
     losses = []
     best_loss_so_far = float(&#34;inf&#34;)
     best_advantage_so_far = 0.0
@@ -844,14 +1102,74 @@ Early stopping patience in epochs.</p>
         avg_advantage = sum(advantages) / len(advantages)
         advantages_per_epoch.append(avg_advantage)
 
-        states = torch.tensor(np.array([t[0] for t in trajectory]), dtype=torch.float32).to(device)
-        actions = (
-            torch.stack([t[2] for t in trajectory]).to(device)
-            if isinstance(trajectory[0][2], torch.Tensor)
-            else torch.tensor([t[2] for t in trajectory], dtype=torch.long).to(device)
-        )
-        returns_tensor = torch.tensor(returns, dtype=torch.float32).to(device)
-        advantages_tensor = torch.tensor(advantages, dtype=torch.float32).to(device)
+    for epoch in range(num_epochs):
+        if mode == &#34;ppo_mode&#34;:
+            # --- PPO: single trajectory per epoch -----------------------
+            trajectory, returns, advantages, old_probs = collect_experience(env, model, **kwargs)
+            trajectories_data = [(trajectory, returns, advantages, old_probs)]
+        else:
+            # --- GRPO: collect a *group* of trajectories ----------------
+            trajectories_data = []
+            all_returns = []
+            for _ in range(group_size):
+                traj, rets, _, old_p = collect_experience(env, model, **kwargs)
+                trajectories_data.append((traj, rets, old_p))
+                all_returns.append(rets)
+
+            # Compute group‑normalised advantages across the group
+            max_len = max(len(r) for r in all_returns)
+            group_advantages_per_traj = [[] for _ in range(group_size)]
+
+            for t in range(max_len):
+                step_returns = []
+                traj_has_t = []
+                for g_idx in range(group_size):
+                    if t &lt; len(all_returns[g_idx]):
+                        step_returns.append(all_returns[g_idx][t])
+                        traj_has_t.append(g_idx)
+
+                step_mean = np.mean(step_returns)
+                step_std = np.std(step_returns) + 1e-8
+
+                for g_idx in traj_has_t:
+                    norm_adv = (all_returns[g_idx][t] - step_mean) / step_std
+                    group_advantages_per_traj[g_idx].append(norm_adv)
+
+            # Rebuild trajectories_data with group‑normalised advantages
+            for g_idx in range(group_size):
+                traj, rets, old_p = trajectories_data[g_idx]
+                trajectories_data[g_idx] = (traj, rets, group_advantages_per_traj[g_idx], old_p)
+
+        # ----------------------------------------------------------------
+        # Accumulate average advantage for logging
+        # ----------------------------------------------------------------
+        for _, _, advantages, _ in trajectories_data:
+            avg_advantage = sum(advantages) / len(advantages)
+            advantages_per_epoch.append(avg_advantage)
+
+        # ----------------------------------------------------------------
+        # Build a single dataset from all trajectories
+        # ----------------------------------------------------------------
+        all_states = []
+        all_actions = []
+        all_returns_list = []
+        all_advantages_list = []
+        all_old_probs_list = []
+
+        for trajectory, returns, advantages, old_probs in trajectories_data:
+            states_arr = np.array([t[0] for t in trajectory])
+            all_states.append(states_arr)
+            acts = trajectory[0][2]
+            if isinstance(acts, torch.Tensor):
+                all_actions.append(torch.stack([t[2] for t in trajectory]))
+            else:
+                all_actions.append(torch.tensor([t[2] for t in trajectory], dtype=torch.long))
+            all_returns_list.append(torch.tensor(returns, dtype=torch.float32))
+            all_advantages_list.append(torch.tensor(advantages, dtype=torch.float32))
+            all_old_probs_list.append(torch.tensor(old_probs, dtype=torch.float32))
+
+        states = torch.tensor(np.concatenate(all_states, axis=0), dtype=torch.float32).to(device)
+        actions = torch.cat([a.to(device) for a in all_actions])
         old_probs_tensor = (
             torch.tensor(old_probs, dtype=torch.float32).view(actions.shape).to(device)
         )
@@ -861,6 +1179,9 @@ Early stopping patience in epochs.</p>
         )
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
+        # ----------------------------------------------------------------
+        # Training loop over batches
+        # ----------------------------------------------------------------
         epoch_loss = 0
         num_batches = 0
 
@@ -904,12 +1225,10 @@ Early stopping patience in epochs.</p>
             if patience_counter_advantage &gt;= patience:
                 if verbose:
                     print(
-                        f&#34;Early stopping at epoch {epoch} after {patience} epochs without advantage improvement.&#34;
+                        f&#34;Early stopping at epoch {epoch} after {patience} &#34;
+                        f&#34;epochs without advantage improvement.&#34;
                     )
                 break
-
-            epoch_loss += loss.item()
-            num_batches += 1
 
         if num_batches &gt; 0:
             avg_epoch_loss = epoch_loss / num_batches
@@ -924,13 +1243,18 @@ Early stopping patience in epochs.</p>
             if patience_counter &gt;= patience:
                 if verbose:
                     print(
-                        f&#34;Early stopping at epoch {epoch} after {patience} epochs without improvement.&#34;
+                        f&#34;Early stopping at epoch {epoch} after {patience} &#34;
+                        f&#34;epochs without improvement.&#34;
                     )
                 break
 
             if verbose:
                 if epoch % (num_epochs // 10) == 0:
-                    print(f&#34;Epoch {epoch}/{num_epochs} - Avg Loss: {avg_epoch_loss:.4f}&#34;)
+                    print(
+                        f&#34;Epoch {epoch}/{num_epochs} - &#34;
+                        f&#34;Avg Loss: {avg_epoch_loss:.4f}  &#34;
+                        f&#34;[{mode}]&#34;
+                    )
 
     return model, avg_epoch_loss, advantages_per_epoch</code></pre>
 </details>
@@ -950,11 +1274,33 @@ Early stopping patience in epochs.</p>
 <dt><strong><code>device</code></strong> :&ensp;<code>str</code></dt>
 <dd>Target device (e.g., "cpu" or "cuda").</dd>
 <dt><strong><code>beta</code></strong> :&ensp;<code>float</code></dt>
-<dd>Critic learning rate hyperparameter.</dd>
+<dd>Critic learning rate hyperparameter (entropy coefficient in PPO mode,
+entropy coefficient in GRPO mode).</dd>
+<dt><strong><code>value_coef</code></strong> :&ensp;<code>float</code></dt>
+<dd>Coefficient weighting the value-function loss (used only in
+<code>'ppo_mode'</code>).</dd>
 <dt><strong><code>epsilon</code></strong> :&ensp;<code>float</code>, optional, default=<code>0.2</code></dt>
-<dd>The clipping parameter that limits how much the policy can change between updates.</dd>
+<dd>The clipping parameter that limits how much the policy can change
+between updates.</dd>
 <dt><strong><code>patience</code></strong> :&ensp;<code>int</code></dt>
 <dd>Early stopping patience in epochs.</dd>
+<dt><strong><code>mode</code></strong> :&ensp;<code>str</code>, optional, default=<code>'ppo_mode'</code></dt>
+<dd>
+<p>Training algorithm to use.
+Must be one of:</p>
+<ul>
+<li><code>'ppo_mode'</code> – Proximal Policy Optimisation (value‑function
+based advantages with GAE).</li>
+<li><code>'grpo_mode'</code> – Group Relative Policy Optimisation (group‑
+normalised advantages with KL penalty; critic‑free).</li>
+</ul>
+</dd>
+<dt><strong><code>beta_kl</code></strong> :&ensp;<code>float</code>, optional, default=<code>0.04</code></dt>
+<dd>KL‑divergence penalty coefficient.
+Only used in <code>'grpo_mode'</code>.</dd>
+<dt><strong><code>group_size</code></strong> :&ensp;<code>int</code>, optional, default=<code>4</code></dt>
+<dd>Number of trajectories collected per group in <code>'grpo_mode'</code>.
+Advantages are normalised within each group.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
@@ -971,7 +1317,7 @@ Early stopping patience in epochs.</p>
 <dl>
 <dt id="likelihood.tools.models_tools.LoRALayer"><code class="flex name class">
 <span>class <span class="ident">LoRALayer</span></span>
-<span>(</span><span>units, rank=4, **kwargs)</span>
+<span>(</span><span>units: int, rank: int = 4, **kwargs: Any)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -980,12 +1326,43 @@ Early stopping patience in epochs.</p>
 </summary>
 <pre><code class="python">@tf.keras.utils.register_keras_serializable(package=&#34;Custom&#34;, name=&#34;LoRALayer&#34;)
 class LoRALayer(tf.keras.layers.Layer):
-    def __init__(self, units, rank=4, **kwargs):
+    &#34;&#34;&#34;A LoRA (Low-Rank Adaptation) layer for fine-tuning large models.&#34;&#34;&#34;
+
+    def __init__(
+        self,
+        units: int,
+        rank: int = 4,
+        **kwargs: Any,
+    ) -&gt; None:
         super(LoRALayer, self).__init__(**kwargs)
         self.units = units
         self.rank = rank
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape):
+        &#34;&#34;&#34;Build the LoRA layer weights based on the input shape.
+
+        This method initializes the weight matrices (A and B) for the LoRA decomposition
+        and validates that the rank parameter is appropriate given the input/output dimensions.
+
+        Parameters
+        ----------
+        input_shape : tf.TensorShape
+            The shape of the input tensor, used to determine the dimensionality of
+            the weight matrices.
+
+        Raises
+        ------
+        ValueError
+            If rank is greater than input dimension or number of units.
+
+        Notes
+        -----
+        Creates two trainable weight matrices:
+        - A: Shape (input_dim, rank) with random_normal initialization
+        - B: Shape (rank, units) with random_normal initialization
+
+        The LoRA approximation computes: inputs @ A @ B instead of the full weight matrix.
+        &#34;&#34;&#34;
         input_dim = input_shape[-1]
         print(f&#34;Input shape: {input_shape}&#34;)
 
@@ -1007,163 +1384,31 @@ class LoRALayer(tf.keras.layers.Layer):
         print(f&#34;Dense weights shape: {input_dim}x{self.units}&#34;)
         print(f&#34;LoRA weights shape: A{self.A.shape}, B{self.B.shape}&#34;)
 
-    def call(self, inputs):
+    def call(self, inputs: Any) -&gt; Any:
+        &#34;&#34;&#34;Apply the LoRA layer to the input tensor.
+
+        This method computes the LoRA approximation by multiplying the input with
+        the weight matrices A and B: output = inputs @ A @ B
+
+        Parameters
+        ----------
+        inputs : Any
+            The input tensor to apply the LoRA transformation to.
+
+        Returns
+        -------
+        Any
+            The output tensor after applying the LoRA layer multiplication.
+
+        Notes
+        -----
+        This method performs the forward pass of the LoRA layer, computing the
+        low-rank approximation without modifying the original weights.
+        &#34;&#34;&#34;
         lora_output = tf.matmul(tf.matmul(inputs, self.A), self.B)
         return lora_output</code></pre>
 </details>
-<div class="desc"><p>This is the class from which all layers inherit.</p>
-<p>A layer is a callable object that takes as input one or more tensors and
-that outputs one or more tensors. It involves <em>computation</em>, defined
-in the <code>call()</code> method, and a <em>state</em> (weight variables). State can be
-created:</p>
-<ul>
-<li>in <code>__init__()</code>, for instance via <code>self.add_weight()</code>;</li>
-<li>in the optional <code>build()</code> method, which is invoked by the first
-<code>__call__()</code> to the layer, and supplies the shape(s) of the input(s),
-which may not have been known at initialization time.</li>
-</ul>
-<p>Layers are recursively composable: If you assign a Layer instance as an
-attribute of another Layer, the outer layer will start tracking the weights
-created by the inner layer. Nested layers should be instantiated in the
-<code>__init__()</code> method or <code>build()</code> method.</p>
-<p>Users will just instantiate a layer and then treat it as a callable.</p>
-<h2 id="args">Args</h2>
-<dl>
-<dt><strong><code>trainable</code></strong></dt>
-<dd>Boolean, whether the layer's variables should be trainable.</dd>
-<dt><strong><code>name</code></strong></dt>
-<dd>String name of the layer.</dd>
-<dt><strong><code>dtype</code></strong></dt>
-<dd>The dtype of the layer's computations and weights. Can also be a
-<code>keras.DTypePolicy</code>, which allows the computation and weight dtype
-to differ. Defaults to <code>None</code>. <code>None</code> means to use
-<code>keras.config.dtype_policy()</code>, which is a <code>float32</code> policy unless
-set to different value (via <code>keras.config.set_dtype_policy()</code>).</dd>
-</dl>
-<h2 id="attributes">Attributes</h2>
-<dl>
-<dt><strong><code>name</code></strong></dt>
-<dd>The name of the layer (string).</dd>
-<dt><strong><code>dtype</code></strong></dt>
-<dd>Dtype of the layer's weights. Alias of <code>layer.variable_dtype</code>.</dd>
-<dt><strong><code>variable_dtype</code></strong></dt>
-<dd>Dtype of the layer's weights.</dd>
-<dt><strong><code>compute_dtype</code></strong></dt>
-<dd>The dtype of the layer's computations.
-Layers automatically cast inputs to this dtype, which causes
-the computations and output to also be in this dtype.
-When mixed precision is used with a
-<code>keras.DTypePolicy</code>, this will be different
-than <code>variable_dtype</code>.</dd>
-<dt><strong><code>trainable_weights</code></strong></dt>
-<dd>List of variables to be included in backprop.</dd>
-<dt><strong><code>non_trainable_weights</code></strong></dt>
-<dd>List of variables that should not be
-included in backprop.</dd>
-<dt><strong><code>weights</code></strong></dt>
-<dd>The concatenation of the lists trainable_weights and
-non_trainable_weights (in this order).</dd>
-<dt><strong><code>trainable</code></strong></dt>
-<dd>Whether the layer should be trained (boolean), i.e.
-whether its potentially-trainable weights should be returned
-as part of <code>layer.trainable_weights</code>.</dd>
-<dt><strong><code>input_spec</code></strong></dt>
-<dd>Optional (list of) <code>InputSpec</code> object(s) specifying the
-constraints on inputs that can be accepted by the layer.</dd>
-</dl>
-<p>We recommend that descendants of <code>Layer</code> implement the following methods:</p>
-<ul>
-<li><code>__init__()</code>: Defines custom layer attributes, and creates layer weights
-that do not depend on input shapes, using <code>add_weight()</code>,
-or other state.</li>
-<li><code>build(self, input_shape)</code>: This method can be used to create weights that
-depend on the shape(s) of the input(s), using <code>add_weight()</code>, or other
-state. <code>__call__()</code> will automatically build the layer
-(if it has not been built yet) by calling <code>build()</code>.</li>
-<li><code>call(self, *args, **kwargs)</code>: Called in <code>__call__</code> after making
-sure <code>build()</code> has been called. <code>call()</code> performs the logic of applying
-the layer to the input arguments.
-Two reserved keyword arguments you can optionally use in <code>call()</code> are:
-1. <code>training</code> (boolean, whether the call is in inference mode or
-training mode).
-2. <code>mask</code> (boolean tensor encoding masked timesteps in the input,
-used e.g. in RNN layers).
-A typical signature for this method is <code>call(self, inputs)</code>, and user
-could optionally add <code>training</code> and <code>mask</code> if the layer need them.</li>
-<li><code>get_config(self)</code>: Returns a dictionary containing the configuration
-used to initialize this layer. If the keys differ from the arguments
-in <code>__init__()</code>, then override <code>from_config(self)</code> as well.
-This method is used when saving
-the layer or a model that contains this layer.</li>
-</ul>
-<p>Examples:</p>
-<p>Here's a basic example: a layer with two variables, <code>w</code> and <code>b</code>,
-that returns <code>y = w . x + b</code>.
-It shows how to implement <code>build()</code> and <code>call()</code>.
-Variables set as attributes of a layer are tracked as weights
-of the layers (in <code>layer.weights</code>).</p>
-<pre><code class="language-python">class SimpleDense(Layer):
-    def __init__(self, units=32):
-        super().__init__()
-        self.units = units
-
-    # Create the state of the layer (weights)
-    def build(self, input_shape):
-        self.kernel = self.add_weight(
-            shape=(input_shape[-1], self.units),
-            initializer=&quot;glorot_uniform&quot;,
-            trainable=True,
-            name=&quot;kernel&quot;,
-        )
-        self.bias = self.add_weight(
-            shape=(self.units,),
-            initializer=&quot;zeros&quot;,
-            trainable=True,
-            name=&quot;bias&quot;,
-        )
-
-    # Defines the computation
-    def call(self, inputs):
-        return ops.matmul(inputs, self.kernel) + self.bias
-
-# Instantiates the layer.
-linear_layer = SimpleDense(4)
-
-# This will also call `build(input_shape)` and create the weights.
-y = linear_layer(ops.ones((2, 2)))
-assert len(linear_layer.weights) == 2
-
-# These weights are trainable, so they're listed in `trainable_weights`:
-assert len(linear_layer.trainable_weights) == 2
-</code></pre>
-<p>Besides trainable weights, updated via backpropagation during training,
-layers can also have non-trainable weights. These weights are meant to
-be updated manually during <code>call()</code>. Here's a example layer that computes
-the running sum of its inputs:</p>
-<pre><code class="language-python">class ComputeSum(Layer):
-
-  def __init__(self, input_dim):
-      super(ComputeSum, self).__init__()
-      # Create a non-trainable weight.
-      self.total = self.add_weight(
-        shape=(),
-        initializer=&quot;zeros&quot;,
-        trainable=False,
-        name=&quot;total&quot;,
-      )
-
-  def call(self, inputs):
-      self.total.assign(self.total + ops.sum(inputs))
-      return self.total
-
-my_sum = ComputeSum(2)
-x = ops.ones((2, 2))
-y = my_sum(x)
-
-assert my_sum.weights == [my_sum.total]
-assert my_sum.non_trainable_weights == [my_sum.total]
-assert my_sum.trainable_weights == []
-</code></pre></div>
+<div class="desc"><p>A LoRA (Low-Rank Adaptation) layer for fine-tuning large models.</p></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li>keras.src.layers.layer.Layer</li>
@@ -1177,14 +1422,38 @@ assert my_sum.trainable_weights == []
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.tools.models_tools.LoRALayer.build"><code class="name flex">
-<span>def <span class="ident">build</span></span>(<span>self, input_shape)</span>
+<span>def <span class="ident">build</span></span>(<span>self, input_shape: tensorflow.python.framework.tensor_shape.TensorShape)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def build(self, input_shape):
+<pre><code class="python">def build(self, input_shape: tf.TensorShape):
+    &#34;&#34;&#34;Build the LoRA layer weights based on the input shape.
+
+    This method initializes the weight matrices (A and B) for the LoRA decomposition
+    and validates that the rank parameter is appropriate given the input/output dimensions.
+
+    Parameters
+    ----------
+    input_shape : tf.TensorShape
+        The shape of the input tensor, used to determine the dimensionality of
+        the weight matrices.
+
+    Raises
+    ------
+    ValueError
+        If rank is greater than input dimension or number of units.
+
+    Notes
+    -----
+    Creates two trainable weight matrices:
+    - A: Shape (input_dim, rank) with random_normal initialization
+    - B: Shape (rank, units) with random_normal initialization
+
+    The LoRA approximation computes: inputs @ A @ B instead of the full weight matrix.
+    &#34;&#34;&#34;
     input_dim = input_shape[-1]
     print(f&#34;Input shape: {input_shape}&#34;)
 
@@ -1206,21 +1475,74 @@ assert my_sum.trainable_weights == []
     print(f&#34;Dense weights shape: {input_dim}x{self.units}&#34;)
     print(f&#34;LoRA weights shape: A{self.A.shape}, B{self.B.shape}&#34;)</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Build the LoRA layer weights based on the input shape.</p>
+<p>This method initializes the weight matrices (A and B) for the LoRA decomposition
+and validates that the rank parameter is appropriate given the input/output dimensions.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>input_shape</code></strong> :&ensp;<code>tf.TensorShape</code></dt>
+<dd>The shape of the input tensor, used to determine the dimensionality of
+the weight matrices.</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>ValueError</code></dt>
+<dd>If rank is greater than input dimension or number of units.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>Creates two trainable weight matrices:
+- A: Shape (input_dim, rank) with random_normal initialization
+- B: Shape (rank, units) with random_normal initialization</p>
+<p>The LoRA approximation computes: inputs @ A @ B instead of the full weight matrix.</p></div>
 </dd>
 <dt id="likelihood.tools.models_tools.LoRALayer.call"><code class="name flex">
-<span>def <span class="ident">call</span></span>(<span>self, inputs)</span>
+<span>def <span class="ident">call</span></span>(<span>self, inputs: Any) ‑> Any</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def call(self, inputs):
+<pre><code class="python">def call(self, inputs: Any) -&gt; Any:
+    &#34;&#34;&#34;Apply the LoRA layer to the input tensor.
+
+    This method computes the LoRA approximation by multiplying the input with
+    the weight matrices A and B: output = inputs @ A @ B
+
+    Parameters
+    ----------
+    inputs : Any
+        The input tensor to apply the LoRA transformation to.
+
+    Returns
+    -------
+    Any
+        The output tensor after applying the LoRA layer multiplication.
+
+    Notes
+    -----
+    This method performs the forward pass of the LoRA layer, computing the
+    low-rank approximation without modifying the original weights.
+    &#34;&#34;&#34;
     lora_output = tf.matmul(tf.matmul(inputs, self.A), self.B)
     return lora_output</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Apply the LoRA layer to the input tensor.</p>
+<p>This method computes the LoRA approximation by multiplying the input with
+the weight matrices A and B: output = inputs @ A @ B</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>inputs</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The input tensor to apply the LoRA transformation to.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>Any</code></dt>
+<dd>The output tensor after applying the LoRA layer multiplication.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>This method performs the forward pass of the LoRA layer, computing the
+low-rank approximation without modifying the original weights.</p></div>
 </dd>
 </dl>
 </dd>
@@ -1234,14 +1556,13 @@ assert my_sum.trainable_weights == []
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class TransformRange:
-    &#34;&#34;&#34;
-    Generates a new DataFrame with ranges represented as strings.
+    &#34;&#34;&#34;Generates a new DataFrame with ranges represented as strings.
 
     Transforms numerical columns into categorical range bins with descriptive labels.
     &#34;&#34;&#34;
 
     def __init__(self, columns_bin_sizes: Dict[str, int]) -&gt; None:
-        &#34;&#34;&#34;Initializes the class with the original DataFrame.
+        &#34;&#34;&#34;Initialize the class with the original DataFrame.
 
         Parameters
         ----------
@@ -1259,8 +1580,7 @@ assert my_sum.trainable_weights == []
     def _create_bins_and_labels(
         self, min_val: Union[int, float], max_val: Union[int, float], bin_size: int
     ) -&gt; Tuple[np.ndarray, List[str]]:
-        &#34;&#34;&#34;
-        Creates the bin edges and their labels.
+        &#34;&#34;&#34;Create the bin edges and their labels.
 
         Parameters
         ----------
@@ -1311,8 +1631,7 @@ assert my_sum.trainable_weights == []
     def _transform_column_to_ranges(
         self, df: pd.DataFrame, column: str, bin_size: int, fit: bool = True
     ) -&gt; pd.Series:
-        &#34;&#34;&#34;
-        Transforms a column in the DataFrame into range bins.
+        &#34;&#34;&#34;Transform a column in the DataFrame into range bins.
 
         Parameters
         ----------
@@ -1369,8 +1688,7 @@ assert my_sum.trainable_weights == []
     def transform(
         self, df: pd.DataFrame, drop_original: bool = False, fit: bool = True
     ) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;
-        Creates a new DataFrame with range columns.
+        &#34;&#34;&#34;Create a new DataFrame with range columns.
 
         Parameters
         ----------
@@ -1413,8 +1731,7 @@ assert my_sum.trainable_weights == []
         return result_df
 
     def get_range_info(self, column: str) -&gt; Dict[str, Union[int, float, List[str]]]:
-        &#34;&#34;&#34;
-        Get information about the range transformation for a specific column.
+        &#34;&#34;&#34;Get information about the range transformation for a specific column.
 
         Parameters
         ----------
@@ -1442,7 +1759,7 @@ assert my_sum.trainable_weights == []
 </details>
 <div class="desc"><p>Generates a new DataFrame with ranges represented as strings.</p>
 <p>Transforms numerical columns into categorical range bins with descriptive labels.</p>
-<p>Initializes the class with the original DataFrame.</p>
+<p>Initialize the class with the original DataFrame.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>columns_bin_sizes</code></strong> :&ensp;<code>dict</code></dt>
@@ -1464,8 +1781,7 @@ assert my_sum.trainable_weights == []
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_range_info(self, column: str) -&gt; Dict[str, Union[int, float, List[str]]]:
-    &#34;&#34;&#34;
-    Get information about the range transformation for a specific column.
+    &#34;&#34;&#34;Get information about the range transformation for a specific column.
 
     Parameters
     ----------
@@ -1512,8 +1828,7 @@ Dictionary containing min_val, max_val, bin_size, and labels.</p></div>
 <pre><code class="python">def transform(
     self, df: pd.DataFrame, drop_original: bool = False, fit: bool = True
 ) -&gt; pd.DataFrame:
-    &#34;&#34;&#34;
-    Creates a new DataFrame with range columns.
+    &#34;&#34;&#34;Create a new DataFrame with range columns.
 
     Parameters
     ----------
@@ -1555,7 +1870,7 @@ Dictionary containing min_val, max_val, bin_size, and labels.</p></div>
 
     return result_df</code></pre>
 </details>
-<div class="desc"><p>Creates a new DataFrame with range columns.</p>
+<div class="desc"><p>Create a new DataFrame with range columns.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
@@ -1585,6 +1900,8 @@ A DataFrame with the transformed range columns.</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class suppress_prints:
+    &#34;&#34;&#34;Context manager that suppresses stdout while the block is executed.&#34;&#34;&#34;
+
     def __enter__(self):
         self.original_stdout = sys.stdout
         sys.stdout = open(os.devnull, &#34;w&#34;)
@@ -1593,7 +1910,7 @@ A DataFrame with the transformed range columns.</p>
         sys.stdout.close()
         sys.stdout = self.original_stdout</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Context manager that suppresses stdout while the block is executed.</p></div>
 </dd>
 </dl>
 </section>

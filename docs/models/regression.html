@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.models.regression API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Regression model definitions.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.models.regression</code></h1>
 </header>
 <section id="section-intro">
+<p>Regression model definitions.</p>
 </section>
 <section>
 </section>
@@ -56,7 +57,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model.
 
     Parameters
     ----------
@@ -101,7 +102,7 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4) -&gt; None:
         &#34;&#34;&#34;Initialize the ARIMA model.
 
         Parameters
@@ -120,7 +121,7 @@ el.replaceWith(d);
         self.tol = tol
         self.n_steps = 0
 
-    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
         &#34;&#34;&#34;Compute the model forward pass.
 
         Parameters
@@ -141,9 +142,9 @@ el.replaceWith(d);
         noise = self.noise
         self.theta_trained = theta
 
-        return super().forward(datapoints, theta, mode, noise)
+        return super().forward(datapoints, theta, mode, noise)  # type: ignore
 
-    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Extract vector of data points.
 
         Parameters
@@ -163,7 +164,7 @@ el.replaceWith(d);
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False) -&gt; None:
         &#34;&#34;&#34;Train the model using sampling method.
 
         Parameters
@@ -207,7 +208,7 @@ el.replaceWith(d);
 
         self.theta_trained = trained
 
-    def predict(self, n_steps: int = 0):
+    def predict(self, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Make predictions for future steps.
 
         Parameters
@@ -235,15 +236,38 @@ el.replaceWith(d);
 
         return np.array(y_pred)
 
-    def save_model(self, name: str = &#34;model&#34;):
+    def save_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Save the model parameters to a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;wb&#34;) as file:
             pickle.dump(self.theta_trained, file)
 
-    def load_model(self, name: str = &#34;model&#34;):
+    def load_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Load the model parameters from a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Evaluate the model performance.
+
+        Parameters
+        ----------
+        y_val : np.ndarray
+            True values.
+        y_pred : np.ndarray
+            Predicted values.
+        &#34;&#34;&#34;
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -253,7 +277,29 @@ el.replaceWith(d);
 
     def plot_pred(
         self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
-    ):
+    ) -&gt; None:
+        &#34;&#34;&#34;Plot predicted values against real values with confidence intervals.
+
+        This method creates a visualization comparing the predicted and actual values,
+        including a confidence interval band around the predictions.
+
+        Parameters
+        ----------
+        y_real : np.ndarray
+            The actual/real values to compare against predictions.
+        y_pred : np.ndarray
+            The predicted values from the model.
+        ci : float, optional
+            The confidence interval level (default is 0.90).
+        mode : bool, optional
+            If True, save the plot as a PNG file; if False, only display (default is True).
+
+        Returns
+        -------
+        None
+            This method does not return a value; it displays/imports a plot and prints
+            confidence interval information.
+        &#34;&#34;&#34;
         sns.set_theme(style=&#34;whitegrid&#34;)
         plt.figure(figsize=(5, 3))
         n = self.n_steps
@@ -287,14 +333,20 @@ el.replaceWith(d);
         plt.tight_layout()
         plt.show()
 
-    def summary(self):
+    def summary(self) -&gt; None:
+        &#34;&#34;&#34;Print a summary of the model parameters.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         print(&#34;\nSummary:&#34;)
         print(&#34;-----------------------&#34;)
         print(&#34;Lenght of theta: {}&#34;.format(len(self.theta_trained)))
         print(&#34;Mean of theta: {:.4f}&#34;.format(np.mean(self.theta_trained)))
         print(&#34;-----------------------&#34;)</code></pre>
 </details>
-<div class="desc"><p>A class that implements the auto-regressive arima (1, 0, 0) model</p>
+<div class="desc"><p>A class that implements the auto-regressive arima (1, 0, 0) model.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -353,7 +405,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model.
 
     Parameters
     ----------
@@ -398,7 +450,7 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4) -&gt; None:
         &#34;&#34;&#34;Initialize the ARIMA model.
 
         Parameters
@@ -417,7 +469,7 @@ el.replaceWith(d);
         self.tol = tol
         self.n_steps = 0
 
-    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
         &#34;&#34;&#34;Compute the model forward pass.
 
         Parameters
@@ -438,9 +490,9 @@ el.replaceWith(d);
         noise = self.noise
         self.theta_trained = theta
 
-        return super().forward(datapoints, theta, mode, noise)
+        return super().forward(datapoints, theta, mode, noise)  # type: ignore
 
-    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Extract vector of data points.
 
         Parameters
@@ -460,7 +512,7 @@ el.replaceWith(d);
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False) -&gt; None:
         &#34;&#34;&#34;Train the model using sampling method.
 
         Parameters
@@ -504,7 +556,7 @@ el.replaceWith(d);
 
         self.theta_trained = trained
 
-    def predict(self, n_steps: int = 0):
+    def predict(self, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Make predictions for future steps.
 
         Parameters
@@ -532,15 +584,38 @@ el.replaceWith(d);
 
         return np.array(y_pred)
 
-    def save_model(self, name: str = &#34;model&#34;):
+    def save_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Save the model parameters to a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;wb&#34;) as file:
             pickle.dump(self.theta_trained, file)
 
-    def load_model(self, name: str = &#34;model&#34;):
+    def load_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Load the model parameters from a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Evaluate the model performance.
+
+        Parameters
+        ----------
+        y_val : np.ndarray
+            True values.
+        y_pred : np.ndarray
+            Predicted values.
+        &#34;&#34;&#34;
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -550,7 +625,29 @@ el.replaceWith(d);
 
     def plot_pred(
         self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
-    ):
+    ) -&gt; None:
+        &#34;&#34;&#34;Plot predicted values against real values with confidence intervals.
+
+        This method creates a visualization comparing the predicted and actual values,
+        including a confidence interval band around the predictions.
+
+        Parameters
+        ----------
+        y_real : np.ndarray
+            The actual/real values to compare against predictions.
+        y_pred : np.ndarray
+            The predicted values from the model.
+        ci : float, optional
+            The confidence interval level (default is 0.90).
+        mode : bool, optional
+            If True, save the plot as a PNG file; if False, only display (default is True).
+
+        Returns
+        -------
+        None
+            This method does not return a value; it displays/imports a plot and prints
+            confidence interval information.
+        &#34;&#34;&#34;
         sns.set_theme(style=&#34;whitegrid&#34;)
         plt.figure(figsize=(5, 3))
         n = self.n_steps
@@ -584,7 +681,13 @@ el.replaceWith(d);
         plt.tight_layout()
         plt.show()
 
-    def summary(self):
+    def summary(self) -&gt; None:
+        &#34;&#34;&#34;Print a summary of the model parameters.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         print(&#34;\nSummary:&#34;)
         print(&#34;-----------------------&#34;)
         print(&#34;Lenght of theta: {}&#34;.format(len(self.theta_trained)))
@@ -600,7 +703,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model.
 
     Parameters
     ----------
@@ -645,7 +748,7 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4) -&gt; None:
         &#34;&#34;&#34;Initialize the ARIMA model.
 
         Parameters
@@ -664,7 +767,7 @@ el.replaceWith(d);
         self.tol = tol
         self.n_steps = 0
 
-    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
         &#34;&#34;&#34;Compute the model forward pass.
 
         Parameters
@@ -685,9 +788,9 @@ el.replaceWith(d);
         noise = self.noise
         self.theta_trained = theta
 
-        return super().forward(datapoints, theta, mode, noise)
+        return super().forward(datapoints, theta, mode, noise)  # type: ignore
 
-    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Extract vector of data points.
 
         Parameters
@@ -707,7 +810,7 @@ el.replaceWith(d);
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False) -&gt; None:
         &#34;&#34;&#34;Train the model using sampling method.
 
         Parameters
@@ -751,7 +854,7 @@ el.replaceWith(d);
 
         self.theta_trained = trained
 
-    def predict(self, n_steps: int = 0):
+    def predict(self, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Make predictions for future steps.
 
         Parameters
@@ -779,15 +882,38 @@ el.replaceWith(d);
 
         return np.array(y_pred)
 
-    def save_model(self, name: str = &#34;model&#34;):
+    def save_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Save the model parameters to a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;wb&#34;) as file:
             pickle.dump(self.theta_trained, file)
 
-    def load_model(self, name: str = &#34;model&#34;):
+    def load_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Load the model parameters from a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Evaluate the model performance.
+
+        Parameters
+        ----------
+        y_val : np.ndarray
+            True values.
+        y_pred : np.ndarray
+            Predicted values.
+        &#34;&#34;&#34;
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -797,7 +923,29 @@ el.replaceWith(d);
 
     def plot_pred(
         self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
-    ):
+    ) -&gt; None:
+        &#34;&#34;&#34;Plot predicted values against real values with confidence intervals.
+
+        This method creates a visualization comparing the predicted and actual values,
+        including a confidence interval band around the predictions.
+
+        Parameters
+        ----------
+        y_real : np.ndarray
+            The actual/real values to compare against predictions.
+        y_pred : np.ndarray
+            The predicted values from the model.
+        ci : float, optional
+            The confidence interval level (default is 0.90).
+        mode : bool, optional
+            If True, save the plot as a PNG file; if False, only display (default is True).
+
+        Returns
+        -------
+        None
+            This method does not return a value; it displays/imports a plot and prints
+            confidence interval information.
+        &#34;&#34;&#34;
         sns.set_theme(style=&#34;whitegrid&#34;)
         plt.figure(figsize=(5, 3))
         n = self.n_steps
@@ -831,7 +979,13 @@ el.replaceWith(d);
         plt.tight_layout()
         plt.show()
 
-    def summary(self):
+    def summary(self) -&gt; None:
+        &#34;&#34;&#34;Print a summary of the model parameters.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         print(&#34;\nSummary:&#34;)
         print(&#34;-----------------------&#34;)
         print(&#34;Lenght of theta: {}&#34;.format(len(self.theta_trained)))
@@ -847,7 +1001,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model.
 
     Parameters
     ----------
@@ -892,7 +1046,7 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4) -&gt; None:
         &#34;&#34;&#34;Initialize the ARIMA model.
 
         Parameters
@@ -911,7 +1065,7 @@ el.replaceWith(d);
         self.tol = tol
         self.n_steps = 0
 
-    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
         &#34;&#34;&#34;Compute the model forward pass.
 
         Parameters
@@ -932,9 +1086,9 @@ el.replaceWith(d);
         noise = self.noise
         self.theta_trained = theta
 
-        return super().forward(datapoints, theta, mode, noise)
+        return super().forward(datapoints, theta, mode, noise)  # type: ignore
 
-    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Extract vector of data points.
 
         Parameters
@@ -954,7 +1108,7 @@ el.replaceWith(d);
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False) -&gt; None:
         &#34;&#34;&#34;Train the model using sampling method.
 
         Parameters
@@ -998,7 +1152,7 @@ el.replaceWith(d);
 
         self.theta_trained = trained
 
-    def predict(self, n_steps: int = 0):
+    def predict(self, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Make predictions for future steps.
 
         Parameters
@@ -1026,15 +1180,38 @@ el.replaceWith(d);
 
         return np.array(y_pred)
 
-    def save_model(self, name: str = &#34;model&#34;):
+    def save_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Save the model parameters to a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;wb&#34;) as file:
             pickle.dump(self.theta_trained, file)
 
-    def load_model(self, name: str = &#34;model&#34;):
+    def load_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Load the model parameters from a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Evaluate the model performance.
+
+        Parameters
+        ----------
+        y_val : np.ndarray
+            True values.
+        y_pred : np.ndarray
+            Predicted values.
+        &#34;&#34;&#34;
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -1044,7 +1221,29 @@ el.replaceWith(d);
 
     def plot_pred(
         self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
-    ):
+    ) -&gt; None:
+        &#34;&#34;&#34;Plot predicted values against real values with confidence intervals.
+
+        This method creates a visualization comparing the predicted and actual values,
+        including a confidence interval band around the predictions.
+
+        Parameters
+        ----------
+        y_real : np.ndarray
+            The actual/real values to compare against predictions.
+        y_pred : np.ndarray
+            The predicted values from the model.
+        ci : float, optional
+            The confidence interval level (default is 0.90).
+        mode : bool, optional
+            If True, save the plot as a PNG file; if False, only display (default is True).
+
+        Returns
+        -------
+        None
+            This method does not return a value; it displays/imports a plot and prints
+            confidence interval information.
+        &#34;&#34;&#34;
         sns.set_theme(style=&#34;whitegrid&#34;)
         plt.figure(figsize=(5, 3))
         n = self.n_steps
@@ -1078,7 +1277,13 @@ el.replaceWith(d);
         plt.tight_layout()
         plt.show()
 
-    def summary(self):
+    def summary(self) -&gt; None:
+        &#34;&#34;&#34;Print a summary of the model parameters.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         print(&#34;\nSummary:&#34;)
         print(&#34;-----------------------&#34;)
         print(&#34;Lenght of theta: {}&#34;.format(len(self.theta_trained)))
@@ -1094,7 +1299,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model.
 
     Parameters
     ----------
@@ -1139,7 +1344,7 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4) -&gt; None:
         &#34;&#34;&#34;Initialize the ARIMA model.
 
         Parameters
@@ -1158,7 +1363,7 @@ el.replaceWith(d);
         self.tol = tol
         self.n_steps = 0
 
-    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
         &#34;&#34;&#34;Compute the model forward pass.
 
         Parameters
@@ -1179,9 +1384,9 @@ el.replaceWith(d);
         noise = self.noise
         self.theta_trained = theta
 
-        return super().forward(datapoints, theta, mode, noise)
+        return super().forward(datapoints, theta, mode, noise)  # type: ignore
 
-    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Extract vector of data points.
 
         Parameters
@@ -1201,7 +1406,7 @@ el.replaceWith(d);
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False) -&gt; None:
         &#34;&#34;&#34;Train the model using sampling method.
 
         Parameters
@@ -1245,7 +1450,7 @@ el.replaceWith(d);
 
         self.theta_trained = trained
 
-    def predict(self, n_steps: int = 0):
+    def predict(self, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Make predictions for future steps.
 
         Parameters
@@ -1273,15 +1478,38 @@ el.replaceWith(d);
 
         return np.array(y_pred)
 
-    def save_model(self, name: str = &#34;model&#34;):
+    def save_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Save the model parameters to a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;wb&#34;) as file:
             pickle.dump(self.theta_trained, file)
 
-    def load_model(self, name: str = &#34;model&#34;):
+    def load_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Load the model parameters from a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Evaluate the model performance.
+
+        Parameters
+        ----------
+        y_val : np.ndarray
+            True values.
+        y_pred : np.ndarray
+            Predicted values.
+        &#34;&#34;&#34;
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -1291,7 +1519,29 @@ el.replaceWith(d);
 
     def plot_pred(
         self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
-    ):
+    ) -&gt; None:
+        &#34;&#34;&#34;Plot predicted values against real values with confidence intervals.
+
+        This method creates a visualization comparing the predicted and actual values,
+        including a confidence interval band around the predictions.
+
+        Parameters
+        ----------
+        y_real : np.ndarray
+            The actual/real values to compare against predictions.
+        y_pred : np.ndarray
+            The predicted values from the model.
+        ci : float, optional
+            The confidence interval level (default is 0.90).
+        mode : bool, optional
+            If True, save the plot as a PNG file; if False, only display (default is True).
+
+        Returns
+        -------
+        None
+            This method does not return a value; it displays/imports a plot and prints
+            confidence interval information.
+        &#34;&#34;&#34;
         sns.set_theme(style=&#34;whitegrid&#34;)
         plt.figure(figsize=(5, 3))
         n = self.n_steps
@@ -1325,7 +1575,13 @@ el.replaceWith(d);
         plt.tight_layout()
         plt.show()
 
-    def summary(self):
+    def summary(self) -&gt; None:
+        &#34;&#34;&#34;Print a summary of the model parameters.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         print(&#34;\nSummary:&#34;)
         print(&#34;-----------------------&#34;)
         print(&#34;Lenght of theta: {}&#34;.format(len(self.theta_trained)))
@@ -1341,7 +1597,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model.
 
     Parameters
     ----------
@@ -1386,7 +1642,7 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4) -&gt; None:
         &#34;&#34;&#34;Initialize the ARIMA model.
 
         Parameters
@@ -1405,7 +1661,7 @@ el.replaceWith(d);
         self.tol = tol
         self.n_steps = 0
 
-    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
         &#34;&#34;&#34;Compute the model forward pass.
 
         Parameters
@@ -1426,9 +1682,9 @@ el.replaceWith(d);
         noise = self.noise
         self.theta_trained = theta
 
-        return super().forward(datapoints, theta, mode, noise)
+        return super().forward(datapoints, theta, mode, noise)  # type: ignore
 
-    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Extract vector of data points.
 
         Parameters
@@ -1448,7 +1704,7 @@ el.replaceWith(d);
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False) -&gt; None:
         &#34;&#34;&#34;Train the model using sampling method.
 
         Parameters
@@ -1492,7 +1748,7 @@ el.replaceWith(d);
 
         self.theta_trained = trained
 
-    def predict(self, n_steps: int = 0):
+    def predict(self, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Make predictions for future steps.
 
         Parameters
@@ -1520,15 +1776,38 @@ el.replaceWith(d);
 
         return np.array(y_pred)
 
-    def save_model(self, name: str = &#34;model&#34;):
+    def save_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Save the model parameters to a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;wb&#34;) as file:
             pickle.dump(self.theta_trained, file)
 
-    def load_model(self, name: str = &#34;model&#34;):
+    def load_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Load the model parameters from a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Evaluate the model performance.
+
+        Parameters
+        ----------
+        y_val : np.ndarray
+            True values.
+        y_pred : np.ndarray
+            Predicted values.
+        &#34;&#34;&#34;
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -1538,7 +1817,29 @@ el.replaceWith(d);
 
     def plot_pred(
         self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
-    ):
+    ) -&gt; None:
+        &#34;&#34;&#34;Plot predicted values against real values with confidence intervals.
+
+        This method creates a visualization comparing the predicted and actual values,
+        including a confidence interval band around the predictions.
+
+        Parameters
+        ----------
+        y_real : np.ndarray
+            The actual/real values to compare against predictions.
+        y_pred : np.ndarray
+            The predicted values from the model.
+        ci : float, optional
+            The confidence interval level (default is 0.90).
+        mode : bool, optional
+            If True, save the plot as a PNG file; if False, only display (default is True).
+
+        Returns
+        -------
+        None
+            This method does not return a value; it displays/imports a plot and prints
+            confidence interval information.
+        &#34;&#34;&#34;
         sns.set_theme(style=&#34;whitegrid&#34;)
         plt.figure(figsize=(5, 3))
         n = self.n_steps
@@ -1572,7 +1873,13 @@ el.replaceWith(d);
         plt.tight_layout()
         plt.show()
 
-    def summary(self):
+    def summary(self) -&gt; None:
+        &#34;&#34;&#34;Print a summary of the model parameters.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         print(&#34;\nSummary:&#34;)
         print(&#34;-----------------------&#34;)
         print(&#34;Lenght of theta: {}&#34;.format(len(self.theta_trained)))
@@ -1588,7 +1895,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model.
 
     Parameters
     ----------
@@ -1633,7 +1940,7 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4) -&gt; None:
         &#34;&#34;&#34;Initialize the ARIMA model.
 
         Parameters
@@ -1652,7 +1959,7 @@ el.replaceWith(d);
         self.tol = tol
         self.n_steps = 0
 
-    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
         &#34;&#34;&#34;Compute the model forward pass.
 
         Parameters
@@ -1673,9 +1980,9 @@ el.replaceWith(d);
         noise = self.noise
         self.theta_trained = theta
 
-        return super().forward(datapoints, theta, mode, noise)
+        return super().forward(datapoints, theta, mode, noise)  # type: ignore
 
-    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Extract vector of data points.
 
         Parameters
@@ -1695,7 +2002,7 @@ el.replaceWith(d);
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False) -&gt; None:
         &#34;&#34;&#34;Train the model using sampling method.
 
         Parameters
@@ -1739,7 +2046,7 @@ el.replaceWith(d);
 
         self.theta_trained = trained
 
-    def predict(self, n_steps: int = 0):
+    def predict(self, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Make predictions for future steps.
 
         Parameters
@@ -1767,15 +2074,38 @@ el.replaceWith(d);
 
         return np.array(y_pred)
 
-    def save_model(self, name: str = &#34;model&#34;):
+    def save_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Save the model parameters to a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;wb&#34;) as file:
             pickle.dump(self.theta_trained, file)
 
-    def load_model(self, name: str = &#34;model&#34;):
+    def load_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Load the model parameters from a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Evaluate the model performance.
+
+        Parameters
+        ----------
+        y_val : np.ndarray
+            True values.
+        y_pred : np.ndarray
+            Predicted values.
+        &#34;&#34;&#34;
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -1785,7 +2115,29 @@ el.replaceWith(d);
 
     def plot_pred(
         self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
-    ):
+    ) -&gt; None:
+        &#34;&#34;&#34;Plot predicted values against real values with confidence intervals.
+
+        This method creates a visualization comparing the predicted and actual values,
+        including a confidence interval band around the predictions.
+
+        Parameters
+        ----------
+        y_real : np.ndarray
+            The actual/real values to compare against predictions.
+        y_pred : np.ndarray
+            The predicted values from the model.
+        ci : float, optional
+            The confidence interval level (default is 0.90).
+        mode : bool, optional
+            If True, save the plot as a PNG file; if False, only display (default is True).
+
+        Returns
+        -------
+        None
+            This method does not return a value; it displays/imports a plot and prints
+            confidence interval information.
+        &#34;&#34;&#34;
         sns.set_theme(style=&#34;whitegrid&#34;)
         plt.figure(figsize=(5, 3))
         n = self.n_steps
@@ -1819,7 +2171,13 @@ el.replaceWith(d);
         plt.tight_layout()
         plt.show()
 
-    def summary(self):
+    def summary(self) -&gt; None:
+        &#34;&#34;&#34;Print a summary of the model parameters.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         print(&#34;\nSummary:&#34;)
         print(&#34;-----------------------&#34;)
         print(&#34;Lenght of theta: {}&#34;.format(len(self.theta_trained)))
@@ -1835,7 +2193,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model.
 
     Parameters
     ----------
@@ -1880,7 +2238,7 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4) -&gt; None:
         &#34;&#34;&#34;Initialize the ARIMA model.
 
         Parameters
@@ -1899,7 +2257,7 @@ el.replaceWith(d);
         self.tol = tol
         self.n_steps = 0
 
-    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
         &#34;&#34;&#34;Compute the model forward pass.
 
         Parameters
@@ -1920,9 +2278,9 @@ el.replaceWith(d);
         noise = self.noise
         self.theta_trained = theta
 
-        return super().forward(datapoints, theta, mode, noise)
+        return super().forward(datapoints, theta, mode, noise)  # type: ignore
 
-    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Extract vector of data points.
 
         Parameters
@@ -1942,7 +2300,7 @@ el.replaceWith(d);
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False) -&gt; None:
         &#34;&#34;&#34;Train the model using sampling method.
 
         Parameters
@@ -1986,7 +2344,7 @@ el.replaceWith(d);
 
         self.theta_trained = trained
 
-    def predict(self, n_steps: int = 0):
+    def predict(self, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Make predictions for future steps.
 
         Parameters
@@ -2014,15 +2372,38 @@ el.replaceWith(d);
 
         return np.array(y_pred)
 
-    def save_model(self, name: str = &#34;model&#34;):
+    def save_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Save the model parameters to a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;wb&#34;) as file:
             pickle.dump(self.theta_trained, file)
 
-    def load_model(self, name: str = &#34;model&#34;):
+    def load_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Load the model parameters from a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Evaluate the model performance.
+
+        Parameters
+        ----------
+        y_val : np.ndarray
+            True values.
+        y_pred : np.ndarray
+            Predicted values.
+        &#34;&#34;&#34;
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -2032,7 +2413,29 @@ el.replaceWith(d);
 
     def plot_pred(
         self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
-    ):
+    ) -&gt; None:
+        &#34;&#34;&#34;Plot predicted values against real values with confidence intervals.
+
+        This method creates a visualization comparing the predicted and actual values,
+        including a confidence interval band around the predictions.
+
+        Parameters
+        ----------
+        y_real : np.ndarray
+            The actual/real values to compare against predictions.
+        y_pred : np.ndarray
+            The predicted values from the model.
+        ci : float, optional
+            The confidence interval level (default is 0.90).
+        mode : bool, optional
+            If True, save the plot as a PNG file; if False, only display (default is True).
+
+        Returns
+        -------
+        None
+            This method does not return a value; it displays/imports a plot and prints
+            confidence interval information.
+        &#34;&#34;&#34;
         sns.set_theme(style=&#34;whitegrid&#34;)
         plt.figure(figsize=(5, 3))
         n = self.n_steps
@@ -2066,7 +2469,13 @@ el.replaceWith(d);
         plt.tight_layout()
         plt.show()
 
-    def summary(self):
+    def summary(self) -&gt; None:
+        &#34;&#34;&#34;Print a summary of the model parameters.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         print(&#34;\nSummary:&#34;)
         print(&#34;-----------------------&#34;)
         print(&#34;Lenght of theta: {}&#34;.format(len(self.theta_trained)))
@@ -2082,7 +2491,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model.
 
     Parameters
     ----------
@@ -2127,7 +2536,7 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4) -&gt; None:
         &#34;&#34;&#34;Initialize the ARIMA model.
 
         Parameters
@@ -2146,7 +2555,7 @@ el.replaceWith(d);
         self.tol = tol
         self.n_steps = 0
 
-    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
         &#34;&#34;&#34;Compute the model forward pass.
 
         Parameters
@@ -2167,9 +2576,9 @@ el.replaceWith(d);
         noise = self.noise
         self.theta_trained = theta
 
-        return super().forward(datapoints, theta, mode, noise)
+        return super().forward(datapoints, theta, mode, noise)  # type: ignore
 
-    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Extract vector of data points.
 
         Parameters
@@ -2189,7 +2598,7 @@ el.replaceWith(d);
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False) -&gt; None:
         &#34;&#34;&#34;Train the model using sampling method.
 
         Parameters
@@ -2233,7 +2642,7 @@ el.replaceWith(d);
 
         self.theta_trained = trained
 
-    def predict(self, n_steps: int = 0):
+    def predict(self, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Make predictions for future steps.
 
         Parameters
@@ -2261,15 +2670,38 @@ el.replaceWith(d);
 
         return np.array(y_pred)
 
-    def save_model(self, name: str = &#34;model&#34;):
+    def save_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Save the model parameters to a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;wb&#34;) as file:
             pickle.dump(self.theta_trained, file)
 
-    def load_model(self, name: str = &#34;model&#34;):
+    def load_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Load the model parameters from a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Evaluate the model performance.
+
+        Parameters
+        ----------
+        y_val : np.ndarray
+            True values.
+        y_pred : np.ndarray
+            Predicted values.
+        &#34;&#34;&#34;
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -2279,7 +2711,29 @@ el.replaceWith(d);
 
     def plot_pred(
         self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
-    ):
+    ) -&gt; None:
+        &#34;&#34;&#34;Plot predicted values against real values with confidence intervals.
+
+        This method creates a visualization comparing the predicted and actual values,
+        including a confidence interval band around the predictions.
+
+        Parameters
+        ----------
+        y_real : np.ndarray
+            The actual/real values to compare against predictions.
+        y_pred : np.ndarray
+            The predicted values from the model.
+        ci : float, optional
+            The confidence interval level (default is 0.90).
+        mode : bool, optional
+            If True, save the plot as a PNG file; if False, only display (default is True).
+
+        Returns
+        -------
+        None
+            This method does not return a value; it displays/imports a plot and prints
+            confidence interval information.
+        &#34;&#34;&#34;
         sns.set_theme(style=&#34;whitegrid&#34;)
         plt.figure(figsize=(5, 3))
         n = self.n_steps
@@ -2313,7 +2767,13 @@ el.replaceWith(d);
         plt.tight_layout()
         plt.show()
 
-    def summary(self):
+    def summary(self) -&gt; None:
+        &#34;&#34;&#34;Print a summary of the model parameters.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         print(&#34;\nSummary:&#34;)
         print(&#34;-----------------------&#34;)
         print(&#34;Lenght of theta: {}&#34;.format(len(self.theta_trained)))
@@ -2329,7 +2789,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AbstractArima(FeaturesArima):
-    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model
+    &#34;&#34;&#34;A class that implements the auto-regressive arima (1, 0, 0) model.
 
     Parameters
     ----------
@@ -2374,7 +2834,7 @@ el.replaceWith(d);
         &#34;theta_trained&#34;,
     ]
 
-    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4):
+    def __init__(self, datapoints: np.ndarray, noise: float = 0, tol: float = 1e-4) -&gt; None:
         &#34;&#34;&#34;Initialize the ARIMA model.
 
         Parameters
@@ -2393,7 +2853,7 @@ el.replaceWith(d);
         self.tol = tol
         self.n_steps = 0
 
-    def model(self, datapoints: np.ndarray, theta: list, mode=True):
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
         &#34;&#34;&#34;Compute the model forward pass.
 
         Parameters
@@ -2414,9 +2874,9 @@ el.replaceWith(d);
         noise = self.noise
         self.theta_trained = theta
 
-        return super().forward(datapoints, theta, mode, noise)
+        return super().forward(datapoints, theta, mode, noise)  # type: ignore
 
-    def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+    def xvec(self, datapoints: np.ndarray, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Extract vector of data points.
 
         Parameters
@@ -2436,7 +2896,7 @@ el.replaceWith(d);
 
         return datapoints[n_steps:]
 
-    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+    def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False) -&gt; None:
         &#34;&#34;&#34;Train the model using sampling method.
 
         Parameters
@@ -2480,7 +2940,7 @@ el.replaceWith(d);
 
         self.theta_trained = trained
 
-    def predict(self, n_steps: int = 0):
+    def predict(self, n_steps: int = 0) -&gt; np.ndarray:
         &#34;&#34;&#34;Make predictions for future steps.
 
         Parameters
@@ -2508,15 +2968,38 @@ el.replaceWith(d);
 
         return np.array(y_pred)
 
-    def save_model(self, name: str = &#34;model&#34;):
+    def save_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Save the model parameters to a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;wb&#34;) as file:
             pickle.dump(self.theta_trained, file)
 
-    def load_model(self, name: str = &#34;model&#34;):
+    def load_model(self, name: str = &#34;model&#34;) -&gt; None:
+        &#34;&#34;&#34;Load the model parameters from a pickle file.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name of the file to load from, by default &#34;model&#34;.
+        &#34;&#34;&#34;
         with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
             self.theta_trained = pickle.load(file)
 
-    def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
+    def eval(self, y_val: np.ndarray, y_pred: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Evaluate the model performance.
+
+        Parameters
+        ----------
+        y_val : np.ndarray
+            True values.
+        y_pred : np.ndarray
+            Predicted values.
+        &#34;&#34;&#34;
         rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
         square_error = np.sqrt((y_pred - y_val) ** 2)
         accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -2526,7 +3009,29 @@ el.replaceWith(d);
 
     def plot_pred(
         self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
-    ):
+    ) -&gt; None:
+        &#34;&#34;&#34;Plot predicted values against real values with confidence intervals.
+
+        This method creates a visualization comparing the predicted and actual values,
+        including a confidence interval band around the predictions.
+
+        Parameters
+        ----------
+        y_real : np.ndarray
+            The actual/real values to compare against predictions.
+        y_pred : np.ndarray
+            The predicted values from the model.
+        ci : float, optional
+            The confidence interval level (default is 0.90).
+        mode : bool, optional
+            If True, save the plot as a PNG file; if False, only display (default is True).
+
+        Returns
+        -------
+        None
+            This method does not return a value; it displays/imports a plot and prints
+            confidence interval information.
+        &#34;&#34;&#34;
         sns.set_theme(style=&#34;whitegrid&#34;)
         plt.figure(figsize=(5, 3))
         n = self.n_steps
@@ -2560,7 +3065,13 @@ el.replaceWith(d);
         plt.tight_layout()
         plt.show()
 
-    def summary(self):
+    def summary(self) -&gt; None:
+        &#34;&#34;&#34;Print a summary of the model parameters.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         print(&#34;\nSummary:&#34;)
         print(&#34;-----------------------&#34;)
         print(&#34;Lenght of theta: {}&#34;.format(len(self.theta_trained)))
@@ -2573,14 +3084,23 @@ el.replaceWith(d);
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.regression.AbstractArima.eval"><code class="name flex">
-<span>def <span class="ident">eval</span></span>(<span>self, y_val: numpy.ndarray, y_pred: numpy.ndarray)</span>
+<span>def <span class="ident">eval</span></span>(<span>self, y_val: numpy.ndarray, y_pred: numpy.ndarray) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def eval(self, y_val: np.ndarray, y_pred: np.ndarray):
+<pre><code class="python">def eval(self, y_val: np.ndarray, y_pred: np.ndarray) -&gt; None:
+    &#34;&#34;&#34;Evaluate the model performance.
+
+    Parameters
+    ----------
+    y_val : np.ndarray
+        True values.
+    y_pred : np.ndarray
+        Predicted values.
+    &#34;&#34;&#34;
     rmse = np.sqrt(np.mean((y_pred - y_val) ** 2))
     square_error = np.sqrt((y_pred - y_val) ** 2)
     accuracy = np.sum(square_error[np.where(square_error &lt; rmse)])
@@ -2588,31 +3108,50 @@ el.replaceWith(d);
     print(&#34;Accuracy: {:.4f}&#34;.format(accuracy))
     print(&#34;RMSE: {:.4f}&#34;.format(rmse))</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Evaluate the model performance.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>y_val</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>True values.</dd>
+<dt><strong><code>y_pred</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Predicted values.</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.regression.AbstractArima.load_model"><code class="name flex">
-<span>def <span class="ident">load_model</span></span>(<span>self, name: str = 'model')</span>
+<span>def <span class="ident">load_model</span></span>(<span>self, name: str = 'model') ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def load_model(self, name: str = &#34;model&#34;):
+<pre><code class="python">def load_model(self, name: str = &#34;model&#34;) -&gt; None:
+    &#34;&#34;&#34;Load the model parameters from a pickle file.
+
+    Parameters
+    ----------
+    name : str, optional
+        The name of the file to load from, by default &#34;model&#34;.
+    &#34;&#34;&#34;
     with open(name + &#34;.pkl&#34;, &#34;rb&#34;) as file:
         self.theta_trained = pickle.load(file)</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Load the model parameters from a pickle file.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>name</code></strong> :&ensp;<code>str</code>, optional</dt>
+<dd>The name of the file to load from, by default "model".</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.regression.AbstractArima.model"><code class="name flex">
-<span>def <span class="ident">model</span></span>(<span>self, datapoints: numpy.ndarray, theta: list, mode=True)</span>
+<span>def <span class="ident">model</span></span>(<span>self, datapoints: numpy.ndarray, theta: list, mode: bool = True) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def model(self, datapoints: np.ndarray, theta: list, mode=True):
+<pre><code class="python">def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
     &#34;&#34;&#34;Compute the model forward pass.
 
     Parameters
@@ -2633,7 +3172,7 @@ el.replaceWith(d);
     noise = self.noise
     self.theta_trained = theta
 
-    return super().forward(datapoints, theta, mode, noise)</code></pre>
+    return super().forward(datapoints, theta, mode, noise)  # type: ignore</code></pre>
 </details>
 <div class="desc"><p>Compute the model forward pass.</p>
 <h2 id="parameters">Parameters</h2>
@@ -2650,7 +3189,7 @@ el.replaceWith(d);
 Model output.</p></div>
 </dd>
 <dt id="likelihood.models.regression.AbstractArima.plot_pred"><code class="name flex">
-<span>def <span class="ident">plot_pred</span></span>(<span>self,<br>y_real: numpy.ndarray,<br>y_pred: numpy.ndarray,<br>ci: float = 0.9,<br>mode: bool = True)</span>
+<span>def <span class="ident">plot_pred</span></span>(<span>self,<br>y_real: numpy.ndarray,<br>y_pred: numpy.ndarray,<br>ci: float = 0.9,<br>mode: bool = True) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -2659,7 +3198,29 @@ Model output.</p></div>
 </summary>
 <pre><code class="python">def plot_pred(
     self, y_real: np.ndarray, y_pred: np.ndarray, ci: float = 0.90, mode: bool = True
-):
+) -&gt; None:
+    &#34;&#34;&#34;Plot predicted values against real values with confidence intervals.
+
+    This method creates a visualization comparing the predicted and actual values,
+    including a confidence interval band around the predictions.
+
+    Parameters
+    ----------
+    y_real : np.ndarray
+        The actual/real values to compare against predictions.
+    y_pred : np.ndarray
+        The predicted values from the model.
+    ci : float, optional
+        The confidence interval level (default is 0.90).
+    mode : bool, optional
+        If True, save the plot as a PNG file; if False, only display (default is True).
+
+    Returns
+    -------
+    None
+        This method does not return a value; it displays/imports a plot and prints
+        confidence interval information.
+    &#34;&#34;&#34;
     sns.set_theme(style=&#34;whitegrid&#34;)
     plt.figure(figsize=(5, 3))
     n = self.n_steps
@@ -2693,17 +3254,36 @@ Model output.</p></div>
     plt.tight_layout()
     plt.show()</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Plot predicted values against real values with confidence intervals.</p>
+<p>This method creates a visualization comparing the predicted and actual values,
+including a confidence interval band around the predictions.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>y_real</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The actual/real values to compare against predictions.</dd>
+<dt><strong><code>y_pred</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>The predicted values from the model.</dd>
+<dt><strong><code>ci</code></strong> :&ensp;<code>float</code>, optional</dt>
+<dd>The confidence interval level (default is 0.90).</dd>
+<dt><strong><code>mode</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>If True, save the plot as a PNG file; if False, only display (default is True).</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>None</code></dt>
+<dd>This method does not return a value; it displays/imports a plot and prints
+confidence interval information.</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.regression.AbstractArima.predict"><code class="name flex">
-<span>def <span class="ident">predict</span></span>(<span>self, n_steps: int = 0)</span>
+<span>def <span class="ident">predict</span></span>(<span>self, n_steps: int = 0) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def predict(self, n_steps: int = 0):
+<pre><code class="python">def predict(self, n_steps: int = 0) -&gt; np.ndarray:
     &#34;&#34;&#34;Make predictions for future steps.
 
     Parameters
@@ -2742,45 +3322,68 @@ Model output.</p></div>
 Predicted values.</p></div>
 </dd>
 <dt id="likelihood.models.regression.AbstractArima.save_model"><code class="name flex">
-<span>def <span class="ident">save_model</span></span>(<span>self, name: str = 'model')</span>
+<span>def <span class="ident">save_model</span></span>(<span>self, name: str = 'model') ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def save_model(self, name: str = &#34;model&#34;):
+<pre><code class="python">def save_model(self, name: str = &#34;model&#34;) -&gt; None:
+    &#34;&#34;&#34;Save the model parameters to a pickle file.
+
+    Parameters
+    ----------
+    name : str, optional
+        The name of the file to load from, by default &#34;model&#34;.
+    &#34;&#34;&#34;
     with open(name + &#34;.pkl&#34;, &#34;wb&#34;) as file:
         pickle.dump(self.theta_trained, file)</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Save the model parameters to a pickle file.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>name</code></strong> :&ensp;<code>str</code>, optional</dt>
+<dd>The name of the file to load from, by default "model".</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.regression.AbstractArima.summary"><code class="name flex">
-<span>def <span class="ident">summary</span></span>(<span>self)</span>
+<span>def <span class="ident">summary</span></span>(<span>self) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def summary(self):
+<pre><code class="python">def summary(self) -&gt; None:
+    &#34;&#34;&#34;Print a summary of the model parameters.
+
+    Returns
+    -------
+    None
+    &#34;&#34;&#34;
     print(&#34;\nSummary:&#34;)
     print(&#34;-----------------------&#34;)
     print(&#34;Lenght of theta: {}&#34;.format(len(self.theta_trained)))
     print(&#34;Mean of theta: {:.4f}&#34;.format(np.mean(self.theta_trained)))
     print(&#34;-----------------------&#34;)</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Print a summary of the model parameters.</p>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>None</code></dt>
+<dd>&nbsp;</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.regression.AbstractArima.train"><code class="name flex">
-<span>def <span class="ident">train</span></span>(<span>self, nwalkers: int = 10, mov: int = 200, weights: bool = False)</span>
+<span>def <span class="ident">train</span></span>(<span>self, nwalkers: int = 10, mov: int = 200, weights: bool = False) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False):
+<pre><code class="python">def train(self, nwalkers: int = 10, mov: int = 200, weights: bool = False) -&gt; None:
     &#34;&#34;&#34;Train the model using sampling method.
 
     Parameters
@@ -2836,14 +3439,14 @@ Predicted values.</p></div>
 </dl></div>
 </dd>
 <dt id="likelihood.models.regression.AbstractArima.xvec"><code class="name flex">
-<span>def <span class="ident">xvec</span></span>(<span>self, datapoints: numpy.ndarray, n_steps: int = 0)</span>
+<span>def <span class="ident">xvec</span></span>(<span>self, datapoints: numpy.ndarray, n_steps: int = 0) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def xvec(self, datapoints: np.ndarray, n_steps: int = 0):
+<pre><code class="python">def xvec(self, datapoints: np.ndarray, n_steps: int = 0) -&gt; np.ndarray:
     &#34;&#34;&#34;Extract vector of data points.
 
     Parameters
@@ -2935,8 +3538,8 @@ Extracted data points vector.</p></div>
         q: float = 0,
         noise: float = 0,
         tol: float = 1e-5,
-    ):
-        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+    ) -&gt; None:
+        &#34;&#34;&#34;Initialize the ARIMA model with given parameters.
 
         Parameters
         ----------
@@ -2966,8 +3569,8 @@ Extracted data points vector.</p></div>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
-        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
+        &#34;&#34;&#34;Compute the prior probability or prediction based on ARIMA model.
 
         Parameters
         ----------
@@ -3026,7 +3629,7 @@ Extracted data points vector.</p></div>
                 y_vec = y_regr_vec
             return y_vec
         else:
-            return super().forward(datapoints, theta, mode, noise)</code></pre>
+            return super().forward(datapoints, theta, mode, noise)  # type: ignore</code></pre>
 </details>
 <div class="desc"><p>A class that implements the (p, d, q) ARIMA model.</p>
 <h2 id="parameters">Parameters</h2>
@@ -3053,7 +3656,7 @@ Extracted data points vector.</p></div>
 </dl>
 <h2 id="notes">Notes</h2>
 <p>The values of <code>p</code>, <code>q</code> are scaled based on the length of <code>datapoints</code>.</p>
-<p>Initializes the ARIMA model with given parameters.</p>
+<p>Initialize the ARIMA model with given parameters.</p>
 <h2 id="parameters_1">Parameters</h2>
 <dl>
 <dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -3126,8 +3729,8 @@ Extracted data points vector.</p></div>
         q: float = 0,
         noise: float = 0,
         tol: float = 1e-5,
-    ):
-        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+    ) -&gt; None:
+        &#34;&#34;&#34;Initialize the ARIMA model with given parameters.
 
         Parameters
         ----------
@@ -3157,8 +3760,8 @@ Extracted data points vector.</p></div>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
-        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
+        &#34;&#34;&#34;Compute the prior probability or prediction based on ARIMA model.
 
         Parameters
         ----------
@@ -3217,7 +3820,7 @@ Extracted data points vector.</p></div>
                 y_vec = y_regr_vec
             return y_vec
         else:
-            return super().forward(datapoints, theta, mode, noise)</code></pre>
+            return super().forward(datapoints, theta, mode, noise)  # type: ignore</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -3266,8 +3869,8 @@ Extracted data points vector.</p></div>
         q: float = 0,
         noise: float = 0,
         tol: float = 1e-5,
-    ):
-        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+    ) -&gt; None:
+        &#34;&#34;&#34;Initialize the ARIMA model with given parameters.
 
         Parameters
         ----------
@@ -3297,8 +3900,8 @@ Extracted data points vector.</p></div>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
-        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
+        &#34;&#34;&#34;Compute the prior probability or prediction based on ARIMA model.
 
         Parameters
         ----------
@@ -3357,7 +3960,7 @@ Extracted data points vector.</p></div>
                 y_vec = y_regr_vec
             return y_vec
         else:
-            return super().forward(datapoints, theta, mode, noise)</code></pre>
+            return super().forward(datapoints, theta, mode, noise)  # type: ignore</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -3406,8 +4009,8 @@ Extracted data points vector.</p></div>
         q: float = 0,
         noise: float = 0,
         tol: float = 1e-5,
-    ):
-        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+    ) -&gt; None:
+        &#34;&#34;&#34;Initialize the ARIMA model with given parameters.
 
         Parameters
         ----------
@@ -3437,8 +4040,8 @@ Extracted data points vector.</p></div>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
-        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
+        &#34;&#34;&#34;Compute the prior probability or prediction based on ARIMA model.
 
         Parameters
         ----------
@@ -3497,7 +4100,7 @@ Extracted data points vector.</p></div>
                 y_vec = y_regr_vec
             return y_vec
         else:
-            return super().forward(datapoints, theta, mode, noise)</code></pre>
+            return super().forward(datapoints, theta, mode, noise)  # type: ignore</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -3546,8 +4149,8 @@ Extracted data points vector.</p></div>
         q: float = 0,
         noise: float = 0,
         tol: float = 1e-5,
-    ):
-        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+    ) -&gt; None:
+        &#34;&#34;&#34;Initialize the ARIMA model with given parameters.
 
         Parameters
         ----------
@@ -3577,8 +4180,8 @@ Extracted data points vector.</p></div>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
-        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
+        &#34;&#34;&#34;Compute the prior probability or prediction based on ARIMA model.
 
         Parameters
         ----------
@@ -3637,7 +4240,7 @@ Extracted data points vector.</p></div>
                 y_vec = y_regr_vec
             return y_vec
         else:
-            return super().forward(datapoints, theta, mode, noise)</code></pre>
+            return super().forward(datapoints, theta, mode, noise)  # type: ignore</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -3686,8 +4289,8 @@ Extracted data points vector.</p></div>
         q: float = 0,
         noise: float = 0,
         tol: float = 1e-5,
-    ):
-        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+    ) -&gt; None:
+        &#34;&#34;&#34;Initialize the ARIMA model with given parameters.
 
         Parameters
         ----------
@@ -3717,8 +4320,8 @@ Extracted data points vector.</p></div>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
-        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
+        &#34;&#34;&#34;Compute the prior probability or prediction based on ARIMA model.
 
         Parameters
         ----------
@@ -3777,7 +4380,7 @@ Extracted data points vector.</p></div>
                 y_vec = y_regr_vec
             return y_vec
         else:
-            return super().forward(datapoints, theta, mode, noise)</code></pre>
+            return super().forward(datapoints, theta, mode, noise)  # type: ignore</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -3826,8 +4429,8 @@ Extracted data points vector.</p></div>
         q: float = 0,
         noise: float = 0,
         tol: float = 1e-5,
-    ):
-        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+    ) -&gt; None:
+        &#34;&#34;&#34;Initialize the ARIMA model with given parameters.
 
         Parameters
         ----------
@@ -3857,8 +4460,8 @@ Extracted data points vector.</p></div>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
-        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
+        &#34;&#34;&#34;Compute the prior probability or prediction based on ARIMA model.
 
         Parameters
         ----------
@@ -3917,7 +4520,7 @@ Extracted data points vector.</p></div>
                 y_vec = y_regr_vec
             return y_vec
         else:
-            return super().forward(datapoints, theta, mode, noise)</code></pre>
+            return super().forward(datapoints, theta, mode, noise)  # type: ignore</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -3966,8 +4569,8 @@ Extracted data points vector.</p></div>
         q: float = 0,
         noise: float = 0,
         tol: float = 1e-5,
-    ):
-        &#34;&#34;&#34;Initializes the ARIMA model with given parameters.
+    ) -&gt; None:
+        &#34;&#34;&#34;Initialize the ARIMA model with given parameters.
 
         Parameters
         ----------
@@ -3997,8 +4600,8 @@ Extracted data points vector.</p></div>
         self.q = int(q * len(datapoints))
         self.tol = tol
 
-    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
-        &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+    def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
+        &#34;&#34;&#34;Compute the prior probability or prediction based on ARIMA model.
 
         Parameters
         ----------
@@ -4057,7 +4660,7 @@ Extracted data points vector.</p></div>
                 y_vec = y_regr_vec
             return y_vec
         else:
-            return super().forward(datapoints, theta, mode, noise)</code></pre>
+            return super().forward(datapoints, theta, mode, noise)  # type: ignore</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -4065,15 +4668,15 @@ Extracted data points vector.</p></div>
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.regression.Arima.model"><code class="name flex">
-<span>def <span class="ident">model</span></span>(<span>self, datapoints: numpy.ndarray, theta: list, mode: bool = True)</span>
+<span>def <span class="ident">model</span></span>(<span>self, datapoints: numpy.ndarray, theta: list, mode: bool = True) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def model(self, datapoints: np.ndarray, theta: list, mode: bool = True):
-    &#34;&#34;&#34;Computes the prior probability or prediction based on ARIMA model.
+<pre><code class="python">def model(self, datapoints: np.ndarray, theta: list, mode: bool = True) -&gt; np.ndarray:
+    &#34;&#34;&#34;Compute the prior probability or prediction based on ARIMA model.
 
     Parameters
     ----------
@@ -4132,9 +4735,9 @@ Extracted data points vector.</p></div>
             y_vec = y_regr_vec
         return y_vec
     else:
-        return super().forward(datapoints, theta, mode, noise)</code></pre>
+        return super().forward(datapoints, theta, mode, noise)  # type: ignore</code></pre>
 </details>
-<div class="desc"><p>Computes the prior probability or prediction based on ARIMA model.</p>
+<div class="desc"><p>Compute the prior probability or prediction based on ARIMA model.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -4156,9 +4759,14 @@ Extracted data points vector.</p></div>
 <li><code><b><a title="likelihood.models.regression.AbstractArima" href="#likelihood.models.regression.AbstractArima">AbstractArima</a></b></code>:
 <ul class="hlist">
 <li><code><a title="likelihood.models.regression.AbstractArima.average" href="utils.html#likelihood.models.utils.FeaturesArima.average">average</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.eval" href="#likelihood.models.regression.AbstractArima.eval">eval</a></code></li>
 <li><code><a title="likelihood.models.regression.AbstractArima.forward" href="utils.html#likelihood.models.utils.FeaturesArima.forward">forward</a></code></li>
 <li><code><a title="likelihood.models.regression.AbstractArima.integrated" href="utils.html#likelihood.models.utils.FeaturesArima.integrated">integrated</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.load_model" href="#likelihood.models.regression.AbstractArima.load_model">load_model</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.plot_pred" href="#likelihood.models.regression.AbstractArima.plot_pred">plot_pred</a></code></li>
 <li><code><a title="likelihood.models.regression.AbstractArima.predict" href="#likelihood.models.regression.AbstractArima.predict">predict</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.save_model" href="#likelihood.models.regression.AbstractArima.save_model">save_model</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.summary" href="#likelihood.models.regression.AbstractArima.summary">summary</a></code></li>
 <li><code><a title="likelihood.models.regression.AbstractArima.train" href="#likelihood.models.regression.AbstractArima.train">train</a></code></li>
 <li><code><a title="likelihood.models.regression.AbstractArima.xvec" href="#likelihood.models.regression.AbstractArima.xvec">xvec</a></code></li>
 </ul>
@@ -4175,7 +4783,7 @@ Extracted data points vector.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class FourierRegression(AbstractArima):
-    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering
+    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering.
 
     Parameters
     ----------
@@ -4187,15 +4795,32 @@ Extracted data points vector.</p></div>
     new_datapoints : np.ndarray
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
-
     &#34;&#34;&#34;
 
     __slots__ = [&#34;datapoints_&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
 
-    def __init__(self, datapoints: np.ndarray):
+    def __init__(self, datapoints: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Initialize the FourierRegression model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        &#34;&#34;&#34;
         self.datapoints_ = datapoints
 
-    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
+    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False) -&gt; None:
+        &#34;&#34;&#34;Fit the FourierRegression model by denoising the datapoints.
+
+        Parameters
+        ----------
+        sigma : int
+            Sigma parameter for denoising.
+        mov : int
+            Moving window size.
+        mode : bool
+            Denoising mode.
+        &#34;&#34;&#34;
         self.sigma = sigma
         self.mode = mode
         self.mov = mov
@@ -4205,7 +4830,33 @@ Extracted data points vector.</p></div>
 
     def predict(
         self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
-    ):
+    ) -&gt; np.ndarray:
+        &#34;&#34;&#34;Predict future values using the FourierRegression model.
+
+        This method predicts future values by training ARIMA models on sliding windows
+        of the denoised datapoints and generating predictions for n_steps time periods.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        n_walkers : int, optional
+            The number of walkers/moving window positions to use (default is 1).
+        name : str, optional
+            The base name for saving models if save is True (default is &#34;fourier_model&#34;).
+        save : bool, optional
+            Whether to save individual ARIMA models during processing (default is True).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that fit() has been called previously to denoise the datapoints.
+        &#34;&#34;&#34;
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -4215,7 +4866,7 @@ Extracted data points vector.</p></div>
         new_datapoints = []
         for i in range(self.datapoints_.shape[0]):
             super().__init__(self.datapoints_[i, :])
-            super().train(n_walkers, mov)
+            super().train(n_walkers, mov)  # type: ignore
             if save:
                 super().save_model(str(i) + &#34;_&#34; + name)
             y_pred_ = super().predict(n_steps)
@@ -4226,7 +4877,29 @@ Extracted data points vector.</p></div>
 
         return new_datapoints
 
-    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
+    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;) -&gt; np.ndarray:
+        &#34;&#34;&#34;Predict future values using pre-saved ARIMA models.
+
+        This method loads previously saved ARIMA models and uses them to generate
+        predictions for n_steps time periods without retraining.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        name : str, optional
+            The base name used when saving the models (default is &#34;fourier_model&#34;).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that models were previously saved using predict() with save=True.
+        &#34;&#34;&#34;
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -4240,7 +4913,7 @@ Extracted data points vector.</p></div>
 
         return new_datapoints</code></pre>
 </details>
-<div class="desc"><p>A class that implements the arima model with FFT noise filtering</p>
+<div class="desc"><p>A class that implements the arima model with FFT noise filtering.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -4252,15 +4925,11 @@ Extracted data points vector.</p></div>
 <dd>It is the number of predicted points. It is necessary
 to apply predict(n_steps) followed by fit()</dd>
 </dl>
-<p>Initialize the ARIMA model.</p>
+<p>Initialize the FourierRegression model.</p>
 <h2 id="parameters_1">Parameters</h2>
 <dl>
 <dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
-<dd>The input data points for training.</dd>
-<dt><strong><code>noise</code></strong> :&ensp;<code>float</code>, optional</dt>
-<dd>Noise level for the model, by default 0</dd>
-<dt><strong><code>tol</code></strong> :&ensp;<code>float</code>, optional</dt>
-<dd>Tolerance for convergence, by default 1e-4</dd>
+<dd>A set of points to train the ARIMA model.</dd>
 </dl></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -4276,7 +4945,7 @@ to apply predict(n_steps) followed by fit()</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class FourierRegression(AbstractArima):
-    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering
+    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering.
 
     Parameters
     ----------
@@ -4288,15 +4957,32 @@ to apply predict(n_steps) followed by fit()</dd>
     new_datapoints : np.ndarray
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
-
     &#34;&#34;&#34;
 
     __slots__ = [&#34;datapoints_&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
 
-    def __init__(self, datapoints: np.ndarray):
+    def __init__(self, datapoints: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Initialize the FourierRegression model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        &#34;&#34;&#34;
         self.datapoints_ = datapoints
 
-    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
+    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False) -&gt; None:
+        &#34;&#34;&#34;Fit the FourierRegression model by denoising the datapoints.
+
+        Parameters
+        ----------
+        sigma : int
+            Sigma parameter for denoising.
+        mov : int
+            Moving window size.
+        mode : bool
+            Denoising mode.
+        &#34;&#34;&#34;
         self.sigma = sigma
         self.mode = mode
         self.mov = mov
@@ -4306,7 +4992,33 @@ to apply predict(n_steps) followed by fit()</dd>
 
     def predict(
         self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
-    ):
+    ) -&gt; np.ndarray:
+        &#34;&#34;&#34;Predict future values using the FourierRegression model.
+
+        This method predicts future values by training ARIMA models on sliding windows
+        of the denoised datapoints and generating predictions for n_steps time periods.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        n_walkers : int, optional
+            The number of walkers/moving window positions to use (default is 1).
+        name : str, optional
+            The base name for saving models if save is True (default is &#34;fourier_model&#34;).
+        save : bool, optional
+            Whether to save individual ARIMA models during processing (default is True).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that fit() has been called previously to denoise the datapoints.
+        &#34;&#34;&#34;
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -4316,7 +5028,7 @@ to apply predict(n_steps) followed by fit()</dd>
         new_datapoints = []
         for i in range(self.datapoints_.shape[0]):
             super().__init__(self.datapoints_[i, :])
-            super().train(n_walkers, mov)
+            super().train(n_walkers, mov)  # type: ignore
             if save:
                 super().save_model(str(i) + &#34;_&#34; + name)
             y_pred_ = super().predict(n_steps)
@@ -4327,7 +5039,29 @@ to apply predict(n_steps) followed by fit()</dd>
 
         return new_datapoints
 
-    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
+    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;) -&gt; np.ndarray:
+        &#34;&#34;&#34;Predict future values using pre-saved ARIMA models.
+
+        This method loads previously saved ARIMA models and uses them to generate
+        predictions for n_steps time periods without retraining.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        name : str, optional
+            The base name used when saving the models (default is &#34;fourier_model&#34;).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that models were previously saved using predict() with save=True.
+        &#34;&#34;&#34;
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -4350,7 +5084,7 @@ to apply predict(n_steps) followed by fit()</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class FourierRegression(AbstractArima):
-    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering
+    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering.
 
     Parameters
     ----------
@@ -4362,15 +5096,32 @@ to apply predict(n_steps) followed by fit()</dd>
     new_datapoints : np.ndarray
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
-
     &#34;&#34;&#34;
 
     __slots__ = [&#34;datapoints_&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
 
-    def __init__(self, datapoints: np.ndarray):
+    def __init__(self, datapoints: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Initialize the FourierRegression model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        &#34;&#34;&#34;
         self.datapoints_ = datapoints
 
-    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
+    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False) -&gt; None:
+        &#34;&#34;&#34;Fit the FourierRegression model by denoising the datapoints.
+
+        Parameters
+        ----------
+        sigma : int
+            Sigma parameter for denoising.
+        mov : int
+            Moving window size.
+        mode : bool
+            Denoising mode.
+        &#34;&#34;&#34;
         self.sigma = sigma
         self.mode = mode
         self.mov = mov
@@ -4380,7 +5131,33 @@ to apply predict(n_steps) followed by fit()</dd>
 
     def predict(
         self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
-    ):
+    ) -&gt; np.ndarray:
+        &#34;&#34;&#34;Predict future values using the FourierRegression model.
+
+        This method predicts future values by training ARIMA models on sliding windows
+        of the denoised datapoints and generating predictions for n_steps time periods.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        n_walkers : int, optional
+            The number of walkers/moving window positions to use (default is 1).
+        name : str, optional
+            The base name for saving models if save is True (default is &#34;fourier_model&#34;).
+        save : bool, optional
+            Whether to save individual ARIMA models during processing (default is True).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that fit() has been called previously to denoise the datapoints.
+        &#34;&#34;&#34;
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -4390,7 +5167,7 @@ to apply predict(n_steps) followed by fit()</dd>
         new_datapoints = []
         for i in range(self.datapoints_.shape[0]):
             super().__init__(self.datapoints_[i, :])
-            super().train(n_walkers, mov)
+            super().train(n_walkers, mov)  # type: ignore
             if save:
                 super().save_model(str(i) + &#34;_&#34; + name)
             y_pred_ = super().predict(n_steps)
@@ -4401,7 +5178,29 @@ to apply predict(n_steps) followed by fit()</dd>
 
         return new_datapoints
 
-    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
+    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;) -&gt; np.ndarray:
+        &#34;&#34;&#34;Predict future values using pre-saved ARIMA models.
+
+        This method loads previously saved ARIMA models and uses them to generate
+        predictions for n_steps time periods without retraining.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        name : str, optional
+            The base name used when saving the models (default is &#34;fourier_model&#34;).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that models were previously saved using predict() with save=True.
+        &#34;&#34;&#34;
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -4424,7 +5223,7 @@ to apply predict(n_steps) followed by fit()</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class FourierRegression(AbstractArima):
-    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering
+    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering.
 
     Parameters
     ----------
@@ -4436,15 +5235,32 @@ to apply predict(n_steps) followed by fit()</dd>
     new_datapoints : np.ndarray
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
-
     &#34;&#34;&#34;
 
     __slots__ = [&#34;datapoints_&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
 
-    def __init__(self, datapoints: np.ndarray):
+    def __init__(self, datapoints: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Initialize the FourierRegression model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        &#34;&#34;&#34;
         self.datapoints_ = datapoints
 
-    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
+    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False) -&gt; None:
+        &#34;&#34;&#34;Fit the FourierRegression model by denoising the datapoints.
+
+        Parameters
+        ----------
+        sigma : int
+            Sigma parameter for denoising.
+        mov : int
+            Moving window size.
+        mode : bool
+            Denoising mode.
+        &#34;&#34;&#34;
         self.sigma = sigma
         self.mode = mode
         self.mov = mov
@@ -4454,7 +5270,33 @@ to apply predict(n_steps) followed by fit()</dd>
 
     def predict(
         self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
-    ):
+    ) -&gt; np.ndarray:
+        &#34;&#34;&#34;Predict future values using the FourierRegression model.
+
+        This method predicts future values by training ARIMA models on sliding windows
+        of the denoised datapoints and generating predictions for n_steps time periods.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        n_walkers : int, optional
+            The number of walkers/moving window positions to use (default is 1).
+        name : str, optional
+            The base name for saving models if save is True (default is &#34;fourier_model&#34;).
+        save : bool, optional
+            Whether to save individual ARIMA models during processing (default is True).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that fit() has been called previously to denoise the datapoints.
+        &#34;&#34;&#34;
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -4464,7 +5306,7 @@ to apply predict(n_steps) followed by fit()</dd>
         new_datapoints = []
         for i in range(self.datapoints_.shape[0]):
             super().__init__(self.datapoints_[i, :])
-            super().train(n_walkers, mov)
+            super().train(n_walkers, mov)  # type: ignore
             if save:
                 super().save_model(str(i) + &#34;_&#34; + name)
             y_pred_ = super().predict(n_steps)
@@ -4475,7 +5317,29 @@ to apply predict(n_steps) followed by fit()</dd>
 
         return new_datapoints
 
-    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
+    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;) -&gt; np.ndarray:
+        &#34;&#34;&#34;Predict future values using pre-saved ARIMA models.
+
+        This method loads previously saved ARIMA models and uses them to generate
+        predictions for n_steps time periods without retraining.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        name : str, optional
+            The base name used when saving the models (default is &#34;fourier_model&#34;).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that models were previously saved using predict() with save=True.
+        &#34;&#34;&#34;
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -4498,7 +5362,7 @@ to apply predict(n_steps) followed by fit()</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class FourierRegression(AbstractArima):
-    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering
+    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering.
 
     Parameters
     ----------
@@ -4510,15 +5374,32 @@ to apply predict(n_steps) followed by fit()</dd>
     new_datapoints : np.ndarray
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
-
     &#34;&#34;&#34;
 
     __slots__ = [&#34;datapoints_&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
 
-    def __init__(self, datapoints: np.ndarray):
+    def __init__(self, datapoints: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Initialize the FourierRegression model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        &#34;&#34;&#34;
         self.datapoints_ = datapoints
 
-    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
+    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False) -&gt; None:
+        &#34;&#34;&#34;Fit the FourierRegression model by denoising the datapoints.
+
+        Parameters
+        ----------
+        sigma : int
+            Sigma parameter for denoising.
+        mov : int
+            Moving window size.
+        mode : bool
+            Denoising mode.
+        &#34;&#34;&#34;
         self.sigma = sigma
         self.mode = mode
         self.mov = mov
@@ -4528,7 +5409,33 @@ to apply predict(n_steps) followed by fit()</dd>
 
     def predict(
         self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
-    ):
+    ) -&gt; np.ndarray:
+        &#34;&#34;&#34;Predict future values using the FourierRegression model.
+
+        This method predicts future values by training ARIMA models on sliding windows
+        of the denoised datapoints and generating predictions for n_steps time periods.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        n_walkers : int, optional
+            The number of walkers/moving window positions to use (default is 1).
+        name : str, optional
+            The base name for saving models if save is True (default is &#34;fourier_model&#34;).
+        save : bool, optional
+            Whether to save individual ARIMA models during processing (default is True).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that fit() has been called previously to denoise the datapoints.
+        &#34;&#34;&#34;
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -4538,7 +5445,7 @@ to apply predict(n_steps) followed by fit()</dd>
         new_datapoints = []
         for i in range(self.datapoints_.shape[0]):
             super().__init__(self.datapoints_[i, :])
-            super().train(n_walkers, mov)
+            super().train(n_walkers, mov)  # type: ignore
             if save:
                 super().save_model(str(i) + &#34;_&#34; + name)
             y_pred_ = super().predict(n_steps)
@@ -4549,7 +5456,29 @@ to apply predict(n_steps) followed by fit()</dd>
 
         return new_datapoints
 
-    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
+    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;) -&gt; np.ndarray:
+        &#34;&#34;&#34;Predict future values using pre-saved ARIMA models.
+
+        This method loads previously saved ARIMA models and uses them to generate
+        predictions for n_steps time periods without retraining.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        name : str, optional
+            The base name used when saving the models (default is &#34;fourier_model&#34;).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that models were previously saved using predict() with save=True.
+        &#34;&#34;&#34;
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -4572,7 +5501,7 @@ to apply predict(n_steps) followed by fit()</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class FourierRegression(AbstractArima):
-    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering
+    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering.
 
     Parameters
     ----------
@@ -4584,15 +5513,32 @@ to apply predict(n_steps) followed by fit()</dd>
     new_datapoints : np.ndarray
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
-
     &#34;&#34;&#34;
 
     __slots__ = [&#34;datapoints_&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
 
-    def __init__(self, datapoints: np.ndarray):
+    def __init__(self, datapoints: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Initialize the FourierRegression model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        &#34;&#34;&#34;
         self.datapoints_ = datapoints
 
-    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
+    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False) -&gt; None:
+        &#34;&#34;&#34;Fit the FourierRegression model by denoising the datapoints.
+
+        Parameters
+        ----------
+        sigma : int
+            Sigma parameter for denoising.
+        mov : int
+            Moving window size.
+        mode : bool
+            Denoising mode.
+        &#34;&#34;&#34;
         self.sigma = sigma
         self.mode = mode
         self.mov = mov
@@ -4602,7 +5548,33 @@ to apply predict(n_steps) followed by fit()</dd>
 
     def predict(
         self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
-    ):
+    ) -&gt; np.ndarray:
+        &#34;&#34;&#34;Predict future values using the FourierRegression model.
+
+        This method predicts future values by training ARIMA models on sliding windows
+        of the denoised datapoints and generating predictions for n_steps time periods.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        n_walkers : int, optional
+            The number of walkers/moving window positions to use (default is 1).
+        name : str, optional
+            The base name for saving models if save is True (default is &#34;fourier_model&#34;).
+        save : bool, optional
+            Whether to save individual ARIMA models during processing (default is True).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that fit() has been called previously to denoise the datapoints.
+        &#34;&#34;&#34;
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -4612,7 +5584,7 @@ to apply predict(n_steps) followed by fit()</dd>
         new_datapoints = []
         for i in range(self.datapoints_.shape[0]):
             super().__init__(self.datapoints_[i, :])
-            super().train(n_walkers, mov)
+            super().train(n_walkers, mov)  # type: ignore
             if save:
                 super().save_model(str(i) + &#34;_&#34; + name)
             y_pred_ = super().predict(n_steps)
@@ -4623,7 +5595,29 @@ to apply predict(n_steps) followed by fit()</dd>
 
         return new_datapoints
 
-    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
+    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;) -&gt; np.ndarray:
+        &#34;&#34;&#34;Predict future values using pre-saved ARIMA models.
+
+        This method loads previously saved ARIMA models and uses them to generate
+        predictions for n_steps time periods without retraining.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        name : str, optional
+            The base name used when saving the models (default is &#34;fourier_model&#34;).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that models were previously saved using predict() with save=True.
+        &#34;&#34;&#34;
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -4646,7 +5640,7 @@ to apply predict(n_steps) followed by fit()</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class FourierRegression(AbstractArima):
-    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering
+    &#34;&#34;&#34;A class that implements the arima model with FFT noise filtering.
 
     Parameters
     ----------
@@ -4658,15 +5652,32 @@ to apply predict(n_steps) followed by fit()</dd>
     new_datapoints : np.ndarray
         It is the number of predicted points. It is necessary
         to apply predict(n_steps) followed by fit()
-
     &#34;&#34;&#34;
 
     __slots__ = [&#34;datapoints_&#34;, &#34;sigma&#34;, &#34;mode&#34;, &#34;mov&#34;, &#34;n_walkers&#34;, &#34;name&#34;]
 
-    def __init__(self, datapoints: np.ndarray):
+    def __init__(self, datapoints: np.ndarray) -&gt; None:
+        &#34;&#34;&#34;Initialize the FourierRegression model.
+
+        Parameters
+        ----------
+        datapoints : np.ndarray
+            A set of points to train the ARIMA model.
+        &#34;&#34;&#34;
         self.datapoints_ = datapoints
 
-    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
+    def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False) -&gt; None:
+        &#34;&#34;&#34;Fit the FourierRegression model by denoising the datapoints.
+
+        Parameters
+        ----------
+        sigma : int
+            Sigma parameter for denoising.
+        mov : int
+            Moving window size.
+        mode : bool
+            Denoising mode.
+        &#34;&#34;&#34;
         self.sigma = sigma
         self.mode = mode
         self.mov = mov
@@ -4676,7 +5687,33 @@ to apply predict(n_steps) followed by fit()</dd>
 
     def predict(
         self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
-    ):
+    ) -&gt; np.ndarray:
+        &#34;&#34;&#34;Predict future values using the FourierRegression model.
+
+        This method predicts future values by training ARIMA models on sliding windows
+        of the denoised datapoints and generating predictions for n_steps time periods.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        n_walkers : int, optional
+            The number of walkers/moving window positions to use (default is 1).
+        name : str, optional
+            The base name for saving models if save is True (default is &#34;fourier_model&#34;).
+        save : bool, optional
+            Whether to save individual ARIMA models during processing (default is True).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that fit() has been called previously to denoise the datapoints.
+        &#34;&#34;&#34;
         self.n_walkers = n_walkers
         self.name = name
         mov = self.mov
@@ -4686,7 +5723,7 @@ to apply predict(n_steps) followed by fit()</dd>
         new_datapoints = []
         for i in range(self.datapoints_.shape[0]):
             super().__init__(self.datapoints_[i, :])
-            super().train(n_walkers, mov)
+            super().train(n_walkers, mov)  # type: ignore
             if save:
                 super().save_model(str(i) + &#34;_&#34; + name)
             y_pred_ = super().predict(n_steps)
@@ -4697,7 +5734,29 @@ to apply predict(n_steps) followed by fit()</dd>
 
         return new_datapoints
 
-    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
+    def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;) -&gt; np.ndarray:
+        &#34;&#34;&#34;Predict future values using pre-saved ARIMA models.
+
+        This method loads previously saved ARIMA models and uses them to generate
+        predictions for n_steps time periods without retraining.
+
+        Parameters
+        ----------
+        n_steps : int
+            The number of time steps to predict.
+        name : str, optional
+            The base name used when saving the models (default is &#34;fourier_model&#34;).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+            depends on the data length and window size.
+
+        Notes
+        -----
+        This method requires that models were previously saved using predict() with save=True.
+        &#34;&#34;&#34;
         new_datapoints = []
 
         for i in range(self.datapoints_.shape[0]):
@@ -4717,14 +5776,25 @@ to apply predict(n_steps) followed by fit()</dd>
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.regression.FourierRegression.fit"><code class="name flex">
-<span>def <span class="ident">fit</span></span>(<span>self, sigma: int = 0, mov: int = 200, mode: bool = False)</span>
+<span>def <span class="ident">fit</span></span>(<span>self, sigma: int = 0, mov: int = 200, mode: bool = False) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False):
+<pre><code class="python">def fit(self, sigma: int = 0, mov: int = 200, mode: bool = False) -&gt; None:
+    &#34;&#34;&#34;Fit the FourierRegression model by denoising the datapoints.
+
+    Parameters
+    ----------
+    sigma : int
+        Sigma parameter for denoising.
+    mov : int
+        Moving window size.
+    mode : bool
+        Denoising mode.
+    &#34;&#34;&#34;
     self.sigma = sigma
     self.mode = mode
     self.mov = mov
@@ -4732,17 +5802,48 @@ to apply predict(n_steps) followed by fit()</dd>
     datapoints = self.datapoints_
     self.datapoints_, _ = fft_denoise(datapoints, sigma, mode)</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Fit the FourierRegression model by denoising the datapoints.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>sigma</code></strong> :&ensp;<code>int</code></dt>
+<dd>Sigma parameter for denoising.</dd>
+<dt><strong><code>mov</code></strong> :&ensp;<code>int</code></dt>
+<dd>Moving window size.</dd>
+<dt><strong><code>mode</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Denoising mode.</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.regression.FourierRegression.load_predict"><code class="name flex">
-<span>def <span class="ident">load_predict</span></span>(<span>self, n_steps: int, name: str = 'fourier_model')</span>
+<span>def <span class="ident">load_predict</span></span>(<span>self, n_steps: int, name: str = 'fourier_model') ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;):
+<pre><code class="python">def load_predict(self, n_steps: int, name: str = &#34;fourier_model&#34;) -&gt; np.ndarray:
+    &#34;&#34;&#34;Predict future values using pre-saved ARIMA models.
+
+    This method loads previously saved ARIMA models and uses them to generate
+    predictions for n_steps time periods without retraining.
+
+    Parameters
+    ----------
+    n_steps : int
+        The number of time steps to predict.
+    name : str, optional
+        The base name used when saving the models (default is &#34;fourier_model&#34;).
+
+    Returns
+    -------
+    np.ndarray
+        A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+        depends on the data length and window size.
+
+    Notes
+    -----
+    This method requires that models were previously saved using predict() with save=True.
+    &#34;&#34;&#34;
     new_datapoints = []
 
     for i in range(self.datapoints_.shape[0]):
@@ -4756,7 +5857,104 @@ to apply predict(n_steps) followed by fit()</dd>
 
     return new_datapoints</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Predict future values using pre-saved ARIMA models.</p>
+<p>This method loads previously saved ARIMA models and uses them to generate
+predictions for n_steps time periods without retraining.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>n_steps</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of time steps to predict.</dd>
+<dt><strong><code>name</code></strong> :&ensp;<code>str</code>, optional</dt>
+<dd>The base name used when saving the models (default is "fourier_model").</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>np.ndarray</code></dt>
+<dd>A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+depends on the data length and window size.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>This method requires that models were previously saved using predict() with save=True.</p></div>
+</dd>
+<dt id="likelihood.models.regression.FourierRegression.predict"><code class="name flex">
+<span>def <span class="ident">predict</span></span>(<span>self,<br>n_steps: int,<br>n_walkers: int = 1,<br>name: str = 'fourier_model',<br>save: bool = True) ‑> numpy.ndarray</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def predict(
+    self, n_steps: int, n_walkers: int = 1, name: str = &#34;fourier_model&#34;, save: bool = True
+) -&gt; np.ndarray:
+    &#34;&#34;&#34;Predict future values using the FourierRegression model.
+
+    This method predicts future values by training ARIMA models on sliding windows
+    of the denoised datapoints and generating predictions for n_steps time periods.
+
+    Parameters
+    ----------
+    n_steps : int
+        The number of time steps to predict.
+    n_walkers : int, optional
+        The number of walkers/moving window positions to use (default is 1).
+    name : str, optional
+        The base name for saving models if save is True (default is &#34;fourier_model&#34;).
+    save : bool, optional
+        Whether to save individual ARIMA models during processing (default is True).
+
+    Returns
+    -------
+    np.ndarray
+        A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+        depends on the data length and window size.
+
+    Notes
+    -----
+    This method requires that fit() has been called previously to denoise the datapoints.
+    &#34;&#34;&#34;
+    self.n_walkers = n_walkers
+    self.name = name
+    mov = self.mov
+
+    assert self.n_walkers &lt;= mov, &#34;n_walkers must be less or equal than mov&#34;
+
+    new_datapoints = []
+    for i in range(self.datapoints_.shape[0]):
+        super().__init__(self.datapoints_[i, :])
+        super().train(n_walkers, mov)  # type: ignore
+        if save:
+            super().save_model(str(i) + &#34;_&#34; + name)
+        y_pred_ = super().predict(n_steps)
+        new_datapoints.append(y_pred_)
+
+    new_datapoints = np.array(new_datapoints)
+    new_datapoints = np.reshape(new_datapoints, (len(new_datapoints), -1))
+
+    return new_datapoints</code></pre>
+</details>
+<div class="desc"><p>Predict future values using the FourierRegression model.</p>
+<p>This method predicts future values by training ARIMA models on sliding windows
+of the denoised datapoints and generating predictions for n_steps time periods.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>n_steps</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of time steps to predict.</dd>
+<dt><strong><code>n_walkers</code></strong> :&ensp;<code>int</code>, optional</dt>
+<dd>The number of walkers/moving window positions to use (default is 1).</dd>
+<dt><strong><code>name</code></strong> :&ensp;<code>str</code>, optional</dt>
+<dd>The base name for saving models if save is True (default is "fourier_model").</dd>
+<dt><strong><code>save</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Whether to save individual ARIMA models during processing (default is True).</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>np.ndarray</code></dt>
+<dd>A 2D array of predicted values with shape (n_windows, n_steps) where n_windows
+depends on the data length and window size.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>This method requires that fit() has been called previously to denoise the datapoints.</p></div>
 </dd>
 </dl>
 <h3>Inherited members</h3>
@@ -4764,10 +5962,14 @@ to apply predict(n_steps) followed by fit()</dd>
 <li><code><b><a title="likelihood.models.regression.AbstractArima" href="#likelihood.models.regression.AbstractArima">AbstractArima</a></b></code>:
 <ul class="hlist">
 <li><code><a title="likelihood.models.regression.AbstractArima.average" href="utils.html#likelihood.models.utils.FeaturesArima.average">average</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.eval" href="#likelihood.models.regression.AbstractArima.eval">eval</a></code></li>
 <li><code><a title="likelihood.models.regression.AbstractArima.forward" href="utils.html#likelihood.models.utils.FeaturesArima.forward">forward</a></code></li>
 <li><code><a title="likelihood.models.regression.AbstractArima.integrated" href="utils.html#likelihood.models.utils.FeaturesArima.integrated">integrated</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.load_model" href="#likelihood.models.regression.AbstractArima.load_model">load_model</a></code></li>
 <li><code><a title="likelihood.models.regression.AbstractArima.model" href="#likelihood.models.regression.AbstractArima.model">model</a></code></li>
-<li><code><a title="likelihood.models.regression.AbstractArima.predict" href="#likelihood.models.regression.AbstractArima.predict">predict</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.plot_pred" href="#likelihood.models.regression.AbstractArima.plot_pred">plot_pred</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.save_model" href="#likelihood.models.regression.AbstractArima.save_model">save_model</a></code></li>
+<li><code><a title="likelihood.models.regression.AbstractArima.summary" href="#likelihood.models.regression.AbstractArima.summary">summary</a></code></li>
 <li><code><a title="likelihood.models.regression.AbstractArima.train" href="#likelihood.models.regression.AbstractArima.train">train</a></code></li>
 <li><code><a title="likelihood.models.regression.AbstractArima.xvec" href="#likelihood.models.regression.AbstractArima.xvec">xvec</a></code></li>
 </ul>
@@ -4835,6 +6037,7 @@ to apply predict(n_steps) followed by fit()</dd>
 <li><code><a title="likelihood.models.regression.FourierRegression.mov" href="#likelihood.models.regression.FourierRegression.mov">mov</a></code></li>
 <li><code><a title="likelihood.models.regression.FourierRegression.n_walkers" href="#likelihood.models.regression.FourierRegression.n_walkers">n_walkers</a></code></li>
 <li><code><a title="likelihood.models.regression.FourierRegression.name" href="#likelihood.models.regression.FourierRegression.name">name</a></code></li>
+<li><code><a title="likelihood.models.regression.FourierRegression.predict" href="#likelihood.models.regression.FourierRegression.predict">predict</a></code></li>
 <li><code><a title="likelihood.models.regression.FourierRegression.sigma" href="#likelihood.models.regression.FourierRegression.sigma">sigma</a></code></li>
 </ul>
 </li>

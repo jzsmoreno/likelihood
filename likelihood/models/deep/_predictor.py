@@ -1,6 +1,7 @@
+import os
 import random
 import warnings
-from typing import List
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib
 import matplotlib.colors as mcolors
@@ -8,7 +9,12 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 from IPython.display import HTML, display
 from matplotlib import cm
 from matplotlib.colors import Normalize
@@ -20,9 +26,8 @@ from likelihood.models.deep._autoencoders import AutoClassifier, sampling
 
 
 class GetInsights:
-    """
-    A class to analyze the output of a neural network model, including visualizations
-    of the weights, t-SNE representation, and feature statistics.
+    """A class to analyze the output of a neural network model, including visualizations of the
+    weights, t-SNE representation, and feature statistics.
 
     Parameters
     ----------
@@ -33,8 +38,7 @@ class GetInsights:
     """
 
     def __init__(self, model: AutoClassifier, inputs: np.ndarray) -> None:
-        """
-        Initializes the GetInsights class.
+        """Initialize the GetInsights class.
 
         Parameters
         ----------
@@ -62,9 +66,8 @@ class GetInsights:
 
         self.sorted_names = self._generate_sorted_color_names()
 
-    def _generate_sorted_color_names(self) -> list:
-        """
-        Generate sorted color names based on their HSV values.
+    def _generate_sorted_color_names(self) -> List:
+        """Generate sorted color names based on their HSV values.
 
         Parameters
         ----------
@@ -72,7 +75,7 @@ class GetInsights:
 
         Returns
         -------
-        `list` : Sorted color names.
+        `List` : Sorted color names.
         """
         colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
         by_hsv = sorted(
@@ -91,9 +94,7 @@ class GetInsights:
         max_rows: int = 5,
         **kwargs,
     ) -> None:
-        """
-        Generate and display an embedded HTML report in a Jupyter Notebook cell.
-        """
+        """Generate and display an embedded HTML report in a Jupyter Notebook cell."""
         display(HTML("<h2 style='margin-top:20px;'>📊 Predictor Analysis</h2>"))
         display(
             HTML(
@@ -160,13 +161,19 @@ class GetInsights:
             )
         )
 
-    def viz_classifier_graphs(self, threshold_factor=1.0, top_k=5, save_path=None):
-        """
-        Visualize all Dense layers in self.model.classifier as a single directed graph,
+    def viz_classifier_graphs(
+        self,
+        threshold_factor: float = 1.0,
+        top_k: int = 5,
+        save_path: Optional[str] = None,
+    ) -> None:
+        """Visualize all Dense layers in self.model.classifier as a single directed graph,
         connecting each Dense layer to the next.
         """
 
-        def get_top_k_edges(weights, src_prefix, dst_prefix, k):
+        def get_top_k_edges(
+            weights: np.ndarray, src_prefix: str, dst_prefix: str, k: int
+        ) -> List[tuple[str, str, float]]:
             flat_weights = np.abs(weights.flatten())
             indices = np.argpartition(flat_weights, -k)[-k:]
             top_k_flat_indices = indices[np.argsort(-flat_weights[indices])]
@@ -177,7 +184,13 @@ class GetInsights:
                 top_k_edges.append((f"{src_prefix}_{i}", f"{dst_prefix}_{j}", weights[i, j]))
             return top_k_edges
 
-        def add_dense_layer_edges(G, weights, layer_idx, threshold_factor, top_k):
+        def add_dense_layer_edges(
+            G: nx.DiGraph,
+            weights: np.ndarray,
+            layer_idx: int,
+            threshold_factor: float,
+            top_k: int,
+        ) -> None:
             src_prefix = f"L{layer_idx}"
             dst_prefix = f"L{layer_idx + 1}"
             input_nodes = [f"{src_prefix}_{i}" for i in range(weights.shape[0])]
@@ -196,7 +209,7 @@ class GetInsights:
                     if abs(w) > threshold:
                         G.add_edge(src, dst, weight=w, highlight=(src, dst) in top_k_set)
 
-        def compute_layout(G):
+        def compute_layout(G: nx.DiGraph) -> Dict[str, Tuple[float, float]]:
             pos = {}
             layer_nodes = {}
 
@@ -211,14 +224,19 @@ class GetInsights:
 
             return pos
 
-        def draw_graph(G, pos, title, save_path=None):
+        def draw_graph(
+            G: nx.DiGraph,
+            pos: Dict[str, Tuple[float, float]],
+            title: str,
+            save_path: Optional[str] = None,
+        ) -> None:
             weights = [abs(G[u][v]["weight"]) for u, v in G.edges()]
             if not weights:
                 print("No edges to draw.")
                 return
 
             norm = Normalize(vmin=min(weights), vmax=max(weights))
-            cmap = cm.get_cmap("coolwarm")
+            cmap = matplotlib.colormaps["coolwarm"]
 
             edge_colors = [cmap(norm(G[u][v]["weight"])) for u, v in G.edges()]
             edge_widths = [1.0 + 2.0 * norm(abs(G[u][v]["weight"])) for u, v in G.edges()]
@@ -267,12 +285,37 @@ class GetInsights:
         pos = compute_layout(G)
         draw_graph(G, pos, "Classifier Dense Layers Graph", save_path)
 
-    def viz_encoder_decoder_graphs(self, threshold_factor=1.0, top_k=5, save_path=None):
-        """
-        Visualize Dense layers in self.model.encoder and self.model.decoder as directed graphs.
+    def viz_encoder_decoder_graphs(
+        self,
+        threshold_factor: float = 1.0,
+        top_k: int = 5,
+        save_path: Optional[str] = None,
+    ) -> None:
+        """Visualize the Dense layers of the encoder and decoder as directed graphs.
+
+        Builds a directed graph for each of the encoder and decoder, connecting each
+        Dense layer to the next and highlighting the strongest weighted connections,
+        then displays each graph along with a bar chart of the input-layer feature
+        importances.
+
+        Parameters
+        ----------
+        threshold_factor : `float`, optional
+            Multiplier applied to the mean absolute weight of a layer, used to determine
+            which edges are drawn (default is `1.0`).
+        top_k : `int`, optional
+            Number of strongest edges to display per layer (default is `5`).
+        save_path : `str`, optional
+            File path at which to save the figure (default is `None`).
+
+        Returns
+        -------
+        `None`
         """
 
-        def get_top_k_edges(weights, labels_src, labels_dst_prefix, k):
+        def get_top_k_edges(
+            weights: np.ndarray, labels_src: List[str], labels_dst_prefix: str, k: int
+        ) -> List[tuple[str, str, float]]:
             flat_weights = np.abs(weights.flatten())
             indices = np.argpartition(flat_weights, -k)[-k:]
             top_k_flat_indices = indices[np.argsort(-flat_weights[indices])]
@@ -285,8 +328,14 @@ class GetInsights:
             return top_k_edges
 
         def add_layer_to_graph(
-            G, weights, labels_src, labels_dst_prefix, x_offset, top_k_set, threshold
-        ):
+            G: nx.DiGraph,
+            weights: np.ndarray,
+            labels_src: List[str],
+            labels_dst_prefix: str,
+            x_offset: float,
+            top_k_set: set[tuple[str, str]],
+            threshold: float,
+        ) -> List[str]:
             output_nodes = [f"{labels_dst_prefix}_{j}" for j in range(weights.shape[1])]
 
             for node in labels_src + output_nodes:
@@ -300,7 +349,7 @@ class GetInsights:
                         G.add_edge(src, dst, weight=w, highlight=(src, dst) in top_k_set)
             return output_nodes
 
-        def layout_graph(G):
+        def layout_graph(G: nx.DiGraph) -> Dict[str, Tuple[float, float]]:
             pos = {}
             layers = {}
             for node, data in G.nodes(data=True):
@@ -314,13 +363,17 @@ class GetInsights:
                     pos[node] = (x, y)
             return pos
 
-        def draw_graph(G, title, ax):
+        def draw_graph(
+            G: nx.DiGraph,
+            title: str,
+            ax: plt.Axes,
+        ) -> None:
             weights = [abs(G[u][v]["weight"]) for u, v in G.edges()]
             if not weights:
                 return
 
             norm = Normalize(vmin=min(weights), vmax=max(weights))
-            cmap = cm.get_cmap("coolwarm")
+            cmap = matplotlib.colormaps["coolwarm"]
 
             edge_colors = [cmap(norm(G[u][v]["weight"])) for u, v in G.edges()]
             edge_widths = [1.0 + 2.0 * norm(abs(G[u][v]["weight"])) for u, v in G.edges()]
@@ -344,7 +397,11 @@ class GetInsights:
             sm.set_array([])
             plt.colorbar(sm, ax=ax, orientation="vertical", label="Edge Weight")
 
-        def build_graph(layers, label_prefix, input_labels=None):
+        def build_graph(
+            layers: List[tf.keras.layers.Dense],
+            label_prefix: str,
+            input_labels: Optional[List[str]] = None,
+        ) -> nx.DiGraph:
             G = nx.DiGraph()
             x_offset = 0
             prev_labels = input_labels or [
@@ -431,8 +488,7 @@ class GetInsights:
         highlight: bool = True,
         **kwargs,
     ) -> None:
-        """
-        Analyze the model's predictions and visualize data.
+        """Analyze the model's predictions and visualize data.
 
         Parameters
         ----------
@@ -474,8 +530,7 @@ class GetInsights:
         return self._statistics(self.data_input)
 
     def _prepare_inputs(self, inputs: np.ndarray, frac: float) -> np.ndarray:
-        """
-        Prepare the input data, possibly selecting a fraction of it.
+        """Prepare the input data, possibly selecting a fraction of it.
 
         Parameters
         ----------
@@ -496,8 +551,7 @@ class GetInsights:
         return inputs
 
     def _encode_decode(self, inputs: np.ndarray) -> tuple:
-        """
-        Perform encoding and decoding on the input data.
+        """Perform encoding and decoding on the input data.
 
         Parameters
         ----------
@@ -519,8 +573,7 @@ class GetInsights:
     def _visualize_data(
         self, inputs: np.ndarray, reconstructed: np.ndarray, cmap: str, aspect: str
     ) -> None:
-        """
-        Visualize the original data and the reconstructed data.
+        """Visualize the original data and the reconstructed data.
 
         Parameters
         ----------
@@ -555,8 +608,7 @@ class GetInsights:
         encoded: np.ndarray,
         y_labels: List[str],
     ) -> None:
-        """
-        Prepare data for statistical analysis.
+        """Prepare data for statistical analysis.
 
         Parameters
         ----------
@@ -591,8 +643,7 @@ class GetInsights:
         self.data_input["class"] = self.classification
 
     def _get_tsne_repr(self, inputs: np.ndarray = None, frac: float = None) -> None:
-        """
-        Perform t-SNE dimensionality reduction on the input data.
+        """Perform t-SNE dimensionality reduction on the input data.
 
         Parameters
         ----------
@@ -618,8 +669,7 @@ class GetInsights:
         self.reduced_data_tsne = tsne.fit_transform(self.latent_representations)
 
     def _viz_tsne_repr(self, **kwargs) -> None:
-        """
-        Visualize the t-SNE representation of the latent space.
+        """Visualize the t-SNE representation of the latent space.
 
         Parameters
         ----------
@@ -654,8 +704,7 @@ class GetInsights:
         plt.show()
 
     def _viz_radviz(self, data: pd.DataFrame, color_column: str, title: str) -> None:
-        """
-        Visualize the data using RadViz.
+        """Visualize the data using RadViz.
 
         Parameters
         ----------
@@ -685,8 +734,7 @@ class GetInsights:
     def _viz_weights(
         self, cmap: str = "viridis", aspect: str = "auto", highlight: bool = True, **kwargs
     ) -> None:
-        """
-        Visualize the encoder layer weights of the model.
+        """Visualize the encoder layer weights of the model.
 
         Parameters
         ----------
@@ -725,8 +773,7 @@ class GetInsights:
         plt.show()
 
     def _statistics(self, data_input: pd.DataFrame) -> pd.DataFrame:
-        """
-        Compute statistical summaries of the input data.
+        """Compute statistical summaries of the input data.
 
         Parameters
         ----------
@@ -748,7 +795,7 @@ class GetInsights:
         numerical_stats = grouped_data.agg(["mean", "min", "max", "std", "median"])
         numerical_stats.columns = ["_".join(col).strip() for col in numerical_stats.columns.values]
 
-        def get_mode(x):
+        def get_mode(x: pd.Series) -> Any:
             mode_series = x.mode()
             return mode_series.iloc[0] if not mode_series.empty else None
 

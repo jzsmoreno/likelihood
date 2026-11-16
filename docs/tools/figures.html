@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.tools.figures API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Utilities for generating figures and visualizations.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.tools.figures</code></h1>
 </header>
 <section id="section-intro">
+<p>Utilities for generating figures and visualizations.</p>
 </section>
 <section>
 </section>
@@ -61,8 +62,8 @@ el.replaceWith(d);
     reg_line: bool = True,
     save_dir: Optional[str] = None,
 ) -&gt; None:
-    &#34;&#34;&#34;
-    Creates a scatter plot of actual vs predicted values along with histograms and a regression line.
+    &#34;&#34;&#34;Create a scatter plot of actual vs predicted values along with histograms and a regression
+    line.
 
     Parameters
     ----------
@@ -85,7 +86,6 @@ el.replaceWith(d);
     -------
     `None` : The function doesn&#39;t return anything. It generates and optionally saves a plot.
     &#34;&#34;&#34;
-
     y_pred, y_act = y_pred.flatten(), y_act.flatten()
 
     if not isinstance(y_act, np.ndarray) or not isinstance(y_pred, np.ndarray):
@@ -155,7 +155,8 @@ el.replaceWith(d);
     plt.show()
     plt.close(fig)</code></pre>
 </details>
-<div class="desc"><p>Creates a scatter plot of actual vs predicted values along with histograms and a regression line.</p>
+<div class="desc"><p>Create a scatter plot of actual vs predicted values along with histograms and a regression
+line.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>y_act</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -191,9 +192,8 @@ el.replaceWith(d);
     name: str = &#34;example&#34;,
     save_dir: Optional[str] = None,
 ) -&gt; None:
-    &#34;&#34;&#34;
-    Plots the loss curve for both training and validation errors over epochs,
-    and optionally saves the plot as an image.
+    &#34;&#34;&#34;Plot the loss curve for both training and validation errors over epochs, and optionally
+    saves the plot as an image.
 
     Parameters
     ----------
@@ -271,8 +271,8 @@ el.replaceWith(d);
     plt.pause(0.001)
     plt.close()</code></pre>
 </details>
-<div class="desc"><p>Plots the loss curve for both training and validation errors over epochs,
-and optionally saves the plot as an image.</p>
+<div class="desc"><p>Plot the loss curve for both training and validation errors over epochs, and optionally
+saves the plot as an image.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>x_data</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -300,8 +300,7 @@ and optionally saves the plot as an image.</p>
 <pre><code class="python">def residual(
     y_act: np.ndarray, y_pred: np.ndarray, name: str = &#34;example&#34;, save_dir: str = None
 ) -&gt; None:
-    &#34;&#34;&#34;
-    Plots the residual errors between the actual and predicted values.
+    &#34;&#34;&#34;Plot the residual errors between the actual and predicted values.
 
     This function generates a residual plot by calculating the difference between the
     actual values (y_act) and predicted values (y_pred). The plot shows the residuals
@@ -329,7 +328,6 @@ and optionally saves the plot as an image.</p>
       is zero (i.e., perfect predictions).
     - The plot will be saved as a PNG image if a valid `save_dir` is provided.
     &#34;&#34;&#34;
-
     mec = &#34;#2F4F4F&#34;
     mfc = &#34;#C0C0C0&#34;
 
@@ -372,7 +370,7 @@ and optionally saves the plot as an image.</p>
 
     plt.close()</code></pre>
 </details>
-<div class="desc"><p>Plots the residual errors between the actual and predicted values.</p>
+<div class="desc"><p>Plot the residual errors between the actual and predicted values.</p>
 <p>This function generates a residual plot by calculating the difference between the
 actual values (y_act) and predicted values (y_pred). The plot shows the residuals
 (y_pred - y_act) against the actual values. Optionally, the plot can be saved to a file.</p>
@@ -408,9 +406,8 @@ is zero (i.e., perfect predictions).</li>
 <pre><code class="python">def residual_hist(
     y_act: np.ndarray, y_pred: np.ndarray, name: str = &#34;example&#34;, save_dir: Optional[str] = None
 ) -&gt; None:
-    &#34;&#34;&#34;
-    Generates a residual error histogram with kernel density estimate (KDE) for the given true and predicted values.
-    Optionally saves the plot to a specified directory.
+    &#34;&#34;&#34;Generate a residual error histogram with kernel density estimate (KDE) for the given true
+    and predicted values. Optionally saves the plot to a specified directory.
 
     Parameters
     ----------
@@ -474,8 +471,8 @@ is zero (i.e., perfect predictions).</li>
     plt.pause(0.001)
     plt.close()</code></pre>
 </details>
-<div class="desc"><p>Generates a residual error histogram with kernel density estimate (KDE) for the given true and predicted values.
-Optionally saves the plot to a specified directory.</p>
+<div class="desc"><p>Generate a residual error histogram with kernel density estimate (KDE) for the given true
+and predicted values. Optionally saves the plot to a specified directory.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>y_act</code></strong> :&ensp;<code>np.ndarray</code></dt>

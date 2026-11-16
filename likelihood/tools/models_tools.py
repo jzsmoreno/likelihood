@@ -1,3 +1,5 @@
+"""Utility tools for machine-learning models, model suppression, and LoRA layer management."""
+
 import logging
 import os
 
@@ -7,23 +9,34 @@ import pandas as pd
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
+import os
 import sys
 import warnings
 from functools import wraps
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import seaborn as sns
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 import torch
+from IPython.display import HTML, display
+from tabulate import tabulate
 from torch.utils.data import DataLoader, TensorDataset
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
 from .figures import *
+from .tools import cal_average
 
 
 class suppress_prints:
+    """Context manager that suppresses stdout while the block is executed."""
+
     def __enter__(self):
         self.original_stdout = sys.stdout
         sys.stdout = open(os.devnull, "w")
@@ -33,9 +46,35 @@ class suppress_prints:
         sys.stdout = self.original_stdout
 
 
-def suppress_warnings(func):
+def suppress_warnings(
+    func: Callable[..., Any],
+) -> Callable[..., Any]:
+    """Create a decorator that suppresses warnings raised by the decorated function.
+
+    This decorator wraps a function and catches all warnings within its execution,
+    effectively silencing any warning messages that would otherwise be displayed.
+
+    Parameters
+    ----------
+    func : Callable[..., Any]
+        The function to wrap with warning suppression.
+
+    Returns
+    -------
+    Callable[..., Any]
+        A wrapped version of the original function that executes without raising warnings.
+
+    Examples
+    --------
+    >>> @suppress_warnings
+    ... def risky_function():
+    ...     import warnings
+    ...     warnings.warn("This is a warning")
+    >>> risky_function()  # No warning will be displayed
+    """
+
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             return func(*args, **kwargs)
@@ -44,14 +83,13 @@ def suppress_warnings(func):
 
 
 class TransformRange:
-    """
-    Generates a new DataFrame with ranges represented as strings.
+    """Generates a new DataFrame with ranges represented as strings.
 
     Transforms numerical columns into categorical range bins with descriptive labels.
     """
 
     def __init__(self, columns_bin_sizes: Dict[str, int]) -> None:
-        """Initializes the class with the original DataFrame.
+        """Initialize the class with the original DataFrame.
 
         Parameters
         ----------
@@ -69,8 +107,7 @@ class TransformRange:
     def _create_bins_and_labels(
         self, min_val: Union[int, float], max_val: Union[int, float], bin_size: int
     ) -> Tuple[np.ndarray, List[str]]:
-        """
-        Creates the bin edges and their labels.
+        """Create the bin edges and their labels.
 
         Parameters
         ----------
@@ -121,8 +158,7 @@ class TransformRange:
     def _transform_column_to_ranges(
         self, df: pd.DataFrame, column: str, bin_size: int, fit: bool = True
     ) -> pd.Series:
-        """
-        Transforms a column in the DataFrame into range bins.
+        """Transform a column in the DataFrame into range bins.
 
         Parameters
         ----------
@@ -179,8 +215,7 @@ class TransformRange:
     def transform(
         self, df: pd.DataFrame, drop_original: bool = False, fit: bool = True
     ) -> pd.DataFrame:
-        """
-        Creates a new DataFrame with range columns.
+        """Create a new DataFrame with range columns.
 
         Parameters
         ----------
@@ -223,8 +258,7 @@ class TransformRange:
         return result_df
 
     def get_range_info(self, column: str) -> Dict[str, Union[int, float, List[str]]]:
-        """
-        Get information about the range transformation for a specific column.
+        """Get information about the range transformation for a specific column.
 
         Parameters
         ----------
@@ -252,8 +286,7 @@ class TransformRange:
 
 
 def remove_collinearity(df: pd.DataFrame, threshold: float = 0.9):
-    """
-    Removes highly collinear features from the DataFrame based on a correlation threshold.
+    """Remove highly collinear features from the DataFrame based on a correlation threshold.
 
     This function calculates the correlation matrix of the DataFrame and removes columns
     that are highly correlated with any other column in the DataFrame. It uses an absolute
@@ -290,8 +323,7 @@ def train_and_insights(
     frac: float = 1.0,
     **kwargs: Optional[Dict],
 ) -> tf.keras.Model:
-    """
-    Train a Keras model and provide insights on the training and validation metrics.
+    """Train a Keras model and provide insights on the training and validation metrics.
 
     Parameters
     ----------
@@ -360,12 +392,43 @@ def train_and_insights(
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="LoRALayer")
 class LoRALayer(tf.keras.layers.Layer):
-    def __init__(self, units, rank=4, **kwargs):
+    """A LoRA (Low-Rank Adaptation) layer for fine-tuning large models."""
+
+    def __init__(
+        self,
+        units: int,
+        rank: int = 4,
+        **kwargs: Any,
+    ) -> None:
         super(LoRALayer, self).__init__(**kwargs)
         self.units = units
         self.rank = rank
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape):
+        """Build the LoRA layer weights based on the input shape.
+
+        This method initializes the weight matrices (A and B) for the LoRA decomposition
+        and validates that the rank parameter is appropriate given the input/output dimensions.
+
+        Parameters
+        ----------
+        input_shape : tf.TensorShape
+            The shape of the input tensor, used to determine the dimensionality of
+            the weight matrices.
+
+        Raises
+        ------
+        ValueError
+            If rank is greater than input dimension or number of units.
+
+        Notes
+        -----
+        Creates two trainable weight matrices:
+        - A: Shape (input_dim, rank) with random_normal initialization
+        - B: Shape (rank, units) with random_normal initialization
+
+        The LoRA approximation computes: inputs @ A @ B instead of the full weight matrix.
+        """
         input_dim = input_shape[-1]
         print(f"Input shape: {input_shape}")
 
@@ -387,12 +450,62 @@ class LoRALayer(tf.keras.layers.Layer):
         print(f"Dense weights shape: {input_dim}x{self.units}")
         print(f"LoRA weights shape: A{self.A.shape}, B{self.B.shape}")
 
-    def call(self, inputs):
+    def call(self, inputs: Any) -> Any:
+        """Apply the LoRA layer to the input tensor.
+
+        This method computes the LoRA approximation by multiplying the input with
+        the weight matrices A and B: output = inputs @ A @ B
+
+        Parameters
+        ----------
+        inputs : Any
+            The input tensor to apply the LoRA transformation to.
+
+        Returns
+        -------
+        Any
+            The output tensor after applying the LoRA layer multiplication.
+
+        Notes
+        -----
+        This method performs the forward pass of the LoRA layer, computing the
+        low-rank approximation without modifying the original weights.
+        """
         lora_output = tf.matmul(tf.matmul(inputs, self.A), self.B)
         return lora_output
 
 
-def apply_lora(model, rank=4):
+def apply_lora(
+    model: tf.keras.Model,
+    rank: int = 4,
+) -> tf.keras.Model:
+    """Apply LoRA (Low-Rank Adaptation) to Dense layers in a Keras model.
+
+    This function creates a new model with LoRA layers applied to all Dense layers
+    in the original model. LoRA is a parameter-efficient fine-tuning method that
+    decomposes weight matrices into two lower-rank matrices.
+
+    Parameters
+    ----------
+    model : tf.keras.Model
+        The original Keras model to apply LoRA to. All Dense layers will have
+        LoRA applied.
+    rank : int, optional
+        The rank parameter for LoRA decomposition (default is 4). This determines
+        the dimensionality of the low-rank approximation.
+
+    Returns
+    -------
+    tf.keras.Model
+        A new Keras model with LoRA layers applied to all Dense layers.
+
+    Notes
+    -----
+    For each Dense layer in the original model, a corresponding LoRALayer is inserted
+    that computes: output = inputs @ W_original + (inputs @ A @ B) where A and B are
+    low-rank matrices. The rank parameter controls the trade-off between model size
+    and adaptation capacity.
+    """
     inputs = tf.keras.Input(shape=model.input_shape[1:])
     x = inputs
 
@@ -407,8 +520,8 @@ def apply_lora(model, rank=4):
 
 
 def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -> pd.DataFrame:
-    """
-    Calculate various graph metrics based on the given adjacency matrix and return them in a single DataFrame.
+    """Calculate various graph metrics based on the given adjacency matrix and return them in a
+    single DataFrame.
 
     Parameters
     ----------
@@ -465,7 +578,48 @@ def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -
     return metrics_df
 
 
-def print_trajectory_info(state, selected_option, action, reward, next_state, terminate, done):
+def print_trajectory_info(
+    state: Any,
+    selected_option: Any,
+    action: Any,
+    reward: Any,
+    next_state: Any,
+    terminate: bool,
+    done: bool,
+) -> None:
+    """Print trajectory information for reinforcement learning episodes.
+
+    This function displays formatted information about a single transition in a
+    reinforcement learning episode, including state, action, reward, and termination
+    status.
+
+    Parameters
+    ----------
+    state : Any
+        The initial state before the action was taken.
+    selected_option : Any
+        The option or decision selected at the given state.
+    action : Any
+        The action executed in the environment.
+    reward : Any
+        The reward received after executing the action.
+    next_state : Any
+        The resulting state after executing the action.
+    terminate : bool
+        Whether the episode has terminated.
+    done : bool
+        Additional flag indicating if the episode is complete.
+
+    Returns
+    -------
+    None
+        This function prints information to stdout but does not return a value.
+
+    Notes
+    -----
+    The output is formatted with separators for readability and includes all key
+    components of a reinforcement learning transition tuple (s, a, r, s', done).
+    """
     print("=" * 50)
     print("TRAJECTORY INFO".center(50, "="))
     print("=" * 50)
@@ -480,8 +634,8 @@ def print_trajectory_info(state, selected_option, action, reward, next_state, te
 
 
 def get_selected_probs(action_probs: torch.Tensor, action: torch.Tensor | int):
-    """
-    Retrieves the probabilities of selected actions from a single-batch action probability distribution.
+    """Retrieve the probabilities of selected actions from a single-batch action probability
+    distribution.
 
     Parameters
     ----------
@@ -553,14 +707,12 @@ def collect_experience(
         option_probs, action_probs, termination_probs, selected_option, action = model(
             state_tensor, multiple_option
         )
-
         if multiple_option:
             action = torch.multinomial(action_probs.squeeze(0), 1).squeeze(-1)
             option = torch.multinomial(option_probs.squeeze(0), 1).squeeze(-1)
         else:
             action = torch.multinomial(action_probs, 1).item()
             option = torch.multinomial(option_probs, 1).item()
-
         old_probs.append(get_selected_probs(action_probs, action))
 
         terminate = torch.bernoulli(termination_probs).item() > 0.5
@@ -579,56 +731,59 @@ def collect_experience(
 
         tolerance_count += 1
         trajectory.append((state, selected_option, action, reward, next_state, terminate, done))
-        state = next_state
 
         if verbose:
             print_trajectory_info(
                 state, selected_option, action, reward, next_state, terminate, done
             )
+        state = next_state
 
     returns = []
     advantages = []
-    G = 0
     delta = 0
+    gae = 0.0
+    G = 0.0
+
     for t in reversed(range(len(trajectory))):
         state, selected_option, action, reward, next_state, terminate, done = trajectory[t]
 
+        # Current state value: V(s_t)
         state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
-        _, action_probs, _, _, _ = model(state_tensor, multiple_option)
 
-        if t == len(trajectory) - 1:
-            G = reward
-            adv = 0
-            selected_probs = get_selected_probs(action_probs, action)
-            if isinstance(selected_probs, list):
-                adv = sum([G - p for p in selected_probs])
-            else:
-                adv = G - selected_probs
-            advantages.insert(0, adv)
+        with torch.no_grad():
+            value = model.value_network(state_tensor)
+
+        value = value.squeeze().item()
+
+        # Next state value: V(s_{t+1})
+        if done:
+            next_value = 0.0
         else:
             next_state_tensor = (
                 torch.tensor(next_state, dtype=torch.float32).unsqueeze(0).to(device)
             )
-            _, next_action_probs, _, _, _ = model(next_state_tensor, multiple_option)
 
-            selected_probs = get_selected_probs(action_probs, action)
-            next_selected_probs = get_selected_probs(next_action_probs, action)
+            with torch.no_grad():
+                next_value = model.value_network(next_state_tensor)
 
-            if isinstance(selected_probs, list):
-                reward_tensor = torch.tensor([reward] * len(action), dtype=torch.float32).to(device)
-                np_tensor = torch.tensor(next_selected_probs, dtype=torch.float32).to(device)
-                sp_tensor = torch.tensor(selected_probs, dtype=torch.float32).to(device)
-                deltas = reward_tensor + gamma * np_tensor - sp_tensor
-                delta = torch.mean(deltas).item()
-            else:
-                delta = reward + gamma * next_selected_probs - selected_probs
+            next_value = next_value.squeeze().item()
 
-            G = reward + gamma * G
-            advantages.insert(
-                0, delta + gamma * lambda_parameter * advantages[0] if advantages else delta
-            )
-
+        # Discounted return:
+        # G_t = r_t + gamma * G_{t+1}
+        G = reward + gamma * G
         returns.insert(0, G)
+
+        # TD error:
+        # delta_t = r_t + gamma * V(s_{t+1}) - V(s_t)
+        # For terminal states:
+        # delta_t = r_t - V(s_t)
+        delta = reward + gamma * next_value * (1.0 - float(done)) - value
+
+        # Generalized Advantage Estimation:
+        # A_t = delta_t + gamma * lambda * A_{t+1}
+        gae = delta + gamma * lambda_parameter * gae
+
+        advantages.insert(0, gae)
 
     return trajectory, returns, advantages, old_probs
 
@@ -638,8 +793,8 @@ def ppo_loss(
     old_action_probs: torch.Tensor,
     action_probs: torch.Tensor,
     epsilon: float = 0.2,
-):
-    """Computes the Proximal Policy Optimization (PPO) loss using the clipped objective.
+) -> torch.Tensor:
+    """Compute the Proximal Policy Optimization (PPO) loss using the clipped objective.
 
     Parameters
     ----------
@@ -657,11 +812,13 @@ def ppo_loss(
     loss : `torch.Tensor`
         The PPO loss, averaged across the batch of samples. The loss is computed using the clipped objective to penalize large policy updates.
     """
-
     if advantages.dim() == 1:
         advantages = advantages.unsqueeze(-1)
-    action_probs = action_probs.view(old_action_probs.shape)
-    log_ratio = torch.log(action_probs + 1e-8) - torch.log(old_action_probs + 1e-8)
+
+    action_probs = torch.clamp(action_probs, min=1e-8)
+    old_action_probs = torch.clamp(old_action_probs, min=1e-8)
+    log_ratio = torch.log(action_probs) - torch.log(old_action_probs)
+
     ratio = torch.exp(log_ratio)  # π(a|s) / π_old(a|s)
     if log_ratio.ndim > 1:
         ratio = ratio.mean(dim=1)
@@ -673,6 +830,73 @@ def ppo_loss(
     return loss.mean()
 
 
+def grpo_loss(
+    advantages: torch.Tensor,
+    old_action_probs: torch.Tensor,
+    action_probs: torch.Tensor,
+    epsilon: float = 0.2,
+    beta_kl: float = 0.04,
+) -> torch.Tensor:
+    """Compute the Group Relative Policy Optimization (GRPO) loss.
+
+    GRPO replaces the value-function-based advantage of PPO with group-relative
+    advantages (normalized within a group of samples) and adds a KL divergence
+    penalty to constrain policy updates, making it a critic‑free algorithm.
+
+    Parameters
+    ----------
+    advantages : `torch.Tensor`
+        Group‑relative advantages, typically computed as
+        ``(returns - mean(returns)) / (std(returns) + 1e-8)`` across a group
+        of trajectories sampled from the same (or similar) states.
+    old_action_probs : `torch.Tensor`
+        The action probabilities from the old policy (before the update).
+    action_probs : `torch.Tensor`
+        The action probabilities from the current policy (after the update).
+    epsilon : `float`, optional, default=0.2
+        The clipping parameter that limits how much the policy can change
+        between updates.
+    beta_kl : `float`, optional, default=0.04
+        Coefficient controlling the strength of the KL‑divergence penalty
+        that keeps the new policy close to the old policy.
+
+    Returns
+    -------
+    loss : `torch.Tensor`
+        The GRPO loss, averaged across the batch.  The loss consists of a
+        clipped surrogate objective (identical to PPO) plus an approximate
+        KL‑divergence regularisation term.
+
+    Notes
+    -----
+    The surrogate objective is identical to the PPO clipped objective,
+    so the policy update logic is the same; the only differences are:
+
+    * advantages are *group‑normalised* instead of GAE‑based, and
+    * a KL‑penalty (approximated via the squared log‑ratio) is added.
+    """
+    if advantages.dim() == 1:
+        advantages = advantages.unsqueeze(-1)
+
+    action_probs = torch.clamp(action_probs, min=1e-8)
+    old_action_probs = torch.clamp(old_action_probs, min=1e-8)
+    log_ratio = torch.log(action_probs) - torch.log(old_action_probs)
+
+    ratio = torch.exp(log_ratio)  # π(a|s) / π_old(a|s)
+    if log_ratio.ndim > 1:
+        ratio = ratio.mean(dim=1)
+    ratio = ratio.view(advantages.shape)
+    clipped_ratio = torch.clamp(ratio, 1 - epsilon, 1 + epsilon)
+
+    # Clipped surrogate objective (same form as PPO)
+    surrogate_loss = -torch.min(ratio * advantages, clipped_ratio * advantages)
+
+    # Approximate KL divergence penalty:  (log π_θ - log π_old)²
+    kl_penalty = beta_kl * (log_ratio**2).mean()
+
+    return surrogate_loss.mean() + kl_penalty
+
+
 def train_option_critic(
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
@@ -681,9 +905,13 @@ def train_option_critic(
     batch_size: int = 32,
     device: str = "cpu",
     beta: float = 1e-2,
+    value_coef: float = 0.5,
     epsilon: float = 0.2,
     patience: int = 15,
     verbose: bool = False,
+    mode: str = "ppo_mode",
+    beta_kl: float = 0.04,
+    group_size: int = 4,
     **kwargs,
 ) -> tuple[torch.nn.Module, float]:
     """Trains an option critic model with the provided environment and hyperparameters.
@@ -703,11 +931,28 @@ def train_option_critic(
     device : `str`
         Target device (e.g., "cpu" or "cuda").
     beta : `float`
-        Critic learning rate hyperparameter.
+        Critic learning rate hyperparameter (entropy coefficient in PPO mode,
+        entropy coefficient in GRPO mode).
+    value_coef : `float`
+        Coefficient weighting the value-function loss (used only in
+        ``'ppo_mode'``).
     epsilon : `float`, optional, default=0.2
-        The clipping parameter that limits how much the policy can change between updates.
+        The clipping parameter that limits how much the policy can change
+        between updates.
     patience : `int`
         Early stopping patience in epochs.
+    mode : `str`, optional, default='ppo_mode'
+        Training algorithm to use.  Must be one of:
+
+        - ``'ppo_mode'`` – Proximal Policy Optimisation (value‑function
+          based advantages with GAE).
+        - ``'grpo_mode'`` – Group Relative Policy Optimisation (group‑
+          normalised advantages with KL penalty; critic‑free).
+    beta_kl : `float`, optional, default=0.04
+        KL‑divergence penalty coefficient.  Only used in ``'grpo_mode'``.
+    group_size : `int`, optional, default=4
+        Number of trajectories collected per group in ``'grpo_mode'``.
+        Advantages are normalised within each group.
 
     Returns
     -------
@@ -716,6 +961,9 @@ def train_option_critic(
     avg_epoch_loss : `float`
         Average loss per epoch over training.
     """
+    if mode not in ("ppo_mode", "grpo_mode"):
+        raise ValueError(f"mode must be 'ppo_mode' or 'grpo_mode', got '{mode}'")
+
     losses = []
     best_loss_so_far = float("inf")
     best_advantage_so_far = 0.0
@@ -724,32 +972,92 @@ def train_option_critic(
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     advantages_per_epoch = []
+    multiple_option = getattr(env, "multiple_option", False)
 
     for epoch in range(num_epochs):
-        trajectory, returns, advantages, old_probs = collect_experience(env, model, **kwargs)
-        avg_advantage = sum(advantages) / len(advantages)
-        advantages_per_epoch.append(avg_advantage)
+        if mode == "ppo_mode":
+            # --- PPO: single trajectory per epoch -----------------------
+            trajectory, returns, advantages, old_probs = collect_experience(env, model, **kwargs)
+            trajectories_data = [(trajectory, returns, advantages, old_probs)]
+        else:
+            # --- GRPO: collect a *group* of trajectories ----------------
+            trajectories_data = []
+            all_returns = []
+            for _ in range(group_size):
+                traj, rets, _, old_p = collect_experience(env, model, **kwargs)
+                trajectories_data.append((traj, rets, old_p))
+                all_returns.append(rets)
 
-        states = torch.tensor(np.array([t[0] for t in trajectory]), dtype=torch.float32).to(device)
-        actions = (
-            torch.stack([t[2] for t in trajectory]).to(device)
-            if isinstance(trajectory[0][2], torch.Tensor)
-            else torch.tensor([t[2] for t in trajectory], dtype=torch.long).to(device)
-        )
-        returns_tensor = torch.tensor(returns, dtype=torch.float32).to(device)
-        advantages_tensor = torch.tensor(advantages, dtype=torch.float32).to(device)
+            # Compute group‑normalised advantages across the group
+            max_len = max(len(r) for r in all_returns)
+            group_advantages_per_traj = [[] for _ in range(group_size)]
+
+            for t in range(max_len):
+                step_returns = []
+                traj_has_t = []
+                for g_idx in range(group_size):
+                    if t < len(all_returns[g_idx]):
+                        step_returns.append(all_returns[g_idx][t])
+                        traj_has_t.append(g_idx)
+
+                step_mean = np.mean(step_returns)
+                step_std = np.std(step_returns) + 1e-8
+
+                for g_idx in traj_has_t:
+                    norm_adv = (all_returns[g_idx][t] - step_mean) / step_std
+                    group_advantages_per_traj[g_idx].append(norm_adv)
+
+            # Rebuild trajectories_data with group‑normalised advantages
+            for g_idx in range(group_size):
+                traj, rets, old_p = trajectories_data[g_idx]
+                trajectories_data[g_idx] = (traj, rets, group_advantages_per_traj[g_idx], old_p)
+
+        # ----------------------------------------------------------------
+        # Accumulate average advantage for logging
+        # ----------------------------------------------------------------
+        for _, _, advantages, _ in trajectories_data:
+            avg_advantage = sum(advantages) / len(advantages)
+            advantages_per_epoch.append(avg_advantage)
+
+        # ----------------------------------------------------------------
+        # Build a single dataset from all trajectories
+        # ----------------------------------------------------------------
+        all_states = []
+        all_actions = []
+        all_returns_list = []
+        all_advantages_list = []
+        all_old_probs_list = []
+
+        for trajectory, returns, advantages, old_probs in trajectories_data:
+            states_arr = np.array([t[0] for t in trajectory])
+            all_states.append(states_arr)
+            acts = trajectory[0][2]
+            if isinstance(acts, torch.Tensor):
+                all_actions.append(torch.stack([t[2] for t in trajectory]))
+            else:
+                all_actions.append(torch.tensor([t[2] for t in trajectory], dtype=torch.long))
+            all_returns_list.append(torch.tensor(returns, dtype=torch.float32))
+            all_advantages_list.append(torch.tensor(advantages, dtype=torch.float32))
+            all_old_probs_list.append(torch.tensor(old_probs, dtype=torch.float32))
+
+        states = torch.tensor(np.concatenate(all_states, axis=0), dtype=torch.float32).to(device)
+        actions = torch.cat([a.to(device) for a in all_actions])
         old_probs_tensor = (
-            torch.tensor(old_probs, dtype=torch.float32).view(actions.shape).to(device)
+            torch.cat([op.to(device) for op in all_old_probs_list]).view(actions.shape).detach()
         )
+        returns_tensor = torch.cat([r.to(device) for r in all_returns_list])
+        advantages_tensor = torch.cat([a.to(device) for a in all_advantages_list])
 
         dataset = TensorDataset(
             states, actions, returns_tensor, advantages_tensor, old_probs_tensor
         )
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
+        # ----------------------------------------------------------------
+        # Training loop over batches
+        # ----------------------------------------------------------------
         epoch_loss = 0
         num_batches = 0
-
         for (
             batch_states,
             batch_actions,
@@ -760,21 +1068,37 @@ def train_option_critic(
             optimizer.zero_grad()
 
             option_probs, action_probs, termination_probs, selected_option, action = model(
-                batch_states
+                batch_states, multiple_option
             )
-            if action_probs.ndim == 2 and batch_actions.ndim == 1:
-                batch_current_probs = action_probs.gather(1, batch_actions.unsqueeze(1))
-                ppo_loss_value = ppo_loss(
-                    batch_advantages, batch_old_probs, batch_current_probs, epsilon=epsilon
+            batch_current_probs = action_probs.gather(
+                batch_actions.ndim, batch_actions.unsqueeze(-1)
+            ).squeeze(-1)
+
+            if mode == "ppo_mode":
+                # --- PPO loss -------------------------------------------
+                policy_loss = ppo_loss(
+                    batch_advantages,
+                    batch_old_probs,
+                    batch_current_probs,
+                    epsilon=epsilon,
                 )
+                batch_values = model.value_network(batch_states).squeeze(-1)
+                batch_returns_target = batch_advantages + batch_values.detach()
+                value_loss = torch.nn.functional.mse_loss(batch_values, batch_returns_target)
+                entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
+                loss = policy_loss + value_coef * value_loss - beta * entropy.mean()
             else:
-                ppo_loss_value = ppo_loss(
-                    batch_advantages, batch_old_probs, action_probs, epsilon=epsilon
+                # --- GRPO loss ------------------------------------------
+                policy_loss = grpo_loss(
+                    batch_advantages,
+                    batch_old_probs,
+                    batch_current_probs,
+                    epsilon=epsilon,
+                    beta_kl=beta_kl,
                 )
+                entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
+                loss = policy_loss - beta * entropy.mean()
 
-            entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1)
-
-            loss = ppo_loss_value + beta * entropy.mean()
             avg_advantages = batch_advantages.mean().item()
             loss.backward()
             optimizer.step()
@@ -790,12 +1114,10 @@ def train_option_critic(
             if patience_counter_advantage >= patience:
                 if verbose:
                     print(
-                        f"Early stopping at epoch {epoch} after {patience} epochs without advantage improvement."
+                        f"Early stopping at epoch {epoch} after {patience} "
+                        f"epochs without advantage improvement."
                     )
                 break
-
-            epoch_loss += loss.item()
-            num_batches += 1
 
         if num_batches > 0:
             avg_epoch_loss = epoch_loss / num_batches
@@ -810,13 +1132,18 @@ def train_option_critic(
             if patience_counter >= patience:
                 if verbose:
                     print(
-                        f"Early stopping at epoch {epoch} after {patience} epochs without improvement."
+                        f"Early stopping at epoch {epoch} after {patience} "
+                        f"epochs without improvement."
                     )
                 break
 
             if verbose:
                 if epoch % (num_epochs // 10) == 0:
-                    print(f"Epoch {epoch}/{num_epochs} - Avg Loss: {avg_epoch_loss:.4f}")
+                    print(
+                        f"Epoch {epoch}/{num_epochs} - "
+                        f"Avg Loss: {avg_epoch_loss:.4f}  "
+                        f"[{mode}]"
+                    )
 
     return model, avg_epoch_loss, advantages_per_epoch
 
@@ -826,9 +1153,10 @@ def train_model_with_episodes(
     optimizer: torch.optim.Optimizer,
     env: Any,
     num_episodes: int,
-    episode_patience: int = 5,
-    **kwargs,
-):
+    episode_patience: int = 1,
+    mode: str = "ppo_mode",
+    **kwargs: Any,
+) -> Tuple[torch.nn.Module, float]:
     """Trains a model via reinforcement learning episodes.
 
     Parameters
@@ -841,6 +1169,13 @@ def train_model_with_episodes(
         The environment used for the episodes.
     num_episodes : `int`
         The number of episodes to train.
+    episode_patience : `int`, optional, default=1
+        Number of episodes without improvement before early stopping.
+    mode : `str`, optional, default='ppo_mode'
+        Training algorithm to use.  Must be one of:
+
+        - ``'ppo_mode'`` – Proximal Policy Optimisation.
+        - ``'grpo_mode'`` – Group Relative Policy Optimisation.
 
     Keyword Arguments
     -----------------
@@ -856,8 +1191,18 @@ def train_model_with_episodes(
         Target device (e.g., "cpu" or "cuda").
     beta : `float`
         Critic learning rate hyperparameter.
+    beta_kl : `float`
+        KL-divergence penalty coefficient (GRPO mode only).
+    group_size : `int`
+        Number of trajectories per group (GRPO mode only).
     patience : `int`
         Early stopping patience in epochs.
+    epsilon_start : `float`, default 1.0
+        Initial exploration probability.
+    epsilon_end : `float`, default 0.05
+        Minimum exploration probability after decay.
+    epsilon_decay : `float`, default 0.99
+        Exponential decay rate for epsilon per episode.
 
     Returns
     -------
@@ -866,14 +1211,18 @@ def train_model_with_episodes(
     best_loss_so_far : `float`
         The best loss value observed during training.
     """
+    epsilon_start = kwargs.pop("epsilon_start", 1.0)
+    epsilon_end = kwargs.pop("epsilon_end", 0.05)
+    epsilon_decay = kwargs.pop("epsilon_decay", 0.99)
+
     previous_weights = model.state_dict()
     best_loss_so_far = float("inf")
     loss_window = []
     average_loss = 0.0
     no_improvement_count = 0
 
-    print(f"{'Episode':<12} {'Loss':<8} {'Best Loss':<17} {'Status':<15} {'Avg Loss':<4}")
-    print("=" * 70)
+    print(f"{'Episode':<12} {'Loss':<8} {'Best Loss':<17} {'Status':<20} {'Avg Loss':<10} ε")
+    print("=" * 85)
 
     NEW_BEST_COLOR = "\033[92m"
     REVERT_COLOR = "\033[91m"
@@ -881,25 +1230,37 @@ def train_model_with_episodes(
     advantages_per_episode = []
 
     for episode in range(num_episodes):
-        model, loss, advantages = train_option_critic(model, optimizer, env, **kwargs)
+        model, loss, advantages = train_option_critic(model, optimizer, env, mode=mode, **kwargs)
         advantages_per_episode.extend(advantages)
 
         loss_window.append(loss)
         average_loss = sum(loss_window) / len(loss_window)
 
-        if loss < best_loss_so_far:
-            best_loss_so_far = loss
-            previous_weights = model.state_dict()
-            no_improvement_count = 0
-            status = f"{NEW_BEST_COLOR}Updated{RESET_COLOR}"
+        epsilon = epsilon_end + (epsilon_start - epsilon_end) * (epsilon_decay**episode)
+
+        # Epsilon-greedy decision logic for weight updates
+        if np.random.random() < epsilon:
+            # Exploration phase: randomly accept or reject the new weights
+            if np.random.random() < 0.5:
+                previous_weights = model.state_dict()
+                status = f"{NEW_BEST_COLOR}Updated{RESET_COLOR}"
+            else:
+                status = f"{REVERT_COLOR}No Improvement{RESET_COLOR}"
         else:
-            model.load_state_dict(previous_weights)
-            no_improvement_count += 1
-            status = f"{REVERT_COLOR}No Improvement{RESET_COLOR}"
+            # Exploitation phase: greedy decision based on loss improvement
+            if loss < best_loss_so_far:
+                best_loss_so_far = loss
+                previous_weights = model.state_dict()
+                no_improvement_count = 0
+                status = f"{NEW_BEST_COLOR}Updated{RESET_COLOR}"
+            else:
+                model.load_state_dict(previous_weights)
+                no_improvement_count += 1
+                status = f"{REVERT_COLOR}No Improvement{RESET_COLOR}"
         print(
-            f"{episode + 1:<8} {loss:<12.4f} {best_loss_so_far:<15.4f} {status:<25} {average_loss:<12.4f}"
+            f"{episode + 1:<8} {loss:<12.4f} {best_loss_so_far:<15.4f} {status:<30} {average_loss:<10.4f} {epsilon:.3f}"
         )
-        print("=" * 70)
+        print("=" * 85)
 
         if no_improvement_count >= episode_patience:
             print(f"\nNo improvement for {episode_patience} episodes. Stopping early.")
@@ -917,6 +1278,16 @@ def train_model_with_episodes(
         linestyle="-",
         linewidth=2,
     )
+    smoothed = cal_average(np.array(advantages_per_episode), alpha=0.1)
+    plt.plot(
+        range(len(smoothed)),
+        smoothed,
+        marker=None,
+        markersize=6,
+        color=sns.color_palette("deep")[1],
+        linestyle="-",
+        linewidth=2,
+    )
     plt.xscale("log")
 
     plt.xlabel("Epoch", fontsize=12)
@@ -926,6 +1297,488 @@ def train_model_with_episodes(
     plt.show()
 
     return model, best_loss_so_far
+
+
+def plot_two_region_histograms_boxplots(
+    option_outputs: Dict[str, np.ndarray],
+    action_outputs: Dict[str, np.ndarray],
+) -> None:
+    """
+    Create a figure with:
+      - Top panel: overlaid histograms for option outputs.
+      - Bottom panel: boxplots for action outputs.
+
+    Parameters
+    ----------
+    option_outputs : dict[str, np.ndarray]
+        Mapping from option name to array of output values.
+
+    action_outputs : dict[str, np.ndarray]
+        Mapping from action name to array of output values.
+
+    Returns
+    -------
+    None
+    """
+    sns.set_theme(style="whitegrid", context="notebook")
+    show_actions = len(action_outputs) <= 5
+    is_dark = plt.rcParams.get("figure.facecolor") not in ["#ffffff", "white"]
+    palette = sns.color_palette("viridis", max(len(option_outputs), 1))
+
+    if is_dark:
+        bg = "#121212"
+        fg = "#EAEAEA"
+        grid_alpha = 0.12
+        spine_color = "#666666"
+        legend_bg = "#1e1e1e"
+    else:
+        bg = "#ffffff"
+        fg = "#111111"
+        grid_alpha = 0.08
+        spine_color = "#333333"
+        legend_bg = "#ffffff"
+
+    plt.rcParams.update(
+        {
+            "figure.facecolor": bg,
+            "axes.facecolor": bg,
+            "axes.edgecolor": spine_color,
+            "axes.labelcolor": fg,
+            "xtick.color": fg,
+            "ytick.color": fg,
+            "text.color": fg,
+        }
+    )
+
+    if show_actions:
+        fig, (ax_top, ax_bottom) = plt.subplots(
+            2,
+            1,
+            figsize=(9, 4.3),
+            gridspec_kw={"height_ratios": [3.2, 1.3]},
+        )
+        fig.subplots_adjust(hspace=0.18)
+    else:
+        fig, ax_top = plt.subplots(figsize=(9, 3.2))
+
+    fig.patch.set_facecolor(bg)
+    ax_top.set_facecolor(bg)
+    if show_actions:
+        ax_bottom.set_facecolor(bg)
+
+    for color, (opt_name, values) in zip(palette, option_outputs.items()):
+        values = np.asarray(values).ravel()
+
+        sns.histplot(
+            values,
+            bins=35,
+            stat="density",
+            alpha=0.22,
+            color=color,
+            edgecolor=None,
+            ax=ax_top,
+            label=opt_name,
+        )
+
+        sns.kdeplot(
+            values,
+            color=color,
+            linewidth=1.8,
+            ax=ax_top,
+        )
+
+    ax_top.grid(axis="y", alpha=grid_alpha)
+    ax_top.grid(axis="x", visible=False)
+
+    ax_top.spines["top"].set_visible(False)
+    ax_top.spines["right"].set_visible(False)
+    ax_top.spines["left"].set_color(spine_color)
+    ax_top.spines["bottom"].set_color(spine_color)
+
+    ax_top.tick_params(labelsize=9)
+
+    if option_outputs:
+        leg = ax_top.legend(
+            frameon=True,
+            fontsize=8.5,
+            ncol=min(4, len(option_outputs)),
+            loc="upper right",
+        )
+        leg.get_frame().set_facecolor(legend_bg)
+        leg.get_frame().set_edgecolor("none")
+        leg.get_frame().set_alpha(0.6)
+
+    if show_actions:
+        labels, action_data = [], []
+
+        for act_name, values in action_outputs.items():
+            values = np.asarray(values).squeeze().ravel()
+            if values.size == 0:
+                continue
+            labels.append(act_name)
+            action_data.append(values)
+
+        if action_data:
+            bp = ax_bottom.boxplot(
+                action_data,
+                labels=labels,
+                patch_artist=True,
+                widths=0.55,
+                showfliers=False,
+                medianprops={"linewidth": 1.8, "color": fg},
+                whiskerprops={"color": spine_color},
+                capprops={"color": spine_color},
+            )
+
+            box_colors = sns.color_palette("viridis", len(bp["boxes"]))
+
+            for box, color in zip(bp["boxes"], box_colors):
+                box.set_facecolor(color)
+                box.set_alpha(0.85)
+                box.set_edgecolor("none")
+
+            ax_bottom.grid(axis="y", alpha=grid_alpha)
+            ax_bottom.grid(axis="x", visible=False)
+
+            ax_bottom.spines["top"].set_visible(False)
+            ax_bottom.spines["right"].set_visible(False)
+
+            ax_bottom.tick_params(labelsize=9)
+
+            plt.setp(
+                ax_bottom.get_xticklabels(),
+                rotation=20,
+                ha="right",
+                fontsize=8.5,
+                color=fg,
+            )
+        else:
+            ax_bottom.set_visible(False)
+
+    plt.tight_layout(pad=0.5)
+    plt.show()
+
+
+def analyze_network_variations(
+    model: torch.nn.Module,
+    sample_data: np.ndarray,
+    train_option: bool = False,
+    temperature: float = 1.0,
+    plot_graph: bool = False,
+) -> Tuple[pd.DataFrame, pd.DataFrame, int]:
+    """Analyzes the output variations of option_network and action_networks for a given sample.
+
+    Parameters
+    ----------
+    model : `torch.nn.Module`
+        The MultiBanditNet model to analyze.
+    sample_data : `np.ndarray`
+        Input sample data of shape (n_samples, state_dim).
+    train_option : `bool`, optional
+        Whether to use train mode, by default False.
+    temperature : float, default 1.0
+        Temperature used to control the sharpness of the output probability
+        distribution. A value of ``1.0`` preserves the default behavior.
+        Values greater than ``1.0`` produce a softer (more uniform)
+        distribution, while values between ``0`` and ``1.0`` produce a
+        sharper (more peaked) distribution. Must be strictly positive.
+    plot_graph : bool, default False
+        Whether to generate and display plots visualizing the variation
+        statistics of the option and action network outputs.
+
+    Returns
+    -------
+    `pd.DataFrame`
+        Table with statistics for option_network dimensions.
+    `pd.DataFrame`
+        Table with statistics for action_networks dimensions.
+    int
+        Index of the dimension with maximum variation in option_network.
+    int
+        Index of the dimension with maximum variation in action_networks.
+    """
+    if train_option:
+        model.train()
+    else:
+        model.eval()
+
+    state_tensor = torch.tensor(sample_data, dtype=torch.float32)
+    model.to("cpu")
+    state_tensor = state_tensor.to("cpu")
+
+    # Get raw outputs from option_network and apply softmax with temperature
+    option_raw_outputs = model.option_network(state_tensor)
+    option_probs = torch.softmax(option_raw_outputs / temperature, dim=-1)
+
+    option_outputs = {}
+    option_prob_outputs = {}
+
+    for i in range(model.num_options):
+        option_outputs[f"Option {i}"] = option_raw_outputs[..., i].detach().numpy()
+        option_prob_outputs[f"Option {i}"] = option_probs[..., i].detach().numpy()
+
+    # Get raw outputs from action_networks and apply softmax with temperature
+    action_outputs = {}
+    action_prob_outputs = {}
+
+    for opt_idx, net in enumerate(model.action_networks):
+        network_output = net(state_tensor)
+        network_probs = torch.softmax(network_output / temperature, dim=-1)
+
+        num_actions = network_probs.shape[-1]
+        for act_idx in range(num_actions):
+            key = f"Option {opt_idx}, Action {act_idx}"
+
+            action_outputs[key] = network_output[..., act_idx].detach().numpy()
+
+            action_prob_outputs[key] = network_probs[..., act_idx].detach().numpy()
+    if plot_graph:
+        plot_two_region_histograms_boxplots(option_outputs, action_outputs)
+    option_stats = {}
+    for opt_name in option_outputs:
+        logits = option_outputs[opt_name]
+        probs = option_prob_outputs[opt_name]
+
+        option_stats[opt_name] = {
+            "Mean": np.mean(logits),
+            "Std": np.std(logits),
+            "Min": np.min(logits),
+            "Max": np.max(logits),
+            "Range": np.ptp(logits),
+            "Variance": np.var(logits),
+            "Prob Mean": np.mean(probs),
+            "Prob Std": np.std(probs),
+        }
+
+    action_stats = {}
+    for act_name in action_outputs:
+        logits = action_outputs[act_name]
+        probs = action_prob_outputs[act_name]
+
+        action_stats[act_name] = {
+            "Mean": np.mean(logits),
+            "Std": np.std(logits),
+            "Min": np.min(logits),
+            "Max": np.max(logits),
+            "Range": np.ptp(logits),
+            "Variance": np.var(logits),
+            "Prob Mean": np.mean(probs),
+            "Prob Std": np.std(probs),
+        }
+
+    option_df = pd.DataFrame(option_stats).T
+    action_df = pd.DataFrame(action_stats).T
+
+    max_variation_opt_dim = None
+    max_range = -float("inf")
+
+    for opt_name, stats in option_stats.items():
+        if stats["Range"] > max_range:
+            max_range = stats["Range"]
+            max_variation_opt_dim = int(opt_name.split()[-1])
+
+    max_variation_act_dim = None
+    max_action_range = -float("inf")
+
+    for act_name, stats in action_stats.items():
+        if stats["Range"] > max_action_range:
+            max_action_range = stats["Range"]
+            max_variation_act_dim = act_name
+
+    return option_df, action_df, max_variation_opt_dim, max_variation_act_dim
+
+
+def network_analysis_table(
+    model: torch.nn.Module,
+    sample_data: np.ndarray,
+    train_option: bool = False,
+    temperature: float = 1.0,
+) -> str:
+    """Create a well-formatted table showing statistics for option_network and action_networks.
+
+    Parameters
+    ----------
+    model : `torch.nn.Module`
+        The MultiBanditNet model to analyze.
+    sample_data : `np.ndarray`
+        Input sample data of shape (n_samples, state_dim).
+    train_option : `bool`, optional
+        Whether to use train mode, by default False.
+    temperature : float, default 1.0
+        Temperature used to control the sharpness of the output probability
+        distribution. A value of ``1.0`` preserves the default behavior.
+        Values greater than ``1.0`` produce a softer (more uniform)
+        distribution, while values between ``0`` and ``1.0`` produce a
+        sharper (more peaked) distribution. Must be strictly positive.
+
+    Returns
+    -------
+    str
+        Formatted string with network analysis tables.
+    """
+    option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
+        model,
+        sample_data,
+        train_option,
+        temperature,
+    )
+
+    def format_df(df: pd.DataFrame, highlight_idx: Optional[int] = None) -> str:
+        df = df.copy()
+
+        numeric_cols = df.select_dtypes(include=["number"]).columns
+        df[numeric_cols] = df[numeric_cols].round(5)
+
+        index_labels = []
+        for idx in df.index:
+            if highlight_idx is not None and idx == highlight_idx:
+                index_labels.append(f"★ {idx}")
+            else:
+                index_labels.append(str(idx))
+
+        df.index = index_labels
+
+        return tabulate(
+            df,
+            headers="keys",
+            tablefmt="rounded_outline",
+            floatfmt=".5f",
+            showindex=True,
+        )
+
+    report = []
+
+    report.append("═" * 80)
+    report.append("                 NETWORK OUTPUT VARIATION ANALYSIS")
+    report.append("═" * 80)
+    report.append("")
+    report.append("┌──────────────────────────────────────────────────────────────┐")
+    report.append("│ OPTION NETWORK                                               │")
+    report.append("└──────────────────────────────────────────────────────────────┘")
+    report.append("")
+
+    report.append(format_df(option_df, max_opt_dim))
+    report.append("")
+
+    if max_opt_dim is not None:
+        report.append(f"★ Most variable option dimension : {max_opt_dim}")
+
+    report.append("")
+    report.append("┌──────────────────────────────────────────────────────────────┐")
+    report.append("│ ACTION NETWORKS                                              │")
+    report.append("└──────────────────────────────────────────────────────────────┘")
+    report.append("")
+
+    report.append(format_df(action_df, max_act_dim))
+    report.append("")
+
+    if max_act_dim is not None:
+        report.append(f"★ Most variable action dimension : {max_act_dim}")
+
+    report.append("")
+    report.append("─" * 80)
+    report.append("SUMMARY")
+    report.append("─" * 80)
+
+    report.append(f"Option dimensions analyzed : {len(option_df)}")
+    report.append(f"Action dimensions analyzed : {len(action_df)}")
+    report.append(f"Samples analyzed           : {len(sample_data):,}")
+
+    if max_opt_dim is not None:
+        report.append(f"Highest option variation   : {max_opt_dim}")
+
+    if max_act_dim is not None:
+        report.append(f"Highest action variation   : {max_act_dim}")
+
+    report.append("─" * 80)
+
+    return "\n".join(report)
+
+
+def display_network_analysis(
+    model: torch.nn.Module,
+    sample_data: np.ndarray,
+    multiple_option: bool = False,
+    temperature: float = 1.0,
+    plot_graph: bool = True,
+) -> None:
+    """Analyze and visualize network statistics for a given model and sample data.
+
+    This function performs network analysis on the provided model using the sample
+    data and optionally displays the results as a graph.
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        The PyTorch neural network model to analyze.
+    sample_data : np.ndarray
+        Input data used for the network analysis.
+    multiple_option : bool, optional
+        If True, enable multiple option analysis. Default is False.
+    temperature : float, optional
+        Temperature parameter for the analysis. Default is 1.0.
+    plot_graph : bool, optional
+        If True, display the analysis graph. Default is True.
+
+    Returns
+    -------
+    None
+        This function does not return any value. It performs analysis and optionally
+        displays a graph.
+    """
+    option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
+        model, sample_data, multiple_option, temperature, plot_graph
+    )
+
+    def highlight_row(row: pd.Series, target: Any) -> List[str]:
+        if row.name == target:
+            return ["background-color: #ffec99; font-weight: bold"] * len(row)
+        return [""] * len(row)
+
+    option_format = {col: "{:.5f}" for col in option_df.columns}
+    action_format = {col: "{:.5f}" for col in action_df.columns}
+
+    option_style = (
+        option_df.style.format(option_format)
+        .apply(highlight_row, axis=1, target=max_opt_dim)
+        .background_gradient(cmap="Blues")
+        .set_caption("🧠 Option Network Statistics")
+    )
+
+    action_style = (
+        action_df.style.format(action_format)
+        .apply(highlight_row, axis=1, target=max_act_dim)
+        .background_gradient(cmap="Greens")
+        .set_caption("🎯 Action Network Statistics")
+    )
+
+    if "Probability" in option_df.columns:
+        option_style = option_style.background_gradient(
+            cmap="Oranges", subset=["Prob Mean", "Prob Std"]
+        )
+
+    if "Probability" in action_df.columns:
+        action_style = action_style.background_gradient(
+            cmap="Oranges", subset=["Prob Mean", "Prob Std"]
+        )
+
+    display(option_style)
+    display(action_style)
+
+    display(HTML(f"""
+    <div style="
+        margin-top:20px;
+        padding:15px;
+        border-left:5px solid #1976d2;
+        border-radius:4px;
+    ">
+        <b>Summary</b><br>
+        Samples analyzed: {len(sample_data):,}<br>
+        Temperature: {temperature}<br>
+        Most variable option dimension: {max_opt_dim}<br>
+        Most variable action dimension: {max_act_dim}
+    </div>
+    """))
 
 
 if __name__ == "__main__":

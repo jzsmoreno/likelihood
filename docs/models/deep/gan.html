@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.models.deep.gan API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Generative adversarial network model definitions.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.models.deep.gan</code></h1>
 </header>
 <section id="section-intro">
+<p>Generative adversarial network model definitions.</p>
 </section>
 <section>
 </section>
@@ -48,7 +49,7 @@ el.replaceWith(d);
 <dl>
 <dt id="likelihood.models.deep.gan.GANRegressor"><code class="flex name class">
 <span>class <span class="ident">GANRegressor</span></span>
-<span>(</span><span>input_shape_parm,<br>output_shape_parm,<br>num_neurons=128,<br>activation='linear',<br>depth=5,<br>dropout=0.2,<br>l2_reg=0.0,<br>**kwargs)</span>
+<span>(</span><span>input_shape_parm: int,<br>output_shape_parm: int,<br>num_neurons: int = 128,<br>activation: str = 'linear',<br>depth: int = 5,<br>dropout: float = 0.2,<br>l2_reg: float = 0.0,<br>**kwargs)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -57,21 +58,19 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">@tf.keras.utils.register_keras_serializable(package=&#34;Custom&#34;, name=&#34;GANRegressor&#34;)
 class GANRegressor(tf.keras.Model):
-    &#34;&#34;&#34;
-    GANRegressor is a custom Keras model that combines a generator and a discriminator
-    &#34;&#34;&#34;
+    &#34;&#34;&#34;GANRegressor is a custom Keras model that combines a generator and a discriminator.&#34;&#34;&#34;
 
     def __init__(
         self,
-        input_shape_parm,
-        output_shape_parm,
-        num_neurons=128,
-        activation=&#34;linear&#34;,
-        depth=5,
-        dropout=0.2,
-        l2_reg=0.0,
+        input_shape_parm: int,
+        output_shape_parm: int,
+        num_neurons: int = 128,
+        activation: str = &#34;linear&#34;,
+        depth: int = 5,
+        dropout: float = 0.2,
+        l2_reg: float = 0.0,
         **kwargs,
-    ):
+    ) -&gt; None:
         super(GANRegressor, self).__init__()
         self.input_shape_parm = input_shape_parm
         self.output_shape_parm = output_shape_parm
@@ -87,9 +86,29 @@ class GANRegressor(tf.keras.Model):
         dummy_input = tf.convert_to_tensor(tf.random.normal([1, self.input_shape_parm]))
         self.build(dummy_input.shape)
 
-    def build(self, input_shape):
+    def build(self, input_shape: Tuple[int, ...]) -&gt; None:
+        &#34;&#34;&#34;Build the GAN model architecture.
+
+        Parameters
+        ----------
+        input_shape : `Tuple[int, ...]`
+            The shape of the input tensor.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
         self.gan = tf.keras.models.Sequential([self.generator, self.discriminator], name=&#34;gan&#34;)
 
+        self._compile_models()
+        super(GANRegressor, self).build(input_shape)
+
+    def _compile_models(self) -&gt; None:
+        &#34;&#34;&#34;Compile the generator, the discriminator and the adversarial model.
+
+        ``build`` uses it for a fresh instance and :meth:`load_model` after
+        restoring an archive, so a loaded model can keep training.
+        &#34;&#34;&#34;
         self.generator.compile(
             optimizer=self.optimizer,
             loss=tf.keras.losses.MeanAbsolutePercentageError(),
@@ -101,9 +120,8 @@ class GANRegressor(tf.keras.Model):
         )
 
         self.gan.compile(optimizer=self.optimizer, loss=&#34;binary_crossentropy&#34;)
-        super(GANRegressor, self).build(input_shape)
 
-    def _build_generator(self):
+    def _build_generator(self) -&gt; tf.keras.Model:
         generator = tf.keras.Sequential(name=&#34;generator&#34;)
         generator.add(
             tf.keras.layers.Dense(
@@ -124,7 +142,7 @@ class GANRegressor(tf.keras.Model):
         generator.add(tf.keras.layers.Dense(2 * self.output_shape_parm, activation=self.activation))
         return generator
 
-    def _build_discriminator(self):
+    def _build_discriminator(self) -&gt; tf.keras.Model:
         discriminator = tf.keras.Sequential(name=&#34;discriminator&#34;)
         for _ in range(self.depth):
             discriminator.add(
@@ -138,15 +156,14 @@ class GANRegressor(tf.keras.Model):
 
     def train_gan(
         self,
-        X,
-        y,
-        batch_size,
-        n_epochs,
-        validation_split=0.2,
-        verbose=1,
-    ):
-        &#34;&#34;&#34;
-        Train the GAN model.
+        X: np.ndarray,
+        y: np.ndarray,
+        batch_size: int,
+        n_epochs: int,
+        validation_split: float = 0.2,
+        verbose: int = 1,
+    ) -&gt; pd.DataFrame:
+        &#34;&#34;&#34;Train the GAN model.
 
         Parameters
         ----------
@@ -240,13 +257,15 @@ class GANRegressor(tf.keras.Model):
 
         return pd.DataFrame(loss_history, columns=[&#34;epoch&#34;, &#34;loss&#34;])
 
-    def _get_frame(self, y, y_pred):
+    def _get_frame(self, y: np.ndarray, y_pred: list) -&gt; pd.DataFrame:
         df = pd.DataFrame()
         df[&#34;y&#34;] = y
         df[&#34;y_pred&#34;] = y_pred
         return df
 
-    def _train_and_val(self, X, y, validation_split):
+    def _train_and_val(
+        self, X: tf.Tensor, y: tf.Tensor, validation_split: float
+    ) -&gt; tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         split = int((1 - validation_split) * len(X))
 
         if len(X) &gt; split and split &gt; 0:
@@ -265,20 +284,19 @@ class GANRegressor(tf.keras.Model):
 
         return X_train, y_train, X_val, y_val
 
-    def _cal_loss(self, generated, y):
-        return tf.math.reduce_mean(100 * abs((y - generated) / y), keepdims=False).numpy()
+    def _cal_loss(self, generated: tf.Tensor, y: tf.Tensor) -&gt; float:
+        return tf.math.reduce_mean(100 * abs((y - generated) / y), keepdims=False).numpy().item()
 
     def train_gen(
         self,
-        X_train,
-        y_train,
-        batch_size,
-        n_epochs,
-        validation_split=0.2,
-        patience=3,
-    ):
-        &#34;&#34;&#34;
-        Train the generator model.
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        batch_size: int,
+        n_epochs: int,
+        validation_split: float = 0.2,
+        patience: int = 3,
+    ) -&gt; pd.DataFrame:
+        &#34;&#34;&#34;Train the generator model.
 
         Parameters
         ----------
@@ -323,10 +341,34 @@ class GANRegressor(tf.keras.Model):
 
         return pd.DataFrame(history.history)
 
-    def call(self, inputs):
+    def call(self, inputs: tf.Tensor) -&gt; tf.Tensor:
+        &#34;&#34;&#34;Compute the output tensor by passing inputs through the generator.
+
+        Parameters
+        ----------
+        inputs : `tf.Tensor`
+            Input tensor to the model.
+
+        Returns
+        -------
+        `tf.Tensor`
+            Output tensor of shape (batch_size, 1).
+        &#34;&#34;&#34;
         return self.generator(inputs)[:, 0]
 
-    def get_config(self):
+    def get_config(self) -&gt; Dict[str, Any]:
+        &#34;&#34;&#34;Get configuration dictionary for serialization.
+
+        Only JSON friendly constructor arguments are returned: the generator,
+        discriminator and adversarial models are rebuilt by ``__init__`` from
+        them, which keeps both the ``.keras`` archive and the SavedModel format
+        of TensorFlow &lt;= 2.15 serializable.
+
+        Returns
+        -------
+        config : `Dict[str, Any]`
+            Configuration dictionary.
+        &#34;&#34;&#34;
         config = {
             &#34;input_shape_parm&#34;: self.input_shape_parm,
             &#34;output_shape_parm&#34;: self.output_shape_parm,
@@ -334,9 +376,6 @@ class GANRegressor(tf.keras.Model):
             &#34;activation&#34;: self.activation,
             &#34;depth&#34;: self.depth,
             &#34;dropout&#34;: self.dropout,
-            &#34;generator&#34;: self.generator,
-            &#34;discriminator&#34;: self.discriminator,
-            &#34;gan&#34;: self.gan,
             &#34;l2_reg&#34;: self.l2_reg,
             &#34;optimizer&#34;: self.optimizer,
         }
@@ -344,22 +383,79 @@ class GANRegressor(tf.keras.Model):
         return dict(list(base_config.items()) + list(config.items()))
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config: Dict[str, Any]) -&gt; &#34;GANRegressor&#34;:
+        &#34;&#34;&#34;Reconstruct an instance from its configuration dictionary.
+
+        Parameters
+        ----------
+        config : `Dict[str, Any]`
+            Configuration dictionary containing the instance&#39;s parameters.
+
+        Returns
+        -------
+        `GANRegressor`
+            Reconstructed instance.
+        &#34;&#34;&#34;
         return cls(
             input_shape_parm=config[&#34;input_shape_parm&#34;],
             output_shape_parm=config[&#34;output_shape_parm&#34;],
-            num_neurons=config[&#34;num_neurons&#34;],
-            activation=config[&#34;activation&#34;],
-            depth=config[&#34;depth&#34;],
-            dropout=config[&#34;dropout&#34;],
-            generator=config[&#34;generator&#34;],
-            discriminator=config[&#34;discriminator&#34;],
-            gan=config[&#34;gan&#34;],
-            l2_reg=config[&#34;l2_reg&#34;],
-            optimizer=config[&#34;optimizer&#34;],
-        )</code></pre>
+            num_neurons=config.get(&#34;num_neurons&#34;, 128),
+            activation=config.get(&#34;activation&#34;, &#34;linear&#34;),
+            depth=config.get(&#34;depth&#34;, 5),
+            dropout=config.get(&#34;dropout&#34;, 0.2),
+            l2_reg=config.get(&#34;l2_reg&#34;, 0.0),
+            optimizer=config.get(&#34;optimizer&#34;, &#34;adam&#34;),
+        )
+
+    def save_model(self, path: str = &#34;./gan_regressor&#34;) -&gt; None:
+        &#34;&#34;&#34;Serialize the GAN using the format supported by the installed TF.
+
+        TensorFlow &gt; 2.15 writes a ``.keras`` archive (the extension is appended
+        when ``path`` does not have it); TensorFlow &lt;= 2.15 writes a SavedModel
+        directory named after ``path``.
+
+        Parameters
+        ----------
+        path : str, default=&#34;./gan_regressor&#34;
+            Destination file or directory, depending on the TensorFlow version.
+
+        Notes
+        -----
+        The artifact can also be produced with the matching Keras call
+        (``model.save(&#34;name.keras&#34;)`` on TensorFlow &gt; 2.15,
+        ``model.save(&#34;name&#34;, save_format=&#34;tf&#34;)`` on older releases);
+        :meth:`load_model` accepts both formats.
+        &#34;&#34;&#34;
+        save_keras_model(self, path)
+
+    @classmethod
+    def load_model(cls, path: str = &#34;./gan_regressor&#34;) -&gt; &#34;GANRegressor&#34;:
+        &#34;&#34;&#34;Rebuild a GAN regressor saved with :meth:`save_model`.
+
+        Parameters
+        ----------
+        path : str, default=&#34;./gan_regressor&#34;
+            Keras archive, the same name without the extension, or a SavedModel
+            directory written by TensorFlow &lt;= 2.15.
+
+        Returns
+        -------
+        GANRegressor
+            Model with the stored generator, discriminator and optimizer
+            settings, recompiled so it can keep training.
+
+        Raises
+        ------
+        TypeError
+            If the artifact does not contain a :class:`GANRegressor`.
+        &#34;&#34;&#34;
+        restored = load_keras_model(path, {cls.__name__: cls}, compile=False)
+        if not isinstance(restored, cls):
+            raise TypeError(f&#34;{path!r} does not contain a {cls.__name__} archive&#34;)
+        restored._compile_models()
+        return restored</code></pre>
 </details>
-<div class="desc"><p>GANRegressor is a custom Keras model that combines a generator and a discriminator</p></div>
+<div class="desc"><p>GANRegressor is a custom Keras model that combines a generator and a discriminator.</p></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li>keras.src.models.model.Model</li>
@@ -376,76 +472,136 @@ class GANRegressor(tf.keras.Model):
 <h3>Static methods</h3>
 <dl>
 <dt id="likelihood.models.deep.gan.GANRegressor.from_config"><code class="name flex">
-<span>def <span class="ident">from_config</span></span>(<span>config)</span>
+<span>def <span class="ident">from_config</span></span>(<span>config: Dict[str, Any]) ‑> <a title="likelihood.models.deep.gan.GANRegressor" href="#likelihood.models.deep.gan.GANRegressor">GANRegressor</a></span>
 </code></dt>
 <dd>
-<div class="desc"><p>Creates an operation from its config.</p>
-<p>This method is the reverse of <code>get_config</code>, capable of instantiating the
-same operation from the config dictionary.</p>
-<p>Note: If you override this method, you might receive a serialized dtype
-config, which is a <code>dict</code>. You can deserialize it as follows:</p>
-<pre><code class="language-python">if &quot;dtype&quot; in config and isinstance(config[&quot;dtype&quot;], dict):
-    policy = dtype_policies.deserialize(config[&quot;dtype&quot;])
-</code></pre>
-<h2 id="args">Args</h2>
+<div class="desc"><p>Reconstruct an instance from its configuration dictionary.</p>
+<h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>config</code></strong></dt>
-<dd>A Python dictionary, typically the output of <code>get_config</code>.</dd>
+<dt><strong><code>config</code></strong> :&ensp;<code>Dict[str, Any]</code></dt>
+<dd>Configuration dictionary containing the instance's parameters.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p>An operation instance.</p></div>
+<p><code><a title="likelihood.models.deep.gan.GANRegressor" href="#likelihood.models.deep.gan.GANRegressor">GANRegressor</a></code>
+Reconstructed instance.</p></div>
+</dd>
+<dt id="likelihood.models.deep.gan.GANRegressor.load_model"><code class="name flex">
+<span>def <span class="ident">load_model</span></span>(<span>path: str = './gan_regressor') ‑> <a title="likelihood.models.deep.gan.GANRegressor" href="#likelihood.models.deep.gan.GANRegressor">GANRegressor</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Rebuild a GAN regressor saved with :meth:<code>save_model</code>.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>path</code></strong> :&ensp;<code>str</code>, default=<code>"./gan_regressor"</code></dt>
+<dd>Keras archive, the same name without the extension, or a SavedModel
+directory written by TensorFlow &lt;= 2.15.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code><a title="likelihood.models.deep.gan.GANRegressor" href="#likelihood.models.deep.gan.GANRegressor">GANRegressor</a></code></dt>
+<dd>Model with the stored generator, discriminator and optimizer
+settings, recompiled so it can keep training.</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>TypeError</code></dt>
+<dd>If the artifact does not contain a :class:<code><a title="likelihood.models.deep.gan.GANRegressor" href="#likelihood.models.deep.gan.GANRegressor">GANRegressor</a></code>.</dd>
+</dl></div>
 </dd>
 </dl>
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.deep.gan.GANRegressor.build"><code class="name flex">
-<span>def <span class="ident">build</span></span>(<span>self, input_shape)</span>
+<span>def <span class="ident">build</span></span>(<span>self, input_shape: Tuple[int, ...]) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def build(self, input_shape):
+<pre><code class="python">def build(self, input_shape: Tuple[int, ...]) -&gt; None:
+    &#34;&#34;&#34;Build the GAN model architecture.
+
+    Parameters
+    ----------
+    input_shape : `Tuple[int, ...]`
+        The shape of the input tensor.
+
+    Returns
+    -------
+    None
+    &#34;&#34;&#34;
     self.gan = tf.keras.models.Sequential([self.generator, self.discriminator], name=&#34;gan&#34;)
 
-    self.generator.compile(
-        optimizer=self.optimizer,
-        loss=tf.keras.losses.MeanAbsolutePercentageError(),
-        metrics=[tf.keras.metrics.MeanAbsolutePercentageError()],
-    )
-
-    self.discriminator.compile(
-        optimizer=self.optimizer, loss=&#34;binary_crossentropy&#34;, metrics=[&#34;accuracy&#34;]
-    )
-
-    self.gan.compile(optimizer=self.optimizer, loss=&#34;binary_crossentropy&#34;)
+    self._compile_models()
     super(GANRegressor, self).build(input_shape)</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Build the GAN model architecture.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>input_shape</code></strong> :&ensp;<code>Tuple[int, &hellip;]</code></dt>
+<dd>The shape of the input tensor.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>None</code></dt>
+<dd>&nbsp;</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.models.deep.gan.GANRegressor.call"><code class="name flex">
-<span>def <span class="ident">call</span></span>(<span>self, inputs)</span>
+<span>def <span class="ident">call</span></span>(<span>self, inputs: tensorflow.python.framework.tensor.Tensor) ‑> tensorflow.python.framework.tensor.Tensor</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def call(self, inputs):
+<pre><code class="python">def call(self, inputs: tf.Tensor) -&gt; tf.Tensor:
+    &#34;&#34;&#34;Compute the output tensor by passing inputs through the generator.
+
+    Parameters
+    ----------
+    inputs : `tf.Tensor`
+        Input tensor to the model.
+
+    Returns
+    -------
+    `tf.Tensor`
+        Output tensor of shape (batch_size, 1).
+    &#34;&#34;&#34;
     return self.generator(inputs)[:, 0]</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Compute the output tensor by passing inputs through the generator.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>inputs</code></strong> :&ensp;<code>tf.Tensor</code></dt>
+<dd>Input tensor to the model.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>tf.Tensor</code>
+Output tensor of shape (batch_size, 1).</p></div>
 </dd>
 <dt id="likelihood.models.deep.gan.GANRegressor.get_config"><code class="name flex">
-<span>def <span class="ident">get_config</span></span>(<span>self)</span>
+<span>def <span class="ident">get_config</span></span>(<span>self) ‑> Dict[str, Any]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_config(self):
+<pre><code class="python">def get_config(self) -&gt; Dict[str, Any]:
+    &#34;&#34;&#34;Get configuration dictionary for serialization.
+
+    Only JSON friendly constructor arguments are returned: the generator,
+    discriminator and adversarial models are rebuilt by ``__init__`` from
+    them, which keeps both the ``.keras`` archive and the SavedModel format
+    of TensorFlow &lt;= 2.15 serializable.
+
+    Returns
+    -------
+    config : `Dict[str, Any]`
+        Configuration dictionary.
+    &#34;&#34;&#34;
     config = {
         &#34;input_shape_parm&#34;: self.input_shape_parm,
         &#34;output_shape_parm&#34;: self.output_shape_parm,
@@ -453,21 +609,69 @@ config, which is a <code>dict</code>. You can deserialize it as follows:</p>
         &#34;activation&#34;: self.activation,
         &#34;depth&#34;: self.depth,
         &#34;dropout&#34;: self.dropout,
-        &#34;generator&#34;: self.generator,
-        &#34;discriminator&#34;: self.discriminator,
-        &#34;gan&#34;: self.gan,
         &#34;l2_reg&#34;: self.l2_reg,
         &#34;optimizer&#34;: self.optimizer,
     }
     base_config = super(GANRegressor, self).get_config()
     return dict(list(base_config.items()) + list(config.items()))</code></pre>
 </details>
-<div class="desc"><p>Returns the config of the object.</p>
-<p>An object config is a Python dictionary (serializable)
-containing the information needed to re-instantiate it.</p></div>
+<div class="desc"><p>Get configuration dictionary for serialization.</p>
+<p>Only JSON friendly constructor arguments are returned: the generator,
+discriminator and adversarial models are rebuilt by <code>__init__</code> from
+them, which keeps both the <code>.keras</code> archive and the SavedModel format
+of TensorFlow &lt;= 2.15 serializable.</p>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>config</code></strong> :&ensp;<code>Dict[str, Any]</code></dt>
+<dd>Configuration dictionary.</dd>
+</dl></div>
+</dd>
+<dt id="likelihood.models.deep.gan.GANRegressor.save_model"><code class="name flex">
+<span>def <span class="ident">save_model</span></span>(<span>self, path: str = './gan_regressor') ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def save_model(self, path: str = &#34;./gan_regressor&#34;) -&gt; None:
+    &#34;&#34;&#34;Serialize the GAN using the format supported by the installed TF.
+
+    TensorFlow &gt; 2.15 writes a ``.keras`` archive (the extension is appended
+    when ``path`` does not have it); TensorFlow &lt;= 2.15 writes a SavedModel
+    directory named after ``path``.
+
+    Parameters
+    ----------
+    path : str, default=&#34;./gan_regressor&#34;
+        Destination file or directory, depending on the TensorFlow version.
+
+    Notes
+    -----
+    The artifact can also be produced with the matching Keras call
+    (``model.save(&#34;name.keras&#34;)`` on TensorFlow &gt; 2.15,
+    ``model.save(&#34;name&#34;, save_format=&#34;tf&#34;)`` on older releases);
+    :meth:`load_model` accepts both formats.
+    &#34;&#34;&#34;
+    save_keras_model(self, path)</code></pre>
+</details>
+<div class="desc"><p>Serialize the GAN using the format supported by the installed TF.</p>
+<p>TensorFlow &gt; 2.15 writes a <code>.keras</code> archive (the extension is appended
+when <code>path</code> does not have it); TensorFlow &lt;= 2.15 writes a SavedModel
+directory named after <code>path</code>.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>path</code></strong> :&ensp;<code>str</code>, default=<code>"./gan_regressor"</code></dt>
+<dd>Destination file or directory, depending on the TensorFlow version.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>The artifact can also be produced with the matching Keras call
+(<code>model.save("name.keras")</code> on TensorFlow &gt; 2.15,
+<code>model.save("name", save_format="tf")</code> on older releases);
+:meth:<code>load_model</code> accepts both formats.</p></div>
 </dd>
 <dt id="likelihood.models.deep.gan.GANRegressor.train_gan"><code class="name flex">
-<span>def <span class="ident">train_gan</span></span>(<span>self, X, y, batch_size, n_epochs, validation_split=0.2, verbose=1)</span>
+<span>def <span class="ident">train_gan</span></span>(<span>self,<br>X: numpy.ndarray,<br>y: numpy.ndarray,<br>batch_size: int,<br>n_epochs: int,<br>validation_split: float = 0.2,<br>verbose: int = 1) ‑> pandas.core.frame.DataFrame</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -476,15 +680,14 @@ containing the information needed to re-instantiate it.</p></div>
 </summary>
 <pre><code class="python">def train_gan(
     self,
-    X,
-    y,
-    batch_size,
-    n_epochs,
-    validation_split=0.2,
-    verbose=1,
-):
-    &#34;&#34;&#34;
-    Train the GAN model.
+    X: np.ndarray,
+    y: np.ndarray,
+    batch_size: int,
+    n_epochs: int,
+    validation_split: float = 0.2,
+    verbose: int = 1,
+) -&gt; pd.DataFrame:
+    &#34;&#34;&#34;Train the GAN model.
 
     Parameters
     ----------
@@ -601,7 +804,7 @@ containing the information needed to re-instantiate it.</p></div>
 </dl></div>
 </dd>
 <dt id="likelihood.models.deep.gan.GANRegressor.train_gen"><code class="name flex">
-<span>def <span class="ident">train_gen</span></span>(<span>self, X_train, y_train, batch_size, n_epochs, validation_split=0.2, patience=3)</span>
+<span>def <span class="ident">train_gen</span></span>(<span>self,<br>X_train: numpy.ndarray,<br>y_train: numpy.ndarray,<br>batch_size: int,<br>n_epochs: int,<br>validation_split: float = 0.2,<br>patience: int = 3) ‑> pandas.core.frame.DataFrame</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -610,15 +813,14 @@ containing the information needed to re-instantiate it.</p></div>
 </summary>
 <pre><code class="python">def train_gen(
     self,
-    X_train,
-    y_train,
-    batch_size,
-    n_epochs,
-    validation_split=0.2,
-    patience=3,
-):
-    &#34;&#34;&#34;
-    Train the generator model.
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    batch_size: int,
+    n_epochs: int,
+    validation_split: float = 0.2,
+    patience: int = 3,
+) -&gt; pd.DataFrame:
+    &#34;&#34;&#34;Train the generator model.
 
     Parameters
     ----------
@@ -709,6 +911,8 @@ containing the information needed to re-instantiate it.</p></div>
 <li><code><a title="likelihood.models.deep.gan.GANRegressor.call" href="#likelihood.models.deep.gan.GANRegressor.call">call</a></code></li>
 <li><code><a title="likelihood.models.deep.gan.GANRegressor.from_config" href="#likelihood.models.deep.gan.GANRegressor.from_config">from_config</a></code></li>
 <li><code><a title="likelihood.models.deep.gan.GANRegressor.get_config" href="#likelihood.models.deep.gan.GANRegressor.get_config">get_config</a></code></li>
+<li><code><a title="likelihood.models.deep.gan.GANRegressor.load_model" href="#likelihood.models.deep.gan.GANRegressor.load_model">load_model</a></code></li>
+<li><code><a title="likelihood.models.deep.gan.GANRegressor.save_model" href="#likelihood.models.deep.gan.GANRegressor.save_model">save_model</a></code></li>
 <li><code><a title="likelihood.models.deep.gan.GANRegressor.train_gan" href="#likelihood.models.deep.gan.GANRegressor.train_gan">train_gan</a></code></li>
 <li><code><a title="likelihood.models.deep.gan.GANRegressor.train_gen" href="#likelihood.models.deep.gan.GANRegressor.train_gen">train_gen</a></code></li>
 </ul>

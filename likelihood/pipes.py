@@ -1,3 +1,11 @@
+"""Likelihood: Data preprocessing pipelines and model training utilities.
+
+This module assembles the individual preprocessing components
+(:class:`~likelihood.tools.impute.SimpleImputer`, encoders, scalers, and feature selectors) into an
+ordered :class:`Pipeline` that cleans and transforms tabular data prior to model training. It also
+provides helper functions to save and load fitted pipelines.
+"""
+
 import json
 import pickle
 import re
@@ -14,9 +22,36 @@ from likelihood.tools.tools import DataFrameEncoder, DataScaler, LinearRegressio
 
 
 class Pipeline:
-    def __init__(self, config_path: str):
-        """
-        Initialize the pipeline with a JSON configuration file.
+    """A preprocessing pipeline that orchestrates a sequence of transformations applied to a tabular
+    dataset prior to model training.
+
+    The pipeline is configured through a JSON file that specifies the target
+    column and the ordered list of preprocessing steps (imputation, scaling,
+    encoding, feature selection, and so on). Upon instantiation it loads and
+    validates that configuration, and upon :meth:`fit` it runs the configured
+    steps over the input data and returns the cleaned feature matrix together
+    with the extracted target vector.
+
+    Attributes
+    ----------
+    config : `dict`
+        The validated JSON configuration dictionary.
+    target_col : `str`
+        Name of the target column.
+    steps : `list`
+        Ordered list of preprocessing step names.
+    compute_importance : `bool`
+        Whether feature importance should be computed.
+    fitted_components : `dict`
+        State of the fitted preprocessing components.
+    fitted_idx : `list`
+        Indices of the columns that were fitted.
+    columns_bin_sizes : `dict` or `None`
+        Bin sizes for range-encoded columns, if any.
+    """
+
+    def __init__(self, config_path: str) -> None:
+        """Initialize the pipeline with a JSON configuration file.
 
         Parameters
         ----------
@@ -41,8 +76,7 @@ class Pipeline:
         return config
 
     def fit(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, np.ndarray, Optional[np.ndarray]]:
-        """
-        Fit preprocessing components on the input DataFrame and return cleaned X/y.
+        """Fit preprocessing components on the input DataFrame and return cleaned X/y.
 
         Parameters
         ----------
@@ -100,10 +134,17 @@ class Pipeline:
             "missing_values": X.isnull().sum().to_dict(),
         }
 
+        sample_df = X.sample(n=min(500, len(X)), random_state=42)
+        sample_data = {
+            "columns": list(sample_df.columns),
+            "rows": sample_df.values.tolist(),
+        }
+
         self.documentation = {
             "initial_dataset": initial_info,
             "processing_steps": steps_info,
             "final_dataset": final_info,
+            "sample_data": sample_data,
         }
 
         importances = None
@@ -123,8 +164,7 @@ class Pipeline:
         return X, y, df_scores_norm
 
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Apply fitted preprocessing steps to new data (no target column needed).
+        """Apply fitted preprocessing steps to new data (no target column needed).
 
         Parameters
         ----------
@@ -146,8 +186,7 @@ class Pipeline:
     def get_doc(
         self, save_to_file: bool = True, file_name: str = "data_processing_report.html"
     ) -> None:
-        """
-        Generate an HTML report from `self.documentation` for pipeline documentation.
+        """Generate an HTML report from `self.documentation` for pipeline documentation.
 
         Parameters
         ----------
@@ -156,7 +195,6 @@ class Pipeline:
         file_name : str, optional
             Filename for output when `save_to_file` is True. Default is "data_processing_report.html".
         """
-
         generate_html_pipeline(self.documentation, save_to_file=save_to_file, file_name=file_name)
 
     def _apply_step(
@@ -322,15 +360,13 @@ class Pipeline:
             return imputer.transform(X, boundary=boundary)
 
     def save(self, filepath: str) -> None:
-        """
-        Save the fitted pipeline state to a file using pickle.
+        """Save the fitted pipeline state to a file using pickle.
 
         Parameters
         ----------
         filepath : str
             Path where the serialized pipeline will be saved.
         """
-
         save_dict = {
             "config": self.config,
             "fitted_components": self.fitted_components,
@@ -349,8 +385,7 @@ class Pipeline:
 
     @classmethod
     def load(cls, filepath: str) -> "Pipeline":
-        """
-        Load a fitted pipeline from a file.
+        """Load a fitted pipeline from a file.
 
         Parameters
         ----------
@@ -362,7 +397,6 @@ class Pipeline:
         pipeline : Pipeline
             Reconstructed pipeline instance with fitted components.
         """
-
         filepath = filepath + ".pkl" if not filepath.endswith(".pkl") else filepath
 
         with open(filepath, "rb") as f:

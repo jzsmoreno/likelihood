@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.models.deep.rl API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Reinforcement learning algorithms and utilities for the likelihood package …">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,9 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.models.deep.rl</code></h1>
 </header>
 <section id="section-intro">
+<p>Reinforcement learning algorithms and utilities for the likelihood package.</p>
+<p>This module provides utilities for training and evaluating reinforcement learning (RL) models,
+including environment wrappers, exploration policies, and training loops.</p>
 </section>
 <section>
 </section>
@@ -45,14 +48,25 @@ el.replaceWith(d);
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="likelihood.models.deep.rl.print_progress_bar"><code class="name flex">
-<span>def <span class="ident">print_progress_bar</span></span>(<span>iteration, total, length=30)</span>
+<span>def <span class="ident">print_progress_bar</span></span>(<span>iteration: int, total: int, length: int = 30) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def print_progress_bar(iteration, total, length=30):
+<pre><code class="python">def print_progress_bar(iteration: int, total: int, length: int = 30) -&gt; None:
+    &#34;&#34;&#34;Print a progress bar to the console showing training progress.
+
+    Parameters
+    ----------
+    iteration : int
+        The current iteration number.
+    total : int
+        The total number of iterations.
+    length : int
+        The length of the progress bar. Default is 30.
+    &#34;&#34;&#34;
     percent = f&#34;{100 * (iteration / float(total)):.1f}&#34;
     filled_length = int(length * iteration // total)
     bar = &#34;█&#34; * filled_length + &#34;-&#34; * (length - filled_length)
@@ -60,7 +74,16 @@ el.replaceWith(d);
     if iteration == total:
         print()</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Print a progress bar to the console showing training progress.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>iteration</code></strong> :&ensp;<code>int</code></dt>
+<dd>The current iteration number.</dd>
+<dt><strong><code>total</code></strong> :&ensp;<code>int</code></dt>
+<dd>The total number of iterations.</dd>
+<dt><strong><code>length</code></strong> :&ensp;<code>int</code></dt>
+<dd>The length of the progress bar. Default is 30.</dd>
+</dl></div>
 </dd>
 </dl>
 </section>
@@ -77,13 +100,18 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AutoQL:
-    &#34;&#34;&#34;
-    AutoQL: A reinforcement learning agent using Q-learning with Epsilon-greedy policy.
+    &#34;&#34;&#34;AutoQL: A reinforcement learning agent using Q-learning with Epsilon-greedy policy.
 
     This class implements a Q-learning agent with:
     - Epsilon-greedy policy for exploration
     - Replay buffer for experience replay
     - Automatic model version handling for TensorFlow
+
+    Notes
+    -----
+    The agent holds the environment and the Q-network supplied by the caller, so
+    it cannot be reconstructed from a path. Persist the ``tf.keras.Model`` with
+    its own ``save``/``load_model`` helpers and create the agent again.
     &#34;&#34;&#34;
 
     def __init__(
@@ -91,8 +119,8 @@ el.replaceWith(d);
         env: Any,
         model: tf.keras.Model,
         maxlen: int = 2000,
-    ):
-        &#34;&#34;&#34;Initialize AutoQL agent
+    ) -&gt; None:
+        &#34;&#34;&#34;Initialize AutoQL agent.
 
         Parameters
         ----------
@@ -101,15 +129,15 @@ el.replaceWith(d);
         model : `tf.keras.Model`
             The Q-network model
         &#34;&#34;&#34;
-
         self.env = env
         self.model = model
         self.maxlen = maxlen
-        self.replay_buffer = deque(maxlen=self.maxlen)
+        self.replay_buffer: deque = deque(maxlen=self.maxlen)
 
-    def epsilon_greedy_policy(self, state: np.ndarray, action: int, epsilon: float = 0.0) -&gt; tuple:
-        &#34;&#34;&#34;
-        Epsilon-greedy policy for action selection
+    def epsilon_greedy_policy(
+        self, state: np.ndarray, action: int, epsilon: float = 0.0
+    ) -&gt; Tuple[Any, int, float, Any, bool]:
+        &#34;&#34;&#34;Epsilon-greedy policy for action selection.
 
         Parameters
         ----------
@@ -134,9 +162,10 @@ el.replaceWith(d);
 
         return _state[0], greedy_action[0], _reward[0], _next_action[0], _done[0]
 
-    def play_one_step(self, state: np.ndarray, action: int, epsilon: float):
-        &#34;&#34;&#34;
-        Perform one step in the environment and add experience to buffer
+    def play_one_step(
+        self, state: np.ndarray, action: int, epsilon: float
+    ) -&gt; Tuple[Any, int, float, Any, int]:
+        &#34;&#34;&#34;Perform one step in the environment and add experience to buffer.
 
         Parameters
         ----------
@@ -172,15 +201,13 @@ el.replaceWith(d);
         return current_state, greedy_action, reward, next_action, done
 
     @tf.function
-    def _training_step(self):
-        &#34;&#34;&#34;
-        Perform one training step using experience replay
+    def _training_step(self) -&gt; float:
+        &#34;&#34;&#34;Perform one training step using experience replay.
 
         Returns
         -------
         float : Training loss
         &#34;&#34;&#34;
-
         batch_ = random.sample(self.replay_buffer, self.batch_size)
         states, actions, rewards, next_actions, dones = zip(*batch_)
         states = np.array(states).reshape(self.batch_size, -1)
@@ -211,18 +238,18 @@ el.replaceWith(d);
 
     def train(
         self,
-        x_data,
-        y_data,
-        optimizer=&#34;adam&#34;,
-        loss_fn=&#34;mse&#34;,
-        num_episodes=50,
-        num_steps=100,
-        gamma=0.7,
-        batch_size=32,
-        patience=10,
-        alpha=0.01,
-    ):
-        &#34;&#34;&#34;Train the agent for a fixed number of episodes
+        x_data: Any,
+        y_data: Any,
+        optimizer: str = &#34;adam&#34;,
+        loss_fn: str = &#34;mse&#34;,
+        num_episodes: int = 50,
+        num_steps: int = 100,
+        gamma: float = 0.7,
+        batch_size: int = 32,
+        patience: int = 10,
+        alpha: float = 0.01,
+    ) -&gt; None:
+        &#34;&#34;&#34;Train the agent for a fixed number of episodes.
 
         Parameters
         ----------
@@ -243,9 +270,9 @@ el.replaceWith(d);
         alpha : `float`
             Trade-off factor between loss and reward.
         &#34;&#34;&#34;
-        rewards = []
-        self.best_weights = None
-        self.best_loss = float(&#34;inf&#34;)
+        rewards: List[float] = []
+        self.best_weights: Optional[List[np.ndarray]] = None
+        self.best_loss: float = float(&#34;inf&#34;)
 
         optimizers = {
             &#34;sgd&#34;: tf.keras.optimizers.SGD(),
@@ -256,6 +283,7 @@ el.replaceWith(d);
         }
         self.optimizer = optimizers[optimizer]
         losses = {
+            &#34;huber&#34;: tf.keras.losses.Huber(),
             &#34;mse&#34;: tf.keras.losses.MeanSquaredError(),
             &#34;mae&#34;: tf.keras.losses.MeanAbsoluteError(),
             &#34;mape&#34;: tf.keras.losses.MeanAbsolutePercentageError(),
@@ -265,9 +293,9 @@ el.replaceWith(d);
         self.num_steps = num_steps if num_steps &gt;= self.env.maxlen else self.env.maxlen
         self.gamma = gamma
         self.batch_size = batch_size
-        loss = float(&#34;inf&#34;)
-        no_improve_count = 0
-        best_combined_metric = float(&#34;inf&#34;)
+        loss: float = float(&#34;inf&#34;)
+        no_improve_count: int = 0
+        best_combined_metric: float = float(&#34;inf&#34;)
 
         for episode in range(self.num_episodes):
             print_progress_bar(episode + 1, self.num_episodes)
@@ -316,7 +344,8 @@ el.replaceWith(d);
         # Save best model
         self.model.set_weights(self.best_weights)
 
-    def __str__(self):
+    def __str__(self) -&gt; str:
+        &#34;&#34;&#34;Return a human-readable string representation of the agent.&#34;&#34;&#34;
         return (
             f&#34;AutoQL (Env: {self.env.name}, Episodes: {self.num_episodes}, Steps: {self.num_steps})&#34;
         )</code></pre>
@@ -326,7 +355,11 @@ el.replaceWith(d);
 - Epsilon-greedy policy for exploration
 - Replay buffer for experience replay
 - Automatic model version handling for TensorFlow</p>
-<p>Initialize AutoQL agent</p>
+<h2 id="notes">Notes</h2>
+<p>The agent holds the environment and the Q-network supplied by the caller, so
+it cannot be reconstructed from a path. Persist the <code>tf.keras.Model</code> with
+its own <code>save</code>/<code>load_model</code> helpers and create the agent again.</p>
+<p>Initialize AutoQL agent.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>env</code></strong> :&ensp;<code>Any</code></dt>
@@ -337,16 +370,17 @@ el.replaceWith(d);
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.deep.rl.AutoQL.epsilon_greedy_policy"><code class="name flex">
-<span>def <span class="ident">epsilon_greedy_policy</span></span>(<span>self, state: numpy.ndarray, action: int, epsilon: float = 0.0) ‑> tuple</span>
+<span>def <span class="ident">epsilon_greedy_policy</span></span>(<span>self, state: numpy.ndarray, action: int, epsilon: float = 0.0) ‑> Tuple[Any, int, float, Any, bool]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def epsilon_greedy_policy(self, state: np.ndarray, action: int, epsilon: float = 0.0) -&gt; tuple:
-    &#34;&#34;&#34;
-    Epsilon-greedy policy for action selection
+<pre><code class="python">def epsilon_greedy_policy(
+    self, state: np.ndarray, action: int, epsilon: float = 0.0
+) -&gt; Tuple[Any, int, float, Any, bool]:
+    &#34;&#34;&#34;Epsilon-greedy policy for action selection.
 
     Parameters
     ----------
@@ -371,7 +405,7 @@ el.replaceWith(d);
 
     return _state[0], greedy_action[0], _reward[0], _next_action[0], _done[0]</code></pre>
 </details>
-<div class="desc"><p>Epsilon-greedy policy for action selection</p>
+<div class="desc"><p>Epsilon-greedy policy for action selection.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>state</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -388,16 +422,17 @@ el.replaceWith(d);
 </dl></div>
 </dd>
 <dt id="likelihood.models.deep.rl.AutoQL.play_one_step"><code class="name flex">
-<span>def <span class="ident">play_one_step</span></span>(<span>self, state: numpy.ndarray, action: int, epsilon: float)</span>
+<span>def <span class="ident">play_one_step</span></span>(<span>self, state: numpy.ndarray, action: int, epsilon: float) ‑> Tuple[Any, int, float, Any, int]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def play_one_step(self, state: np.ndarray, action: int, epsilon: float):
-    &#34;&#34;&#34;
-    Perform one step in the environment and add experience to buffer
+<pre><code class="python">def play_one_step(
+    self, state: np.ndarray, action: int, epsilon: float
+) -&gt; Tuple[Any, int, float, Any, int]:
+    &#34;&#34;&#34;Perform one step in the environment and add experience to buffer.
 
     Parameters
     ----------
@@ -432,7 +467,7 @@ el.replaceWith(d);
 
     return current_state, greedy_action, reward, next_action, done</code></pre>
 </details>
-<div class="desc"><p>Perform one step in the environment and add experience to buffer</p>
+<div class="desc"><p>Perform one step in the environment and add experience to buffer.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>state</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -449,7 +484,7 @@ el.replaceWith(d);
 </dl></div>
 </dd>
 <dt id="likelihood.models.deep.rl.AutoQL.train"><code class="name flex">
-<span>def <span class="ident">train</span></span>(<span>self,<br>x_data,<br>y_data,<br>optimizer='adam',<br>loss_fn='mse',<br>num_episodes=50,<br>num_steps=100,<br>gamma=0.7,<br>batch_size=32,<br>patience=10,<br>alpha=0.01)</span>
+<span>def <span class="ident">train</span></span>(<span>self,<br>x_data: Any,<br>y_data: Any,<br>optimizer: str = 'adam',<br>loss_fn: str = 'mse',<br>num_episodes: int = 50,<br>num_steps: int = 100,<br>gamma: float = 0.7,<br>batch_size: int = 32,<br>patience: int = 10,<br>alpha: float = 0.01) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -458,18 +493,18 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def train(
     self,
-    x_data,
-    y_data,
-    optimizer=&#34;adam&#34;,
-    loss_fn=&#34;mse&#34;,
-    num_episodes=50,
-    num_steps=100,
-    gamma=0.7,
-    batch_size=32,
-    patience=10,
-    alpha=0.01,
-):
-    &#34;&#34;&#34;Train the agent for a fixed number of episodes
+    x_data: Any,
+    y_data: Any,
+    optimizer: str = &#34;adam&#34;,
+    loss_fn: str = &#34;mse&#34;,
+    num_episodes: int = 50,
+    num_steps: int = 100,
+    gamma: float = 0.7,
+    batch_size: int = 32,
+    patience: int = 10,
+    alpha: float = 0.01,
+) -&gt; None:
+    &#34;&#34;&#34;Train the agent for a fixed number of episodes.
 
     Parameters
     ----------
@@ -490,9 +525,9 @@ el.replaceWith(d);
     alpha : `float`
         Trade-off factor between loss and reward.
     &#34;&#34;&#34;
-    rewards = []
-    self.best_weights = None
-    self.best_loss = float(&#34;inf&#34;)
+    rewards: List[float] = []
+    self.best_weights: Optional[List[np.ndarray]] = None
+    self.best_loss: float = float(&#34;inf&#34;)
 
     optimizers = {
         &#34;sgd&#34;: tf.keras.optimizers.SGD(),
@@ -503,6 +538,7 @@ el.replaceWith(d);
     }
     self.optimizer = optimizers[optimizer]
     losses = {
+        &#34;huber&#34;: tf.keras.losses.Huber(),
         &#34;mse&#34;: tf.keras.losses.MeanSquaredError(),
         &#34;mae&#34;: tf.keras.losses.MeanAbsoluteError(),
         &#34;mape&#34;: tf.keras.losses.MeanAbsolutePercentageError(),
@@ -512,9 +548,9 @@ el.replaceWith(d);
     self.num_steps = num_steps if num_steps &gt;= self.env.maxlen else self.env.maxlen
     self.gamma = gamma
     self.batch_size = batch_size
-    loss = float(&#34;inf&#34;)
-    no_improve_count = 0
-    best_combined_metric = float(&#34;inf&#34;)
+    loss: float = float(&#34;inf&#34;)
+    no_improve_count: int = 0
+    best_combined_metric: float = float(&#34;inf&#34;)
 
     for episode in range(self.num_episodes):
         print_progress_bar(episode + 1, self.num_episodes)
@@ -563,7 +599,7 @@ el.replaceWith(d);
     # Save best model
     self.model.set_weights(self.best_weights)</code></pre>
 </details>
-<div class="desc"><p>Train the agent for a fixed number of episodes</p>
+<div class="desc"><p>Train the agent for a fixed number of episodes.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>optimizer</code></strong> :&ensp;<code>str</code></dt>
@@ -596,9 +632,19 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Env:
-    def __init__(self, model: Any, maxlen: int = 100, name: str = &#34;likenasium&#34;):
-        &#34;&#34;&#34;
-        Initialize the environment with a model.
+    &#34;&#34;&#34;Wraps a Keras model to provide a reinforcement learning environment.
+
+    The environment samples actions from the model&#39;s predicted probability distribution and records
+    the resulting transitions for training.
+
+    Notes
+    -----
+    It keeps a live model and an in-memory transition buffer, so it cannot be
+    rebuilt from a checkpoint: create it again for each training run.
+    &#34;&#34;&#34;
+
+    def __init__(self, model: Any, maxlen: int = 100, name: str = &#34;likenasium&#34;) -&gt; None:
+        &#34;&#34;&#34;Initialize the environment with a model.
 
         Parameters
         ----------
@@ -611,16 +657,17 @@ el.replaceWith(d);
         &#34;&#34;&#34;
         self.model = model
         self.maxlen = maxlen
-        self.transitions = deque(
+        self.transitions: deque = deque(
             maxlen=self.maxlen
         )  # Stores (state, action, reward, next_action, done)
-        self.current_state = None
-        self.current_step = 0
-        self.done = False
+        self.current_state: Optional[np.ndarray] = None
+        self.current_step: int = 0
+        self.done: bool = False
 
-    def step(self, state: np.ndarray, action: int, verbose: int = 0):
-        &#34;&#34;&#34;
-        Perform an environment step with the given action.
+    def step(
+        self, state: np.ndarray, action: int, verbose: int = 0
+    ) -&gt; Tuple[Any, int, float, Any, bool]:
+        &#34;&#34;&#34;Perform an environment step with the given action.
 
         Parameters
         ----------
@@ -662,7 +709,7 @@ el.replaceWith(d);
             )
         return self.current_state, action_pred, reward, next_action, self.done
 
-    def reset(self):
+    def reset(self) -&gt; Optional[np.ndarray]:
         &#34;&#34;&#34;Reset the environment to initial state.&#34;&#34;&#34;
         self.current_state = None
         self.current_step = 0
@@ -670,11 +717,17 @@ el.replaceWith(d);
         self.transitions = deque(maxlen=self.maxlen)
         return self.current_state
 
-    def get_transitions(self):
+    def get_transitions(self) -&gt; deque:
         &#34;&#34;&#34;Get all stored transitions.&#34;&#34;&#34;
         return self.transitions</code></pre>
 </details>
-<div class="desc"><p>Initialize the environment with a model.</p>
+<div class="desc"><p>Wraps a Keras model to provide a reinforcement learning environment.</p>
+<p>The environment samples actions from the model's predicted probability distribution and records
+the resulting transitions for training.</p>
+<h2 id="notes">Notes</h2>
+<p>It keeps a live model and an in-memory transition buffer, so it cannot be
+rebuilt from a checkpoint: create it again for each training run.</p>
+<p>Initialize the environment with a model.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>model</code></strong> :&ensp;<code>Any</code></dt>
@@ -687,28 +740,28 @@ el.replaceWith(d);
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.deep.rl.Env.get_transitions"><code class="name flex">
-<span>def <span class="ident">get_transitions</span></span>(<span>self)</span>
+<span>def <span class="ident">get_transitions</span></span>(<span>self) ‑> collections.deque</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_transitions(self):
+<pre><code class="python">def get_transitions(self) -&gt; deque:
     &#34;&#34;&#34;Get all stored transitions.&#34;&#34;&#34;
     return self.transitions</code></pre>
 </details>
 <div class="desc"><p>Get all stored transitions.</p></div>
 </dd>
 <dt id="likelihood.models.deep.rl.Env.reset"><code class="name flex">
-<span>def <span class="ident">reset</span></span>(<span>self)</span>
+<span>def <span class="ident">reset</span></span>(<span>self) ‑> numpy.ndarray | None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def reset(self):
+<pre><code class="python">def reset(self) -&gt; Optional[np.ndarray]:
     &#34;&#34;&#34;Reset the environment to initial state.&#34;&#34;&#34;
     self.current_state = None
     self.current_step = 0
@@ -719,16 +772,17 @@ el.replaceWith(d);
 <div class="desc"><p>Reset the environment to initial state.</p></div>
 </dd>
 <dt id="likelihood.models.deep.rl.Env.step"><code class="name flex">
-<span>def <span class="ident">step</span></span>(<span>self, state: numpy.ndarray, action: int, verbose: int = 0)</span>
+<span>def <span class="ident">step</span></span>(<span>self, state: numpy.ndarray, action: int, verbose: int = 0) ‑> Tuple[Any, int, float, Any, bool]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def step(self, state: np.ndarray, action: int, verbose: int = 0):
-    &#34;&#34;&#34;
-    Perform an environment step with the given action.
+<pre><code class="python">def step(
+    self, state: np.ndarray, action: int, verbose: int = 0
+) -&gt; Tuple[Any, int, float, Any, bool]:
+    &#34;&#34;&#34;Perform an environment step with the given action.
 
     Parameters
     ----------
