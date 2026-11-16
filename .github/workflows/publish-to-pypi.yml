@@ -7,6 +7,9 @@ on:
     paths:
       - 'likelihood/VERSION'
 
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
 jobs:
   build:
     name: Build Wheels
@@ -70,6 +73,8 @@ jobs:
 
       - name: Build wheels with cibuildwheel
         env:
+          CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-*"
+          CIBW_SKIP: cp*-musllinux_*
           CIBW_BEFORE_ALL: |
             curl https://sh.rustup.rs -sSf | sh -s -- -y
             rustup update stable
@@ -83,7 +88,7 @@ jobs:
             rustc --version
           CIBW_ENVIRONMENT: "PATH=$HOME/.cargo/bin:$PATH"
           CIBW_OUTPUT_DIR: dist
-          CIBW_ARCHS_WINDOWS: x86_64,i686
+          CIBW_ARCHS_WINDOWS: AMD64,x86
         run: |
           echo "Starting cibuildwheel..."
           cibuildwheel --output-dir dist
