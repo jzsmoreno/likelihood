@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.graph.graph API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Build and visualize dynamic graphs from feature-importance data …">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,20 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.graph.graph</code></h1>
 </header>
 <section id="section-intro">
+<p>Build and visualize dynamic graphs from feature-importance data.</p>
+<p>This module provides :class:<code><a title="likelihood.graph.graph.DynamicGraph" href="#likelihood.graph.graph.DynamicGraph">DynamicGraph</a></code>, which constructs a directed,
+weighted network from a tabular dataset using feature-importance scores and
+renders it with :mod:<code>pyvis</code>. It can also convert the interactive network back
+into a static :class:<code>networkx.Graph</code>.</p>
+<h2 id="examples">Examples</h2>
+<pre><code class="language-python-repl">&gt;&gt;&gt; import pandas as pd
+&gt;&gt;&gt; import numpy as np
+&gt;&gt;&gt; from likelihood.graph import DynamicGraph
+&gt;&gt;&gt; df = pd.DataFrame(np.random.rand(3, 100).T, columns=[&quot;x1&quot;, &quot;x2&quot;, &quot;x3&quot;])
+&gt;&gt;&gt; df[&quot;y&quot;] = np.random.rand(len(df))
+&gt;&gt;&gt; graph = DynamicGraph(df, n_importances=2)
+&gt;&gt;&gt; graph.fit()
+</code></pre>
 </section>
 <section>
 </section>
@@ -56,7 +70,17 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class DynamicGraph(FeatureSelection):
-    &#34;&#34;&#34;A class to represent a dynamic graph&#34;&#34;&#34;
+    &#34;&#34;&#34;Represent a dynamic graph built from feature-importance data.
+
+    Parameters
+    ----------
+    df : `pd.DataFrame`
+        The input data containing the features.
+    n_importances : `int`
+        The number of features to use for computing the graph edges.
+    **kwargs : `dict`
+        Additional keyword arguments passed to :class:`FeatureSelection`.
+    &#34;&#34;&#34;
 
     def __init__(self, df: pd.DataFrame, n_importances: int, **kwargs) -&gt; None:
         self.G = Network(notebook=True, cdn_resources=&#34;remote&#34;, directed=True)
@@ -72,7 +96,7 @@ el.replaceWith(d);
         self._make_network()
 
     def _make_network(self) -&gt; None:
-        &#34;&#34;&#34;Create nodes and edges of the network based on feature importance scores&#34;&#34;&#34;
+        &#34;&#34;&#34;Create nodes and edges of the network based on feature importance scores.&#34;&#34;&#34;
         self._add_nodes()
         for i in range(len(self.all_features_imp_graph)):
             node = self.all_features_imp_graph[i][0]
@@ -88,7 +112,7 @@ el.replaceWith(d);
             self.G.add_node(n_id=i, label=node)
 
     def draw(self, name: str = &#34;graph.html&#34;, **kwargs) -&gt; None:
-        &#34;&#34;&#34;Display the network using HTML format&#34;&#34;&#34;
+        &#34;&#34;&#34;Display the network using HTML format.&#34;&#34;&#34;
         spring_length = kwargs.get(&#34;spring_length&#34;, 500)
         node_distance = kwargs.get(&#34;node_distance&#34;, 100)
         self.G.repulsion(node_distance=node_distance, spring_length=spring_length)
@@ -99,6 +123,13 @@ el.replaceWith(d);
         display(HTML(html_file_content))
 
     def pyvis_to_networkx(self) -&gt; nx.Graph:
+        &#34;&#34;&#34;Convert the interactive pyvis network into a static networkx graph.
+
+        Returns
+        -------
+        `nx.Graph`
+            The equivalent undirected networkx graph.
+        &#34;&#34;&#34;
         nx_graph = nx.Graph()
         nodes = [d[&#34;id&#34;] for d in self.G.nodes]
         for node_dic in self.G.nodes:
@@ -115,8 +146,18 @@ el.replaceWith(d);
 
         return nx_graph</code></pre>
 </details>
-<div class="desc"><p>A class to represent a dynamic graph</p>
-<p>The initializer of the class. The initial parameter is a list of strings with variables to discard.</p></div>
+<div class="desc"><p>Represent a dynamic graph built from feature-importance data.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>The input data containing the features.</dd>
+<dt><strong><code>n_importances</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of features to use for computing the graph edges.</dd>
+<dt><strong><code>**kwargs</code></strong> :&ensp;<code>dict</code></dt>
+<dd>Additional keyword arguments passed to :class:<code>FeatureSelection</code>.</dd>
+</dl>
+<p>Initialize the class .</p>
+<p>The initial parameter is a list of strings with variables to discard.</p></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li><a title="likelihood.tools.tools.FeatureSelection" href="../tools/tools.html#likelihood.tools.tools.FeatureSelection">FeatureSelection</a></li>
@@ -132,7 +173,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def draw(self, name: str = &#34;graph.html&#34;, **kwargs) -&gt; None:
-    &#34;&#34;&#34;Display the network using HTML format&#34;&#34;&#34;
+    &#34;&#34;&#34;Display the network using HTML format.&#34;&#34;&#34;
     spring_length = kwargs.get(&#34;spring_length&#34;, 500)
     node_distance = kwargs.get(&#34;node_distance&#34;, 100)
     self.G.repulsion(node_distance=node_distance, spring_length=spring_length)
@@ -142,7 +183,7 @@ el.replaceWith(d);
     html_file_content = open(name, &#34;r&#34;).read()
     display(HTML(html_file_content))</code></pre>
 </details>
-<div class="desc"><p>Display the network using HTML format</p></div>
+<div class="desc"><p>Display the network using HTML format.</p></div>
 </dd>
 <dt id="likelihood.graph.graph.DynamicGraph.fit"><code class="name flex">
 <span>def <span class="ident">fit</span></span>(<span>self, **kwargs) ‑> None</span>
@@ -169,6 +210,13 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def pyvis_to_networkx(self) -&gt; nx.Graph:
+    &#34;&#34;&#34;Convert the interactive pyvis network into a static networkx graph.
+
+    Returns
+    -------
+    `nx.Graph`
+        The equivalent undirected networkx graph.
+    &#34;&#34;&#34;
     nx_graph = nx.Graph()
     nodes = [d[&#34;id&#34;] for d in self.G.nodes]
     for node_dic in self.G.nodes:
@@ -185,7 +233,10 @@ el.replaceWith(d);
 
     return nx_graph</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Convert the interactive pyvis network into a static networkx graph.</p>
+<h2 id="returns">Returns</h2>
+<p><code>nx.Graph</code>
+The equivalent undirected networkx graph.</p></div>
 </dd>
 </dl>
 <h3>Inherited members</h3>
@@ -202,7 +253,9 @@ el.replaceWith(d);
 </article>
 <nav id="sidebar">
 <div class="toc">
-<ul></ul>
+<ul>
+<li><a href="#examples">Examples</a></li>
+</ul>
 </div>
 <ul id="index">
 <li><h3>Super-module</h3>

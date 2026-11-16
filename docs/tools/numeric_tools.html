@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.tools.numeric_tools API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Numerical data manipulation utilities for numeric columns.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.tools.numeric_tools</code></h1>
 </header>
 <section id="section-intro">
+<p>Numerical data manipulation utilities for numeric columns.</p>
 </section>
 <section>
 </section>
@@ -53,7 +54,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def ecprint(A: np.ndarray) -&gt; None:
-    &#34;&#34;&#34;Function that prints the augmented matrix.
+    &#34;&#34;&#34;Print the augmented matrix.
 
     Parameters
     ----------
@@ -75,7 +76,7 @@ el.replaceWith(d);
         print(line)
     print()</code></pre>
 </details>
-<div class="desc"><p>Function that prints the augmented matrix.</p>
+<div class="desc"><p>Print the augmented matrix.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>A</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -94,8 +95,7 @@ Prints the matrix to console.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def find_multiples(target: int) -&gt; tuple[int, int] | None:
-    &#34;&#34;&#34;
-    Find two factors of a given target number that are as close to each other as possible.
+    &#34;&#34;&#34;Find two factors of a given target number that are as close to each other as possible.
 
     Parameters
     ----------
@@ -137,7 +137,7 @@ Returns <code>None</code> if no factors are found.</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def gauss_elimination(A: np.ndarray | list, pr: int = 2) -&gt; np.ndarray:
-    &#34;&#34;&#34;Computes the Gauss elimination algorithm.
+    &#34;&#34;&#34;Compute the Gauss elimination algorithm.
 
     Parameters
     ----------
@@ -152,7 +152,6 @@ Returns <code>None</code> if no factors are found.</dd>
     X : `np.ndarray`
         The solution of the system of $n$ equationsS
     &#34;&#34;&#34;
-
     n = len(A)
     X = [0 for _ in range(n)]
 
@@ -195,7 +194,7 @@ Returns <code>None</code> if no factors are found.</dd>
 
     return X</code></pre>
 </details>
-<div class="desc"><p>Computes the Gauss elimination algorithm.</p>
+<div class="desc"><p>Compute the Gauss elimination algorithm.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>A</code></strong> :&ensp;<code>np.ndarray</code> or <code>list</code></dt>
@@ -224,6 +223,37 @@ with the equalities.</dd>
     predicted_column_name: str,
     verbose: bool = False,
 ) -&gt; Dict[str, float]:
+    &#34;&#34;&#34;Calculate performance metrics from a DataFrame containing actual and predicted values.
+
+    Computes accuracy, precision, recall, F1-score, and Cohen&#39;s kappa from the provided
+    dataset. Results are printed if verbose is True, otherwise returned as a dictionary.
+
+    Parameters
+    ----------
+    dataset : pd.DataFrame
+        Input DataFrame containing the actual and predicted class columns.
+    actual_column_name : str
+        Name of the column with the true/actual class labels.
+    predicted_column_name : str
+        Name of the column with the model&#39;s predicted class labels.
+    verbose : bool, optional
+        If True, print the computed metrics to stdout. Default is False.
+
+    Returns
+    -------
+    Dict[str, float]
+        A dictionary containing the following keys and their corresponding metric values:
+        - &#39;accuracy&#39;: Overall accuracy percentage
+        - &#39;precision&#39;: Precision score
+        - &#39;recall&#39;: Recall score
+        - &#39;f1_score&#39;: F1-score
+        - &#39;kappa&#39;: Cohen&#39;s kappa coefficient
+
+    Notes
+    -----
+    Metrics are calculated from a confusion matrix derived from the dataset. All metrics
+    are expressed as percentages except for Cohen&#39;s kappa, which is a normalized value.
+    &#34;&#34;&#34;
     # Variables to keep track of the number of correct and total predictions
     true_positives = 0  # Correctly predicted positives
     true_negatives = 0  # Correctly predicted negatives
@@ -309,7 +339,33 @@ with the equalities.</dd>
     else:
         return metrics</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Calculate performance metrics from a DataFrame containing actual and predicted values.</p>
+<p>Computes accuracy, precision, recall, F1-score, and Cohen's kappa from the provided
+dataset. Results are printed if verbose is True, otherwise returned as a dictionary.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>dataset</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>Input DataFrame containing the actual and predicted class columns.</dd>
+<dt><strong><code>actual_column_name</code></strong> :&ensp;<code>str</code></dt>
+<dd>Name of the column with the true/actual class labels.</dd>
+<dt><strong><code>predicted_column_name</code></strong> :&ensp;<code>str</code></dt>
+<dd>Name of the column with the model's predicted class labels.</dd>
+<dt><strong><code>verbose</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>If True, print the computed metrics to stdout. Default is False.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>Dict[str, float]</code></dt>
+<dd>A dictionary containing the following keys and their corresponding metric values:
+- 'accuracy': Overall accuracy percentage
+- 'precision': Precision score
+- 'recall': Recall score
+- 'f1_score': F1-score
+- 'kappa': Cohen's kappa coefficient</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>Metrics are calculated from a confusion matrix derived from the dataset. All metrics
+are expressed as percentages except for Cohen's kappa, which is a normalized value.</p></div>
 </dd>
 <dt id="likelihood.tools.numeric_tools.sor_elimination"><code class="name flex">
 <span>def <span class="ident">sor_elimination</span></span>(<span>A: numpy.ndarray,<br>b: numpy.ndarray,<br>n: int,<br>max_iterations: int,<br>w: float,<br>error: float = 0.001,<br>verbose: bool = True) ‑> numpy.ndarray</span>
@@ -328,7 +384,7 @@ with the equalities.</dd>
     error: float = 1e-3,
     verbose: bool = True,
 ) -&gt; np.ndarray:
-    &#34;&#34;&#34;Computes the Successive Over-Relaxation algorithm.
+    &#34;&#34;&#34;Compute the Successive Over-Relaxation algorithm.
 
     Parameters
     ----------
@@ -371,7 +427,7 @@ with the equalities.</dd>
 
     raise RuntimeError(&#34;Convergence not achieved within the maximum number of iterations.&#34;)</code></pre>
 </details>
-<div class="desc"><p>Computes the Successive Over-Relaxation algorithm.</p>
+<div class="desc"><p>Compute the Successive Over-Relaxation algorithm.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>A</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -417,7 +473,6 @@ with the equalities.</dd>
         A square dataframe with variable names as both index and columns,
         containing their corresponding correlation coefficients.
     &#34;&#34;&#34;
-
     columns = df.select_dtypes(include=&#34;number&#34;).columns
     n = len(columns)
 
@@ -433,7 +488,6 @@ with the equalities.</dd>
                 correlation = xicor(x, y)
                 correlations.loc[col1, col2] = round(correlation, 8)
                 correlations.loc[col2, col1] = round(correlation, 8)  # Mirror the correlation
-
     return correlations</code></pre>
 </details>
 <div class="desc"><p>Calculate new coefficient of correlation for all pairs of columns in a <code>DataFrame</code>.</p>
@@ -458,8 +512,7 @@ containing their corresponding correlation coefficients.</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def xicor(X: np.ndarray, Y: np.ndarray, ties: bool = True, random_seed: int = None) -&gt; float:
-    &#34;&#34;&#34;
-    Calculate a generalized coefficient of correlation between two variables.
+    &#34;&#34;&#34;Calculate a generalized coefficient of correlation between two variables.
 
     This coefficient is an extension of Pearson&#39;s correlation, accounting for ties with optional randomization.
 

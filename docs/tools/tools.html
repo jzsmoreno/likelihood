@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.tools.tools API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Data science numerical and statistical utility functions.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.tools.tools</code></h1>
 </header>
 <section id="section-intro">
+<p>Data science numerical and statistical utility functions.</p>
 </section>
 <section>
 </section>
@@ -53,7 +54,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def cal_average(y: np.ndarray, alpha: float = 1):
-    &#34;&#34;&#34;Calculates the moving average of the data
+    &#34;&#34;&#34;Calculate the moving average of the data.
 
     Parameters
     ----------
@@ -67,7 +68,6 @@ el.replaceWith(d);
     average : `float`
         The average of the data.
     &#34;&#34;&#34;
-
     window_size = int(alpha * len(y))
     if len(y) &lt; 2:
         return y
@@ -79,7 +79,7 @@ el.replaceWith(d);
     padded = np.pad(y, n // 2, mode=&#34;edge&#34;)
     return np.convolve(padded, np.ones(n) / n, mode=&#34;valid&#34;)[: len(y)]</code></pre>
 </details>
-<div class="desc"><p>Calculates the moving average of the data</p>
+<div class="desc"><p>Calculate the moving average of the data.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>y</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -113,7 +113,6 @@ el.replaceWith(d);
     -------
     `None` : Prints out a table with columns as index and percentages of missing values as data.
     &#34;&#34;&#34;
-
     col = df.columns
     print(&#34;Total size :&#34;, &#34;{:,}&#34;.format(len(df)))
     for i in col:
@@ -139,7 +138,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def calculate_probability(x: np.ndarray, points: int = 1, cond: bool = True) -&gt; np.ndarray:
-    &#34;&#34;&#34;Calculates the probability of the data based on the CDF fit.
+    &#34;&#34;&#34;Calculate the probability of the data based on the CDF fit.
 
     Parameters
     ----------
@@ -155,7 +154,6 @@ el.replaceWith(d);
     p : `np.ndarray`
         Array containing the probabilities of the data.
     &#34;&#34;&#34;
-
     if len(x) == 0:
         raise ValueError(&#34;Input array &#39;x&#39; must not be empty.&#34;)
 
@@ -176,7 +174,7 @@ el.replaceWith(d);
 
     return p</code></pre>
 </details>
-<div class="desc"><p>Calculates the probability of the data based on the CDF fit.</p>
+<div class="desc"><p>Calculate the probability of the data based on the CDF fit.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>x</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -208,7 +206,7 @@ el.replaceWith(d);
     savename: str | None = None,
     key: str | None = None,
 ) -&gt; tuple:
-    &#34;&#34;&#34;Calculates the cumulative distribution function of the data.
+    &#34;&#34;&#34;Calculate the cumulative distribution function of the data.
 
     Parameters
     ----------
@@ -234,7 +232,6 @@ el.replaceWith(d);
     sorted_x : `np.ndarray`
         Sorted input data.
     &#34;&#34;&#34;
-
     if len(x) == 0:
         raise ValueError(&#34;Input array &#39;x&#39; must not be empty.&#34;)
 
@@ -274,7 +271,7 @@ el.replaceWith(d);
 
     return f, cdf_values, sorted_x</code></pre>
 </details>
-<div class="desc"><p>Calculates the cumulative distribution function of the data.</p>
+<div class="desc"><p>Calculate the cumulative distribution function of the data.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>x</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -309,20 +306,19 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def check_nan_inf(df: pd.DataFrame, verbose: bool = False) -&gt; pd.DataFrame:
+    &#34;&#34;&#34;Check for NaN and Inf values in the DataFrame.
+
+    If any are found, they will be removed.
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The input DataFrame to be checked.
+
+        Returns
+        -------
+        pd.DataFrame
+            A new DataFrame with NaN and Inf values removed.
     &#34;&#34;&#34;
-    Checks for NaN and Inf values in the DataFrame. If any are found, they will be removed.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        The input DataFrame to be checked.
-
-    Returns
-    -------
-    pd.DataFrame
-        A new DataFrame with NaN and Inf values removed.
-    &#34;&#34;&#34;
-
     nan_values = df.isnull().values.any()
     inf_values = np.isinf(df.select_dtypes(include=&#34;number&#34;)).values.any()
 
@@ -356,17 +352,17 @@ el.replaceWith(d);
 
     return df</code></pre>
 </details>
-<div class="desc"><p>Checks for NaN and Inf values in the DataFrame. If any are found, they will be removed.</p>
-<h2 id="parameters">Parameters</h2>
-<dl>
-<dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
-<dd>The input DataFrame to be checked.</dd>
-</dl>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code>pd.DataFrame</code></dt>
-<dd>A new DataFrame with NaN and Inf values removed.</dd>
-</dl></div>
+<div class="desc"><p>Check for NaN and Inf values in the DataFrame.</p>
+<p>If any are found, they will be removed.
+Parameters
+----------
+df : pd.DataFrame
+The input DataFrame to be checked.</p>
+<pre><code>Returns
+-------
+pd.DataFrame
+    A new DataFrame with NaN and Inf values removed.
+</code></pre></div>
 </dd>
 <dt id="likelihood.tools.tools.difference_quotient"><code class="name flex">
 <span>def <span class="ident">difference_quotient</span></span>(<span>f: Callable, x: float, h: float) ‑> Callable</span>
@@ -377,7 +373,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def difference_quotient(f: Callable, x: float, h: float) -&gt; Callable:
-    &#34;&#34;&#34;Calculates the difference quotient of `f` evaluated at `x` and `x + h`
+    &#34;&#34;&#34;Calculate the difference quotient of `f` evaluated at `x` and `x + h`.
 
     Parameters
     ----------
@@ -395,7 +391,7 @@ el.replaceWith(d);
     &#34;&#34;&#34;
     return (f(x + h) - f(x)) / h</code></pre>
 </details>
-<div class="desc"><p>Calculates the difference quotient of <code>f</code> evaluated at <code>x</code> and <code>x + h</code></p>
+<div class="desc"><p>Calculate the difference quotient of <code>f</code> evaluated at <code>x</code> and <code>x + h</code>.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><code>f(x)</code> : <code>Callable</code></dt>
@@ -418,7 +414,7 @@ Difference quotient of <code>f</code> evaluated at <code>x</code>.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def estimate_gradient(f: Callable, v: np.ndarray, h: float = 1e-4) -&gt; List[np.ndarray]:
-    &#34;&#34;&#34;Calculates the gradient of `f` at `v`
+    &#34;&#34;&#34;Calculate the gradient of `f` at `v`.
 
     Parameters
     ----------
@@ -436,7 +432,7 @@ Difference quotient of <code>f</code> evaluated at <code>x</code>.</p></div>
     &#34;&#34;&#34;
     return [partial_difference_quotient(f, v, i, h) for i in range(len(v))]</code></pre>
 </details>
-<div class="desc"><p>Calculates the gradient of <code>f</code> at <code>v</code></p>
+<div class="desc"><p>Calculate the gradient of <code>f</code> at <code>v</code>.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><code>f(x0,...,xi-th)</code> : <code>Callable</code> function</dt>
@@ -463,7 +459,7 @@ Difference quotient of <code>f</code> evaluated at <code>x</code>.</p></div>
 <pre><code class="python">def fft_denoise(
     dataset: np.ndarray, sigma: float = 0, mode: bool = True
 ) -&gt; Tuple[np.ndarray, np.ndarray]:
-    &#34;&#34;&#34;Performs noise removal using the Fast Fourier Transform.
+    &#34;&#34;&#34;Perform noise removal using the Fast Fourier Transform.
 
     Parameters
     ----------
@@ -481,7 +477,6 @@ Difference quotient of <code>f</code> evaluated at <code>x</code>.</p></div>
     periods : `np.ndarray`
         Array of estimated periods for each sample in `dataset`.
     &#34;&#34;&#34;
-
     if not (0 &lt;= sigma &lt;= 1):
         raise ValueError(&#34;sigma must be between 0 and 1&#34;)
 
@@ -513,7 +508,7 @@ Difference quotient of <code>f</code> evaluated at <code>x</code>.</p></div>
 
     return denoised_dataset, periods</code></pre>
 </details>
-<div class="desc"><p>Performs noise removal using the Fast Fourier Transform.</p>
+<div class="desc"><p>Perform noise removal using the Fast Fourier Transform.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>dataset</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -542,9 +537,8 @@ Difference quotient of <code>f</code> evaluated at <code>x</code>.</p></div>
 <pre><code class="python">def generate_feature_yaml(
     df: pd.DataFrame, ignore_features: List[str] = None, yaml_string: bool = False
 ) -&gt; Dict | str:
-    &#34;&#34;&#34;
-    Generate a YAML string containing information about ordinal, numeric, and categorical features
-    based on the given DataFrame.
+    &#34;&#34;&#34;Generate a YAML string containing information about ordinal, numeric, and categorical
+    features based on the given DataFrame.
 
     Parameters
     ----------
@@ -588,8 +582,8 @@ Difference quotient of <code>f</code> evaluated at <code>x</code>.</p></div>
 
     return feature_info</code></pre>
 </details>
-<div class="desc"><p>Generate a YAML string containing information about ordinal, numeric, and categorical features
-based on the given DataFrame.</p>
+<div class="desc"><p>Generate a YAML string containing information about ordinal, numeric, and categorical
+features based on the given DataFrame.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
@@ -615,7 +609,7 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def generate_series(n: int, n_steps: int, incline: bool = True):
-    &#34;&#34;&#34;Function that generates `n` series of length `n_steps`&#34;&#34;&#34;
+    &#34;&#34;&#34;Generate `n` series of length `n_steps`.&#34;&#34;&#34;
     freq1, freq2, offsets1, offsets2 = np.random.rand(4, n, 1)
 
     if incline:
@@ -632,7 +626,7 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
     series = series
     return series.astype(np.float32)</code></pre>
 </details>
-<div class="desc"><p>Function that generates <code>n</code> series of length <code>n_steps</code></p></div>
+<div class="desc"><p>Generate <code>n</code> series of length <code>n_steps</code>.</p></div>
 </dd>
 <dt id="likelihood.tools.tools.get_period"><code class="name flex">
 <span>def <span class="ident">get_period</span></span>(<span>dataset: numpy.ndarray) ‑> float</span>
@@ -643,7 +637,7 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_period(dataset: np.ndarray) -&gt; float:
-    &#34;&#34;&#34;Calculates the periodicity of a `dataset`.
+    &#34;&#34;&#34;Calculate the periodicity of a `dataset`.
 
     Parameters
     ----------
@@ -677,7 +671,7 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 
     return period</code></pre>
 </details>
-<div class="desc"><p>Calculates the periodicity of a <code>dataset</code>.</p>
+<div class="desc"><p>Calculate the periodicity of a <code>dataset</code>.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>dataset</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -698,7 +692,7 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def mean_square_error(y_true: np.ndarray, y_pred: np.ndarray, print_error: bool = False):
-    &#34;&#34;&#34;Calculates the Root Mean Squared Error
+    &#34;&#34;&#34;Calculate the Root Mean Squared Error.
 
     Parameters
     ----------
@@ -717,7 +711,7 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 
     return np.sqrt(np.mean((y_true - y_pred) ** 2))</code></pre>
 </details>
-<div class="desc"><p>Calculates the Root Mean Squared Error</p>
+<div class="desc"><p>Calculate the Root Mean Squared Error.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>y_true</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -740,7 +734,7 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def minibatches(dataset: List, batch_size: int, shuffle: bool = True) -&gt; Generator:
-    &#34;&#34;&#34;Generates &#39;batch_size&#39;-sized minibatches from the dataset
+    &#34;&#34;&#34;Generate &#39;batch_size&#39;-sized minibatches from the dataset.
 
     Parameters
     ----------
@@ -756,7 +750,6 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
     `Generator`
         A list of lists containing the mini-batches. Each sublist is a separate mini-batch with length `batch_size`.
     &#34;&#34;&#34;
-
     # start indexes 0, batch_size, 2 * batch_size, ...
     batch_starts = [start for start in range(0, len(dataset), batch_size)]
 
@@ -767,7 +760,7 @@ mapping to lists of feature names. Or a YAML formatted string if <code>yaml_stri
         end = start + batch_size
         yield dataset[start:end]</code></pre>
 </details>
-<div class="desc"><p>Generates 'batch_size'-sized minibatches from the dataset</p>
+<div class="desc"><p>Generate 'batch_size'-sized minibatches from the dataset.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>dataset</code></strong> :&ensp;<code>List</code></dt>
@@ -790,7 +783,7 @@ A list of lists containing the mini-batches. Each sublist is a separate mini-bat
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def partial_difference_quotient(f: Callable, v: np.ndarray, i: int, h: float) -&gt; np.ndarray:
-    &#34;&#34;&#34;Calculates the partial difference quotient of `f`
+    &#34;&#34;&#34;Calculate the partial difference quotient of `f`.
 
     Parameters
     ----------
@@ -811,7 +804,7 @@ A list of lists containing the mini-batches. Each sublist is a separate mini-bat
     ]
     return (f(w) - f(v)) / h</code></pre>
 </details>
-<div class="desc"><p>Calculates the partial difference quotient of <code>f</code></p>
+<div class="desc"><p>Calculate the partial difference quotient of <code>f</code>.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><code>f(x0,...,xi-th)</code> : <code>Callable</code> function</dt>
@@ -834,10 +827,10 @@ the <code>i-th</code> partial difference quotient of <code>f</code> at <code>v</
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def sigmoide(x: float) -&gt; float:
-    &#34;&#34;&#34;The sigmoid function&#34;&#34;&#34;
+    &#34;&#34;&#34;Compute the sigmoid function .&#34;&#34;&#34;
     return 1 / (1 + math.exp(-x))</code></pre>
 </details>
-<div class="desc"><p>The sigmoid function</p></div>
+<div class="desc"><p>Compute the sigmoid function .</p></div>
 </dd>
 <dt id="likelihood.tools.tools.sigmoide_inv"><code class="name flex">
 <span>def <span class="ident">sigmoide_inv</span></span>(<span>y: float) ‑> float</span>
@@ -848,7 +841,7 @@ the <code>i-th</code> partial difference quotient of <code>f</code> at <code>v</
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def sigmoide_inv(y: float) -&gt; float:
-    &#34;&#34;&#34;Calculates the inverse of the sigmoid function
+    &#34;&#34;&#34;Calculate the inverse of the sigmoid function.
 
     Parameters
     ----------
@@ -860,10 +853,9 @@ the <code>i-th</code> partial difference quotient of <code>f</code> at <code>v</
     `float`
         value of evaluated function.
     &#34;&#34;&#34;
-
     return math.log(y / (1 - y))</code></pre>
 </details>
-<div class="desc"><p>Calculates the inverse of the sigmoid function</p>
+<div class="desc"><p>Calculate the inverse of the sigmoid function.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>y</code></strong> :&ensp;<code>float</code></dt>
@@ -1207,7 +1199,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class DataFrameEncoder:
-    &#34;&#34;&#34;Allows encoding and decoding Dataframes&#34;&#34;&#34;
+    &#34;&#34;&#34;Allows encoding and decoding Dataframes.&#34;&#34;&#34;
 
     __slots__ = [
         &#34;_df&#34;,
@@ -1219,7 +1211,7 @@ value of evaluated function.</p></div>
     ]
 
     def __init__(self, data: pd.DataFrame) -&gt; None:
-        &#34;&#34;&#34;Sets the columns of the `DataFrame`&#34;&#34;&#34;
+        &#34;&#34;&#34;Set the columns of the `DataFrame`.&#34;&#34;&#34;
         self._df = data.copy()
         self._names = data.columns
         self._encode_columns = []
@@ -1228,7 +1220,7 @@ value of evaluated function.</p></div>
         self.median_list = []
 
     def load_config(self, path_to_dictionaries: str = &#34;./&#34;, **kwargs) -&gt; None:
-        &#34;&#34;&#34;Loads dictionaries from a given directory
+        &#34;&#34;&#34;Load dictionaries from a given directory.
 
         Keyword Arguments
         -----------------
@@ -1246,7 +1238,7 @@ value of evaluated function.</p></div>
         print(&#34;Configuration successfully uploaded&#34;)
 
     def train(self, path_to_save: str, **kwargs) -&gt; None:
-        &#34;&#34;&#34;Trains the encoders and decoders using the `DataFrame`&#34;&#34;&#34;
+        &#34;&#34;&#34;Trains the encoders and decoders using the `DataFrame`.&#34;&#34;&#34;
         save_mode = kwargs[&#34;save_mode&#34;] if &#34;save_mode&#34; in kwargs else True
         dictionary_name = (
             kwargs[&#34;dictionary_name&#34;] if &#34;dictionary_name&#34; in kwargs else &#34;labelencoder_dictionary&#34;
@@ -1276,7 +1268,7 @@ value of evaluated function.</p></div>
             self._save_encoder(path_to_save, dictionary_name)
 
     def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;Encodes the `object` type columns of the dataframe
+        &#34;&#34;&#34;Encode the `object` type columns of the dataframe.
 
         Keyword Arguments
         -----------------
@@ -1306,7 +1298,7 @@ value of evaluated function.</p></div>
             return self._df
 
     def decode(self) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;Decodes the `int` type columns of the `DataFrame`&#34;&#34;&#34;
+        &#34;&#34;&#34;Decode the `int` type columns of the `DataFrame`.&#34;&#34;&#34;
         j = 0
         df_decoded = self._df.copy()
         if len(self.median_list) == len(self._encode_columns):
@@ -1332,7 +1324,7 @@ value of evaluated function.</p></div>
             print(f&#34;{warning_type}: {msg}&#34;)
 
     def get_dictionaries(self) -&gt; Tuple[List[dict], List[dict]]:
-        &#34;&#34;&#34;Allows to return the `list` of dictionaries for `encoding` and `decoding`&#34;&#34;&#34;
+        &#34;&#34;&#34;Allow to return the `list` of dictionaries for `encoding` and `decoding`.&#34;&#34;&#34;
         try:
             return self.encoding_list, self.decoding_list
         except ValueError as e:
@@ -1342,14 +1334,14 @@ value of evaluated function.</p></div>
             print(f&#34;{warning_type}: {msg}&#34;)
 
     def _save_encoder(self, path_to_save: str, dictionary_name: str) -&gt; None:
-        &#34;&#34;&#34;Method to serialize the `encoding_list`, `decoding_list` and `_encode_columns` list&#34;&#34;&#34;
+        &#34;&#34;&#34;Serialize the `encoding_list`, `decoding_list` and `_encode_columns` list.&#34;&#34;&#34;
         with open(path_to_save + dictionary_name + &#34;.pkl&#34;, &#34;wb&#34;) as f:
             pickle.dump(
                 [self.encoding_list, self.decoding_list, self._encode_columns, self.median_list], f
             )
 
     def _code_transformation_to(self, character: str, dictionary_list: List[dict]) -&gt; int:
-        &#34;&#34;&#34;Auxiliary function to perform data transformation using a dictionary
+        &#34;&#34;&#34;Auxiliary function to perform data transformation using a dictionary.
 
         Parameters
         ----------
@@ -1367,8 +1359,8 @@ value of evaluated function.</p></div>
         except:
             return np.nan</code></pre>
 </details>
-<div class="desc"><p>Allows encoding and decoding Dataframes</p>
-<p>Sets the columns of the <code>DataFrame</code></p></div>
+<div class="desc"><p>Allows encoding and decoding Dataframes.</p>
+<p>Set the columns of the <code>DataFrame</code>.</p></div>
 <h3>Instance variables</h3>
 <dl>
 <dt id="likelihood.tools.tools.DataFrameEncoder.decoding_list"><code class="name">var <span class="ident">decoding_list</span></code></dt>
@@ -1378,7 +1370,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class DataFrameEncoder:
-    &#34;&#34;&#34;Allows encoding and decoding Dataframes&#34;&#34;&#34;
+    &#34;&#34;&#34;Allows encoding and decoding Dataframes.&#34;&#34;&#34;
 
     __slots__ = [
         &#34;_df&#34;,
@@ -1390,7 +1382,7 @@ value of evaluated function.</p></div>
     ]
 
     def __init__(self, data: pd.DataFrame) -&gt; None:
-        &#34;&#34;&#34;Sets the columns of the `DataFrame`&#34;&#34;&#34;
+        &#34;&#34;&#34;Set the columns of the `DataFrame`.&#34;&#34;&#34;
         self._df = data.copy()
         self._names = data.columns
         self._encode_columns = []
@@ -1399,7 +1391,7 @@ value of evaluated function.</p></div>
         self.median_list = []
 
     def load_config(self, path_to_dictionaries: str = &#34;./&#34;, **kwargs) -&gt; None:
-        &#34;&#34;&#34;Loads dictionaries from a given directory
+        &#34;&#34;&#34;Load dictionaries from a given directory.
 
         Keyword Arguments
         -----------------
@@ -1417,7 +1409,7 @@ value of evaluated function.</p></div>
         print(&#34;Configuration successfully uploaded&#34;)
 
     def train(self, path_to_save: str, **kwargs) -&gt; None:
-        &#34;&#34;&#34;Trains the encoders and decoders using the `DataFrame`&#34;&#34;&#34;
+        &#34;&#34;&#34;Trains the encoders and decoders using the `DataFrame`.&#34;&#34;&#34;
         save_mode = kwargs[&#34;save_mode&#34;] if &#34;save_mode&#34; in kwargs else True
         dictionary_name = (
             kwargs[&#34;dictionary_name&#34;] if &#34;dictionary_name&#34; in kwargs else &#34;labelencoder_dictionary&#34;
@@ -1447,7 +1439,7 @@ value of evaluated function.</p></div>
             self._save_encoder(path_to_save, dictionary_name)
 
     def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;Encodes the `object` type columns of the dataframe
+        &#34;&#34;&#34;Encode the `object` type columns of the dataframe.
 
         Keyword Arguments
         -----------------
@@ -1477,7 +1469,7 @@ value of evaluated function.</p></div>
             return self._df
 
     def decode(self) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;Decodes the `int` type columns of the `DataFrame`&#34;&#34;&#34;
+        &#34;&#34;&#34;Decode the `int` type columns of the `DataFrame`.&#34;&#34;&#34;
         j = 0
         df_decoded = self._df.copy()
         if len(self.median_list) == len(self._encode_columns):
@@ -1503,7 +1495,7 @@ value of evaluated function.</p></div>
             print(f&#34;{warning_type}: {msg}&#34;)
 
     def get_dictionaries(self) -&gt; Tuple[List[dict], List[dict]]:
-        &#34;&#34;&#34;Allows to return the `list` of dictionaries for `encoding` and `decoding`&#34;&#34;&#34;
+        &#34;&#34;&#34;Allow to return the `list` of dictionaries for `encoding` and `decoding`.&#34;&#34;&#34;
         try:
             return self.encoding_list, self.decoding_list
         except ValueError as e:
@@ -1513,14 +1505,14 @@ value of evaluated function.</p></div>
             print(f&#34;{warning_type}: {msg}&#34;)
 
     def _save_encoder(self, path_to_save: str, dictionary_name: str) -&gt; None:
-        &#34;&#34;&#34;Method to serialize the `encoding_list`, `decoding_list` and `_encode_columns` list&#34;&#34;&#34;
+        &#34;&#34;&#34;Serialize the `encoding_list`, `decoding_list` and `_encode_columns` list.&#34;&#34;&#34;
         with open(path_to_save + dictionary_name + &#34;.pkl&#34;, &#34;wb&#34;) as f:
             pickle.dump(
                 [self.encoding_list, self.decoding_list, self._encode_columns, self.median_list], f
             )
 
     def _code_transformation_to(self, character: str, dictionary_list: List[dict]) -&gt; int:
-        &#34;&#34;&#34;Auxiliary function to perform data transformation using a dictionary
+        &#34;&#34;&#34;Auxiliary function to perform data transformation using a dictionary.
 
         Parameters
         ----------
@@ -1547,7 +1539,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class DataFrameEncoder:
-    &#34;&#34;&#34;Allows encoding and decoding Dataframes&#34;&#34;&#34;
+    &#34;&#34;&#34;Allows encoding and decoding Dataframes.&#34;&#34;&#34;
 
     __slots__ = [
         &#34;_df&#34;,
@@ -1559,7 +1551,7 @@ value of evaluated function.</p></div>
     ]
 
     def __init__(self, data: pd.DataFrame) -&gt; None:
-        &#34;&#34;&#34;Sets the columns of the `DataFrame`&#34;&#34;&#34;
+        &#34;&#34;&#34;Set the columns of the `DataFrame`.&#34;&#34;&#34;
         self._df = data.copy()
         self._names = data.columns
         self._encode_columns = []
@@ -1568,7 +1560,7 @@ value of evaluated function.</p></div>
         self.median_list = []
 
     def load_config(self, path_to_dictionaries: str = &#34;./&#34;, **kwargs) -&gt; None:
-        &#34;&#34;&#34;Loads dictionaries from a given directory
+        &#34;&#34;&#34;Load dictionaries from a given directory.
 
         Keyword Arguments
         -----------------
@@ -1586,7 +1578,7 @@ value of evaluated function.</p></div>
         print(&#34;Configuration successfully uploaded&#34;)
 
     def train(self, path_to_save: str, **kwargs) -&gt; None:
-        &#34;&#34;&#34;Trains the encoders and decoders using the `DataFrame`&#34;&#34;&#34;
+        &#34;&#34;&#34;Trains the encoders and decoders using the `DataFrame`.&#34;&#34;&#34;
         save_mode = kwargs[&#34;save_mode&#34;] if &#34;save_mode&#34; in kwargs else True
         dictionary_name = (
             kwargs[&#34;dictionary_name&#34;] if &#34;dictionary_name&#34; in kwargs else &#34;labelencoder_dictionary&#34;
@@ -1616,7 +1608,7 @@ value of evaluated function.</p></div>
             self._save_encoder(path_to_save, dictionary_name)
 
     def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;Encodes the `object` type columns of the dataframe
+        &#34;&#34;&#34;Encode the `object` type columns of the dataframe.
 
         Keyword Arguments
         -----------------
@@ -1646,7 +1638,7 @@ value of evaluated function.</p></div>
             return self._df
 
     def decode(self) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;Decodes the `int` type columns of the `DataFrame`&#34;&#34;&#34;
+        &#34;&#34;&#34;Decode the `int` type columns of the `DataFrame`.&#34;&#34;&#34;
         j = 0
         df_decoded = self._df.copy()
         if len(self.median_list) == len(self._encode_columns):
@@ -1672,7 +1664,7 @@ value of evaluated function.</p></div>
             print(f&#34;{warning_type}: {msg}&#34;)
 
     def get_dictionaries(self) -&gt; Tuple[List[dict], List[dict]]:
-        &#34;&#34;&#34;Allows to return the `list` of dictionaries for `encoding` and `decoding`&#34;&#34;&#34;
+        &#34;&#34;&#34;Allow to return the `list` of dictionaries for `encoding` and `decoding`.&#34;&#34;&#34;
         try:
             return self.encoding_list, self.decoding_list
         except ValueError as e:
@@ -1682,14 +1674,14 @@ value of evaluated function.</p></div>
             print(f&#34;{warning_type}: {msg}&#34;)
 
     def _save_encoder(self, path_to_save: str, dictionary_name: str) -&gt; None:
-        &#34;&#34;&#34;Method to serialize the `encoding_list`, `decoding_list` and `_encode_columns` list&#34;&#34;&#34;
+        &#34;&#34;&#34;Serialize the `encoding_list`, `decoding_list` and `_encode_columns` list.&#34;&#34;&#34;
         with open(path_to_save + dictionary_name + &#34;.pkl&#34;, &#34;wb&#34;) as f:
             pickle.dump(
                 [self.encoding_list, self.decoding_list, self._encode_columns, self.median_list], f
             )
 
     def _code_transformation_to(self, character: str, dictionary_list: List[dict]) -&gt; int:
-        &#34;&#34;&#34;Auxiliary function to perform data transformation using a dictionary
+        &#34;&#34;&#34;Auxiliary function to perform data transformation using a dictionary.
 
         Parameters
         ----------
@@ -1716,7 +1708,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class DataFrameEncoder:
-    &#34;&#34;&#34;Allows encoding and decoding Dataframes&#34;&#34;&#34;
+    &#34;&#34;&#34;Allows encoding and decoding Dataframes.&#34;&#34;&#34;
 
     __slots__ = [
         &#34;_df&#34;,
@@ -1728,7 +1720,7 @@ value of evaluated function.</p></div>
     ]
 
     def __init__(self, data: pd.DataFrame) -&gt; None:
-        &#34;&#34;&#34;Sets the columns of the `DataFrame`&#34;&#34;&#34;
+        &#34;&#34;&#34;Set the columns of the `DataFrame`.&#34;&#34;&#34;
         self._df = data.copy()
         self._names = data.columns
         self._encode_columns = []
@@ -1737,7 +1729,7 @@ value of evaluated function.</p></div>
         self.median_list = []
 
     def load_config(self, path_to_dictionaries: str = &#34;./&#34;, **kwargs) -&gt; None:
-        &#34;&#34;&#34;Loads dictionaries from a given directory
+        &#34;&#34;&#34;Load dictionaries from a given directory.
 
         Keyword Arguments
         -----------------
@@ -1755,7 +1747,7 @@ value of evaluated function.</p></div>
         print(&#34;Configuration successfully uploaded&#34;)
 
     def train(self, path_to_save: str, **kwargs) -&gt; None:
-        &#34;&#34;&#34;Trains the encoders and decoders using the `DataFrame`&#34;&#34;&#34;
+        &#34;&#34;&#34;Trains the encoders and decoders using the `DataFrame`.&#34;&#34;&#34;
         save_mode = kwargs[&#34;save_mode&#34;] if &#34;save_mode&#34; in kwargs else True
         dictionary_name = (
             kwargs[&#34;dictionary_name&#34;] if &#34;dictionary_name&#34; in kwargs else &#34;labelencoder_dictionary&#34;
@@ -1785,7 +1777,7 @@ value of evaluated function.</p></div>
             self._save_encoder(path_to_save, dictionary_name)
 
     def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;Encodes the `object` type columns of the dataframe
+        &#34;&#34;&#34;Encode the `object` type columns of the dataframe.
 
         Keyword Arguments
         -----------------
@@ -1815,7 +1807,7 @@ value of evaluated function.</p></div>
             return self._df
 
     def decode(self) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;Decodes the `int` type columns of the `DataFrame`&#34;&#34;&#34;
+        &#34;&#34;&#34;Decode the `int` type columns of the `DataFrame`.&#34;&#34;&#34;
         j = 0
         df_decoded = self._df.copy()
         if len(self.median_list) == len(self._encode_columns):
@@ -1841,7 +1833,7 @@ value of evaluated function.</p></div>
             print(f&#34;{warning_type}: {msg}&#34;)
 
     def get_dictionaries(self) -&gt; Tuple[List[dict], List[dict]]:
-        &#34;&#34;&#34;Allows to return the `list` of dictionaries for `encoding` and `decoding`&#34;&#34;&#34;
+        &#34;&#34;&#34;Allow to return the `list` of dictionaries for `encoding` and `decoding`.&#34;&#34;&#34;
         try:
             return self.encoding_list, self.decoding_list
         except ValueError as e:
@@ -1851,14 +1843,14 @@ value of evaluated function.</p></div>
             print(f&#34;{warning_type}: {msg}&#34;)
 
     def _save_encoder(self, path_to_save: str, dictionary_name: str) -&gt; None:
-        &#34;&#34;&#34;Method to serialize the `encoding_list`, `decoding_list` and `_encode_columns` list&#34;&#34;&#34;
+        &#34;&#34;&#34;Serialize the `encoding_list`, `decoding_list` and `_encode_columns` list.&#34;&#34;&#34;
         with open(path_to_save + dictionary_name + &#34;.pkl&#34;, &#34;wb&#34;) as f:
             pickle.dump(
                 [self.encoding_list, self.decoding_list, self._encode_columns, self.median_list], f
             )
 
     def _code_transformation_to(self, character: str, dictionary_list: List[dict]) -&gt; int:
-        &#34;&#34;&#34;Auxiliary function to perform data transformation using a dictionary
+        &#34;&#34;&#34;Auxiliary function to perform data transformation using a dictionary.
 
         Parameters
         ----------
@@ -1890,7 +1882,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def decode(self) -&gt; pd.DataFrame:
-    &#34;&#34;&#34;Decodes the `int` type columns of the `DataFrame`&#34;&#34;&#34;
+    &#34;&#34;&#34;Decode the `int` type columns of the `DataFrame`.&#34;&#34;&#34;
     j = 0
     df_decoded = self._df.copy()
     if len(self.median_list) == len(self._encode_columns):
@@ -1915,7 +1907,7 @@ value of evaluated function.</p></div>
         msg += &#34;Error: {%s}&#34; % e
         print(f&#34;{warning_type}: {msg}&#34;)</code></pre>
 </details>
-<div class="desc"><p>Decodes the <code>int</code> type columns of the <code>DataFrame</code></p></div>
+<div class="desc"><p>Decode the <code>int</code> type columns of the <code>DataFrame</code>.</p></div>
 </dd>
 <dt id="likelihood.tools.tools.DataFrameEncoder.encode"><code class="name flex">
 <span>def <span class="ident">encode</span></span>(<span>self, path_to_save: str = './', **kwargs) ‑> pandas.core.frame.DataFrame</span>
@@ -1926,7 +1918,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def encode(self, path_to_save: str = &#34;./&#34;, **kwargs) -&gt; pd.DataFrame:
-    &#34;&#34;&#34;Encodes the `object` type columns of the dataframe
+    &#34;&#34;&#34;Encode the `object` type columns of the dataframe.
 
     Keyword Arguments
     -----------------
@@ -1955,7 +1947,7 @@ value of evaluated function.</p></div>
                     self._df[colname] = self._df[colname] / self.median_list[num]
         return self._df</code></pre>
 </details>
-<div class="desc"><p>Encodes the <code>object</code> type columns of the dataframe</p>
+<div class="desc"><p>Encode the <code>object</code> type columns of the dataframe.</p>
 <h2 id="keyword-arguments">Keyword Arguments</h2>
 <ul>
 <li>save_mode (<code>bool</code>): An optional integer parameter. By default it is set to <code>True</code></li>
@@ -1972,7 +1964,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_dictionaries(self) -&gt; Tuple[List[dict], List[dict]]:
-    &#34;&#34;&#34;Allows to return the `list` of dictionaries for `encoding` and `decoding`&#34;&#34;&#34;
+    &#34;&#34;&#34;Allow to return the `list` of dictionaries for `encoding` and `decoding`.&#34;&#34;&#34;
     try:
         return self.encoding_list, self.decoding_list
     except ValueError as e:
@@ -1981,7 +1973,7 @@ value of evaluated function.</p></div>
         msg += &#34;Error: {%s}&#34; % e
         print(f&#34;{warning_type}: {msg}&#34;)</code></pre>
 </details>
-<div class="desc"><p>Allows to return the <code>list</code> of dictionaries for <code>encoding</code> and <code>decoding</code></p></div>
+<div class="desc"><p>Allow to return the <code>list</code> of dictionaries for <code>encoding</code> and <code>decoding</code>.</p></div>
 </dd>
 <dt id="likelihood.tools.tools.DataFrameEncoder.load_config"><code class="name flex">
 <span>def <span class="ident">load_config</span></span>(<span>self, path_to_dictionaries: str = './', **kwargs) ‑> None</span>
@@ -1992,7 +1984,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def load_config(self, path_to_dictionaries: str = &#34;./&#34;, **kwargs) -&gt; None:
-    &#34;&#34;&#34;Loads dictionaries from a given directory
+    &#34;&#34;&#34;Load dictionaries from a given directory.
 
     Keyword Arguments
     -----------------
@@ -2009,7 +2001,7 @@ value of evaluated function.</p></div>
     self.median_list = labelencoder[3]
     print(&#34;Configuration successfully uploaded&#34;)</code></pre>
 </details>
-<div class="desc"><p>Loads dictionaries from a given directory</p>
+<div class="desc"><p>Load dictionaries from a given directory.</p>
 <h2 id="keyword-arguments">Keyword Arguments</h2>
 <ul>
 <li>dictionary_name (<code>str</code>): An optional string parameter. By default it is set to <code>labelencoder_dictionary</code></li>
@@ -2024,7 +2016,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def train(self, path_to_save: str, **kwargs) -&gt; None:
-    &#34;&#34;&#34;Trains the encoders and decoders using the `DataFrame`&#34;&#34;&#34;
+    &#34;&#34;&#34;Trains the encoders and decoders using the `DataFrame`.&#34;&#34;&#34;
     save_mode = kwargs[&#34;save_mode&#34;] if &#34;save_mode&#34; in kwargs else True
     dictionary_name = (
         kwargs[&#34;dictionary_name&#34;] if &#34;dictionary_name&#34; in kwargs else &#34;labelencoder_dictionary&#34;
@@ -2053,7 +2045,7 @@ value of evaluated function.</p></div>
     if save_mode:
         self._save_encoder(path_to_save, dictionary_name)</code></pre>
 </details>
-<div class="desc"><p>Trains the encoders and decoders using the <code>DataFrame</code></p></div>
+<div class="desc"><p>Trains the encoders and decoders using the <code>DataFrame</code>.</p></div>
 </dd>
 </dl>
 </dd>
@@ -2067,17 +2059,17 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class DataScaler:
-    &#34;&#34;&#34;numpy array `scaler` and `rescaler`&#34;&#34;&#34;
+    &#34;&#34;&#34;Numpy array `scaler` and `rescaler`.&#34;&#34;&#34;
 
     __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
     def __init__(self, dataset: np.ndarray, n: int | None = 1) -&gt; None:
-        &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
+        &#34;&#34;&#34;Initialize the parameters required for scaling the data.&#34;&#34;&#34;
         self.dataset_ = dataset.copy()
         self._n = n
 
     def rescale(self, dataset_: np.ndarray | None = None) -&gt; np.ndarray:
-        &#34;&#34;&#34;Perform a standard rescaling of the data
+        &#34;&#34;&#34;Perform a standard rescaling of the data.
 
         Returns
         -------
@@ -2136,7 +2128,7 @@ value of evaluated function.</p></div>
         return self.data_scaled
 
     def scale(self, dataset_: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;Performs the inverse operation to the rescale function
+        &#34;&#34;&#34;Perform the inverse operation to the rescale function.
 
         Parameters
         ----------
@@ -2158,8 +2150,8 @@ value of evaluated function.</p></div>
 
         return dataset_</code></pre>
 </details>
-<div class="desc"><p>numpy array <code>scaler</code> and <code>rescaler</code></p>
-<p>Initializes the parameters required for scaling the data</p></div>
+<div class="desc"><p>Numpy array <code>scaler</code> and <code>rescaler</code>.</p>
+<p>Initialize the parameters required for scaling the data.</p></div>
 <h3>Instance variables</h3>
 <dl>
 <dt id="likelihood.tools.tools.DataScaler.data_scaled"><code class="name">var <span class="ident">data_scaled</span></code></dt>
@@ -2169,17 +2161,17 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class DataScaler:
-    &#34;&#34;&#34;numpy array `scaler` and `rescaler`&#34;&#34;&#34;
+    &#34;&#34;&#34;Numpy array `scaler` and `rescaler`.&#34;&#34;&#34;
 
     __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
     def __init__(self, dataset: np.ndarray, n: int | None = 1) -&gt; None:
-        &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
+        &#34;&#34;&#34;Initialize the parameters required for scaling the data.&#34;&#34;&#34;
         self.dataset_ = dataset.copy()
         self._n = n
 
     def rescale(self, dataset_: np.ndarray | None = None) -&gt; np.ndarray:
-        &#34;&#34;&#34;Perform a standard rescaling of the data
+        &#34;&#34;&#34;Perform a standard rescaling of the data.
 
         Returns
         -------
@@ -2238,7 +2230,7 @@ value of evaluated function.</p></div>
         return self.data_scaled
 
     def scale(self, dataset_: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;Performs the inverse operation to the rescale function
+        &#34;&#34;&#34;Perform the inverse operation to the rescale function.
 
         Parameters
         ----------
@@ -2269,17 +2261,17 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class DataScaler:
-    &#34;&#34;&#34;numpy array `scaler` and `rescaler`&#34;&#34;&#34;
+    &#34;&#34;&#34;Numpy array `scaler` and `rescaler`.&#34;&#34;&#34;
 
     __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
     def __init__(self, dataset: np.ndarray, n: int | None = 1) -&gt; None:
-        &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
+        &#34;&#34;&#34;Initialize the parameters required for scaling the data.&#34;&#34;&#34;
         self.dataset_ = dataset.copy()
         self._n = n
 
     def rescale(self, dataset_: np.ndarray | None = None) -&gt; np.ndarray:
-        &#34;&#34;&#34;Perform a standard rescaling of the data
+        &#34;&#34;&#34;Perform a standard rescaling of the data.
 
         Returns
         -------
@@ -2338,7 +2330,7 @@ value of evaluated function.</p></div>
         return self.data_scaled
 
     def scale(self, dataset_: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;Performs the inverse operation to the rescale function
+        &#34;&#34;&#34;Perform the inverse operation to the rescale function.
 
         Parameters
         ----------
@@ -2369,17 +2361,17 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class DataScaler:
-    &#34;&#34;&#34;numpy array `scaler` and `rescaler`&#34;&#34;&#34;
+    &#34;&#34;&#34;Numpy array `scaler` and `rescaler`.&#34;&#34;&#34;
 
     __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
     def __init__(self, dataset: np.ndarray, n: int | None = 1) -&gt; None:
-        &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
+        &#34;&#34;&#34;Initialize the parameters required for scaling the data.&#34;&#34;&#34;
         self.dataset_ = dataset.copy()
         self._n = n
 
     def rescale(self, dataset_: np.ndarray | None = None) -&gt; np.ndarray:
-        &#34;&#34;&#34;Perform a standard rescaling of the data
+        &#34;&#34;&#34;Perform a standard rescaling of the data.
 
         Returns
         -------
@@ -2438,7 +2430,7 @@ value of evaluated function.</p></div>
         return self.data_scaled
 
     def scale(self, dataset_: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;Performs the inverse operation to the rescale function
+        &#34;&#34;&#34;Perform the inverse operation to the rescale function.
 
         Parameters
         ----------
@@ -2469,17 +2461,17 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class DataScaler:
-    &#34;&#34;&#34;numpy array `scaler` and `rescaler`&#34;&#34;&#34;
+    &#34;&#34;&#34;Numpy array `scaler` and `rescaler`.&#34;&#34;&#34;
 
     __slots__ = [&#34;dataset_&#34;, &#34;_n&#34;, &#34;data_scaled&#34;, &#34;values&#34;, &#34;inv_fitting&#34;]
 
     def __init__(self, dataset: np.ndarray, n: int | None = 1) -&gt; None:
-        &#34;&#34;&#34;Initializes the parameters required for scaling the data&#34;&#34;&#34;
+        &#34;&#34;&#34;Initialize the parameters required for scaling the data.&#34;&#34;&#34;
         self.dataset_ = dataset.copy()
         self._n = n
 
     def rescale(self, dataset_: np.ndarray | None = None) -&gt; np.ndarray:
-        &#34;&#34;&#34;Perform a standard rescaling of the data
+        &#34;&#34;&#34;Perform a standard rescaling of the data.
 
         Returns
         -------
@@ -2538,7 +2530,7 @@ value of evaluated function.</p></div>
         return self.data_scaled
 
     def scale(self, dataset_: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;Performs the inverse operation to the rescale function
+        &#34;&#34;&#34;Perform the inverse operation to the rescale function.
 
         Parameters
         ----------
@@ -2574,7 +2566,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def rescale(self, dataset_: np.ndarray | None = None) -&gt; np.ndarray:
-    &#34;&#34;&#34;Perform a standard rescaling of the data
+    &#34;&#34;&#34;Perform a standard rescaling of the data.
 
     Returns
     -------
@@ -2632,7 +2624,7 @@ value of evaluated function.</p></div>
 
     return self.data_scaled</code></pre>
 </details>
-<div class="desc"><p>Perform a standard rescaling of the data</p>
+<div class="desc"><p>Perform a standard rescaling of the data.</p>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><strong><code>data_scaled</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -2648,7 +2640,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def scale(self, dataset_: np.ndarray) -&gt; np.ndarray:
-    &#34;&#34;&#34;Performs the inverse operation to the rescale function
+    &#34;&#34;&#34;Perform the inverse operation to the rescale function.
 
     Parameters
     ----------
@@ -2670,7 +2662,7 @@ value of evaluated function.</p></div>
 
     return dataset_</code></pre>
 </details>
-<div class="desc"><p>Performs the inverse operation to the rescale function</p>
+<div class="desc"><p>Perform the inverse operation to the rescale function.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>dataset_</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -2694,8 +2686,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class FeatureSelection:
-    &#34;&#34;&#34;
-    Generate the data graph using a variation of the feature selection algorithm.
+    &#34;&#34;&#34;Generate the data graph using a variation of the feature selection algorithm.
 
     - The method `get_digraph` returns the network based on the feature selection method.
     &#34;&#34;&#34;
@@ -2703,7 +2694,10 @@ value of evaluated function.</p></div>
     __slots__ = [&#34;not_features&#34;, &#34;X&#34;, &#34;all_features_imp_graph&#34;, &#34;w_dict&#34;, &#34;scaler&#34;]
 
     def __init__(self, not_features: list[str] = []) -&gt; None:
-        &#34;&#34;&#34;The initializer of the class. The initial parameter is a list of strings with variables to discard.&#34;&#34;&#34;
+        &#34;&#34;&#34;Initialize the class .
+
+        The initial parameter is a list of strings with variables to discard.
+        &#34;&#34;&#34;
         self.not_features: List[str] = not_features
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
@@ -2711,8 +2705,7 @@ value of evaluated function.</p></div>
     def get_digraph(
         self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
     ) -&gt; str:
-        &#34;&#34;&#34;
-        Get directed graph showing importance of features.
+        &#34;&#34;&#34;Get directed graph showing importance of features.
 
         Parameters
         ----------
@@ -2727,7 +2720,6 @@ value of evaluated function.</p></div>
             A string representation of the directed graph.
         &#34;&#34;&#34;
         self._load_data(dataset)
-
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
@@ -2813,7 +2805,8 @@ value of evaluated function.</p></div>
 <ul>
 <li>The method <code>get_digraph</code> returns the network based on the feature selection method.</li>
 </ul>
-<p>The initializer of the class. The initial parameter is a list of strings with variables to discard.</p></div>
+<p>Initialize the class .</p>
+<p>The initial parameter is a list of strings with variables to discard.</p></div>
 <h3>Subclasses</h3>
 <ul class="hlist">
 <li><a title="likelihood.graph.graph.DynamicGraph" href="../graph/graph.html#likelihood.graph.graph.DynamicGraph">DynamicGraph</a></li>
@@ -2828,8 +2821,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class FeatureSelection:
-    &#34;&#34;&#34;
-    Generate the data graph using a variation of the feature selection algorithm.
+    &#34;&#34;&#34;Generate the data graph using a variation of the feature selection algorithm.
 
     - The method `get_digraph` returns the network based on the feature selection method.
     &#34;&#34;&#34;
@@ -2837,7 +2829,10 @@ value of evaluated function.</p></div>
     __slots__ = [&#34;not_features&#34;, &#34;X&#34;, &#34;all_features_imp_graph&#34;, &#34;w_dict&#34;, &#34;scaler&#34;]
 
     def __init__(self, not_features: list[str] = []) -&gt; None:
-        &#34;&#34;&#34;The initializer of the class. The initial parameter is a list of strings with variables to discard.&#34;&#34;&#34;
+        &#34;&#34;&#34;Initialize the class .
+
+        The initial parameter is a list of strings with variables to discard.
+        &#34;&#34;&#34;
         self.not_features: List[str] = not_features
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
@@ -2845,8 +2840,7 @@ value of evaluated function.</p></div>
     def get_digraph(
         self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
     ) -&gt; str:
-        &#34;&#34;&#34;
-        Get directed graph showing importance of features.
+        &#34;&#34;&#34;Get directed graph showing importance of features.
 
         Parameters
         ----------
@@ -2861,7 +2855,6 @@ value of evaluated function.</p></div>
             A string representation of the directed graph.
         &#34;&#34;&#34;
         self._load_data(dataset)
-
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
@@ -2952,8 +2945,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class FeatureSelection:
-    &#34;&#34;&#34;
-    Generate the data graph using a variation of the feature selection algorithm.
+    &#34;&#34;&#34;Generate the data graph using a variation of the feature selection algorithm.
 
     - The method `get_digraph` returns the network based on the feature selection method.
     &#34;&#34;&#34;
@@ -2961,7 +2953,10 @@ value of evaluated function.</p></div>
     __slots__ = [&#34;not_features&#34;, &#34;X&#34;, &#34;all_features_imp_graph&#34;, &#34;w_dict&#34;, &#34;scaler&#34;]
 
     def __init__(self, not_features: list[str] = []) -&gt; None:
-        &#34;&#34;&#34;The initializer of the class. The initial parameter is a list of strings with variables to discard.&#34;&#34;&#34;
+        &#34;&#34;&#34;Initialize the class .
+
+        The initial parameter is a list of strings with variables to discard.
+        &#34;&#34;&#34;
         self.not_features: List[str] = not_features
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
@@ -2969,8 +2964,7 @@ value of evaluated function.</p></div>
     def get_digraph(
         self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
     ) -&gt; str:
-        &#34;&#34;&#34;
-        Get directed graph showing importance of features.
+        &#34;&#34;&#34;Get directed graph showing importance of features.
 
         Parameters
         ----------
@@ -2985,7 +2979,6 @@ value of evaluated function.</p></div>
             A string representation of the directed graph.
         &#34;&#34;&#34;
         self._load_data(dataset)
-
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
@@ -3076,8 +3069,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class FeatureSelection:
-    &#34;&#34;&#34;
-    Generate the data graph using a variation of the feature selection algorithm.
+    &#34;&#34;&#34;Generate the data graph using a variation of the feature selection algorithm.
 
     - The method `get_digraph` returns the network based on the feature selection method.
     &#34;&#34;&#34;
@@ -3085,7 +3077,10 @@ value of evaluated function.</p></div>
     __slots__ = [&#34;not_features&#34;, &#34;X&#34;, &#34;all_features_imp_graph&#34;, &#34;w_dict&#34;, &#34;scaler&#34;]
 
     def __init__(self, not_features: list[str] = []) -&gt; None:
-        &#34;&#34;&#34;The initializer of the class. The initial parameter is a list of strings with variables to discard.&#34;&#34;&#34;
+        &#34;&#34;&#34;Initialize the class .
+
+        The initial parameter is a list of strings with variables to discard.
+        &#34;&#34;&#34;
         self.not_features: List[str] = not_features
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
@@ -3093,8 +3088,7 @@ value of evaluated function.</p></div>
     def get_digraph(
         self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
     ) -&gt; str:
-        &#34;&#34;&#34;
-        Get directed graph showing importance of features.
+        &#34;&#34;&#34;Get directed graph showing importance of features.
 
         Parameters
         ----------
@@ -3109,7 +3103,6 @@ value of evaluated function.</p></div>
             A string representation of the directed graph.
         &#34;&#34;&#34;
         self._load_data(dataset)
-
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
@@ -3200,8 +3193,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class FeatureSelection:
-    &#34;&#34;&#34;
-    Generate the data graph using a variation of the feature selection algorithm.
+    &#34;&#34;&#34;Generate the data graph using a variation of the feature selection algorithm.
 
     - The method `get_digraph` returns the network based on the feature selection method.
     &#34;&#34;&#34;
@@ -3209,7 +3201,10 @@ value of evaluated function.</p></div>
     __slots__ = [&#34;not_features&#34;, &#34;X&#34;, &#34;all_features_imp_graph&#34;, &#34;w_dict&#34;, &#34;scaler&#34;]
 
     def __init__(self, not_features: list[str] = []) -&gt; None:
-        &#34;&#34;&#34;The initializer of the class. The initial parameter is a list of strings with variables to discard.&#34;&#34;&#34;
+        &#34;&#34;&#34;Initialize the class .
+
+        The initial parameter is a list of strings with variables to discard.
+        &#34;&#34;&#34;
         self.not_features: List[str] = not_features
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
@@ -3217,8 +3212,7 @@ value of evaluated function.</p></div>
     def get_digraph(
         self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
     ) -&gt; str:
-        &#34;&#34;&#34;
-        Get directed graph showing importance of features.
+        &#34;&#34;&#34;Get directed graph showing importance of features.
 
         Parameters
         ----------
@@ -3233,7 +3227,6 @@ value of evaluated function.</p></div>
             A string representation of the directed graph.
         &#34;&#34;&#34;
         self._load_data(dataset)
-
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
@@ -3324,8 +3317,7 @@ value of evaluated function.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class FeatureSelection:
-    &#34;&#34;&#34;
-    Generate the data graph using a variation of the feature selection algorithm.
+    &#34;&#34;&#34;Generate the data graph using a variation of the feature selection algorithm.
 
     - The method `get_digraph` returns the network based on the feature selection method.
     &#34;&#34;&#34;
@@ -3333,7 +3325,10 @@ value of evaluated function.</p></div>
     __slots__ = [&#34;not_features&#34;, &#34;X&#34;, &#34;all_features_imp_graph&#34;, &#34;w_dict&#34;, &#34;scaler&#34;]
 
     def __init__(self, not_features: list[str] = []) -&gt; None:
-        &#34;&#34;&#34;The initializer of the class. The initial parameter is a list of strings with variables to discard.&#34;&#34;&#34;
+        &#34;&#34;&#34;Initialize the class .
+
+        The initial parameter is a list of strings with variables to discard.
+        &#34;&#34;&#34;
         self.not_features: List[str] = not_features
         self.all_features_imp_graph: List[Tuple] = []
         self.w_dict = dict()
@@ -3341,8 +3336,7 @@ value of evaluated function.</p></div>
     def get_digraph(
         self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
     ) -&gt; str:
-        &#34;&#34;&#34;
-        Get directed graph showing importance of features.
+        &#34;&#34;&#34;Get directed graph showing importance of features.
 
         Parameters
         ----------
@@ -3357,7 +3351,6 @@ value of evaluated function.</p></div>
             A string representation of the directed graph.
         &#34;&#34;&#34;
         self._load_data(dataset)
-
         curr_dataset = self.X
         columns = list(curr_dataset.columns)
 
@@ -3455,8 +3448,7 @@ value of evaluated function.</p></div>
 <pre><code class="python">def get_digraph(
     self, dataset: pd.DataFrame, n_importances: int, use_scaler: bool = False
 ) -&gt; str:
-    &#34;&#34;&#34;
-    Get directed graph showing importance of features.
+    &#34;&#34;&#34;Get directed graph showing importance of features.
 
     Parameters
     ----------
@@ -3471,7 +3463,6 @@ value of evaluated function.</p></div>
         A string representation of the directed graph.
     &#34;&#34;&#34;
     self._load_data(dataset)
-
     curr_dataset = self.X
     columns = list(curr_dataset.columns)
 
@@ -3563,17 +3554,16 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class LinearRegression:
-    &#34;&#34;&#34;class implementing multiple linear regression&#34;&#34;&#34;
+    &#34;&#34;&#34;Class implementing multiple linear regression.&#34;&#34;&#34;
 
     __slots__ = [&#34;importance&#34;, &#34;X&#34;, &#34;y&#34;, &#34;w&#34;]
 
     def __init__(self) -&gt; None:
-        &#34;&#34;&#34;The class initializer&#34;&#34;&#34;
-
+        &#34;&#34;&#34;Initialize the class .&#34;&#34;&#34;
         self.importance = []
 
     def fit(self, dataset: np.ndarray, values: np.ndarray, verbose: bool = False) -&gt; None:
-        &#34;&#34;&#34;Performs linear multiple model training
+        &#34;&#34;&#34;Perform linear multiple model training.
 
         Parameters
         ----------
@@ -3586,7 +3576,6 @@ A string representation of the directed graph.</p></div>
         -------
         `None` : The function doesn&#39;t return anything.
         &#34;&#34;&#34;
-
         self.X = dataset
         self.y = values
 
@@ -3604,20 +3593,17 @@ A string representation of the directed graph.</p></div>
             print(&#34;RMSE: {:.4f}&#34;.format(mean_square_error(self.y, self.predict(self.X))))
 
     def predict(self, datapoints: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Performs predictions for a set of points
+        &#34;&#34;&#34;Perform predictions for a set of points.
 
         Parameters
         ----------
         datapoints : `np.ndarray`
             An array containing the values of the independent variable.
-
         &#34;&#34;&#34;
         return np.array(self.importance) @ datapoints
 
     def get_importances(self, print_important_features: bool = False) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Returns the important features
+        &#34;&#34;&#34;Return the important features.
 
         Parameters
         ----------
@@ -3634,8 +3620,8 @@ A string representation of the directed graph.</p></div>
                 print(f&#34;The importance of the {i+1} feature is {a}&#34;)
         return np.array(self.importance)</code></pre>
 </details>
-<div class="desc"><p>class implementing multiple linear regression</p>
-<p>The class initializer</p></div>
+<div class="desc"><p>Class implementing multiple linear regression.</p>
+<p>Initialize the class .</p></div>
 <h3>Instance variables</h3>
 <dl>
 <dt id="likelihood.tools.tools.LinearRegression.X"><code class="name">var <span class="ident">X</span></code></dt>
@@ -3645,17 +3631,16 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class LinearRegression:
-    &#34;&#34;&#34;class implementing multiple linear regression&#34;&#34;&#34;
+    &#34;&#34;&#34;Class implementing multiple linear regression.&#34;&#34;&#34;
 
     __slots__ = [&#34;importance&#34;, &#34;X&#34;, &#34;y&#34;, &#34;w&#34;]
 
     def __init__(self) -&gt; None:
-        &#34;&#34;&#34;The class initializer&#34;&#34;&#34;
-
+        &#34;&#34;&#34;Initialize the class .&#34;&#34;&#34;
         self.importance = []
 
     def fit(self, dataset: np.ndarray, values: np.ndarray, verbose: bool = False) -&gt; None:
-        &#34;&#34;&#34;Performs linear multiple model training
+        &#34;&#34;&#34;Perform linear multiple model training.
 
         Parameters
         ----------
@@ -3668,7 +3653,6 @@ A string representation of the directed graph.</p></div>
         -------
         `None` : The function doesn&#39;t return anything.
         &#34;&#34;&#34;
-
         self.X = dataset
         self.y = values
 
@@ -3686,20 +3670,17 @@ A string representation of the directed graph.</p></div>
             print(&#34;RMSE: {:.4f}&#34;.format(mean_square_error(self.y, self.predict(self.X))))
 
     def predict(self, datapoints: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Performs predictions for a set of points
+        &#34;&#34;&#34;Perform predictions for a set of points.
 
         Parameters
         ----------
         datapoints : `np.ndarray`
             An array containing the values of the independent variable.
-
         &#34;&#34;&#34;
         return np.array(self.importance) @ datapoints
 
     def get_importances(self, print_important_features: bool = False) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Returns the important features
+        &#34;&#34;&#34;Return the important features.
 
         Parameters
         ----------
@@ -3725,17 +3706,16 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class LinearRegression:
-    &#34;&#34;&#34;class implementing multiple linear regression&#34;&#34;&#34;
+    &#34;&#34;&#34;Class implementing multiple linear regression.&#34;&#34;&#34;
 
     __slots__ = [&#34;importance&#34;, &#34;X&#34;, &#34;y&#34;, &#34;w&#34;]
 
     def __init__(self) -&gt; None:
-        &#34;&#34;&#34;The class initializer&#34;&#34;&#34;
-
+        &#34;&#34;&#34;Initialize the class .&#34;&#34;&#34;
         self.importance = []
 
     def fit(self, dataset: np.ndarray, values: np.ndarray, verbose: bool = False) -&gt; None:
-        &#34;&#34;&#34;Performs linear multiple model training
+        &#34;&#34;&#34;Perform linear multiple model training.
 
         Parameters
         ----------
@@ -3748,7 +3728,6 @@ A string representation of the directed graph.</p></div>
         -------
         `None` : The function doesn&#39;t return anything.
         &#34;&#34;&#34;
-
         self.X = dataset
         self.y = values
 
@@ -3766,20 +3745,17 @@ A string representation of the directed graph.</p></div>
             print(&#34;RMSE: {:.4f}&#34;.format(mean_square_error(self.y, self.predict(self.X))))
 
     def predict(self, datapoints: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Performs predictions for a set of points
+        &#34;&#34;&#34;Perform predictions for a set of points.
 
         Parameters
         ----------
         datapoints : `np.ndarray`
             An array containing the values of the independent variable.
-
         &#34;&#34;&#34;
         return np.array(self.importance) @ datapoints
 
     def get_importances(self, print_important_features: bool = False) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Returns the important features
+        &#34;&#34;&#34;Return the important features.
 
         Parameters
         ----------
@@ -3805,17 +3781,16 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class LinearRegression:
-    &#34;&#34;&#34;class implementing multiple linear regression&#34;&#34;&#34;
+    &#34;&#34;&#34;Class implementing multiple linear regression.&#34;&#34;&#34;
 
     __slots__ = [&#34;importance&#34;, &#34;X&#34;, &#34;y&#34;, &#34;w&#34;]
 
     def __init__(self) -&gt; None:
-        &#34;&#34;&#34;The class initializer&#34;&#34;&#34;
-
+        &#34;&#34;&#34;Initialize the class .&#34;&#34;&#34;
         self.importance = []
 
     def fit(self, dataset: np.ndarray, values: np.ndarray, verbose: bool = False) -&gt; None:
-        &#34;&#34;&#34;Performs linear multiple model training
+        &#34;&#34;&#34;Perform linear multiple model training.
 
         Parameters
         ----------
@@ -3828,7 +3803,6 @@ A string representation of the directed graph.</p></div>
         -------
         `None` : The function doesn&#39;t return anything.
         &#34;&#34;&#34;
-
         self.X = dataset
         self.y = values
 
@@ -3846,20 +3820,17 @@ A string representation of the directed graph.</p></div>
             print(&#34;RMSE: {:.4f}&#34;.format(mean_square_error(self.y, self.predict(self.X))))
 
     def predict(self, datapoints: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Performs predictions for a set of points
+        &#34;&#34;&#34;Perform predictions for a set of points.
 
         Parameters
         ----------
         datapoints : `np.ndarray`
             An array containing the values of the independent variable.
-
         &#34;&#34;&#34;
         return np.array(self.importance) @ datapoints
 
     def get_importances(self, print_important_features: bool = False) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Returns the important features
+        &#34;&#34;&#34;Return the important features.
 
         Parameters
         ----------
@@ -3885,17 +3856,16 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class LinearRegression:
-    &#34;&#34;&#34;class implementing multiple linear regression&#34;&#34;&#34;
+    &#34;&#34;&#34;Class implementing multiple linear regression.&#34;&#34;&#34;
 
     __slots__ = [&#34;importance&#34;, &#34;X&#34;, &#34;y&#34;, &#34;w&#34;]
 
     def __init__(self) -&gt; None:
-        &#34;&#34;&#34;The class initializer&#34;&#34;&#34;
-
+        &#34;&#34;&#34;Initialize the class .&#34;&#34;&#34;
         self.importance = []
 
     def fit(self, dataset: np.ndarray, values: np.ndarray, verbose: bool = False) -&gt; None:
-        &#34;&#34;&#34;Performs linear multiple model training
+        &#34;&#34;&#34;Perform linear multiple model training.
 
         Parameters
         ----------
@@ -3908,7 +3878,6 @@ A string representation of the directed graph.</p></div>
         -------
         `None` : The function doesn&#39;t return anything.
         &#34;&#34;&#34;
-
         self.X = dataset
         self.y = values
 
@@ -3926,20 +3895,17 @@ A string representation of the directed graph.</p></div>
             print(&#34;RMSE: {:.4f}&#34;.format(mean_square_error(self.y, self.predict(self.X))))
 
     def predict(self, datapoints: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Performs predictions for a set of points
+        &#34;&#34;&#34;Perform predictions for a set of points.
 
         Parameters
         ----------
         datapoints : `np.ndarray`
             An array containing the values of the independent variable.
-
         &#34;&#34;&#34;
         return np.array(self.importance) @ datapoints
 
     def get_importances(self, print_important_features: bool = False) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Returns the important features
+        &#34;&#34;&#34;Return the important features.
 
         Parameters
         ----------
@@ -3970,7 +3936,7 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def fit(self, dataset: np.ndarray, values: np.ndarray, verbose: bool = False) -&gt; None:
-    &#34;&#34;&#34;Performs linear multiple model training
+    &#34;&#34;&#34;Perform linear multiple model training.
 
     Parameters
     ----------
@@ -3983,7 +3949,6 @@ A string representation of the directed graph.</p></div>
     -------
     `None` : The function doesn&#39;t return anything.
     &#34;&#34;&#34;
-
     self.X = dataset
     self.y = values
 
@@ -4000,7 +3965,7 @@ A string representation of the directed graph.</p></div>
         print(&#34;\nParameters:&#34;, np.array(self.importance).shape)
         print(&#34;RMSE: {:.4f}&#34;.format(mean_square_error(self.y, self.predict(self.X))))</code></pre>
 </details>
-<div class="desc"><p>Performs linear multiple model training</p>
+<div class="desc"><p>Perform linear multiple model training.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>dataset</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -4020,8 +3985,7 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_importances(self, print_important_features: bool = False) -&gt; np.ndarray:
-    &#34;&#34;&#34;
-    Returns the important features
+    &#34;&#34;&#34;Return the important features.
 
     Parameters
     ----------
@@ -4038,7 +4002,7 @@ A string representation of the directed graph.</p></div>
             print(f&#34;The importance of the {i+1} feature is {a}&#34;)
     return np.array(self.importance)</code></pre>
 </details>
-<div class="desc"><p>Returns the important features</p>
+<div class="desc"><p>Return the important features.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>print_important_features</code></strong> :&ensp;<code>bool</code></dt>
@@ -4059,18 +4023,16 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def predict(self, datapoints: np.ndarray) -&gt; np.ndarray:
-    &#34;&#34;&#34;
-    Performs predictions for a set of points
+    &#34;&#34;&#34;Perform predictions for a set of points.
 
     Parameters
     ----------
     datapoints : `np.ndarray`
         An array containing the values of the independent variable.
-
     &#34;&#34;&#34;
     return np.array(self.importance) @ datapoints</code></pre>
 </details>
-<div class="desc"><p>Performs predictions for a set of points</p>
+<div class="desc"><p>Perform predictions for a set of points.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -4088,17 +4050,16 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class LogisticRegression:
-    &#34;&#34;&#34;class implementing multiple logistic regression&#34;&#34;&#34;
+    &#34;&#34;&#34;Class implementing multiple logistic regression.&#34;&#34;&#34;
 
     __slots__ = [&#34;importance&#34;, &#34;X&#34;, &#34;y&#34;, &#34;w&#34;]
 
     def __init__(self) -&gt; None:
-        &#34;&#34;&#34;The class initializer&#34;&#34;&#34;
-
+        &#34;&#34;&#34;Initialize the class .&#34;&#34;&#34;
         self.importance = []
 
     def fit(self, dataset: np.ndarray, values: np.ndarray) -&gt; None:
-        &#34;&#34;&#34;Performs linear multiple model training
+        &#34;&#34;&#34;Perform linear multiple model training.
 
         Parameters
         ----------
@@ -4111,9 +4072,7 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.ndarray`
             An array containing the importance of each feature.
-
         &#34;&#34;&#34;
-
         self.X = dataset
         self.y = values
 
@@ -4131,8 +4090,7 @@ A string representation of the directed graph.</p></div>
                 self.importance.append(a)
 
     def predict(self, datapoints: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Performs predictions for a set of points
+        &#34;&#34;&#34;Perform predictions for a set of points.
 
         Parameters
         ----------
@@ -4142,15 +4100,13 @@ A string representation of the directed graph.</p></div>
         Returns
         -------
         `np.ndarray`
-
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
 
         return sig(np.array(self.importance) @ datapoints)
 
     def get_importances(self, print_important_features: bool = False) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Returns the important features
+        &#34;&#34;&#34;Return the important features.
 
         Parameters
         ----------
@@ -4167,8 +4123,8 @@ A string representation of the directed graph.</p></div>
                 print(f&#34;The importance of the {i+1} feature is {a}&#34;)
         return np.array(self.importance)</code></pre>
 </details>
-<div class="desc"><p>class implementing multiple logistic regression</p>
-<p>The class initializer</p></div>
+<div class="desc"><p>Class implementing multiple logistic regression.</p>
+<p>Initialize the class .</p></div>
 <h3>Instance variables</h3>
 <dl>
 <dt id="likelihood.tools.tools.LogisticRegression.X"><code class="name">var <span class="ident">X</span></code></dt>
@@ -4178,17 +4134,16 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class LogisticRegression:
-    &#34;&#34;&#34;class implementing multiple logistic regression&#34;&#34;&#34;
+    &#34;&#34;&#34;Class implementing multiple logistic regression.&#34;&#34;&#34;
 
     __slots__ = [&#34;importance&#34;, &#34;X&#34;, &#34;y&#34;, &#34;w&#34;]
 
     def __init__(self) -&gt; None:
-        &#34;&#34;&#34;The class initializer&#34;&#34;&#34;
-
+        &#34;&#34;&#34;Initialize the class .&#34;&#34;&#34;
         self.importance = []
 
     def fit(self, dataset: np.ndarray, values: np.ndarray) -&gt; None:
-        &#34;&#34;&#34;Performs linear multiple model training
+        &#34;&#34;&#34;Perform linear multiple model training.
 
         Parameters
         ----------
@@ -4201,9 +4156,7 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.ndarray`
             An array containing the importance of each feature.
-
         &#34;&#34;&#34;
-
         self.X = dataset
         self.y = values
 
@@ -4221,8 +4174,7 @@ A string representation of the directed graph.</p></div>
                 self.importance.append(a)
 
     def predict(self, datapoints: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Performs predictions for a set of points
+        &#34;&#34;&#34;Perform predictions for a set of points.
 
         Parameters
         ----------
@@ -4232,15 +4184,13 @@ A string representation of the directed graph.</p></div>
         Returns
         -------
         `np.ndarray`
-
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
 
         return sig(np.array(self.importance) @ datapoints)
 
     def get_importances(self, print_important_features: bool = False) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Returns the important features
+        &#34;&#34;&#34;Return the important features.
 
         Parameters
         ----------
@@ -4266,17 +4216,16 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class LogisticRegression:
-    &#34;&#34;&#34;class implementing multiple logistic regression&#34;&#34;&#34;
+    &#34;&#34;&#34;Class implementing multiple logistic regression.&#34;&#34;&#34;
 
     __slots__ = [&#34;importance&#34;, &#34;X&#34;, &#34;y&#34;, &#34;w&#34;]
 
     def __init__(self) -&gt; None:
-        &#34;&#34;&#34;The class initializer&#34;&#34;&#34;
-
+        &#34;&#34;&#34;Initialize the class .&#34;&#34;&#34;
         self.importance = []
 
     def fit(self, dataset: np.ndarray, values: np.ndarray) -&gt; None:
-        &#34;&#34;&#34;Performs linear multiple model training
+        &#34;&#34;&#34;Perform linear multiple model training.
 
         Parameters
         ----------
@@ -4289,9 +4238,7 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.ndarray`
             An array containing the importance of each feature.
-
         &#34;&#34;&#34;
-
         self.X = dataset
         self.y = values
 
@@ -4309,8 +4256,7 @@ A string representation of the directed graph.</p></div>
                 self.importance.append(a)
 
     def predict(self, datapoints: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Performs predictions for a set of points
+        &#34;&#34;&#34;Perform predictions for a set of points.
 
         Parameters
         ----------
@@ -4320,15 +4266,13 @@ A string representation of the directed graph.</p></div>
         Returns
         -------
         `np.ndarray`
-
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
 
         return sig(np.array(self.importance) @ datapoints)
 
     def get_importances(self, print_important_features: bool = False) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Returns the important features
+        &#34;&#34;&#34;Return the important features.
 
         Parameters
         ----------
@@ -4354,17 +4298,16 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class LogisticRegression:
-    &#34;&#34;&#34;class implementing multiple logistic regression&#34;&#34;&#34;
+    &#34;&#34;&#34;Class implementing multiple logistic regression.&#34;&#34;&#34;
 
     __slots__ = [&#34;importance&#34;, &#34;X&#34;, &#34;y&#34;, &#34;w&#34;]
 
     def __init__(self) -&gt; None:
-        &#34;&#34;&#34;The class initializer&#34;&#34;&#34;
-
+        &#34;&#34;&#34;Initialize the class .&#34;&#34;&#34;
         self.importance = []
 
     def fit(self, dataset: np.ndarray, values: np.ndarray) -&gt; None:
-        &#34;&#34;&#34;Performs linear multiple model training
+        &#34;&#34;&#34;Perform linear multiple model training.
 
         Parameters
         ----------
@@ -4377,9 +4320,7 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.ndarray`
             An array containing the importance of each feature.
-
         &#34;&#34;&#34;
-
         self.X = dataset
         self.y = values
 
@@ -4397,8 +4338,7 @@ A string representation of the directed graph.</p></div>
                 self.importance.append(a)
 
     def predict(self, datapoints: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Performs predictions for a set of points
+        &#34;&#34;&#34;Perform predictions for a set of points.
 
         Parameters
         ----------
@@ -4408,15 +4348,13 @@ A string representation of the directed graph.</p></div>
         Returns
         -------
         `np.ndarray`
-
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
 
         return sig(np.array(self.importance) @ datapoints)
 
     def get_importances(self, print_important_features: bool = False) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Returns the important features
+        &#34;&#34;&#34;Return the important features.
 
         Parameters
         ----------
@@ -4442,17 +4380,16 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class LogisticRegression:
-    &#34;&#34;&#34;class implementing multiple logistic regression&#34;&#34;&#34;
+    &#34;&#34;&#34;Class implementing multiple logistic regression.&#34;&#34;&#34;
 
     __slots__ = [&#34;importance&#34;, &#34;X&#34;, &#34;y&#34;, &#34;w&#34;]
 
     def __init__(self) -&gt; None:
-        &#34;&#34;&#34;The class initializer&#34;&#34;&#34;
-
+        &#34;&#34;&#34;Initialize the class .&#34;&#34;&#34;
         self.importance = []
 
     def fit(self, dataset: np.ndarray, values: np.ndarray) -&gt; None:
-        &#34;&#34;&#34;Performs linear multiple model training
+        &#34;&#34;&#34;Perform linear multiple model training.
 
         Parameters
         ----------
@@ -4465,9 +4402,7 @@ A string representation of the directed graph.</p></div>
         -------
         importance : `np.ndarray`
             An array containing the importance of each feature.
-
         &#34;&#34;&#34;
-
         self.X = dataset
         self.y = values
 
@@ -4485,8 +4420,7 @@ A string representation of the directed graph.</p></div>
                 self.importance.append(a)
 
     def predict(self, datapoints: np.ndarray) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Performs predictions for a set of points
+        &#34;&#34;&#34;Perform predictions for a set of points.
 
         Parameters
         ----------
@@ -4496,15 +4430,13 @@ A string representation of the directed graph.</p></div>
         Returns
         -------
         `np.ndarray`
-
         &#34;&#34;&#34;
         sig = np.vectorize(sigmoide)
 
         return sig(np.array(self.importance) @ datapoints)
 
     def get_importances(self, print_important_features: bool = False) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Returns the important features
+        &#34;&#34;&#34;Return the important features.
 
         Parameters
         ----------
@@ -4535,7 +4467,7 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def fit(self, dataset: np.ndarray, values: np.ndarray) -&gt; None:
-    &#34;&#34;&#34;Performs linear multiple model training
+    &#34;&#34;&#34;Perform linear multiple model training.
 
     Parameters
     ----------
@@ -4548,9 +4480,7 @@ A string representation of the directed graph.</p></div>
     -------
     importance : `np.ndarray`
         An array containing the importance of each feature.
-
     &#34;&#34;&#34;
-
     self.X = dataset
     self.y = values
 
@@ -4567,7 +4497,7 @@ A string representation of the directed graph.</p></div>
             a = np.around(self.w[i], decimals=8)
             self.importance.append(a)</code></pre>
 </details>
-<div class="desc"><p>Performs linear multiple model training</p>
+<div class="desc"><p>Perform linear multiple model training.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>dataset</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -4590,8 +4520,7 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_importances(self, print_important_features: bool = False) -&gt; np.ndarray:
-    &#34;&#34;&#34;
-    Returns the important features
+    &#34;&#34;&#34;Return the important features.
 
     Parameters
     ----------
@@ -4608,7 +4537,7 @@ A string representation of the directed graph.</p></div>
             print(f&#34;The importance of the {i+1} feature is {a}&#34;)
     return np.array(self.importance)</code></pre>
 </details>
-<div class="desc"><p>Returns the important features</p>
+<div class="desc"><p>Return the important features.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>print_important_features</code></strong> :&ensp;<code>bool</code></dt>
@@ -4629,8 +4558,7 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def predict(self, datapoints: np.ndarray) -&gt; np.ndarray:
-    &#34;&#34;&#34;
-    Performs predictions for a set of points
+    &#34;&#34;&#34;Perform predictions for a set of points.
 
     Parameters
     ----------
@@ -4640,13 +4568,12 @@ A string representation of the directed graph.</p></div>
     Returns
     -------
     `np.ndarray`
-
     &#34;&#34;&#34;
     sig = np.vectorize(sigmoide)
 
     return sig(np.array(self.importance) @ datapoints)</code></pre>
 </details>
-<div class="desc"><p>Performs predictions for a set of points</p>
+<div class="desc"><p>Perform predictions for a set of points.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>datapoints</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -4666,8 +4593,8 @@ A string representation of the directed graph.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class OneHotEncoder:
-    &#34;&#34;&#34;
-    Class used to encode categorical variables.
+    &#34;&#34;&#34;Class used to encode categorical variables.
+
     It receives an array of integers and returns a binary array using the one-hot encoding method.
     &#34;&#34;&#34;
 
@@ -4677,6 +4604,27 @@ A string representation of the directed graph.</p></div>
         self.num_categories = None
 
     def encode(self, x: np.ndarray | list, fit: bool = True):
+        &#34;&#34;&#34;Convert categorical integer data to one-hot encoded binary array.
+
+        Transforms input integers into a binary matrix representation where each row
+        has a 1 at the position corresponding to its category value and NaN positions
+        are handled appropriately.
+
+        Parameters
+        ----------
+        x : np.ndarray or list
+            Input array of integer category labels. May contain NaN values.
+        fit : bool, optional
+            If True, initialize the encoder with the maximum category value in x.
+            If False, update num_categories if any new categories are encountered.
+            Default is True.
+
+        Returns
+        -------
+        np.ndarray
+            A 2D binary array of shape (len(x), num_categories) where each row has a 1
+            at the index corresponding to its category value and 0 elsewhere.
+        &#34;&#34;&#34;
         if not isinstance(x, np.ndarray):
             x = np.array(x)
         valid_mask = ~np.isnan(x)
@@ -4693,6 +4641,23 @@ A string representation of the directed graph.</p></div>
         return y
 
     def decode(self, x: np.ndarray | list) -&gt; np.ndarray:
+        &#34;&#34;&#34;Convert one-hot encoded binary array back to original category labels.
+
+        Transforms a one-hot encoded matrix back into the original integer category
+        labels. Rows with no 1s (invalid entries) are returned as NaN.
+
+        Parameters
+        ----------
+        x : np.ndarray or list
+            A 2D binary array from the encode method, where each row has a single 1
+            at the position corresponding to its category.
+
+        Returns
+        -------
+        np.ndarray
+            A 1D array of integer category labels, with NaN values for any rows that
+            had no 1s in the original encoded array.
+        &#34;&#34;&#34;
         if not isinstance(x, np.ndarray):
             x = np.array(x)
 
@@ -4703,8 +4668,8 @@ A string representation of the directed graph.</p></div>
         y[valid_mask] = np.argmax(x[valid_mask], axis=1)
         return y</code></pre>
 </details>
-<div class="desc"><p>Class used to encode categorical variables.
-It receives an array of integers and returns a binary array using the one-hot encoding method.</p></div>
+<div class="desc"><p>Class used to encode categorical variables.</p>
+<p>It receives an array of integers and returns a binary array using the one-hot encoding method.</p></div>
 <h3>Instance variables</h3>
 <dl>
 <dt id="likelihood.tools.tools.OneHotEncoder.num_categories"><code class="name">var <span class="ident">num_categories</span></code></dt>
@@ -4714,8 +4679,8 @@ It receives an array of integers and returns a binary array using the one-hot en
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class OneHotEncoder:
-    &#34;&#34;&#34;
-    Class used to encode categorical variables.
+    &#34;&#34;&#34;Class used to encode categorical variables.
+
     It receives an array of integers and returns a binary array using the one-hot encoding method.
     &#34;&#34;&#34;
 
@@ -4725,6 +4690,27 @@ It receives an array of integers and returns a binary array using the one-hot en
         self.num_categories = None
 
     def encode(self, x: np.ndarray | list, fit: bool = True):
+        &#34;&#34;&#34;Convert categorical integer data to one-hot encoded binary array.
+
+        Transforms input integers into a binary matrix representation where each row
+        has a 1 at the position corresponding to its category value and NaN positions
+        are handled appropriately.
+
+        Parameters
+        ----------
+        x : np.ndarray or list
+            Input array of integer category labels. May contain NaN values.
+        fit : bool, optional
+            If True, initialize the encoder with the maximum category value in x.
+            If False, update num_categories if any new categories are encountered.
+            Default is True.
+
+        Returns
+        -------
+        np.ndarray
+            A 2D binary array of shape (len(x), num_categories) where each row has a 1
+            at the index corresponding to its category value and 0 elsewhere.
+        &#34;&#34;&#34;
         if not isinstance(x, np.ndarray):
             x = np.array(x)
         valid_mask = ~np.isnan(x)
@@ -4741,6 +4727,23 @@ It receives an array of integers and returns a binary array using the one-hot en
         return y
 
     def decode(self, x: np.ndarray | list) -&gt; np.ndarray:
+        &#34;&#34;&#34;Convert one-hot encoded binary array back to original category labels.
+
+        Transforms a one-hot encoded matrix back into the original integer category
+        labels. Rows with no 1s (invalid entries) are returned as NaN.
+
+        Parameters
+        ----------
+        x : np.ndarray or list
+            A 2D binary array from the encode method, where each row has a single 1
+            at the position corresponding to its category.
+
+        Returns
+        -------
+        np.ndarray
+            A 1D array of integer category labels, with NaN values for any rows that
+            had no 1s in the original encoded array.
+        &#34;&#34;&#34;
         if not isinstance(x, np.ndarray):
             x = np.array(x)
 
@@ -4765,6 +4768,23 @@ It receives an array of integers and returns a binary array using the one-hot en
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def decode(self, x: np.ndarray | list) -&gt; np.ndarray:
+    &#34;&#34;&#34;Convert one-hot encoded binary array back to original category labels.
+
+    Transforms a one-hot encoded matrix back into the original integer category
+    labels. Rows with no 1s (invalid entries) are returned as NaN.
+
+    Parameters
+    ----------
+    x : np.ndarray or list
+        A 2D binary array from the encode method, where each row has a single 1
+        at the position corresponding to its category.
+
+    Returns
+    -------
+    np.ndarray
+        A 1D array of integer category labels, with NaN values for any rows that
+        had no 1s in the original encoded array.
+    &#34;&#34;&#34;
     if not isinstance(x, np.ndarray):
         x = np.array(x)
 
@@ -4775,7 +4795,21 @@ It receives an array of integers and returns a binary array using the one-hot en
     y[valid_mask] = np.argmax(x[valid_mask], axis=1)
     return y</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Convert one-hot encoded binary array back to original category labels.</p>
+<p>Transforms a one-hot encoded matrix back into the original integer category
+labels. Rows with no 1s (invalid entries) are returned as NaN.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>x</code></strong> :&ensp;<code>np.ndarray</code> or <code>list</code></dt>
+<dd>A 2D binary array from the encode method, where each row has a single 1
+at the position corresponding to its category.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>np.ndarray</code></dt>
+<dd>A 1D array of integer category labels, with NaN values for any rows that
+had no 1s in the original encoded array.</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.tools.tools.OneHotEncoder.encode"><code class="name flex">
 <span>def <span class="ident">encode</span></span>(<span>self, x: numpy.ndarray | list, fit: bool = True)</span>
@@ -4786,6 +4820,27 @@ It receives an array of integers and returns a binary array using the one-hot en
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def encode(self, x: np.ndarray | list, fit: bool = True):
+    &#34;&#34;&#34;Convert categorical integer data to one-hot encoded binary array.
+
+    Transforms input integers into a binary matrix representation where each row
+    has a 1 at the position corresponding to its category value and NaN positions
+    are handled appropriately.
+
+    Parameters
+    ----------
+    x : np.ndarray or list
+        Input array of integer category labels. May contain NaN values.
+    fit : bool, optional
+        If True, initialize the encoder with the maximum category value in x.
+        If False, update num_categories if any new categories are encountered.
+        Default is True.
+
+    Returns
+    -------
+    np.ndarray
+        A 2D binary array of shape (len(x), num_categories) where each row has a 1
+        at the index corresponding to its category value and 0 elsewhere.
+    &#34;&#34;&#34;
     if not isinstance(x, np.ndarray):
         x = np.array(x)
     valid_mask = ~np.isnan(x)
@@ -4801,7 +4856,25 @@ It receives an array of integers and returns a binary array using the one-hot en
 
     return y</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Convert categorical integer data to one-hot encoded binary array.</p>
+<p>Transforms input integers into a binary matrix representation where each row
+has a 1 at the position corresponding to its category value and NaN positions
+are handled appropriately.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>x</code></strong> :&ensp;<code>np.ndarray</code> or <code>list</code></dt>
+<dd>Input array of integer category labels. May contain NaN values.</dd>
+<dt><strong><code>fit</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>If True, initialize the encoder with the maximum category value in x.
+If False, update num_categories if any new categories are encountered.
+Default is True.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>np.ndarray</code></dt>
+<dd>A 2D binary array of shape (len(x), num_categories) where each row has a 1
+at the index corresponding to its category value and 0 elsewhere.</dd>
+</dl></div>
 </dd>
 </dl>
 </dd>
@@ -4814,12 +4887,31 @@ It receives an array of integers and returns a binary array using the one-hot en
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class PerformanceMeasures:
-    &#34;&#34;&#34;Class with methods to measure performance&#34;&#34;&#34;
+    &#34;&#34;&#34;Class with methods to measure performance.&#34;&#34;&#34;
 
     def __init__(self) -&gt; None:
         pass
 
     def f_mean(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -&gt; float:
+        &#34;&#34;&#34;Calculate and display the mean F1-score across all class labels.
+
+        Computes the F1-score for each label, prints individual scores and the mean,
+        then returns the averaged value.
+
+        Parameters
+        ----------
+        y_true : np.ndarray
+            Array of true class labels.
+        y_pred : np.ndarray
+            Array of predicted class labels.
+        labels : List[int]
+            List of all class labels to include in the calculation.
+
+        Returns
+        -------
+        float
+            The mean F1-score across all specified labels, rounded to 4 decimal places.
+        &#34;&#34;&#34;
         F_vec = self._f1_score(y_true, y_pred, labels)
         mean_f_measure = np.mean(F_vec)
         mean_f_measure = np.around(mean_f_measure, decimals=4)
@@ -4832,6 +4924,25 @@ It receives an array of integers and returns a binary array using the one-hot en
         return mean_f_measure
 
     def resp(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -&gt; float:
+        &#34;&#34;&#34;Calculate and display the response rate metric (Res_p).
+
+        Computes a weighted response rate metric based on F1-scores for each label,
+        accounting for class distribution imbalances. Prints and returns the result.
+
+        Parameters
+        ----------
+        y_true : np.ndarray
+            Array of true class labels.
+        y_pred : np.ndarray
+            Array of predicted class labels.
+        labels : List[int]
+            List of all class labels to include in the calculation.
+
+        Returns
+        -------
+        float
+            The Res_p (response rate) metric value, rounded to 4 decimal places.
+        &#34;&#34;&#34;
         T_C = len(y_true)
         sum1, sum2 = 0.0, 0.0
         F_vec = self._f1_score(y_true, y_pred, labels)
@@ -4880,7 +4991,7 @@ It receives an array of integers and returns a binary array using the one-hot en
 
         return count_mat</code></pre>
 </details>
-<div class="desc"><p>Class with methods to measure performance</p></div>
+<div class="desc"><p>Class with methods to measure performance.</p></div>
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.tools.tools.PerformanceMeasures.f_mean"><code class="name flex">
@@ -4892,6 +5003,25 @@ It receives an array of integers and returns a binary array using the one-hot en
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def f_mean(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -&gt; float:
+    &#34;&#34;&#34;Calculate and display the mean F1-score across all class labels.
+
+    Computes the F1-score for each label, prints individual scores and the mean,
+    then returns the averaged value.
+
+    Parameters
+    ----------
+    y_true : np.ndarray
+        Array of true class labels.
+    y_pred : np.ndarray
+        Array of predicted class labels.
+    labels : List[int]
+        List of all class labels to include in the calculation.
+
+    Returns
+    -------
+    float
+        The mean F1-score across all specified labels, rounded to 4 decimal places.
+    &#34;&#34;&#34;
     F_vec = self._f1_score(y_true, y_pred, labels)
     mean_f_measure = np.mean(F_vec)
     mean_f_measure = np.around(mean_f_measure, decimals=4)
@@ -4903,7 +5033,23 @@ It receives an array of integers and returns a binary array using the one-hot en
 
     return mean_f_measure</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Calculate and display the mean F1-score across all class labels.</p>
+<p>Computes the F1-score for each label, prints individual scores and the mean,
+then returns the averaged value.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>y_true</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Array of true class labels.</dd>
+<dt><strong><code>y_pred</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Array of predicted class labels.</dd>
+<dt><strong><code>labels</code></strong> :&ensp;<code>List[int]</code></dt>
+<dd>List of all class labels to include in the calculation.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>float</code></dt>
+<dd>The mean F1-score across all specified labels, rounded to 4 decimal places.</dd>
+</dl></div>
 </dd>
 <dt id="likelihood.tools.tools.PerformanceMeasures.resp"><code class="name flex">
 <span>def <span class="ident">resp</span></span>(<span>self, y_true: numpy.ndarray, y_pred: numpy.ndarray, labels: List[int]) ‑> float</span>
@@ -4914,6 +5060,25 @@ It receives an array of integers and returns a binary array using the one-hot en
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def resp(self, y_true: np.ndarray, y_pred: np.ndarray, labels: List[int]) -&gt; float:
+    &#34;&#34;&#34;Calculate and display the response rate metric (Res_p).
+
+    Computes a weighted response rate metric based on F1-scores for each label,
+    accounting for class distribution imbalances. Prints and returns the result.
+
+    Parameters
+    ----------
+    y_true : np.ndarray
+        Array of true class labels.
+    y_pred : np.ndarray
+        Array of predicted class labels.
+    labels : List[int]
+        List of all class labels to include in the calculation.
+
+    Returns
+    -------
+    float
+        The Res_p (response rate) metric value, rounded to 4 decimal places.
+    &#34;&#34;&#34;
     T_C = len(y_true)
     sum1, sum2 = 0.0, 0.0
     F_vec = self._f1_score(y_true, y_pred, labels)
@@ -4928,7 +5093,23 @@ It receives an array of integers and returns a binary array using the one-hot en
 
     return res_p</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Calculate and display the response rate metric (Res_p).</p>
+<p>Computes a weighted response rate metric based on F1-scores for each label,
+accounting for class distribution imbalances. Prints and returns the result.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>y_true</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Array of true class labels.</dd>
+<dt><strong><code>y_pred</code></strong> :&ensp;<code>np.ndarray</code></dt>
+<dd>Array of predicted class labels.</dd>
+<dt><strong><code>labels</code></strong> :&ensp;<code>List[int]</code></dt>
+<dd>List of all class labels to include in the calculation.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>float</code></dt>
+<dd>The Res_p (response rate) metric value, rounded to 4 decimal places.</dd>
+</dl></div>
 </dd>
 </dl>
 </dd>

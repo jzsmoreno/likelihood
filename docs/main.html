@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.main API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Module for core likelihood computations, including data preprocessing, model fitting, and
+analysis utilities.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +37,8 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.main</code></h1>
 </header>
 <section id="section-intro">
+<p>Module for core likelihood computations, including data preprocessing, model fitting, and
+analysis utilities.</p>
 </section>
 <section>
 </section>
@@ -60,7 +63,7 @@ el.replaceWith(d);
     conditions: List[Tuple[float, float]] = None,
     var2: float = 1.0,
 ) -&gt; float:
-    &#34;&#34;&#34;Computes the likelihood.
+    &#34;&#34;&#34;Compute the likelihood.
 
     Parameters
     ----------
@@ -101,7 +104,7 @@ el.replaceWith(d);
 
     return lhood + lp</code></pre>
 </details>
-<div class="desc"><p>Computes the likelihood.</p>
+<div class="desc"><p>Compute the likelihood.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>x</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -134,7 +137,7 @@ $n$ parameters. Defaults to None.</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def lnprior(theta: np.ndarray, conditions: List[Tuple[float, float]]) -&gt; float:
-    &#34;&#34;&#34;Computes the prior probability.
+    &#34;&#34;&#34;Compute the prior probability.
 
     Parameters
     ----------
@@ -159,7 +162,7 @@ $n$ parameters. Defaults to None.</dd>
 
     return 0.0</code></pre>
 </details>
-<div class="desc"><p>Computes the prior probability.</p>
+<div class="desc"><p>Compute the prior probability.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>theta</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -183,7 +186,7 @@ $n$ parameters.</dd>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def update_theta(theta: np.ndarray, d: float) -&gt; np.ndarray:
-    &#34;&#34;&#34;Updates the theta parameters.
+    &#34;&#34;&#34;Update the theta parameters.
 
     Parameters
     ----------
@@ -197,9 +200,9 @@ $n$ parameters.</dd>
     theta_new : `np.array`
         An ndarray with the updated theta values.
     &#34;&#34;&#34;
-    return np.random.normal(theta, d / 2.0)</code></pre>
+    return theta + np.random.normal(0.0, d / 2.0)</code></pre>
 </details>
-<div class="desc"><p>Updates the theta parameters.</p>
+<div class="desc"><p>Update the theta parameters.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>theta</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -233,7 +236,7 @@ $n$ parameters.</dd>
     tol: float = 1e-4,
     mode: bool = True,
 ) -&gt; Tuple[np.ndarray, List[np.ndarray], float]:
-    &#34;&#34;&#34;Executes the walker implementation.
+    &#34;&#34;&#34;Execute the walker implementation.
 
     Parameters
     ----------
@@ -282,7 +285,9 @@ $n$ parameters.</dd>
         if y0 &lt;= tol or y1 &lt;= tol:
             if mode:
                 print(&#34;Goal reached!&#34;)
-            return (theta_new, nwalk, y1) if y1 &lt;= tol else (theta, nwalk, y0)
+            if y1 &lt;= tol:
+                return (theta_new, nwalk, y1)
+            return (theta, nwalk, y0)
 
         if y1 &gt;= y0:
             ratio = y0 / y1
@@ -300,7 +305,7 @@ $n$ parameters.</dd>
 
     return theta, nwalk, y0</code></pre>
 </details>
-<div class="desc"><p>Executes the walker implementation.</p>
+<div class="desc"><p>Execute the walker implementation.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>x</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -360,7 +365,7 @@ to <code>1e-3</code>.</dd>
     mode: bool = False,
     figname: str = &#34;fig_out.png&#34;,
 ) -&gt; Tuple[List[np.ndarray], List[float]]:
-    &#34;&#34;&#34;Executes multiple walkers.
+    &#34;&#34;&#34;Execute multiple walkers.
 
     Parameters
     ----------
@@ -454,7 +459,7 @@ to <code>1e-3</code>.</dd>
 
     return par, error</code></pre>
 </details>
-<div class="desc"><p>Executes multiple walkers.</p>
+<div class="desc"><p>Execute multiple walkers.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>nwalkers</code></strong> :&ensp;<code>int</code></dt>

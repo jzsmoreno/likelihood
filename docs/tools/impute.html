@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.tools.impute API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Missing-value imputation utilities for data preprocessing.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.tools.impute</code></h1>
 </header>
 <section id="section-intro">
+<p>Missing-value imputation utilities for data preprocessing.</p>
 </section>
 <section>
 </section>
@@ -63,8 +64,7 @@ el.replaceWith(d);
         n_features: int | None = None,
         use_scaler: bool = False,
     ) -&gt; None:
-        &#34;&#34;&#34;
-        Initialize the imputer.
+        &#34;&#34;&#34;Initialize the imputer.
 
         Parameters
         ----------
@@ -79,8 +79,7 @@ el.replaceWith(d);
         self.cols_transf = pd.Series([])
 
     def fit(self, X: pd.DataFrame) -&gt; None:
-        &#34;&#34;&#34;
-        Fit the imputer to the data.
+        &#34;&#34;&#34;Fit the imputer to the data.
 
         Parameters
         ----------
@@ -101,8 +100,7 @@ el.replaceWith(d);
     def transform(
         self, X: pd.DataFrame, boundary: bool = True, inplace: bool = True
     ) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;
-        Impute missing values in the data.
+        &#34;&#34;&#34;Impute missing values in the data.
 
         Parameters
         ----------
@@ -157,8 +155,7 @@ el.replaceWith(d);
     def fit_transform(
         self, X: pd.DataFrame, boundary: bool = True, inplace: bool = True
     ) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;
-        Fit and transform the data.
+        &#34;&#34;&#34;Fit and transform the data.
 
         Parameters
         ----------
@@ -178,8 +175,7 @@ el.replaceWith(d);
         X: pd.Series,
         column_exception: str,
     ) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;
-        Set missing values to zero, except for `column_exception`.
+        &#34;&#34;&#34;Set missing values to zero, except for `column_exception`.
 
         Parameters
         ----------
@@ -194,8 +190,7 @@ el.replaceWith(d);
         return data
 
     def _check_dtype_convert(self, value: Union[int, float], to_compare: Union[int, float]) -&gt; None:
-        &#34;&#34;&#34;
-        Check if the value is an integer and convert it to float if it is.
+        &#34;&#34;&#34;Check if the value is an integer and convert it to float if it is.
 
         Parameters
         ----------
@@ -212,8 +207,7 @@ el.replaceWith(d);
         return value
 
     def _get_dict_params(self, df: pd.DataFrame) -&gt; dict:
-        &#34;&#34;&#34;
-        Get the parameters for the imputer.
+        &#34;&#34;&#34;Get the parameters for the imputer.
 
         Parameters
         ----------
@@ -233,15 +227,13 @@ el.replaceWith(d);
         return params
 
     def eval(self, X: pd.DataFrame) -&gt; None:
-        &#34;&#34;&#34;
-        Create a histogram of the imputed values.
+        &#34;&#34;&#34;Create a histogram of the imputed values.
 
         Parameters
         ----------
         X: pd.DataFrame
             Dataframe to create the histogram from.
         &#34;&#34;&#34;
-
         if not isinstance(X, pd.DataFrame):
             raise ValueError(&#34;Input X must be a pandas DataFrame.&#34;)
 
@@ -301,8 +293,7 @@ el.replaceWith(d);
         plt.show()
 
     def save(self, filename: str = &#34;./imputer&#34;) -&gt; None:
-        &#34;&#34;&#34;
-        Save the state of the SimpleImputer to a file.
+        &#34;&#34;&#34;Save the state of the SimpleImputer to a file.
 
         Parameters
         ----------
@@ -315,8 +306,7 @@ el.replaceWith(d);
 
     @staticmethod
     def load(filename: str = &#34;./imputer&#34;) -&gt; &#34;SimpleImputer&#34;:
-        &#34;&#34;&#34;
-        Load the state of a SimpleImputer from a file.
+        &#34;&#34;&#34;Load the state of a SimpleImputer from a file.
 
         Parameters
         ----------
@@ -348,8 +338,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">@staticmethod
 def load(filename: str = &#34;./imputer&#34;) -&gt; &#34;SimpleImputer&#34;:
-    &#34;&#34;&#34;
-    Load the state of a SimpleImputer from a file.
+    &#34;&#34;&#34;Load the state of a SimpleImputer from a file.
 
     Parameters
     ----------
@@ -379,15 +368,13 @@ def load(filename: str = &#34;./imputer&#34;) -&gt; &#34;SimpleImputer&#34;:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def eval(self, X: pd.DataFrame) -&gt; None:
-    &#34;&#34;&#34;
-    Create a histogram of the imputed values.
+    &#34;&#34;&#34;Create a histogram of the imputed values.
 
     Parameters
     ----------
     X: pd.DataFrame
         Dataframe to create the histogram from.
     &#34;&#34;&#34;
-
     if not isinstance(X, pd.DataFrame):
         raise ValueError(&#34;Input X must be a pandas DataFrame.&#34;)
 
@@ -462,8 +449,7 @@ def load(filename: str = &#34;./imputer&#34;) -&gt; &#34;SimpleImputer&#34;:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def fit(self, X: pd.DataFrame) -&gt; None:
-    &#34;&#34;&#34;
-    Fit the imputer to the data.
+    &#34;&#34;&#34;Fit the imputer to the data.
 
     Parameters
     ----------
@@ -499,8 +485,7 @@ def load(filename: str = &#34;./imputer&#34;) -&gt; &#34;SimpleImputer&#34;:
 <pre><code class="python">def fit_transform(
     self, X: pd.DataFrame, boundary: bool = True, inplace: bool = True
 ) -&gt; pd.DataFrame:
-    &#34;&#34;&#34;
-    Fit and transform the data.
+    &#34;&#34;&#34;Fit and transform the data.
 
     Parameters
     ----------
@@ -535,8 +520,7 @@ def load(filename: str = &#34;./imputer&#34;) -&gt; &#34;SimpleImputer&#34;:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def save(self, filename: str = &#34;./imputer&#34;) -&gt; None:
-    &#34;&#34;&#34;
-    Save the state of the SimpleImputer to a file.
+    &#34;&#34;&#34;Save the state of the SimpleImputer to a file.
 
     Parameters
     ----------
@@ -565,8 +549,7 @@ def load(filename: str = &#34;./imputer&#34;) -&gt; &#34;SimpleImputer&#34;:
 <pre><code class="python">def transform(
     self, X: pd.DataFrame, boundary: bool = True, inplace: bool = True
 ) -&gt; pd.DataFrame:
-    &#34;&#34;&#34;
-    Impute missing values in the data.
+    &#34;&#34;&#34;Impute missing values in the data.
 
     Parameters
     ----------

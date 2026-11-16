@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.models.hmm API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Hidden Markov Model utilities.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.models.hmm</code></h1>
 </header>
 <section id="section-intro">
+<p>Hidden Markov Model utilities.</p>
 </section>
 <section>
 </section>
@@ -57,8 +58,7 @@ el.replaceWith(d);
     sequences: list[list[int]],
     true_states: list[list[int]],
 ) -&gt; float:
-    &#34;&#34;&#34;
-    Compute Viterbi decoding accuracy after optimal hidden-state label alignment.
+    &#34;&#34;&#34;Compute Viterbi decoding accuracy after optimal hidden-state label alignment.
 
     Hidden-state labels learned by an HMM are arbitrary. For example,
     predicted state 0 may correspond to ground-truth state 2. This function
@@ -187,8 +187,7 @@ and true states differs.</dd>
     random_state=42,
     show_results=True,
 ):
-    &#34;&#34;&#34;
-    Train multiple HMM configurations and return the best model.
+    &#34;&#34;&#34;Train multiple HMM configurations and return the best model.
 
     Parameters
     ----------
@@ -224,7 +223,6 @@ and true states differs.</dd>
     history_df : pandas.DataFrame
         Results from every configuration and restart.
     &#34;&#34;&#34;
-
     best_model = None
     best_result = None
     best_accuracy = -np.inf
