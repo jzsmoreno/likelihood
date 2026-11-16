@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.models.ensemble API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Ensemble model definitions.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.models.ensemble</code></h1>
 </header>
 <section id="section-intro">
+<p>Ensemble model definitions.</p>
 </section>
 <section>
 </section>
@@ -284,9 +285,7 @@ el.replaceWith(d);
         return self.scores
 
     def _save_keras_model(self, model: Any, path: str) -&gt; None:
-        &#34;&#34;&#34;
-        Internal helper to save a Keras model depending on TF version.
-        &#34;&#34;&#34;
+        &#34;&#34;&#34;Save a Keras model depending on TF version.&#34;&#34;&#34;
         is_updated = version.parse(tf.__version__) &gt; version.parse(&#34;2.15.0&#34;)
 
         if is_updated:
@@ -295,11 +294,9 @@ el.replaceWith(d);
             model.save(path, save_format=&#34;tf&#34;)
 
     def save(self, filepath: str) -&gt; None:
+        &#34;&#34;&#34;Save ensemble metadata and models inside a directory named after the last part of
+        filepath.
         &#34;&#34;&#34;
-        Save ensemble metadata and models inside a directory
-        named after the last part of filepath.
-        &#34;&#34;&#34;
-
         filepath = filepath.rstrip(&#34;.pkl&#34;)
         parent_dir = os.path.dirname(filepath)
         folder_name = os.path.basename(filepath)
@@ -327,6 +324,20 @@ el.replaceWith(d);
 
     @classmethod
     def load(cls, filepath: str, base_model_class: Optional[Type] = None) -&gt; &#34;EnsembleClassifier&#34;:
+        &#34;&#34;&#34;Load an EnsembleClassifier instance from a saved directory.
+
+        Parameters
+        ----------
+        filepath : str
+            Path to the .pkl file containing the saved ensemble metadata.
+        base_model_class : type, optional
+            The base model class to use for reconstructing models. Defaults to AutoClassifier.
+
+        Returns
+        -------
+        EnsembleClassifier
+            The loaded ensemble instance.
+        &#34;&#34;&#34;
         filepath = filepath.rstrip(&#34;.pkl&#34;)
 
         parent_dir = os.path.dirname(filepath)
@@ -348,9 +359,7 @@ el.replaceWith(d);
             base_model_class = AutoClassifier
 
         def _load_keras_model(path: str) -&gt; Any:
-            &#34;&#34;&#34;
-            Internal helper to load a Keras model depending on TF version.
-            &#34;&#34;&#34;
+            &#34;&#34;&#34;Load a Keras model depending on TF version.&#34;&#34;&#34;
             is_updated = version.parse(tf.__version__) &gt; version.parse(&#34;2.15.0&#34;)
 
             if is_updated:
@@ -368,6 +377,7 @@ el.replaceWith(d);
         return ensemble
 
     def __repr__(self) -&gt; str:
+        &#34;&#34;&#34;Return a human-readable representation of the ensemble.&#34;&#34;&#34;
         return (
             f&#34;EnsembleClassifier(n_models={self.n_models}, &#34;
             f&#34;voting_method=&#39;{self.voting_method}&#39;, &#34;
@@ -437,7 +447,19 @@ Retrieve individual model performance metrics if available.</p>
 <span>def <span class="ident">load</span></span>(<span>filepath: str, base_model_class: Type | None = None) ‑> <a title="likelihood.models.ensemble.EnsembleClassifier" href="#likelihood.models.ensemble.EnsembleClassifier">EnsembleClassifier</a></span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Load an EnsembleClassifier instance from a saved directory.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>filepath</code></strong> :&ensp;<code>str</code></dt>
+<dd>Path to the .pkl file containing the saved ensemble metadata.</dd>
+<dt><strong><code>base_model_class</code></strong> :&ensp;<code>type</code>, optional</dt>
+<dd>The base model class to use for reconstructing models. Defaults to AutoClassifier.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code><a title="likelihood.models.ensemble.EnsembleClassifier" href="#likelihood.models.ensemble.EnsembleClassifier">EnsembleClassifier</a></code></dt>
+<dd>The loaded ensemble instance.</dd>
+</dl></div>
 </dd>
 </dl>
 <h3>Methods</h3>
@@ -588,11 +610,9 @@ Retrieve individual model performance metrics if available.</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def save(self, filepath: str) -&gt; None:
+    &#34;&#34;&#34;Save ensemble metadata and models inside a directory named after the last part of
+    filepath.
     &#34;&#34;&#34;
-    Save ensemble metadata and models inside a directory
-    named after the last part of filepath.
-    &#34;&#34;&#34;
-
     filepath = filepath.rstrip(&#34;.pkl&#34;)
     parent_dir = os.path.dirname(filepath)
     folder_name = os.path.basename(filepath)
@@ -618,8 +638,8 @@ Retrieve individual model performance metrics if available.</p>
     for i, model in enumerate(self.models_):
         self._save_keras_model(model, os.path.join(save_dir, f&#34;model_{i}&#34;))</code></pre>
 </details>
-<div class="desc"><p>Save ensemble metadata and models inside a directory
-named after the last part of filepath.</p></div>
+<div class="desc"><p>Save ensemble metadata and models inside a directory named after the last part of
+filepath.</p></div>
 </dd>
 <dt id="likelihood.models.ensemble.EnsembleClassifier.set_score_request"><code class="name flex">
 <span>def <span class="ident">set_score_request</span></span>(<span>self: <a title="likelihood.models.ensemble.EnsembleClassifier" href="#likelihood.models.ensemble.EnsembleClassifier">EnsembleClassifier</a>,<br>*,<br>sample_weight: bool | str | None = '$UNCHANGED$') ‑> <a title="likelihood.models.ensemble.EnsembleClassifier" href="#likelihood.models.ensemble.EnsembleClassifier">EnsembleClassifier</a></span>

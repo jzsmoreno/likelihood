@@ -1,3 +1,6 @@
+"""Bandit model definitions."""
+
+from pathlib import Path
 from typing import List
 
 import torch
@@ -5,6 +8,31 @@ import torch.nn as nn
 
 
 class MultiBanditNet(nn.Module):
+    """A neural network for the multi-armed bandit problem with several options.
+
+    Parameters
+    ----------
+    state_dim : int
+        Dimensionality of the state (observation) vector.
+    num_options : int
+        Number of distinct options (or bandits) to choose between.
+    num_actions_per_option : int or List[int]
+        Number of actions available for a single option, or a list giving the
+        number of actions for each option individually.
+    num_neurons : int, default 128
+        Width of the hidden layers in every sub-network.
+    num_layers : int, default 1
+        Number of hidden layers in the action networks.
+    activation : str or nn.Module, default ``nn.SELU()``
+        Activation function applied between the linear layers. One of
+        ``"relu"``, ``"relu6"``, ``"rrelu"``, ``"selu"``,
+        ``"leaky_relu"``, ``"sigmoid"``, ``"tanh"``, ``"hardswish"``,
+        ``"gelu"``, ``"elu"``, ``"softplus"``, ``"softmax"`` or ``"identity"``.
+    dropout_rate : float, default 0.3
+        Dropout probability applied to the action networks when greater than
+        zero; the option and value networks are not dropped.
+    """
+
     def __init__(
         self,
         state_dim: int,
@@ -12,7 +40,7 @@ class MultiBanditNet(nn.Module):
         num_actions_per_option: int | List[int],
         num_neurons: int = 128,
         num_layers: int = 1,
-        activation: nn.Module = nn.SELU(),
+        activation: str | nn.Module = nn.SELU(),
         dropout_rate: float = 0.3,
     ) -> None:
         super(MultiBanditNet, self).__init__()
@@ -21,7 +49,9 @@ class MultiBanditNet(nn.Module):
         self.num_actions_per_option = num_actions_per_option
         self.num_neurons = num_neurons
         self.num_layers = num_layers
-        self.activation = activation
+        self.activation = (
+            self._activation_module(activation) if isinstance(activation, str) else activation
+        )
         self.dropout_rate = max(0.0, dropout_rate)
 
         def build_action_network(num_actions: int) -> nn.Sequential:
@@ -80,9 +110,36 @@ class MultiBanditNet(nn.Module):
         self.equal_action_sizes = len(set(self.num_actions)) == 1
         self.max_num_actions = max(self.num_actions)
 
-    def apply_initialization(self, method: str = "xavier_uniform") -> None:
+    @classmethod
+    def _activation_module(cls, activation: str) -> nn.Module:
+        """Instantiate the activation module from its name.
+
+        The catalog exposes ``activation`` as a plain string (``"relu"``, ``"selu"``, ``"sigmoid"``,
+        ``"tanh"``, ``"leaky_relu"``); this maps the name to the matching :class:`torch.nn.Module`
+        subclass used inside the network.
         """
-        Applies a specific initialization method to all linear layers in the network.
+        name = str(activation).lower()
+        activations = {
+            "relu": nn.ReLU(),
+            "relu6": nn.ReLU6(),
+            "rrelu": nn.RReLU(),
+            "selu": nn.SELU(),
+            "leaky_relu": nn.LeakyReLU(),
+            "sigmoid": nn.Sigmoid(),
+            "tanh": nn.Tanh(),
+            "hardswish": nn.Hardswish(),
+            "gelu": nn.GELU(),
+            "elu": nn.ELU(),
+            "softplus": nn.Softplus(),
+            "softmax": nn.Softmax(dim=-1),
+            "identity": nn.Identity(),
+        }
+        if name not in activations:
+            raise ValueError(f"Unsupported activation: {activation!r}")
+        return activations[name]
+
+    def apply_initialization(self, method: str = "xavier_uniform") -> None:
+        """Apply a specific initialization method to all linear layers in the network.
 
         Parameters
         ----------
@@ -187,3 +244,66 @@ class MultiBanditNet(nn.Module):
         termination_prob = self.termination_network(state)
 
         return option_probs, action_probs, termination_prob, selected_options, selected_actions
+
+    def save(self, path: str | Path = "./multibanditnet.pt") -> None:
+        """Serialize the network configuration and weights to ``path``.
+
+        The checkpoint stores the constructor arguments (including the
+        activation module) next to the ``state_dict``, so :meth:`load` can
+        rebuild the very same architecture without guessing it.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default="./multibanditnet.pt"
+            Destination file. Any extension accepted by :func:`torch.save`
+            works; ``.pt`` and ``.pth`` are the usual choices.
+        """
+        checkpoint = {
+            "format": "likelihood.models.deep.bandit.MultiBanditNet",
+            "version": 1,
+            "config": {
+                "state_dim": self.state_dim,
+                "num_options": self.num_options,
+                "num_actions_per_option": self.num_actions_per_option,
+                "num_neurons": self.num_neurons,
+                "num_layers": self.num_layers,
+                "activation": self.activation,
+                "dropout_rate": self.dropout_rate,
+            },
+            "state_dict": self.state_dict(),
+        }
+        torch.save(checkpoint, str(path))
+
+    @classmethod
+    def load(cls, path: str | Path = "./multibanditnet.pt") -> "MultiBanditNet":
+        """Rebuild a network saved with :meth:`save`.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default="./multibanditnet.pt"
+            Checkpoint written by :meth:`save`.
+
+        Returns
+        -------
+        MultiBanditNet
+            Network with the stored weights, in evaluation mode.
+
+        Raises
+        ------
+        ValueError
+            If the file is not a checkpoint written by :meth:`save`.
+
+        Notes
+        -----
+        Checkpoints are pickles, so only load files you trust.
+        """
+        try:
+            checkpoint = torch.load(str(path), map_location="cpu", weights_only=False)
+        except TypeError:  # torch < 1.13 has no ``weights_only`` argument
+            checkpoint = torch.load(str(path), map_location="cpu")
+        if not isinstance(checkpoint, dict) or "config" not in checkpoint:
+            raise ValueError(f"{str(path)!r} is not a MultiBanditNet checkpoint written by save()")
+        network = cls(**checkpoint["config"])
+        network.load_state_dict(checkpoint["state_dict"])
+        network.eval()
+        return network

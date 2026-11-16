@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.tools.models_tools API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Utility tools for machine-learning models, model suppression, and LoRA layer management.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.tools.models_tools</code></h1>
 </header>
 <section id="section-intro">
+<p>Utility tools for machine-learning models, model suppression, and LoRA layer management.</p>
 </section>
 <section>
 </section>
@@ -56,6 +57,33 @@ el.replaceWith(d);
     model: tf.keras.Model,
     rank: int = 4,
 ) -&gt; tf.keras.Model:
+    &#34;&#34;&#34;Apply LoRA (Low-Rank Adaptation) to Dense layers in a Keras model.
+
+    This function creates a new model with LoRA layers applied to all Dense layers
+    in the original model. LoRA is a parameter-efficient fine-tuning method that
+    decomposes weight matrices into two lower-rank matrices.
+
+    Parameters
+    ----------
+    model : tf.keras.Model
+        The original Keras model to apply LoRA to. All Dense layers will have
+        LoRA applied.
+    rank : int, optional
+        The rank parameter for LoRA decomposition (default is 4). This determines
+        the dimensionality of the low-rank approximation.
+
+    Returns
+    -------
+    tf.keras.Model
+        A new Keras model with LoRA layers applied to all Dense layers.
+
+    Notes
+    -----
+    For each Dense layer in the original model, a corresponding LoRALayer is inserted
+    that computes: output = inputs @ W_original + (inputs @ A @ B) where A and B are
+    low-rank matrices. The rank parameter controls the trade-off between model size
+    and adaptation capacity.
+    &#34;&#34;&#34;
     inputs = tf.keras.Input(shape=model.input_shape[1:])
     x = inputs
 
@@ -68,7 +96,29 @@ el.replaceWith(d);
     new_model = tf.keras.Model(inputs=inputs, outputs=x)
     return new_model</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Apply LoRA (Low-Rank Adaptation) to Dense layers in a Keras model.</p>
+<p>This function creates a new model with LoRA layers applied to all Dense layers
+in the original model. LoRA is a parameter-efficient fine-tuning method that
+decomposes weight matrices into two lower-rank matrices.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>model</code></strong> :&ensp;<code>tf.keras.Model</code></dt>
+<dd>The original Keras model to apply LoRA to. All Dense layers will have
+LoRA applied.</dd>
+<dt><strong><code>rank</code></strong> :&ensp;<code>int</code>, optional</dt>
+<dd>The rank parameter for LoRA decomposition (default is 4). This determines
+the dimensionality of the low-rank approximation.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>tf.keras.Model</code></dt>
+<dd>A new Keras model with LoRA layers applied to all Dense layers.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>For each Dense layer in the original model, a corresponding LoRALayer is inserted
+that computes: output = inputs @ W_original + (inputs @ A @ B) where A and B are
+low-rank matrices. The rank parameter controls the trade-off between model size
+and adaptation capacity.</p></div>
 </dd>
 <dt id="likelihood.tools.models_tools.collect_experience"><code class="name flex">
 <span>def <span class="ident">collect_experience</span></span>(<span>env: Any,<br>model: torch.nn.modules.module.Module,<br>gamma: float = 0.99,<br>lambda_parameter: float = 0.95,<br>penalty_for_done_state: float = -1.0,<br>tolerance: int = inf,<br>verbose: bool = False) ‑> tuple[typing.List[tuple], typing.List[float], typing.List[float], typing.List[float]]</span>
@@ -246,8 +296,8 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_selected_probs(action_probs: torch.Tensor, action: torch.Tensor | int):
-    &#34;&#34;&#34;
-    Retrieves the probabilities of selected actions from a single-batch action probability distribution.
+    &#34;&#34;&#34;Retrieve the probabilities of selected actions from a single-batch action probability
+    distribution.
 
     Parameters
     ----------
@@ -267,7 +317,8 @@ el.replaceWith(d);
     selected_probs = action_probs.squeeze(0).gather(1, action.unsqueeze(1)).squeeze(-1)
     return selected_probs.tolist()</code></pre>
 </details>
-<div class="desc"><p>Retrieves the probabilities of selected actions from a single-batch action probability distribution.</p>
+<div class="desc"><p>Retrieve the probabilities of selected actions from a single-batch action probability
+distribution.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>action_probs</code></strong> :&ensp;<code>torch.Tensor</code></dt>
@@ -290,8 +341,8 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -&gt; pd.DataFrame:
-    &#34;&#34;&#34;
-    Calculate various graph metrics based on the given adjacency matrix and return them in a single DataFrame.
+    &#34;&#34;&#34;Calculate various graph metrics based on the given adjacency matrix and return them in a
+    single DataFrame.
 
     Parameters
     ----------
@@ -347,7 +398,8 @@ el.replaceWith(d);
 
     return metrics_df</code></pre>
 </details>
-<div class="desc"><p>Calculate various graph metrics based on the given adjacency matrix and return them in a single DataFrame.</p>
+<div class="desc"><p>Calculate various graph metrics based on the given adjacency matrix and return them in a
+single DataFrame.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>adj_matrix</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -384,7 +436,7 @@ el.replaceWith(d);
     action_probs: torch.Tensor,
     epsilon: float = 0.2,
 ) -&gt; torch.Tensor:
-    &#34;&#34;&#34;Computes the Proximal Policy Optimization (PPO) loss using the clipped objective.
+    &#34;&#34;&#34;Compute the Proximal Policy Optimization (PPO) loss using the clipped objective.
 
     Parameters
     ----------
@@ -402,7 +454,6 @@ el.replaceWith(d);
     loss : `torch.Tensor`
         The PPO loss, averaged across the batch of samples. The loss is computed using the clipped objective to penalize large policy updates.
     &#34;&#34;&#34;
-
     if advantages.dim() == 1:
         advantages = advantages.unsqueeze(-1)
     action_probs = action_probs.view(old_action_probs.shape)
@@ -417,7 +468,7 @@ el.replaceWith(d);
 
     return loss.mean()</code></pre>
 </details>
-<div class="desc"><p>Computes the Proximal Policy Optimization (PPO) loss using the clipped objective.</p>
+<div class="desc"><p>Compute the Proximal Policy Optimization (PPO) loss using the clipped objective.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>advantages</code></strong> :&ensp;<code>torch.Tensor</code></dt>
@@ -452,6 +503,39 @@ el.replaceWith(d);
     terminate: bool,
     done: bool,
 ) -&gt; None:
+    &#34;&#34;&#34;Print trajectory information for reinforcement learning episodes.
+
+    This function displays formatted information about a single transition in a
+    reinforcement learning episode, including state, action, reward, and termination
+    status.
+
+    Parameters
+    ----------
+    state : Any
+        The initial state before the action was taken.
+    selected_option : Any
+        The option or decision selected at the given state.
+    action : Any
+        The action executed in the environment.
+    reward : Any
+        The reward received after executing the action.
+    next_state : Any
+        The resulting state after executing the action.
+    terminate : bool
+        Whether the episode has terminated.
+    done : bool
+        Additional flag indicating if the episode is complete.
+
+    Returns
+    -------
+    None
+        This function prints information to stdout but does not return a value.
+
+    Notes
+    -----
+    The output is formatted with separators for readability and includes all key
+    components of a reinforcement learning transition tuple (s, a, r, s&#39;, done).
+    &#34;&#34;&#34;
     print(&#34;=&#34; * 50)
     print(&#34;TRAJECTORY INFO&#34;.center(50, &#34;=&#34;))
     print(&#34;=&#34; * 50)
@@ -464,7 +548,35 @@ el.replaceWith(d);
     print(f&#34;Done: {done}&#34;)
     print(&#34;=&#34; * 50)</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Print trajectory information for reinforcement learning episodes.</p>
+<p>This function displays formatted information about a single transition in a
+reinforcement learning episode, including state, action, reward, and termination
+status.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>state</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The initial state before the action was taken.</dd>
+<dt><strong><code>selected_option</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The option or decision selected at the given state.</dd>
+<dt><strong><code>action</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The action executed in the environment.</dd>
+<dt><strong><code>reward</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The reward received after executing the action.</dd>
+<dt><strong><code>next_state</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The resulting state after executing the action.</dd>
+<dt><strong><code>terminate</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether the episode has terminated.</dd>
+<dt><strong><code>done</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Additional flag indicating if the episode is complete.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>None</code></dt>
+<dd>This function prints information to stdout but does not return a value.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>The output is formatted with separators for readability and includes all key
+components of a reinforcement learning transition tuple (s, a, r, s', done).</p></div>
 </dd>
 <dt id="likelihood.tools.models_tools.remove_collinearity"><code class="name flex">
 <span>def <span class="ident">remove_collinearity</span></span>(<span>df: pandas.core.frame.DataFrame, threshold: float = 0.9)</span>
@@ -475,8 +587,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def remove_collinearity(df: pd.DataFrame, threshold: float = 0.9):
-    &#34;&#34;&#34;
-    Removes highly collinear features from the DataFrame based on a correlation threshold.
+    &#34;&#34;&#34;Remove highly collinear features from the DataFrame based on a correlation threshold.
 
     This function calculates the correlation matrix of the DataFrame and removes columns
     that are highly correlated with any other column in the DataFrame. It uses an absolute
@@ -503,7 +614,7 @@ el.replaceWith(d);
 
     return df_reduced</code></pre>
 </details>
-<div class="desc"><p>Removes highly collinear features from the DataFrame based on a correlation threshold.</p>
+<div class="desc"><p>Remove highly collinear features from the DataFrame based on a correlation threshold.</p>
 <p>This function calculates the correlation matrix of the DataFrame and removes columns
 that are highly correlated with any other column in the DataFrame. It uses an absolute
 correlation value greater than the specified threshold to identify which columns to drop.</p>
@@ -531,6 +642,30 @@ correlation value greater than the specified threshold to identify which columns
 <pre><code class="python">def suppress_warnings(
     func: Callable[..., Any],
 ) -&gt; Callable[..., Any]:
+    &#34;&#34;&#34;Create a decorator that suppresses warnings raised by the decorated function.
+
+    This decorator wraps a function and catches all warnings within its execution,
+    effectively silencing any warning messages that would otherwise be displayed.
+
+    Parameters
+    ----------
+    func : Callable[..., Any]
+        The function to wrap with warning suppression.
+
+    Returns
+    -------
+    Callable[..., Any]
+        A wrapped version of the original function that executes without raising warnings.
+
+    Examples
+    --------
+    &gt;&gt;&gt; @suppress_warnings
+    ... def risky_function():
+    ...     import warnings
+    ...     warnings.warn(&#34;This is a warning&#34;)
+    &gt;&gt;&gt; risky_function()  # No warning will be displayed
+    &#34;&#34;&#34;
+
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any):
         with warnings.catch_warnings():
@@ -539,7 +674,26 @@ correlation value greater than the specified threshold to identify which columns
 
     return wrapper</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Create a decorator that suppresses warnings raised by the decorated function.</p>
+<p>This decorator wraps a function and catches all warnings within its execution,
+effectively silencing any warning messages that would otherwise be displayed.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>func</code></strong> :&ensp;<code>Callable[&hellip;, Any]</code></dt>
+<dd>The function to wrap with warning suppression.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>Callable[&hellip;, Any]</code></dt>
+<dd>A wrapped version of the original function that executes without raising warnings.</dd>
+</dl>
+<h2 id="examples">Examples</h2>
+<pre><code class="language-python-repl">&gt;&gt;&gt; @suppress_warnings
+... def risky_function():
+...     import warnings
+...     warnings.warn(&quot;This is a warning&quot;)
+&gt;&gt;&gt; risky_function()  # No warning will be displayed
+</code></pre></div>
 </dd>
 <dt id="likelihood.tools.models_tools.train_and_insights"><code class="name flex">
 <span>def <span class="ident">train_and_insights</span></span>(<span>x_data: numpy.ndarray,<br>y_act: numpy.ndarray,<br>model: keras.src.models.model.Model,<br>patience: int = 3,<br>reg: bool = False,<br>frac: float = 1.0,<br>**kwargs: Dict | None) ‑> keras.src.models.model.Model</span>
@@ -558,8 +712,7 @@ correlation value greater than the specified threshold to identify which columns
     frac: float = 1.0,
     **kwargs: Optional[Dict],
 ) -&gt; tf.keras.Model:
-    &#34;&#34;&#34;
-    Train a Keras model and provide insights on the training and validation metrics.
+    &#34;&#34;&#34;Train a Keras model and provide insights on the training and validation metrics.
 
     Parameters
     ----------
@@ -1173,6 +1326,8 @@ Advantages are normalised within each group.</dd>
 </summary>
 <pre><code class="python">@tf.keras.utils.register_keras_serializable(package=&#34;Custom&#34;, name=&#34;LoRALayer&#34;)
 class LoRALayer(tf.keras.layers.Layer):
+    &#34;&#34;&#34;A LoRA (Low-Rank Adaptation) layer for fine-tuning large models.&#34;&#34;&#34;
+
     def __init__(
         self,
         units: int,
@@ -1184,6 +1339,30 @@ class LoRALayer(tf.keras.layers.Layer):
         self.rank = rank
 
     def build(self, input_shape: tf.TensorShape):
+        &#34;&#34;&#34;Build the LoRA layer weights based on the input shape.
+
+        This method initializes the weight matrices (A and B) for the LoRA decomposition
+        and validates that the rank parameter is appropriate given the input/output dimensions.
+
+        Parameters
+        ----------
+        input_shape : tf.TensorShape
+            The shape of the input tensor, used to determine the dimensionality of
+            the weight matrices.
+
+        Raises
+        ------
+        ValueError
+            If rank is greater than input dimension or number of units.
+
+        Notes
+        -----
+        Creates two trainable weight matrices:
+        - A: Shape (input_dim, rank) with random_normal initialization
+        - B: Shape (rank, units) with random_normal initialization
+
+        The LoRA approximation computes: inputs @ A @ B instead of the full weight matrix.
+        &#34;&#34;&#34;
         input_dim = input_shape[-1]
         print(f&#34;Input shape: {input_shape}&#34;)
 
@@ -1206,162 +1385,30 @@ class LoRALayer(tf.keras.layers.Layer):
         print(f&#34;LoRA weights shape: A{self.A.shape}, B{self.B.shape}&#34;)
 
     def call(self, inputs: Any) -&gt; Any:
+        &#34;&#34;&#34;Apply the LoRA layer to the input tensor.
+
+        This method computes the LoRA approximation by multiplying the input with
+        the weight matrices A and B: output = inputs @ A @ B
+
+        Parameters
+        ----------
+        inputs : Any
+            The input tensor to apply the LoRA transformation to.
+
+        Returns
+        -------
+        Any
+            The output tensor after applying the LoRA layer multiplication.
+
+        Notes
+        -----
+        This method performs the forward pass of the LoRA layer, computing the
+        low-rank approximation without modifying the original weights.
+        &#34;&#34;&#34;
         lora_output = tf.matmul(tf.matmul(inputs, self.A), self.B)
         return lora_output</code></pre>
 </details>
-<div class="desc"><p>This is the class from which all layers inherit.</p>
-<p>A layer is a callable object that takes as input one or more tensors and
-that outputs one or more tensors. It involves <em>computation</em>, defined
-in the <code>call()</code> method, and a <em>state</em> (weight variables). State can be
-created:</p>
-<ul>
-<li>in <code>__init__()</code>, for instance via <code>self.add_weight()</code>;</li>
-<li>in the optional <code>build()</code> method, which is invoked by the first
-<code>__call__()</code> to the layer, and supplies the shape(s) of the input(s),
-which may not have been known at initialization time.</li>
-</ul>
-<p>Layers are recursively composable: If you assign a Layer instance as an
-attribute of another Layer, the outer layer will start tracking the weights
-created by the inner layer. Nested layers should be instantiated in the
-<code>__init__()</code> method or <code>build()</code> method.</p>
-<p>Users will just instantiate a layer and then treat it as a callable.</p>
-<dl>
-<dt>Args</dt>
-<dt>-----=</dt>
-<dt><strong><code>trainable</code></strong></dt>
-<dd>Boolean, whether the layer's variables should be trainable.</dd>
-<dt><strong><code>name</code></strong></dt>
-<dd>String name of the layer.</dd>
-<dt><strong><code>dtype</code></strong></dt>
-<dd>The dtype of the layer's computations and weights. Can also be a
-<code>keras.DTypePolicy</code>, which allows the computation and weight dtype
-to differ. Defaults to <code>None</code>. <code>None</code> means to use
-<code>keras.config.dtype_policy()</code>, which is a <code>float32</code> policy unless
-set to different value (via <code>keras.config.set_dtype_policy()</code>).</dd>
-<dt>Attributes</dt>
-<dt>-----=</dt>
-<dt><strong><code>name</code></strong></dt>
-<dd>The name of the layer (string).</dd>
-<dt><strong><code>dtype</code></strong></dt>
-<dd>Dtype of the layer's weights. Alias of <code>layer.variable_dtype</code>.</dd>
-<dt><strong><code>variable_dtype</code></strong></dt>
-<dd>Dtype of the layer's weights.</dd>
-<dt><strong><code>compute_dtype</code></strong></dt>
-<dd>The dtype of the layer's computations.
-Layers automatically cast inputs to this dtype, which causes
-the computations and output to also be in this dtype.
-When mixed precision is used with a
-<code>keras.DTypePolicy</code>, this will be different
-than <code>variable_dtype</code>.</dd>
-<dt><strong><code>trainable_weights</code></strong></dt>
-<dd>List of variables to be included in backprop.</dd>
-<dt><strong><code>non_trainable_weights</code></strong></dt>
-<dd>List of variables that should not be
-included in backprop.</dd>
-<dt><strong><code>weights</code></strong></dt>
-<dd>The concatenation of the lists trainable_weights and
-non_trainable_weights (in this order).</dd>
-<dt><strong><code>trainable</code></strong></dt>
-<dd>Whether the layer should be trained (boolean), i.e.
-whether its potentially-trainable weights should be returned
-as part of <code>layer.trainable_weights</code>.</dd>
-<dt><strong><code>input_spec</code></strong></dt>
-<dd>Optional (list of) <code>InputSpec</code> object(s) specifying the
-constraints on inputs that can be accepted by the layer.</dd>
-</dl>
-<p>We recommend that descendants of <code>Layer</code> implement the following methods:</p>
-<ul>
-<li><code>__init__()</code>: Defines custom layer attributes, and creates layer weights
-that do not depend on input shapes, using <code>add_weight()</code>,
-or other state.</li>
-<li><code>build(self, input_shape)</code>: This method can be used to create weights that
-depend on the shape(s) of the input(s), using <code>add_weight()</code>, or other
-state. <code>__call__()</code> will automatically build the layer
-(if it has not been built yet) by calling <code>build()</code>.</li>
-<li><code>call(self, *args, **kwargs)</code>: Called in <code>__call__</code> after making
-sure <code>build()</code> has been called. <code>call()</code> performs the logic of applying
-the layer to the input arguments.
-Two reserved keyword arguments you can optionally use in <code>call()</code> are:
-1. <code>training</code> (boolean, whether the call is in inference mode or
-training mode).
-2. <code>mask</code> (boolean tensor encoding masked timesteps in the input,
-used e.g. in RNN layers).
-A typical signature for this method is <code>call(self, inputs)</code>, and user
-could optionally add <code>training</code> and <code>mask</code> if the layer need them.</li>
-<li><code>get_config(self)</code>: Returns a dictionary containing the configuration
-used to initialize this layer. If the keys differ from the arguments
-in <code>__init__()</code>, then override <code>from_config(self)</code> as well.
-This method is used when saving
-the layer or a model that contains this layer.</li>
-</ul>
-<p>Examples:</p>
-<p>Here's a basic example: a layer with two variables, <code>w</code> and <code>b</code>,
-that returns <code>y = w . x + b</code>.
-It shows how to implement <code>build()</code> and <code>call()</code>.
-Variables set as attributes of a layer are tracked as weights
-of the layers (in <code>layer.weights</code>).</p>
-<pre><code class="language-python">class SimpleDense(Layer):
-    def __init__(self, units=32):
-        super().__init__()
-        self.units = units
-
-    # Create the state of the layer (weights)
-    def build(self, input_shape):
-        self.kernel = self.add_weight(
-            shape=(input_shape[-1], self.units),
-            initializer=&quot;glorot_uniform&quot;,
-            trainable=True,
-            name=&quot;kernel&quot;,
-        )
-        self.bias = self.add_weight(
-            shape=(self.units,),
-            initializer=&quot;zeros&quot;,
-            trainable=True,
-            name=&quot;bias&quot;,
-        )
-
-    # Defines the computation
-    def call(self, inputs):
-        return ops.matmul(inputs, self.kernel) + self.bias
-
-# Instantiates the layer.
-linear_layer = SimpleDense(4)
-
-# This will also call `build(input_shape)` and create the weights.
-y = linear_layer(ops.ones((2, 2)))
-assert len(linear_layer.weights) == 2
-
-# These weights are trainable, so they're listed in `trainable_weights`:
-assert len(linear_layer.trainable_weights) == 2
-</code></pre>
-<p>Besides trainable weights, updated via backpropagation during training,
-layers can also have non-trainable weights. These weights are meant to
-be updated manually during <code>call()</code>. Here's a example layer that computes
-the running sum of its inputs:</p>
-<pre><code class="language-python">class ComputeSum(Layer):
-
-  def __init__(self, input_dim):
-      super(ComputeSum, self).__init__()
-      # Create a non-trainable weight.
-      self.total = self.add_weight(
-        shape=(),
-        initializer=&quot;zeros&quot;,
-        trainable=False,
-        name=&quot;total&quot;,
-      )
-
-  def call(self, inputs):
-      self.total.assign(self.total + ops.sum(inputs))
-      return self.total
-
-my_sum = ComputeSum(2)
-x = ops.ones((2, 2))
-y = my_sum(x)
-
-assert my_sum.weights == [my_sum.total]
-assert my_sum.non_trainable_weights == [my_sum.total]
-assert my_sum.trainable_weights == []
-</code></pre></div>
+<div class="desc"><p>A LoRA (Low-Rank Adaptation) layer for fine-tuning large models.</p></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li>keras.src.layers.layer.Layer</li>
@@ -1383,6 +1430,30 @@ assert my_sum.trainable_weights == []
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def build(self, input_shape: tf.TensorShape):
+    &#34;&#34;&#34;Build the LoRA layer weights based on the input shape.
+
+    This method initializes the weight matrices (A and B) for the LoRA decomposition
+    and validates that the rank parameter is appropriate given the input/output dimensions.
+
+    Parameters
+    ----------
+    input_shape : tf.TensorShape
+        The shape of the input tensor, used to determine the dimensionality of
+        the weight matrices.
+
+    Raises
+    ------
+    ValueError
+        If rank is greater than input dimension or number of units.
+
+    Notes
+    -----
+    Creates two trainable weight matrices:
+    - A: Shape (input_dim, rank) with random_normal initialization
+    - B: Shape (rank, units) with random_normal initialization
+
+    The LoRA approximation computes: inputs @ A @ B instead of the full weight matrix.
+    &#34;&#34;&#34;
     input_dim = input_shape[-1]
     print(f&#34;Input shape: {input_shape}&#34;)
 
@@ -1404,7 +1475,25 @@ assert my_sum.trainable_weights == []
     print(f&#34;Dense weights shape: {input_dim}x{self.units}&#34;)
     print(f&#34;LoRA weights shape: A{self.A.shape}, B{self.B.shape}&#34;)</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Build the LoRA layer weights based on the input shape.</p>
+<p>This method initializes the weight matrices (A and B) for the LoRA decomposition
+and validates that the rank parameter is appropriate given the input/output dimensions.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>input_shape</code></strong> :&ensp;<code>tf.TensorShape</code></dt>
+<dd>The shape of the input tensor, used to determine the dimensionality of
+the weight matrices.</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>ValueError</code></dt>
+<dd>If rank is greater than input dimension or number of units.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>Creates two trainable weight matrices:
+- A: Shape (input_dim, rank) with random_normal initialization
+- B: Shape (rank, units) with random_normal initialization</p>
+<p>The LoRA approximation computes: inputs @ A @ B instead of the full weight matrix.</p></div>
 </dd>
 <dt id="likelihood.tools.models_tools.LoRALayer.call"><code class="name flex">
 <span>def <span class="ident">call</span></span>(<span>self, inputs: Any) ‑> Any</span>
@@ -1415,10 +1504,45 @@ assert my_sum.trainable_weights == []
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def call(self, inputs: Any) -&gt; Any:
+    &#34;&#34;&#34;Apply the LoRA layer to the input tensor.
+
+    This method computes the LoRA approximation by multiplying the input with
+    the weight matrices A and B: output = inputs @ A @ B
+
+    Parameters
+    ----------
+    inputs : Any
+        The input tensor to apply the LoRA transformation to.
+
+    Returns
+    -------
+    Any
+        The output tensor after applying the LoRA layer multiplication.
+
+    Notes
+    -----
+    This method performs the forward pass of the LoRA layer, computing the
+    low-rank approximation without modifying the original weights.
+    &#34;&#34;&#34;
     lora_output = tf.matmul(tf.matmul(inputs, self.A), self.B)
     return lora_output</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Apply the LoRA layer to the input tensor.</p>
+<p>This method computes the LoRA approximation by multiplying the input with
+the weight matrices A and B: output = inputs @ A @ B</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>inputs</code></strong> :&ensp;<code>Any</code></dt>
+<dd>The input tensor to apply the LoRA transformation to.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>Any</code></dt>
+<dd>The output tensor after applying the LoRA layer multiplication.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>This method performs the forward pass of the LoRA layer, computing the
+low-rank approximation without modifying the original weights.</p></div>
 </dd>
 </dl>
 </dd>
@@ -1432,14 +1556,13 @@ assert my_sum.trainable_weights == []
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class TransformRange:
-    &#34;&#34;&#34;
-    Generates a new DataFrame with ranges represented as strings.
+    &#34;&#34;&#34;Generates a new DataFrame with ranges represented as strings.
 
     Transforms numerical columns into categorical range bins with descriptive labels.
     &#34;&#34;&#34;
 
     def __init__(self, columns_bin_sizes: Dict[str, int]) -&gt; None:
-        &#34;&#34;&#34;Initializes the class with the original DataFrame.
+        &#34;&#34;&#34;Initialize the class with the original DataFrame.
 
         Parameters
         ----------
@@ -1457,8 +1580,7 @@ assert my_sum.trainable_weights == []
     def _create_bins_and_labels(
         self, min_val: Union[int, float], max_val: Union[int, float], bin_size: int
     ) -&gt; Tuple[np.ndarray, List[str]]:
-        &#34;&#34;&#34;
-        Creates the bin edges and their labels.
+        &#34;&#34;&#34;Create the bin edges and their labels.
 
         Parameters
         ----------
@@ -1509,8 +1631,7 @@ assert my_sum.trainable_weights == []
     def _transform_column_to_ranges(
         self, df: pd.DataFrame, column: str, bin_size: int, fit: bool = True
     ) -&gt; pd.Series:
-        &#34;&#34;&#34;
-        Transforms a column in the DataFrame into range bins.
+        &#34;&#34;&#34;Transform a column in the DataFrame into range bins.
 
         Parameters
         ----------
@@ -1567,8 +1688,7 @@ assert my_sum.trainable_weights == []
     def transform(
         self, df: pd.DataFrame, drop_original: bool = False, fit: bool = True
     ) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;
-        Creates a new DataFrame with range columns.
+        &#34;&#34;&#34;Create a new DataFrame with range columns.
 
         Parameters
         ----------
@@ -1611,8 +1731,7 @@ assert my_sum.trainable_weights == []
         return result_df
 
     def get_range_info(self, column: str) -&gt; Dict[str, Union[int, float, List[str]]]:
-        &#34;&#34;&#34;
-        Get information about the range transformation for a specific column.
+        &#34;&#34;&#34;Get information about the range transformation for a specific column.
 
         Parameters
         ----------
@@ -1640,7 +1759,7 @@ assert my_sum.trainable_weights == []
 </details>
 <div class="desc"><p>Generates a new DataFrame with ranges represented as strings.</p>
 <p>Transforms numerical columns into categorical range bins with descriptive labels.</p>
-<p>Initializes the class with the original DataFrame.</p>
+<p>Initialize the class with the original DataFrame.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>columns_bin_sizes</code></strong> :&ensp;<code>dict</code></dt>
@@ -1662,8 +1781,7 @@ assert my_sum.trainable_weights == []
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_range_info(self, column: str) -&gt; Dict[str, Union[int, float, List[str]]]:
-    &#34;&#34;&#34;
-    Get information about the range transformation for a specific column.
+    &#34;&#34;&#34;Get information about the range transformation for a specific column.
 
     Parameters
     ----------
@@ -1710,8 +1828,7 @@ Dictionary containing min_val, max_val, bin_size, and labels.</p></div>
 <pre><code class="python">def transform(
     self, df: pd.DataFrame, drop_original: bool = False, fit: bool = True
 ) -&gt; pd.DataFrame:
-    &#34;&#34;&#34;
-    Creates a new DataFrame with range columns.
+    &#34;&#34;&#34;Create a new DataFrame with range columns.
 
     Parameters
     ----------
@@ -1753,7 +1870,7 @@ Dictionary containing min_val, max_val, bin_size, and labels.</p></div>
 
     return result_df</code></pre>
 </details>
-<div class="desc"><p>Creates a new DataFrame with range columns.</p>
+<div class="desc"><p>Create a new DataFrame with range columns.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
@@ -1783,6 +1900,8 @@ A DataFrame with the transformed range columns.</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class suppress_prints:
+    &#34;&#34;&#34;Context manager that suppresses stdout while the block is executed.&#34;&#34;&#34;
+
     def __enter__(self):
         self.original_stdout = sys.stdout
         sys.stdout = open(os.devnull, &#34;w&#34;)
@@ -1791,7 +1910,7 @@ A DataFrame with the transformed range columns.</p>
         sys.stdout.close()
         sys.stdout = self.original_stdout</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Context manager that suppresses stdout while the block is executed.</p></div>
 </dd>
 </dl>
 </section>

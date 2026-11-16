@@ -1,3 +1,5 @@
+"""Deep autoencoder model definitions."""
+
 import logging
 import os
 from functools import partial
@@ -28,6 +30,8 @@ tf.get_logger().setLevel("ERROR")
 
 
 class EarlyStopping:
+    """Early stopping callback to monitor validation loss and stop training when no improvement."""
+
     def __init__(self, patience: int = 10, min_delta: float = 0.001) -> None:
         self.patience = patience
         self.min_delta = min_delta
@@ -36,6 +40,13 @@ class EarlyStopping:
         self.stop_training: bool = False
 
     def __call__(self, current_loss: float) -> None:
+        """Update the stopping criteria based on the current loss.
+
+        Parameters
+        ----------
+        current_loss : float
+            The current loss value to evaluate against the best loss.
+        """
         if self.best_loss - current_loss > self.min_delta:
             self.best_loss = current_loss
             self.counter = 0
@@ -47,8 +58,7 @@ class EarlyStopping:
 
 
 def mse_loss(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-    """
-    Mean squared error loss function.
+    """Mean squared error loss function.
 
     Parameters
     ----------
@@ -65,8 +75,7 @@ def mse_loss(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
 
 
 def kl_loss(mean: tf.Tensor, log_var: tf.Tensor) -> tf.Tensor:
-    """
-    Kullback-Leibler divergence loss function.
+    """Kullback-Leibler divergence loss function.
 
     Parameters
     ----------
@@ -85,8 +94,7 @@ def kl_loss(mean: tf.Tensor, log_var: tf.Tensor) -> tf.Tensor:
 def vae_loss(
     y_true: tf.Tensor, y_pred: tf.Tensor, mean: tf.Tensor, log_var: tf.Tensor
 ) -> tf.Tensor:
-    """
-    Variational autoencoder loss function.
+    """Variational autoencoder loss function.
 
     Parameters
     ----------
@@ -107,8 +115,7 @@ def vae_loss(
 
 
 def sampling(mean: tf.Tensor, log_var: tf.Tensor, epsilon_value: float = 1e-8) -> tf.Tensor:
-    """
-    Samples from the distribution.
+    """Sample from the distribution.
 
     Parameters
     ----------
@@ -130,6 +137,20 @@ def sampling(mean: tf.Tensor, log_var: tf.Tensor, epsilon_value: float = 1e-8) -
 
 
 def check_for_nans(tensors: List[tf.Tensor], name: str = "Tensor") -> bool:
+    """Check if any tensor contains NaN or Inf values.
+
+    Parameters
+    ----------
+    tensors : List[tf.Tensor]
+        List of tensors to check.
+    name : str, optional
+        Name of the tensor group for warning messages, by default "Tensor".
+
+    Returns
+    -------
+    bool
+        True if any tensor contains NaN or Inf, False otherwise.
+    """
     for t in tensors:
         if tf.reduce_any(tf.math.is_nan(t)) or tf.reduce_any(tf.math.is_inf(t)):
             print(f"Warning: {name} contains NaNs or Infs")
@@ -144,7 +165,7 @@ def cal_loss_step(
     vae_mode: bool = False,
     training: bool = True,
 ) -> tf.Tensor:
-    """Calculates the loss value on a batch of data.
+    """Calculate the loss value on a batch of data.
 
     Parameters
     ----------
@@ -227,8 +248,8 @@ def train_step(
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="AutoClassifier")
 class AutoClassifier(tf.keras.Model):
-    """
-    An auto-classifier model that automatically determines the best classification strategy based on the input data.
+    """An auto-classifier model that automatically determines the best classification strategy based
+    on the input data.
 
     Parameters
     ----------
@@ -290,6 +311,18 @@ class AutoClassifier(tf.keras.Model):
         self.lora_rank: int = kwargs.get("lora_rank", 4)
 
     def build_encoder_decoder(self, input_shape: tuple) -> None:
+        """Build the encoder and decoder layers for the autoencoder.
+
+        Parameters
+        ----------
+        input_shape : tuple
+            The shape of the input data.
+
+        Returns
+        -------
+        None
+            The method initializes the encoder and decoder attributes.
+        """
         self.encoder = (
             tf.keras.Sequential(
                 [
@@ -331,6 +364,13 @@ class AutoClassifier(tf.keras.Model):
         )
 
     def build(self, input_shape: tuple) -> None:
+        """Build the model architecture for the AutoClassifier.
+
+        Parameters
+        ----------
+        input_shape : tuple
+            The shape of the input data.
+        """
         if self.vae_mode:
             inputs = tf.keras.Input(shape=self.input_shape_parm, name="encoder_input")
             x = tf.keras.layers.Dense(
@@ -482,6 +522,18 @@ class AutoClassifier(tf.keras.Model):
         self.freeze_encoder_decoder()
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
+        """Perform the forward pass of the AutoClassifier.
+
+        Parameters
+        ----------
+        x : tf.Tensor
+            Input tensor.
+
+        Returns
+        -------
+        tf.Tensor
+            Output tensor.
+        """
         if self.vae_mode:
             mean, log_var = self.encoder(x)
             encoded = sampling(mean, log_var)
@@ -493,7 +545,9 @@ class AutoClassifier(tf.keras.Model):
         return classification
 
     def freeze_encoder_decoder(self) -> None:
-        """Freezes the encoder and decoder layers to prevent them from being updated during training."""
+        """Freezes the encoder and decoder layers to prevent them from being updated during
+        training.
+        """
         for layer in self.encoder.layers:
             layer.trainable = False
         for layer in self.decoder.layers:
@@ -507,8 +561,8 @@ class AutoClassifier(tf.keras.Model):
             layer.trainable = True
 
     def set_encoder_decoder(self, source_model: "AutoClassifier") -> None:
-        """Sets the encoder and decoder layers from another AutoClassifier instance,
-        ensuring compatibility in dimensions. Only works if vae_mode is False.
+        """Set the encoder and decoder layers from another AutoClassifier instance, ensuring
+        compatibility in dimensions. Only works if vae_mode is False.
 
         Parameters
         ----------
@@ -561,6 +615,13 @@ class AutoClassifier(tf.keras.Model):
                 raise ValueError(f"Layer type {type(layer)} not supported for copying.")
 
     def get_config(self) -> Dict[str, Any]:
+        """Get the configuration dictionary for serialization.
+
+        Returns
+        -------
+        config : dict
+            Configuration dictionary containing the parameters for the AutoClassifier.
+        """
         config = {
             "input_shape_parm": self.input_shape_parm,
             "num_classes": self.num_classes,
@@ -580,6 +641,24 @@ class AutoClassifier(tf.keras.Model):
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> "AutoClassifier":
+        """Create an AutoClassifier instance from a configuration dictionary.
+
+        This class method deserializes a configuration dictionary and creates
+        an AutoClassifier instance with the specified parameters.
+
+        Parameters
+        ----------
+        config : Dict[str, Any]
+            A dictionary containing the configuration parameters for the AutoClassifier.
+            Expected keys include: input_shape_parm, num_classes, units, activation,
+            classifier_activation, num_layers, dropout, l2_reg, vae_mode, vae_units,
+            lora_mode, and lora_rank.
+
+        Returns
+        -------
+        AutoClassifier
+            A new AutoClassifier instance configured according to the provided dictionary.
+        """
         return cls(
             input_shape_parm=config["input_shape_parm"],
             num_classes=config["num_classes"],
@@ -606,8 +685,7 @@ def call_existing_code(
     num_layers: int = 1,
     **kwargs,
 ) -> AutoClassifier:
-    """
-    Calls an existing AutoClassifier instance.
+    """Call an existing AutoClassifier instance.
 
     Parameters
     ----------
@@ -664,7 +742,7 @@ def call_existing_code(
 def build_model(
     hp: keras_tuner.HyperParameters, input_shape_parm: None | int, num_classes: None | int, **kwargs
 ) -> AutoClassifier:
-    """Builds a neural network model using Keras Tuner's search algorithm.
+    """Build a neural network model using Keras Tuner's search algorithm.
 
     Parameters
     ----------
@@ -805,7 +883,7 @@ def setup_model(
     method: str = "Hyperband",
     **kwargs,
 ) -> Tuple[AutoClassifier, pd.DataFrame]:
-    """Setup model for training and tuning.
+    """Set up model for training and tuning.
 
     Parameters
     ----------

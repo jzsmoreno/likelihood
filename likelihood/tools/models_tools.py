@@ -1,3 +1,5 @@
+"""Utility tools for machine-learning models, model suppression, and LoRA layer management."""
+
 import logging
 import os
 
@@ -33,6 +35,8 @@ from .tools import cal_average
 
 
 class suppress_prints:
+    """Context manager that suppresses stdout while the block is executed."""
+
     def __enter__(self):
         self.original_stdout = sys.stdout
         sys.stdout = open(os.devnull, "w")
@@ -45,6 +49,30 @@ class suppress_prints:
 def suppress_warnings(
     func: Callable[..., Any],
 ) -> Callable[..., Any]:
+    """Create a decorator that suppresses warnings raised by the decorated function.
+
+    This decorator wraps a function and catches all warnings within its execution,
+    effectively silencing any warning messages that would otherwise be displayed.
+
+    Parameters
+    ----------
+    func : Callable[..., Any]
+        The function to wrap with warning suppression.
+
+    Returns
+    -------
+    Callable[..., Any]
+        A wrapped version of the original function that executes without raising warnings.
+
+    Examples
+    --------
+    >>> @suppress_warnings
+    ... def risky_function():
+    ...     import warnings
+    ...     warnings.warn("This is a warning")
+    >>> risky_function()  # No warning will be displayed
+    """
+
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any):
         with warnings.catch_warnings():
@@ -55,14 +83,13 @@ def suppress_warnings(
 
 
 class TransformRange:
-    """
-    Generates a new DataFrame with ranges represented as strings.
+    """Generates a new DataFrame with ranges represented as strings.
 
     Transforms numerical columns into categorical range bins with descriptive labels.
     """
 
     def __init__(self, columns_bin_sizes: Dict[str, int]) -> None:
-        """Initializes the class with the original DataFrame.
+        """Initialize the class with the original DataFrame.
 
         Parameters
         ----------
@@ -80,8 +107,7 @@ class TransformRange:
     def _create_bins_and_labels(
         self, min_val: Union[int, float], max_val: Union[int, float], bin_size: int
     ) -> Tuple[np.ndarray, List[str]]:
-        """
-        Creates the bin edges and their labels.
+        """Create the bin edges and their labels.
 
         Parameters
         ----------
@@ -132,8 +158,7 @@ class TransformRange:
     def _transform_column_to_ranges(
         self, df: pd.DataFrame, column: str, bin_size: int, fit: bool = True
     ) -> pd.Series:
-        """
-        Transforms a column in the DataFrame into range bins.
+        """Transform a column in the DataFrame into range bins.
 
         Parameters
         ----------
@@ -190,8 +215,7 @@ class TransformRange:
     def transform(
         self, df: pd.DataFrame, drop_original: bool = False, fit: bool = True
     ) -> pd.DataFrame:
-        """
-        Creates a new DataFrame with range columns.
+        """Create a new DataFrame with range columns.
 
         Parameters
         ----------
@@ -234,8 +258,7 @@ class TransformRange:
         return result_df
 
     def get_range_info(self, column: str) -> Dict[str, Union[int, float, List[str]]]:
-        """
-        Get information about the range transformation for a specific column.
+        """Get information about the range transformation for a specific column.
 
         Parameters
         ----------
@@ -263,8 +286,7 @@ class TransformRange:
 
 
 def remove_collinearity(df: pd.DataFrame, threshold: float = 0.9):
-    """
-    Removes highly collinear features from the DataFrame based on a correlation threshold.
+    """Remove highly collinear features from the DataFrame based on a correlation threshold.
 
     This function calculates the correlation matrix of the DataFrame and removes columns
     that are highly correlated with any other column in the DataFrame. It uses an absolute
@@ -301,8 +323,7 @@ def train_and_insights(
     frac: float = 1.0,
     **kwargs: Optional[Dict],
 ) -> tf.keras.Model:
-    """
-    Train a Keras model and provide insights on the training and validation metrics.
+    """Train a Keras model and provide insights on the training and validation metrics.
 
     Parameters
     ----------
@@ -371,6 +392,8 @@ def train_and_insights(
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="LoRALayer")
 class LoRALayer(tf.keras.layers.Layer):
+    """A LoRA (Low-Rank Adaptation) layer for fine-tuning large models."""
+
     def __init__(
         self,
         units: int,
@@ -382,6 +405,30 @@ class LoRALayer(tf.keras.layers.Layer):
         self.rank = rank
 
     def build(self, input_shape: tf.TensorShape):
+        """Build the LoRA layer weights based on the input shape.
+
+        This method initializes the weight matrices (A and B) for the LoRA decomposition
+        and validates that the rank parameter is appropriate given the input/output dimensions.
+
+        Parameters
+        ----------
+        input_shape : tf.TensorShape
+            The shape of the input tensor, used to determine the dimensionality of
+            the weight matrices.
+
+        Raises
+        ------
+        ValueError
+            If rank is greater than input dimension or number of units.
+
+        Notes
+        -----
+        Creates two trainable weight matrices:
+        - A: Shape (input_dim, rank) with random_normal initialization
+        - B: Shape (rank, units) with random_normal initialization
+
+        The LoRA approximation computes: inputs @ A @ B instead of the full weight matrix.
+        """
         input_dim = input_shape[-1]
         print(f"Input shape: {input_shape}")
 
@@ -404,6 +451,26 @@ class LoRALayer(tf.keras.layers.Layer):
         print(f"LoRA weights shape: A{self.A.shape}, B{self.B.shape}")
 
     def call(self, inputs: Any) -> Any:
+        """Apply the LoRA layer to the input tensor.
+
+        This method computes the LoRA approximation by multiplying the input with
+        the weight matrices A and B: output = inputs @ A @ B
+
+        Parameters
+        ----------
+        inputs : Any
+            The input tensor to apply the LoRA transformation to.
+
+        Returns
+        -------
+        Any
+            The output tensor after applying the LoRA layer multiplication.
+
+        Notes
+        -----
+        This method performs the forward pass of the LoRA layer, computing the
+        low-rank approximation without modifying the original weights.
+        """
         lora_output = tf.matmul(tf.matmul(inputs, self.A), self.B)
         return lora_output
 
@@ -412,6 +479,33 @@ def apply_lora(
     model: tf.keras.Model,
     rank: int = 4,
 ) -> tf.keras.Model:
+    """Apply LoRA (Low-Rank Adaptation) to Dense layers in a Keras model.
+
+    This function creates a new model with LoRA layers applied to all Dense layers
+    in the original model. LoRA is a parameter-efficient fine-tuning method that
+    decomposes weight matrices into two lower-rank matrices.
+
+    Parameters
+    ----------
+    model : tf.keras.Model
+        The original Keras model to apply LoRA to. All Dense layers will have
+        LoRA applied.
+    rank : int, optional
+        The rank parameter for LoRA decomposition (default is 4). This determines
+        the dimensionality of the low-rank approximation.
+
+    Returns
+    -------
+    tf.keras.Model
+        A new Keras model with LoRA layers applied to all Dense layers.
+
+    Notes
+    -----
+    For each Dense layer in the original model, a corresponding LoRALayer is inserted
+    that computes: output = inputs @ W_original + (inputs @ A @ B) where A and B are
+    low-rank matrices. The rank parameter controls the trade-off between model size
+    and adaptation capacity.
+    """
     inputs = tf.keras.Input(shape=model.input_shape[1:])
     x = inputs
 
@@ -426,8 +520,8 @@ def apply_lora(
 
 
 def graph_metrics(adj_matrix: np.ndarray, eigenvector_threshold: float = 1e-6) -> pd.DataFrame:
-    """
-    Calculate various graph metrics based on the given adjacency matrix and return them in a single DataFrame.
+    """Calculate various graph metrics based on the given adjacency matrix and return them in a
+    single DataFrame.
 
     Parameters
     ----------
@@ -493,6 +587,39 @@ def print_trajectory_info(
     terminate: bool,
     done: bool,
 ) -> None:
+    """Print trajectory information for reinforcement learning episodes.
+
+    This function displays formatted information about a single transition in a
+    reinforcement learning episode, including state, action, reward, and termination
+    status.
+
+    Parameters
+    ----------
+    state : Any
+        The initial state before the action was taken.
+    selected_option : Any
+        The option or decision selected at the given state.
+    action : Any
+        The action executed in the environment.
+    reward : Any
+        The reward received after executing the action.
+    next_state : Any
+        The resulting state after executing the action.
+    terminate : bool
+        Whether the episode has terminated.
+    done : bool
+        Additional flag indicating if the episode is complete.
+
+    Returns
+    -------
+    None
+        This function prints information to stdout but does not return a value.
+
+    Notes
+    -----
+    The output is formatted with separators for readability and includes all key
+    components of a reinforcement learning transition tuple (s, a, r, s', done).
+    """
     print("=" * 50)
     print("TRAJECTORY INFO".center(50, "="))
     print("=" * 50)
@@ -507,8 +634,8 @@ def print_trajectory_info(
 
 
 def get_selected_probs(action_probs: torch.Tensor, action: torch.Tensor | int):
-    """
-    Retrieves the probabilities of selected actions from a single-batch action probability distribution.
+    """Retrieve the probabilities of selected actions from a single-batch action probability
+    distribution.
 
     Parameters
     ----------
@@ -667,7 +794,7 @@ def ppo_loss(
     action_probs: torch.Tensor,
     epsilon: float = 0.2,
 ) -> torch.Tensor:
-    """Computes the Proximal Policy Optimization (PPO) loss using the clipped objective.
+    """Compute the Proximal Policy Optimization (PPO) loss using the clipped objective.
 
     Parameters
     ----------
@@ -685,7 +812,6 @@ def ppo_loss(
     loss : `torch.Tensor`
         The PPO loss, averaged across the batch of samples. The loss is computed using the clipped objective to penalize large policy updates.
     """
-
     if advantages.dim() == 1:
         advantages = advantages.unsqueeze(-1)
 
@@ -711,7 +837,7 @@ def grpo_loss(
     epsilon: float = 0.2,
     beta_kl: float = 0.04,
 ) -> torch.Tensor:
-    """Computes the Group Relative Policy Optimization (GRPO) loss.
+    """Compute the Group Relative Policy Optimization (GRPO) loss.
 
     GRPO replaces the value-function-based advantage of PPO with group-relative
     advantages (normalized within a group of samples) and adds a KL divergence
@@ -1178,7 +1304,7 @@ def plot_two_region_histograms_boxplots(
     action_outputs: Dict[str, np.ndarray],
 ) -> None:
     """
-    Creates a figure with:
+    Create a figure with:
       - Top panel: overlaid histograms for option outputs.
       - Bottom panel: boxplots for action outputs.
 
@@ -1194,7 +1320,6 @@ def plot_two_region_histograms_boxplots(
     -------
     None
     """
-
     sns.set_theme(style="whitegrid", context="notebook")
     show_actions = len(action_outputs) <= 5
     is_dark = plt.rcParams.get("figure.facecolor") not in ["#ffffff", "white"]
@@ -1341,8 +1466,7 @@ def analyze_network_variations(
     temperature: float = 1.0,
     plot_graph: bool = False,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, int]:
-    """
-    Analyzes the output variations of option_network and action_networks for a given sample.
+    """Analyzes the output variations of option_network and action_networks for a given sample.
 
     Parameters
     ----------
@@ -1470,8 +1594,7 @@ def network_analysis_table(
     train_option: bool = False,
     temperature: float = 1.0,
 ) -> str:
-    """
-    Creates a well-formatted table showing statistics for option_network and action_networks.
+    """Create a well-formatted table showing statistics for option_network and action_networks.
 
     Parameters
     ----------
@@ -1493,7 +1616,6 @@ def network_analysis_table(
     str
         Formatted string with network analysis tables.
     """
-
     option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
         model,
         sample_data,
@@ -1580,6 +1702,30 @@ def display_network_analysis(
     temperature: float = 1.0,
     plot_graph: bool = True,
 ) -> None:
+    """Analyze and visualize network statistics for a given model and sample data.
+
+    This function performs network analysis on the provided model using the sample
+    data and optionally displays the results as a graph.
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        The PyTorch neural network model to analyze.
+    sample_data : np.ndarray
+        Input data used for the network analysis.
+    multiple_option : bool, optional
+        If True, enable multiple option analysis. Default is False.
+    temperature : float, optional
+        Temperature parameter for the analysis. Default is 1.0.
+    plot_graph : bool, optional
+        If True, display the analysis graph. Default is True.
+
+    Returns
+    -------
+    None
+        This function does not return any value. It performs analysis and optionally
+        displays a graph.
+    """
     option_df, action_df, max_opt_dim, max_act_dim = analyze_network_variations(
         model, sample_data, multiple_option, temperature, plot_graph
     )

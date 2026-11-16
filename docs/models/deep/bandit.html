@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.models.deep.bandit API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Bandit model definitions.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.models.deep.bandit</code></h1>
 </header>
 <section id="section-intro">
+<p>Bandit model definitions.</p>
 </section>
 <section>
 </section>
@@ -56,6 +57,31 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class MultiBanditNet(nn.Module):
+    &#34;&#34;&#34;A neural network for the multi-armed bandit problem with several options.
+
+    Parameters
+    ----------
+    state_dim : int
+        Dimensionality of the state (observation) vector.
+    num_options : int
+        Number of distinct options (or bandits) to choose between.
+    num_actions_per_option : int or List[int]
+        Number of actions available for a single option, or a list giving the
+        number of actions for each option individually.
+    num_neurons : int, default 128
+        Width of the hidden layers in every sub-network.
+    num_layers : int, default 1
+        Number of hidden layers in the action networks.
+    activation : str or nn.Module, default ``nn.SELU()``
+        Activation function applied between the linear layers. One of
+        ``&#34;relu&#34;``, ``&#34;relu6&#34;``, ``&#34;rrelu&#34;``, ``&#34;selu&#34;``,
+        ``&#34;leaky_relu&#34;``, ``&#34;sigmoid&#34;``, ``&#34;tanh&#34;``, ``&#34;hardswish&#34;``,
+        ``&#34;gelu&#34;``, ``&#34;elu&#34;``, ``&#34;softplus&#34;``, ``&#34;softmax&#34;`` or ``&#34;identity&#34;``.
+    dropout_rate : float, default 0.3
+        Dropout probability applied to the action networks when greater than
+        zero; the option and value networks are not dropped.
+    &#34;&#34;&#34;
+
     def __init__(
         self,
         state_dim: int,
@@ -171,39 +197,60 @@ el.replaceWith(d);
             selected_actions,
         )</code></pre>
 </details>
-<div class="desc"><p>Base class for all neural network modules.</p>
-<p>Your models should also subclass this class.</p>
-<p>Modules can also contain other Modules, allowing them to be nested in
-a tree structure. You can assign the submodules as regular attributes::</p>
-<pre><code>import torch.nn as nn
-import torch.nn.functional as F
-
-
-class Model(nn.Module):
-    def __init__(self) -&gt; None:
-        super().__init__()
-        self.conv1 = nn.Conv2d(1, 20, 5)
-        self.conv2 = nn.Conv2d(20, 20, 5)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        return F.relu(self.conv2(x))
-</code></pre>
-<p>Submodules assigned in this way will be registered, and will also have their
-parameters converted when you call :meth:<code>to</code>, etc.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>As per the example above, an <code>__init__()</code> call to the parent class
-must be made before assignment on the child.</p>
-</div>
-<p>:ivar training: Boolean represents whether this module is in training or
-evaluation mode.
-:vartype training: bool</p>
+<div class="desc"><p>A neural network for the multi-armed bandit problem with several options.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>state_dim</code></strong> :&ensp;<code>int</code></dt>
+<dd>Dimensionality of the state (observation) vector.</dd>
+<dt><strong><code>num_options</code></strong> :&ensp;<code>int</code></dt>
+<dd>Number of distinct options (or bandits) to choose between.</dd>
+<dt><strong><code>num_actions_per_option</code></strong> :&ensp;<code>int</code> or <code>List[int]</code></dt>
+<dd>Number of actions available for a single option, or a list giving the
+number of actions for each option individually.</dd>
+<dt><strong><code>num_neurons</code></strong> :&ensp;<code>int</code>, default <code>128</code></dt>
+<dd>Width of the hidden layers in every sub-network.</dd>
+<dt><strong><code>num_layers</code></strong> :&ensp;<code>int</code>, default <code>1</code></dt>
+<dd>Number of hidden layers in the action networks.</dd>
+<dt><strong><code>activation</code></strong> :&ensp;<code>str</code> or <code>nn.Module</code>, default <code>nn.SELU()</code></dt>
+<dd>Activation function applied between the linear layers. One of
+<code>"relu"</code>, <code>"relu6"</code>, <code>"rrelu"</code>, <code>"selu"</code>,
+<code>"leaky_relu"</code>, <code>"sigmoid"</code>, <code>"tanh"</code>, <code>"hardswish"</code>,
+<code>"gelu"</code>, <code>"elu"</code>, <code>"softplus"</code>, <code>"softmax"</code> or <code>"identity"</code>.</dd>
+<dt><strong><code>dropout_rate</code></strong> :&ensp;<code>float</code>, default <code>0.3</code></dt>
+<dd>Dropout probability applied to the action networks when greater than
+zero; the option and value networks are not dropped.</dd>
+</dl>
 <p>Initialize internal Module state, shared by both nn.Module and ScriptModule.</p></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li>torch.nn.modules.module.Module</li>
 </ul>
+<h3>Static methods</h3>
+<dl>
+<dt id="likelihood.models.deep.bandit.MultiBanditNet.load"><code class="name flex">
+<span>def <span class="ident">load</span></span>(<span>path: str | pathlib.Path = './multibanditnet.pt') ‑> <a title="likelihood.models.deep.bandit.MultiBanditNet" href="#likelihood.models.deep.bandit.MultiBanditNet">MultiBanditNet</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Rebuild a network saved with :meth:<code>save</code>.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>path</code></strong> :&ensp;<code>str</code> or <code>pathlib.Path</code>, default=<code>"./multibanditnet.pt"</code></dt>
+<dd>Checkpoint written by :meth:<code>save</code>.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code><a title="likelihood.models.deep.bandit.MultiBanditNet" href="#likelihood.models.deep.bandit.MultiBanditNet">MultiBanditNet</a></code></dt>
+<dd>Network with the stored weights, in evaluation mode.</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>ValueError</code></dt>
+<dd>If the file is not a checkpoint written by :meth:<code>save</code>.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>Checkpoints are pickles, so only load files you trust.</p></div>
+</dd>
+</dl>
 <h3>Methods</h3>
 <dl>
 <dt id="likelihood.models.deep.bandit.MultiBanditNet.forward"><code class="name flex">
@@ -311,6 +358,54 @@ evaluation mode.
 </dd>
 </dl></div>
 </dd>
+<dt id="likelihood.models.deep.bandit.MultiBanditNet.save"><code class="name flex">
+<span>def <span class="ident">save</span></span>(<span>self, path: str | pathlib.Path = './multibanditnet.pt') ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def save(self, path: str | Path = &#34;./multibanditnet.pt&#34;) -&gt; None:
+    &#34;&#34;&#34;Serialize the network configuration and weights to ``path``.
+
+    The checkpoint stores the constructor arguments (including the
+    activation module) next to the ``state_dict``, so :meth:`load` can
+    rebuild the very same architecture without guessing it.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path, default=&#34;./multibanditnet.pt&#34;
+        Destination file. Any extension accepted by :func:`torch.save`
+        works; ``.pt`` and ``.pth`` are the usual choices.
+    &#34;&#34;&#34;
+    checkpoint = {
+        &#34;format&#34;: &#34;likelihood.models.deep.bandit.MultiBanditNet&#34;,
+        &#34;version&#34;: 1,
+        &#34;config&#34;: {
+            &#34;state_dim&#34;: self.state_dim,
+            &#34;num_options&#34;: self.num_options,
+            &#34;num_actions_per_option&#34;: self.num_actions_per_option,
+            &#34;num_neurons&#34;: self.num_neurons,
+            &#34;num_layers&#34;: self.num_layers,
+            &#34;activation&#34;: self.activation,
+            &#34;dropout_rate&#34;: self.dropout_rate,
+        },
+        &#34;state_dict&#34;: self.state_dict(),
+    }
+    torch.save(checkpoint, str(path))</code></pre>
+</details>
+<div class="desc"><p>Serialize the network configuration and weights to <code>path</code>.</p>
+<p>The checkpoint stores the constructor arguments (including the
+activation module) next to the <code>state_dict</code>, so :meth:<code>load</code> can
+rebuild the very same architecture without guessing it.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>path</code></strong> :&ensp;<code>str</code> or <code>pathlib.Path</code>, default=<code>"./multibanditnet.pt"</code></dt>
+<dd>Destination file. Any extension accepted by :func:<code>torch.save</code>
+works; <code>.pt</code> and <code>.pth</code> are the usual choices.</dd>
+</dl></div>
+</dd>
 </dl>
 </dd>
 </dl>
@@ -332,6 +427,8 @@ evaluation mode.
 <h4><code><a title="likelihood.models.deep.bandit.MultiBanditNet" href="#likelihood.models.deep.bandit.MultiBanditNet">MultiBanditNet</a></code></h4>
 <ul class="">
 <li><code><a title="likelihood.models.deep.bandit.MultiBanditNet.forward" href="#likelihood.models.deep.bandit.MultiBanditNet.forward">forward</a></code></li>
+<li><code><a title="likelihood.models.deep.bandit.MultiBanditNet.load" href="#likelihood.models.deep.bandit.MultiBanditNet.load">load</a></code></li>
+<li><code><a title="likelihood.models.deep.bandit.MultiBanditNet.save" href="#likelihood.models.deep.bandit.MultiBanditNet.save">save</a></code></li>
 </ul>
 </li>
 </ul>

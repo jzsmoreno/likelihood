@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.models.environments API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="RL environment and action-space definitions.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.models.environments</code></h1>
 </header>
 <section id="section-intro">
+<p>RL environment and action-space definitions.</p>
 </section>
 <section>
 </section>
@@ -53,9 +54,31 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def flatten_chain(matrix: List[List[Any]]) -&gt; List[Any]:
+    &#34;&#34;&#34;Flatten a chain of lists into a single list.
+
+    Parameters
+    ----------
+    matrix : List[List[Any]]
+        A list of lists to be flattened.
+
+    Returns
+    -------
+    List[Any]
+        A single list containing all elements from the nested lists.
+    &#34;&#34;&#34;
     return list(chain.from_iterable(matrix))</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Flatten a chain of lists into a single list.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>matrix</code></strong> :&ensp;<code>List[List[Any]]</code></dt>
+<dd>A list of lists to be flattened.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>List[Any]</code></dt>
+<dd>A single list containing all elements from the nested lists.</dd>
+</dl></div>
 </dd>
 </dl>
 </section>
@@ -72,14 +95,94 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class ActionSpace:
+    &#34;&#34;&#34;Action space representing a discrete set of actions.
+
+    Parameters
+    ----------
+    num_actions : int
+        The number of possible actions.
+    &#34;&#34;&#34;
+
     def __init__(self, num_actions: int) -&gt; None:
         self._num_actions = num_actions
 
     @property
     def n(self) -&gt; int:
-        return self._num_actions</code></pre>
+        &#34;&#34;&#34;The number of actions in the space.&#34;&#34;&#34;
+        return self._num_actions
+
+    def save(self, path: str | Path = &#34;./action_space.pkl&#34;) -&gt; None:
+        &#34;&#34;&#34;Serialize the action space to disk using pickle.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default=&#34;./action_space.pkl&#34;
+            Destination file.
+        &#34;&#34;&#34;
+        with Path(path).open(&#34;wb&#34;) as file:
+            pickle.dump(self, file)
+
+    @classmethod
+    def load(cls, path: str | Path = &#34;./action_space.pkl&#34;) -&gt; &#34;ActionSpace&#34;:
+        &#34;&#34;&#34;Restore an action space saved with :meth:`save`.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default=&#34;./action_space.pkl&#34;
+            Checkpoint written by :meth:`save`.
+
+        Returns
+        -------
+        ActionSpace
+            Action space with the stored number of actions.
+
+        Raises
+        ------
+        TypeError
+            If the pickle does not contain an :class:`ActionSpace` instance.
+
+        Notes
+        -----
+        Checkpoints are pickles, so only load files you trust.
+        &#34;&#34;&#34;
+        with Path(path).open(&#34;rb&#34;) as file:
+            space = pickle.load(file)
+        if not isinstance(space, cls):
+            raise TypeError(f&#34;{str(path)!r} does not contain an ActionSpace instance&#34;)
+        return space</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Action space representing a discrete set of actions.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>num_actions</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of possible actions.</dd>
+</dl></div>
+<h3>Static methods</h3>
+<dl>
+<dt id="likelihood.models.environments.ActionSpace.load"><code class="name flex">
+<span>def <span class="ident">load</span></span>(<span>path: str | pathlib.Path = './action_space.pkl') ‑> <a title="likelihood.models.environments.ActionSpace" href="#likelihood.models.environments.ActionSpace">ActionSpace</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Restore an action space saved with :meth:<code>save</code>.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>path</code></strong> :&ensp;<code>str</code> or <code>pathlib.Path</code>, default=<code>"./action_space.pkl"</code></dt>
+<dd>Checkpoint written by :meth:<code>save</code>.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code><a title="likelihood.models.environments.ActionSpace" href="#likelihood.models.environments.ActionSpace">ActionSpace</a></code></dt>
+<dd>Action space with the stored number of actions.</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<dl>
+<dt><code>TypeError</code></dt>
+<dd>If the pickle does not contain an :class:<code><a title="likelihood.models.environments.ActionSpace" href="#likelihood.models.environments.ActionSpace">ActionSpace</a></code> instance.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>Checkpoints are pickles, so only load files you trust.</p></div>
+</dd>
+</dl>
 <h3>Instance variables</h3>
 <dl>
 <dt id="likelihood.models.environments.ActionSpace.n"><code class="name">prop <span class="ident">n</span> : int</code></dt>
@@ -90,9 +193,39 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">@property
 def n(self) -&gt; int:
+    &#34;&#34;&#34;The number of actions in the space.&#34;&#34;&#34;
     return self._num_actions</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>The number of actions in the space.</p></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="likelihood.models.environments.ActionSpace.save"><code class="name flex">
+<span>def <span class="ident">save</span></span>(<span>self, path: str | pathlib.Path = './action_space.pkl') ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def save(self, path: str | Path = &#34;./action_space.pkl&#34;) -&gt; None:
+    &#34;&#34;&#34;Serialize the action space to disk using pickle.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path, default=&#34;./action_space.pkl&#34;
+        Destination file.
+    &#34;&#34;&#34;
+    with Path(path).open(&#34;wb&#34;) as file:
+        pickle.dump(self, file)</code></pre>
+</details>
+<div class="desc"><p>Serialize the action space to disk using pickle.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>path</code></strong> :&ensp;<code>str</code> or <code>pathlib.Path</code>, default=<code>"./action_space.pkl"</code></dt>
+<dd>Destination file.</dd>
+</dl></div>
 </dd>
 </dl>
 </dd>
@@ -106,8 +239,7 @@ def n(self) -&gt; int:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class OptionCriticEnv:
-    &#34;&#34;&#34;
-    An environment for Option Critic reinforcement learning that processes a dataset of episodes.
+    &#34;&#34;&#34;An environment for Option Critic reinforcement learning that processes a dataset of episodes.
 
     Attributes
     ----------
@@ -135,8 +267,7 @@ def n(self) -&gt; int:
         self,
         episodes: Dict[int, Dict[str, List]],
     ) -&gt; None:
-        &#34;&#34;&#34;
-        Initializes the OptionCriticEnv with a dataset of episodes.
+        &#34;&#34;&#34;Initialize the OptionCriticEnv with a dataset of episodes.
 
         Parameters
         ----------
@@ -246,7 +377,7 @@ def n(self) -&gt; int:
         decimals: int = 6,
     ) -&gt; Tuple:
         &#34;&#34;&#34;
-        Builds a canonical transition key:
+        Build a canonical transition key.
         ((state_tuple), option(s)..., action(s)...)
         &#34;&#34;&#34;
         state_key = tuple(round(float(x), decimals) for x in state)
@@ -258,8 +389,7 @@ def n(self) -&gt; int:
             return (state_key, int(option), int(action))
 
     def reset(self) -&gt; tuple[np.ndarray, dict]:
-        &#34;&#34;&#34;
-        Resets the environment to a random episode and returns the initial state.
+        &#34;&#34;&#34;Reset the environment to a random episode and returns the initial state.
 
         Returns
         -------
@@ -276,8 +406,8 @@ def n(self) -&gt; int:
     def step(
         self, action: int | List[int], option: int | List[int]
     ) -&gt; tuple[np.ndarray, float, bool, bool, dict]:
-        &#34;&#34;&#34;
-        Takes an action with a specific option and returns the next state, reward, and termination status.
+        &#34;&#34;&#34;Take an action with a specific option and returns the next state, reward, and
+        termination status.
 
         Parameters
         ----------
@@ -350,7 +480,11 @@ def n(self) -&gt; int:
 <dt><strong><code>current_state</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>Current state observation in the environment</dd>
 </dl>
-<p>Initializes the OptionCriticEnv with a dataset of episodes.</p>
+<h2 id="notes">Notes</h2>
+<p>The environment is a simulator derived from the episode dataset (it builds
+spatial indexes over the transitions), so it is rebuilt from that dataset
+instead of being checkpointed as a model artifact.</p>
+<p>Initialize the OptionCriticEnv with a dataset of episodes.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>episodes</code></strong> :&ensp;<code>Dict[int, Dict]</code></dt>
@@ -379,8 +513,7 @@ Each episode must contain at least:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def reset(self) -&gt; tuple[np.ndarray, dict]:
-    &#34;&#34;&#34;
-    Resets the environment to a random episode and returns the initial state.
+    &#34;&#34;&#34;Reset the environment to a random episode and returns the initial state.
 
     Returns
     -------
@@ -394,7 +527,7 @@ Each episode must contain at least:
     self.current_state = self.episodes[episode_id][&#34;state&#34;][0]
     return self.current_state, {}</code></pre>
 </details>
-<div class="desc"><p>Resets the environment to a random episode and returns the initial state.</p>
+<div class="desc"><p>Reset the environment to a random episode and returns the initial state.</p>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><strong><code>observation</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -414,8 +547,8 @@ Each episode must contain at least:
 <pre><code class="python">def step(
     self, action: int | List[int], option: int | List[int]
 ) -&gt; tuple[np.ndarray, float, bool, bool, dict]:
-    &#34;&#34;&#34;
-    Takes an action with a specific option and returns the next state, reward, and termination status.
+    &#34;&#34;&#34;Take an action with a specific option and returns the next state, reward, and
+    termination status.
 
     Parameters
     ----------
@@ -466,7 +599,8 @@ Each episode must contain at least:
             {},
         )</code></pre>
 </details>
-<div class="desc"><p>Takes an action with a specific option and returns the next state, reward, and termination status.</p>
+<div class="desc"><p>Take an action with a specific option and returns the next state, reward, and
+termination status.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>action</code></strong> :&ensp;<code>int` | `List[int]</code></dt>
@@ -517,7 +651,9 @@ Each episode must contain at least:
 <li>
 <h4><code><a title="likelihood.models.environments.ActionSpace" href="#likelihood.models.environments.ActionSpace">ActionSpace</a></code></h4>
 <ul class="">
+<li><code><a title="likelihood.models.environments.ActionSpace.load" href="#likelihood.models.environments.ActionSpace.load">load</a></code></li>
 <li><code><a title="likelihood.models.environments.ActionSpace.n" href="#likelihood.models.environments.ActionSpace.n">n</a></code></li>
+<li><code><a title="likelihood.models.environments.ActionSpace.save" href="#likelihood.models.environments.ActionSpace.save">save</a></code></li>
 </ul>
 </li>
 <li>

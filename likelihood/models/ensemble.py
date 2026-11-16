@@ -1,3 +1,5 @@
+"""Ensemble model definitions."""
+
 import json
 import os
 from typing import Any, Dict, List, Optional, Tuple, Type
@@ -242,9 +244,7 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
         return self.scores
 
     def _save_keras_model(self, model: Any, path: str) -> None:
-        """
-        Internal helper to save a Keras model depending on TF version.
-        """
+        """Save a Keras model depending on TF version."""
         is_updated = version.parse(tf.__version__) > version.parse("2.15.0")
 
         if is_updated:
@@ -253,11 +253,9 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
             model.save(path, save_format="tf")
 
     def save(self, filepath: str) -> None:
+        """Save ensemble metadata and models inside a directory named after the last part of
+        filepath.
         """
-        Save ensemble metadata and models inside a directory
-        named after the last part of filepath.
-        """
-
         filepath = filepath.rstrip(".pkl")
         parent_dir = os.path.dirname(filepath)
         folder_name = os.path.basename(filepath)
@@ -285,6 +283,20 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
 
     @classmethod
     def load(cls, filepath: str, base_model_class: Optional[Type] = None) -> "EnsembleClassifier":
+        """Load an EnsembleClassifier instance from a saved directory.
+
+        Parameters
+        ----------
+        filepath : str
+            Path to the .pkl file containing the saved ensemble metadata.
+        base_model_class : type, optional
+            The base model class to use for reconstructing models. Defaults to AutoClassifier.
+
+        Returns
+        -------
+        EnsembleClassifier
+            The loaded ensemble instance.
+        """
         filepath = filepath.rstrip(".pkl")
 
         parent_dir = os.path.dirname(filepath)
@@ -306,9 +318,7 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
             base_model_class = AutoClassifier
 
         def _load_keras_model(path: str) -> Any:
-            """
-            Internal helper to load a Keras model depending on TF version.
-            """
+            """Load a Keras model depending on TF version."""
             is_updated = version.parse(tf.__version__) > version.parse("2.15.0")
 
             if is_updated:
@@ -326,6 +336,7 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
         return ensemble
 
     def __repr__(self) -> str:
+        """Return a human-readable representation of the ensemble."""
         return (
             f"EnsembleClassifier(n_models={self.n_models}, "
             f"voting_method='{self.voting_method}', "

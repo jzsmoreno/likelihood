@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.models.deep.rl API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Reinforcement learning algorithms and utilities for the likelihood package …">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,9 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.models.deep.rl</code></h1>
 </header>
 <section id="section-intro">
+<p>Reinforcement learning algorithms and utilities for the likelihood package.</p>
+<p>This module provides utilities for training and evaluating reinforcement learning (RL) models,
+including environment wrappers, exploration policies, and training loops.</p>
 </section>
 <section>
 </section>
@@ -53,6 +56,17 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def print_progress_bar(iteration: int, total: int, length: int = 30) -&gt; None:
+    &#34;&#34;&#34;Print a progress bar to the console showing training progress.
+
+    Parameters
+    ----------
+    iteration : int
+        The current iteration number.
+    total : int
+        The total number of iterations.
+    length : int
+        The length of the progress bar. Default is 30.
+    &#34;&#34;&#34;
     percent = f&#34;{100 * (iteration / float(total)):.1f}&#34;
     filled_length = int(length * iteration // total)
     bar = &#34;█&#34; * filled_length + &#34;-&#34; * (length - filled_length)
@@ -60,7 +74,16 @@ el.replaceWith(d);
     if iteration == total:
         print()</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Print a progress bar to the console showing training progress.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>iteration</code></strong> :&ensp;<code>int</code></dt>
+<dd>The current iteration number.</dd>
+<dt><strong><code>total</code></strong> :&ensp;<code>int</code></dt>
+<dd>The total number of iterations.</dd>
+<dt><strong><code>length</code></strong> :&ensp;<code>int</code></dt>
+<dd>The length of the progress bar. Default is 30.</dd>
+</dl></div>
 </dd>
 </dl>
 </section>
@@ -77,13 +100,18 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AutoQL:
-    &#34;&#34;&#34;
-    AutoQL: A reinforcement learning agent using Q-learning with Epsilon-greedy policy.
+    &#34;&#34;&#34;AutoQL: A reinforcement learning agent using Q-learning with Epsilon-greedy policy.
 
     This class implements a Q-learning agent with:
     - Epsilon-greedy policy for exploration
     - Replay buffer for experience replay
     - Automatic model version handling for TensorFlow
+
+    Notes
+    -----
+    The agent holds the environment and the Q-network supplied by the caller, so
+    it cannot be reconstructed from a path. Persist the ``tf.keras.Model`` with
+    its own ``save``/``load_model`` helpers and create the agent again.
     &#34;&#34;&#34;
 
     def __init__(
@@ -92,7 +120,7 @@ el.replaceWith(d);
         model: tf.keras.Model,
         maxlen: int = 2000,
     ) -&gt; None:
-        &#34;&#34;&#34;Initialize AutoQL agent
+        &#34;&#34;&#34;Initialize AutoQL agent.
 
         Parameters
         ----------
@@ -101,7 +129,6 @@ el.replaceWith(d);
         model : `tf.keras.Model`
             The Q-network model
         &#34;&#34;&#34;
-
         self.env = env
         self.model = model
         self.maxlen = maxlen
@@ -110,8 +137,7 @@ el.replaceWith(d);
     def epsilon_greedy_policy(
         self, state: np.ndarray, action: int, epsilon: float = 0.0
     ) -&gt; Tuple[Any, int, float, Any, bool]:
-        &#34;&#34;&#34;
-        Epsilon-greedy policy for action selection
+        &#34;&#34;&#34;Epsilon-greedy policy for action selection.
 
         Parameters
         ----------
@@ -139,8 +165,7 @@ el.replaceWith(d);
     def play_one_step(
         self, state: np.ndarray, action: int, epsilon: float
     ) -&gt; Tuple[Any, int, float, Any, int]:
-        &#34;&#34;&#34;
-        Perform one step in the environment and add experience to buffer
+        &#34;&#34;&#34;Perform one step in the environment and add experience to buffer.
 
         Parameters
         ----------
@@ -177,14 +202,12 @@ el.replaceWith(d);
 
     @tf.function
     def _training_step(self) -&gt; float:
-        &#34;&#34;&#34;
-        Perform one training step using experience replay
+        &#34;&#34;&#34;Perform one training step using experience replay.
 
         Returns
         -------
         float : Training loss
         &#34;&#34;&#34;
-
         batch_ = random.sample(self.replay_buffer, self.batch_size)
         states, actions, rewards, next_actions, dones = zip(*batch_)
         states = np.array(states).reshape(self.batch_size, -1)
@@ -226,7 +249,7 @@ el.replaceWith(d);
         patience: int = 10,
         alpha: float = 0.01,
     ) -&gt; None:
-        &#34;&#34;&#34;Train the agent for a fixed number of episodes
+        &#34;&#34;&#34;Train the agent for a fixed number of episodes.
 
         Parameters
         ----------
@@ -322,6 +345,7 @@ el.replaceWith(d);
         self.model.set_weights(self.best_weights)
 
     def __str__(self) -&gt; str:
+        &#34;&#34;&#34;Return a human-readable string representation of the agent.&#34;&#34;&#34;
         return (
             f&#34;AutoQL (Env: {self.env.name}, Episodes: {self.num_episodes}, Steps: {self.num_steps})&#34;
         )</code></pre>
@@ -331,7 +355,11 @@ el.replaceWith(d);
 - Epsilon-greedy policy for exploration
 - Replay buffer for experience replay
 - Automatic model version handling for TensorFlow</p>
-<p>Initialize AutoQL agent</p>
+<h2 id="notes">Notes</h2>
+<p>The agent holds the environment and the Q-network supplied by the caller, so
+it cannot be reconstructed from a path. Persist the <code>tf.keras.Model</code> with
+its own <code>save</code>/<code>load_model</code> helpers and create the agent again.</p>
+<p>Initialize AutoQL agent.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>env</code></strong> :&ensp;<code>Any</code></dt>
@@ -352,8 +380,7 @@ el.replaceWith(d);
 <pre><code class="python">def epsilon_greedy_policy(
     self, state: np.ndarray, action: int, epsilon: float = 0.0
 ) -&gt; Tuple[Any, int, float, Any, bool]:
-    &#34;&#34;&#34;
-    Epsilon-greedy policy for action selection
+    &#34;&#34;&#34;Epsilon-greedy policy for action selection.
 
     Parameters
     ----------
@@ -378,7 +405,7 @@ el.replaceWith(d);
 
     return _state[0], greedy_action[0], _reward[0], _next_action[0], _done[0]</code></pre>
 </details>
-<div class="desc"><p>Epsilon-greedy policy for action selection</p>
+<div class="desc"><p>Epsilon-greedy policy for action selection.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>state</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -405,8 +432,7 @@ el.replaceWith(d);
 <pre><code class="python">def play_one_step(
     self, state: np.ndarray, action: int, epsilon: float
 ) -&gt; Tuple[Any, int, float, Any, int]:
-    &#34;&#34;&#34;
-    Perform one step in the environment and add experience to buffer
+    &#34;&#34;&#34;Perform one step in the environment and add experience to buffer.
 
     Parameters
     ----------
@@ -441,7 +467,7 @@ el.replaceWith(d);
 
     return current_state, greedy_action, reward, next_action, done</code></pre>
 </details>
-<div class="desc"><p>Perform one step in the environment and add experience to buffer</p>
+<div class="desc"><p>Perform one step in the environment and add experience to buffer.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>state</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -478,7 +504,7 @@ el.replaceWith(d);
     patience: int = 10,
     alpha: float = 0.01,
 ) -&gt; None:
-    &#34;&#34;&#34;Train the agent for a fixed number of episodes
+    &#34;&#34;&#34;Train the agent for a fixed number of episodes.
 
     Parameters
     ----------
@@ -573,7 +599,7 @@ el.replaceWith(d);
     # Save best model
     self.model.set_weights(self.best_weights)</code></pre>
 </details>
-<div class="desc"><p>Train the agent for a fixed number of episodes</p>
+<div class="desc"><p>Train the agent for a fixed number of episodes.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>optimizer</code></strong> :&ensp;<code>str</code></dt>
@@ -606,9 +632,19 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Env:
+    &#34;&#34;&#34;Wraps a Keras model to provide a reinforcement learning environment.
+
+    The environment samples actions from the model&#39;s predicted probability distribution and records
+    the resulting transitions for training.
+
+    Notes
+    -----
+    It keeps a live model and an in-memory transition buffer, so it cannot be
+    rebuilt from a checkpoint: create it again for each training run.
+    &#34;&#34;&#34;
+
     def __init__(self, model: Any, maxlen: int = 100, name: str = &#34;likenasium&#34;) -&gt; None:
-        &#34;&#34;&#34;
-        Initialize the environment with a model.
+        &#34;&#34;&#34;Initialize the environment with a model.
 
         Parameters
         ----------
@@ -631,8 +667,7 @@ el.replaceWith(d);
     def step(
         self, state: np.ndarray, action: int, verbose: int = 0
     ) -&gt; Tuple[Any, int, float, Any, bool]:
-        &#34;&#34;&#34;
-        Perform an environment step with the given action.
+        &#34;&#34;&#34;Perform an environment step with the given action.
 
         Parameters
         ----------
@@ -686,7 +721,13 @@ el.replaceWith(d);
         &#34;&#34;&#34;Get all stored transitions.&#34;&#34;&#34;
         return self.transitions</code></pre>
 </details>
-<div class="desc"><p>Initialize the environment with a model.</p>
+<div class="desc"><p>Wraps a Keras model to provide a reinforcement learning environment.</p>
+<p>The environment samples actions from the model's predicted probability distribution and records
+the resulting transitions for training.</p>
+<h2 id="notes">Notes</h2>
+<p>It keeps a live model and an in-memory transition buffer, so it cannot be
+rebuilt from a checkpoint: create it again for each training run.</p>
+<p>Initialize the environment with a model.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>model</code></strong> :&ensp;<code>Any</code></dt>
@@ -741,8 +782,7 @@ el.replaceWith(d);
 <pre><code class="python">def step(
     self, state: np.ndarray, action: int, verbose: int = 0
 ) -&gt; Tuple[Any, int, float, Any, bool]:
-    &#34;&#34;&#34;
-    Perform an environment step with the given action.
+    &#34;&#34;&#34;Perform an environment step with the given action.
 
     Parameters
     ----------

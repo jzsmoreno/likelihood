@@ -1,6 +1,10 @@
+"""RL environment and action-space definitions."""
+
+import pickle
 import random
 from collections import OrderedDict, defaultdict
 from itertools import chain
+from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
@@ -8,21 +12,81 @@ from scipy.spatial import KDTree
 
 
 def flatten_chain(matrix: List[List[Any]]) -> List[Any]:
+    """Flatten a chain of lists into a single list.
+
+    Parameters
+    ----------
+    matrix : List[List[Any]]
+        A list of lists to be flattened.
+
+    Returns
+    -------
+    List[Any]
+        A single list containing all elements from the nested lists.
+    """
     return list(chain.from_iterable(matrix))
 
 
 class ActionSpace:
+    """Action space representing a discrete set of actions.
+
+    Parameters
+    ----------
+    num_actions : int
+        The number of possible actions.
+    """
+
     def __init__(self, num_actions: int) -> None:
         self._num_actions = num_actions
 
     @property
     def n(self) -> int:
+        """The number of actions in the space."""
         return self._num_actions
+
+    def save(self, path: str | Path = "./action_space.pkl") -> None:
+        """Serialize the action space to disk using pickle.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default="./action_space.pkl"
+            Destination file.
+        """
+        with Path(path).open("wb") as file:
+            pickle.dump(self, file)
+
+    @classmethod
+    def load(cls, path: str | Path = "./action_space.pkl") -> "ActionSpace":
+        """Restore an action space saved with :meth:`save`.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, default="./action_space.pkl"
+            Checkpoint written by :meth:`save`.
+
+        Returns
+        -------
+        ActionSpace
+            Action space with the stored number of actions.
+
+        Raises
+        ------
+        TypeError
+            If the pickle does not contain an :class:`ActionSpace` instance.
+
+        Notes
+        -----
+        Checkpoints are pickles, so only load files you trust.
+        """
+        with Path(path).open("rb") as file:
+            space = pickle.load(file)
+        if not isinstance(space, cls):
+            raise TypeError(f"{str(path)!r} does not contain an ActionSpace instance")
+        return space
 
 
 class OptionCriticEnv:
-    """
-    An environment for Option Critic reinforcement learning that processes a dataset of episodes.
+    """An environment for Option Critic reinforcement learning that processes a dataset of episodes.
 
     Attributes
     ----------
@@ -46,14 +110,19 @@ class OptionCriticEnv:
         Current state observation in the environment
     epsilon : `float`
         Probability of choosing the reward from the nearest state. By default it is set to `0.1`.
+
+    Notes
+    -----
+    The environment is a simulator derived from the episode dataset (it builds
+    spatial indexes over the transitions), so it is rebuilt from that dataset
+    instead of being checkpointed as a model artifact.
     """
 
     def __init__(
         self,
         episodes: Dict[int, Dict[str, List]],
     ) -> None:
-        """
-        Initializes the OptionCriticEnv with a dataset of episodes.
+        """Initialize the OptionCriticEnv with a dataset of episodes.
 
         Parameters
         ----------
@@ -178,7 +247,7 @@ class OptionCriticEnv:
         decimals: int = 6,
     ) -> Tuple:
         """
-        Builds a canonical transition key:
+        Build a canonical transition key.
         ((state_tuple), option(s)..., action(s)...)
         """
         state_key = tuple(round(float(x), decimals) for x in state)
@@ -197,8 +266,7 @@ class OptionCriticEnv:
         return value
 
     def reset(self) -> tuple[np.ndarray, dict]:
-        """
-        Resets the environment to a random episode and returns the initial state.
+        """Reset the environment to a random episode and returns the initial state.
 
         Returns
         -------
@@ -217,8 +285,8 @@ class OptionCriticEnv:
     def step(
         self, action: int | List[int], option: int | List[int]
     ) -> tuple[np.ndarray, float, bool, bool, dict]:
-        """
-        Takes an action with a specific option and returns the next state, reward, and termination status.
+        """Take an action with a specific option and returns the next state, reward, and
+        termination status.
 
         Parameters
         ----------
