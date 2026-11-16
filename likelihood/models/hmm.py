@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import copy
+import pickle
+from pathlib import Path
+from typing import Any, Mapping, Sequence, TypeAlias
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -387,10 +392,10 @@ class HMM:
                     .T
                 )
 
-                # Initial state probabilities
-                pi_num += gamma[0]
-                gamma_sum = gamma.sum(axis=0)
-                B_den += gamma_sum
+                if n_steps > 1:
+                    next_factor = B_current[:, observations[1:]].T * beta_hat[1:]
+                    xi_den = np.sum((alpha_hat[:-1] @ A_current) * next_factor, axis=1)
+                    xi_den += self._EPSILON
 
                     A_num += A_current * ((alpha_hat[:-1] / xi_den[:, None]).T @ next_factor)
                     A_den += gamma_sum - gamma[-1]
@@ -399,18 +404,10 @@ class HMM:
             self.A = A_num / (A_den[:, None] + self._EPSILON)
             self.B = B_num / (B_den[:, None] + self._EPSILON)
 
-            # Logging parameters every 10 iterations
-            if iteration % 10 == 0 and verbose:
-                subprocess.run("cls" if os.name == "nt" else "clear", shell=True, check=False)
-                clear_output(wait=True)
-                print(f"Iteration {iteration}:")
-                print("Pi:")
+            if verbose and iteration % 10 == 0:
+                print(f"Iteration {iteration}")
+                print("\nPi:")
                 print(self.pi)
-                print("\nA:")
-                print(self.A)
-                print("\nB:")
-                print(self.B)
-
                 print("\nA:")
                 print(self.A)
                 print("\nB:")
