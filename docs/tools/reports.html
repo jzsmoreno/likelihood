@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.tools.reports API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Utilities for generating HTML and text reports.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.tools.reports</code></h1>
 </header>
 <section id="section-intro">
+<p>Utilities for generating HTML and text reports.</p>
 </section>
 <section>
 </section>
@@ -58,7 +59,7 @@ el.replaceWith(d);
     file_name: str = &#34;data_processing_report.html&#34;,
 ) -&gt; str:
     &#34;&#34;&#34;
-    Generates an HTML report for a data processing pipeline with:
+    Generate an HTML report for a data processing pipeline with.
       - Tabbed interface (Initial / Steps / Final / Visualizations)
       - Stat cards summary bar
       - Automatic chart generation from sample_data:
@@ -979,22 +980,19 @@ el.replaceWith(d);
         charts_html += (
             &#39;&lt;div style=&#34;grid-column:1/-1&#34; class=&#34;subsection-label&#34;&gt;🔗 Correlation Analysis&lt;/div&gt;&#39;
         )
-        charts_html += &#34;&#34;&#34;
-        &lt;div class=&#34;chart-card heatmap-wrapper&#34;&gt;
-            &lt;div class=&#34;chart-header&#34;&gt;
-                &lt;h4&gt;Correlation Matrix&lt;/h4&gt;
-                &lt;div class=&#34;chart-toggle&#34;&gt;
-                    &lt;button data-type=&#34;pearson&#34; onclick=&#34;drawHeatmap(document.getElementById(&#39;heatmap-canvas&#39;),&#39;pearson&#39;)&#34;&gt;Pearson&lt;/button&gt;
-                    &lt;button data-type=&#34;spearman&#34; onclick=&#34;drawHeatmap(document.getElementById(&#39;heatmap-canvas&#39;),&#39;spearman&#39;)&#34;&gt;Spearman&lt;/button&gt;
-                    &lt;button data-type=&#34;kendall&#34; onclick=&#34;drawHeatmap(document.getElementById(&#39;heatmap-canvas&#39;),&#39;kendall&#39;)&#34;&gt;Kendall&lt;/button&gt;
-                &lt;/div&gt;
-            &lt;/div&gt;
-            &lt;div class=&#34;chart-body&#34;&gt;&lt;canvas id=&#34;heatmap-canvas&#34;&gt;&lt;/canvas&gt;&lt;/div&gt;
-            &lt;div class=&#34;heatmap-legend&#34;&gt;
-                &lt;span&gt;-1&lt;/span&gt;&lt;canvas id=&#34;heatmap-legend-grad&#34; width=&#34;120&#34; height=&#34;12&#34; class=&#34;grad&#34;&gt;&lt;/canvas&gt;&lt;span&gt;+1&lt;/span&gt;
-                &lt;span style=&#34;margin-left:auto&#34;&gt;● Strong &amp;gt; 0.7 &amp;nbsp; ◐ Moderate 0.4–0.7 &amp;nbsp; ○ Weak &amp;lt; 0.4&lt;/span&gt;
-            &lt;/div&gt;
-        &lt;/div&gt;&#34;&#34;&#34;
+        charts_html += &#34;&#34;&#34;&lt;div class=&#34;chart-card heatmap-wrapper&#34;&gt; &lt;div class=&#34;chart-header&#34;&gt;
+                       &lt;h4&gt;Correlation Matrix&lt;/h4&gt; &lt;div class=&#34;chart-toggle&#34;&gt; &lt;button data-
+                       type=&#34;pearson&#34; onclick=&#34;drawHeatmap(document.getElementById(&#39;heatmap-
+                       canvas&#39;),&#39;pearson&#39;)&#34;&gt;Pearson&lt;/button&gt; &lt;button data-type=&#34;spearman&#34;
+                       onclick=&#34;drawHeatmap(document.getElementById(&#39;heatmap-
+                       canvas&#39;),&#39;spearman&#39;)&#34;&gt;Spearman&lt;/button&gt; &lt;button data-type=&#34;kendall&#34;
+                       onclick=&#34;drawHeatmap(document.getElementById(&#39;heatmap-
+                       canvas&#39;),&#39;kendall&#39;)&#34;&gt;Kendall&lt;/button&gt; &lt;/div&gt; &lt;/div&gt; &lt;div class=&#34;chart-
+                       body&#34;&gt;&lt;canvas id=&#34;heatmap-canvas&#34;&gt;&lt;/canvas&gt;&lt;/div&gt; &lt;div class=&#34;heatmap-
+                       legend&#34;&gt; &lt;span&gt;-1&lt;/span&gt;&lt;canvas id=&#34;heatmap-legend-grad&#34; width=&#34;120&#34;
+                       height=&#34;12&#34; class=&#34;grad&#34;&gt;&lt;/canvas&gt;&lt;span&gt;+1&lt;/span&gt; &lt;span style=&#34;margin-
+                       left:auto&#34;&gt;● Strong &amp;gt; 0.7 &amp;nbsp; ◐ Moderate 0.4–0.7 &amp;nbsp; ○ Weak &amp;lt;
+                       0.4&lt;/span&gt; &lt;/div&gt; &lt;/div&gt;&#34;&#34;&#34;
     charts_html += &#34;&lt;/div&gt;&#34;
 
     has_viz = bool(numeric_cols or categorical_cols or onehot_groups)
@@ -1072,7 +1070,7 @@ el.replaceWith(d);
         except (ImportError, NameError):
             return html</code></pre>
 </details>
-<div class="desc"><p>Generates an HTML report for a data processing pipeline with:
+<div class="desc"><p>Generate an HTML report for a data processing pipeline with.
 - Tabbed interface (Initial / Steps / Final / Visualizations)
 - Stat cards summary bar
 - Automatic chart generation from sample_data:

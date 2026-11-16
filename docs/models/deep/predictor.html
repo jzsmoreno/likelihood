@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.models.deep.predictor API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Deep predictor model definitions.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.models.deep.predictor</code></h1>
 </header>
 <section id="section-intro">
+<p>Deep predictor model definitions.</p>
 </section>
 <section>
 </section>
@@ -56,9 +57,8 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class GetInsights:
-    &#34;&#34;&#34;
-    A class to analyze the output of a neural network model, including visualizations
-    of the weights, t-SNE representation, and feature statistics.
+    &#34;&#34;&#34;A class to analyze the output of a neural network model, including visualizations of the
+    weights, t-SNE representation, and feature statistics.
 
     Parameters
     ----------
@@ -66,11 +66,16 @@ el.replaceWith(d);
         The trained model to analyze.
     inputs : `np.ndarray`
         The input data for analysis.
+
+    Notes
+    -----
+    The analyzer is a view over a trained classifier plus its inputs, so it has
+    no checkpoint of its own: persist the :class:`AutoClassifier` instead and
+    build ``GetInsights(model, inputs)`` again when the report is needed.
     &#34;&#34;&#34;
 
     def __init__(self, model: AutoClassifier, inputs: np.ndarray) -&gt; None:
-        &#34;&#34;&#34;
-        Initializes the GetInsights class.
+        &#34;&#34;&#34;Initialize the GetInsights class.
 
         Parameters
         ----------
@@ -95,8 +100,7 @@ el.replaceWith(d);
         self.sorted_names = self._generate_sorted_color_names()
 
     def _generate_sorted_color_names(self) -&gt; list:
-        &#34;&#34;&#34;
-        Generate sorted color names based on their HSV values.
+        &#34;&#34;&#34;Generate sorted color names based on their HSV values.
 
         Parameters
         ----------
@@ -123,9 +127,7 @@ el.replaceWith(d);
         max_rows: int = 5,
         **kwargs,
     ) -&gt; None:
-        &#34;&#34;&#34;
-        Generate and display an embedded HTML report in a Jupyter Notebook cell.
-        &#34;&#34;&#34;
+        &#34;&#34;&#34;Generate and display an embedded HTML report in a Jupyter Notebook cell.&#34;&#34;&#34;
         display(HTML(&#34;&lt;h2 style=&#39;margin-top:20px;&#39;&gt;📊 Predictor Analysis&lt;/h2&gt;&#34;))
         display(
             HTML(
@@ -193,8 +195,7 @@ el.replaceWith(d);
         )
 
     def viz_classifier_graphs(self, threshold_factor=1.0, top_k=5, save_path=None):
-        &#34;&#34;&#34;
-        Visualize all Dense layers in self.model.classifier as a single directed graph,
+        &#34;&#34;&#34;Visualize all Dense layers in self.model.classifier as a single directed graph,
         connecting each Dense layer to the next.
         &#34;&#34;&#34;
 
@@ -250,7 +251,7 @@ el.replaceWith(d);
                 return
 
             norm = Normalize(vmin=min(weights), vmax=max(weights))
-            cmap = cm.get_cmap(&#34;coolwarm&#34;)
+            cmap = matplotlib.colormaps[&#34;coolwarm&#34;]
 
             edge_colors = [cmap(norm(G[u][v][&#34;weight&#34;])) for u, v in G.edges()]
             edge_widths = [1.0 + 2.0 * norm(abs(G[u][v][&#34;weight&#34;])) for u, v in G.edges()]
@@ -300,8 +301,8 @@ el.replaceWith(d);
         draw_graph(G, pos, &#34;Classifier Dense Layers Graph&#34;, save_path)
 
     def viz_encoder_decoder_graphs(self, threshold_factor=1.0, top_k=5, save_path=None):
-        &#34;&#34;&#34;
-        Visualize Dense layers in self.model.encoder and self.model.decoder as directed graphs.
+        &#34;&#34;&#34;Visualize Dense layers in self.model.encoder and self.model.decoder as directed
+        graphs.
         &#34;&#34;&#34;
 
         def get_top_k_edges(weights, labels_src, labels_dst_prefix, k):
@@ -352,7 +353,7 @@ el.replaceWith(d);
                 return
 
             norm = Normalize(vmin=min(weights), vmax=max(weights))
-            cmap = cm.get_cmap(&#34;coolwarm&#34;)
+            cmap = matplotlib.colormaps[&#34;coolwarm&#34;]
 
             edge_colors = [cmap(norm(G[u][v][&#34;weight&#34;])) for u, v in G.edges()]
             edge_widths = [1.0 + 2.0 * norm(abs(G[u][v][&#34;weight&#34;])) for u, v in G.edges()]
@@ -463,8 +464,7 @@ el.replaceWith(d);
         highlight: bool = True,
         **kwargs,
     ) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;
-        Analyze the model&#39;s predictions and visualize data.
+        &#34;&#34;&#34;Analyze the model&#39;s predictions and visualize data.
 
         Parameters
         ----------
@@ -506,8 +506,7 @@ el.replaceWith(d);
         return self._statistics(self.data_input)
 
     def _prepare_inputs(self, inputs: np.ndarray, frac: float) -&gt; np.ndarray:
-        &#34;&#34;&#34;
-        Prepare the input data, possibly selecting a fraction of it.
+        &#34;&#34;&#34;Prepare the input data, possibly selecting a fraction of it.
 
         Parameters
         ----------
@@ -528,8 +527,7 @@ el.replaceWith(d);
         return inputs
 
     def _encode_decode(self, inputs: np.ndarray) -&gt; tuple:
-        &#34;&#34;&#34;
-        Perform encoding and decoding on the input data.
+        &#34;&#34;&#34;Perform encoding and decoding on the input data.
 
         Parameters
         ----------
@@ -551,8 +549,7 @@ el.replaceWith(d);
     def _visualize_data(
         self, inputs: np.ndarray, reconstructed: np.ndarray, cmap: str, aspect: str
     ) -&gt; None:
-        &#34;&#34;&#34;
-        Visualize the original data and the reconstructed data.
+        &#34;&#34;&#34;Visualize the original data and the reconstructed data.
 
         Parameters
         ----------
@@ -587,8 +584,7 @@ el.replaceWith(d);
         encoded: np.ndarray,
         y_labels: List[str],
     ) -&gt; None:
-        &#34;&#34;&#34;
-        Prepare data for statistical analysis.
+        &#34;&#34;&#34;Prepare data for statistical analysis.
 
         Parameters
         ----------
@@ -623,8 +619,7 @@ el.replaceWith(d);
         self.data_input[&#34;class&#34;] = self.classification
 
     def _get_tsne_repr(self, inputs: np.ndarray = None, frac: float = None) -&gt; None:
-        &#34;&#34;&#34;
-        Perform t-SNE dimensionality reduction on the input data.
+        &#34;&#34;&#34;Perform t-SNE dimensionality reduction on the input data.
 
         Parameters
         ----------
@@ -650,8 +645,7 @@ el.replaceWith(d);
         self.reduced_data_tsne = tsne.fit_transform(self.latent_representations)
 
     def _viz_tsne_repr(self, **kwargs) -&gt; None:
-        &#34;&#34;&#34;
-        Visualize the t-SNE representation of the latent space.
+        &#34;&#34;&#34;Visualize the t-SNE representation of the latent space.
 
         Parameters
         ----------
@@ -686,8 +680,7 @@ el.replaceWith(d);
         plt.show()
 
     def _viz_radviz(self, data: pd.DataFrame, color_column: str, title: str) -&gt; None:
-        &#34;&#34;&#34;
-        Visualize the data using RadViz.
+        &#34;&#34;&#34;Visualize the data using RadViz.
 
         Parameters
         ----------
@@ -717,8 +710,7 @@ el.replaceWith(d);
     def _viz_weights(
         self, cmap: str = &#34;viridis&#34;, aspect: str = &#34;auto&#34;, highlight: bool = True, **kwargs
     ) -&gt; None:
-        &#34;&#34;&#34;
-        Visualize the encoder layer weights of the model.
+        &#34;&#34;&#34;Visualize the encoder layer weights of the model.
 
         Parameters
         ----------
@@ -757,8 +749,7 @@ el.replaceWith(d);
         plt.show()
 
     def _statistics(self, data_input: pd.DataFrame) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;
-        Compute statistical summaries of the input data.
+        &#34;&#34;&#34;Compute statistical summaries of the input data.
 
         Parameters
         ----------
@@ -790,8 +781,8 @@ el.replaceWith(d);
 
         return combined_stats.T</code></pre>
 </details>
-<div class="desc"><p>A class to analyze the output of a neural network model, including visualizations
-of the weights, t-SNE representation, and feature statistics.</p>
+<div class="desc"><p>A class to analyze the output of a neural network model, including visualizations of the
+weights, t-SNE representation, and feature statistics.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>model</code></strong> :&ensp;<code>AutoClassifier</code></dt>
@@ -799,7 +790,11 @@ of the weights, t-SNE representation, and feature statistics.</p>
 <dt><strong><code>inputs</code></strong> :&ensp;<code>np.ndarray</code></dt>
 <dd>The input data for analysis.</dd>
 </dl>
-<p>Initializes the GetInsights class.</p>
+<h2 id="notes">Notes</h2>
+<p>The analyzer is a view over a trained classifier plus its inputs, so it has
+no checkpoint of its own: persist the :class:<code>AutoClassifier</code> instead and
+build <code><a title="likelihood.models.deep.predictor.GetInsights" href="#likelihood.models.deep.predictor.GetInsights">GetInsights</a>(model, inputs)</code> again when the report is needed.</p>
+<p>Initialize the GetInsights class.</p>
 <h2 id="parameters_1">Parameters</h2>
 <dl>
 <dt><strong><code>model</code></strong> :&ensp;<code>AutoClassifier</code></dt>
@@ -825,8 +820,7 @@ of the weights, t-SNE representation, and feature statistics.</p>
     highlight: bool = True,
     **kwargs,
 ) -&gt; pd.DataFrame:
-    &#34;&#34;&#34;
-    Analyze the model&#39;s predictions and visualize data.
+    &#34;&#34;&#34;Analyze the model&#39;s predictions and visualize data.
 
     Parameters
     ----------
@@ -900,9 +894,7 @@ of the weights, t-SNE representation, and feature statistics.</p>
     max_rows: int = 5,
     **kwargs,
 ) -&gt; None:
-    &#34;&#34;&#34;
-    Generate and display an embedded HTML report in a Jupyter Notebook cell.
-    &#34;&#34;&#34;
+    &#34;&#34;&#34;Generate and display an embedded HTML report in a Jupyter Notebook cell.&#34;&#34;&#34;
     display(HTML(&#34;&lt;h2 style=&#39;margin-top:20px;&#39;&gt;📊 Predictor Analysis&lt;/h2&gt;&#34;))
     display(
         HTML(
@@ -980,8 +972,7 @@ of the weights, t-SNE representation, and feature statistics.</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def viz_classifier_graphs(self, threshold_factor=1.0, top_k=5, save_path=None):
-    &#34;&#34;&#34;
-    Visualize all Dense layers in self.model.classifier as a single directed graph,
+    &#34;&#34;&#34;Visualize all Dense layers in self.model.classifier as a single directed graph,
     connecting each Dense layer to the next.
     &#34;&#34;&#34;
 
@@ -1037,7 +1028,7 @@ of the weights, t-SNE representation, and feature statistics.</p>
             return
 
         norm = Normalize(vmin=min(weights), vmax=max(weights))
-        cmap = cm.get_cmap(&#34;coolwarm&#34;)
+        cmap = matplotlib.colormaps[&#34;coolwarm&#34;]
 
         edge_colors = [cmap(norm(G[u][v][&#34;weight&#34;])) for u, v in G.edges()]
         edge_widths = [1.0 + 2.0 * norm(abs(G[u][v][&#34;weight&#34;])) for u, v in G.edges()]
@@ -1098,8 +1089,8 @@ connecting each Dense layer to the next.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def viz_encoder_decoder_graphs(self, threshold_factor=1.0, top_k=5, save_path=None):
-    &#34;&#34;&#34;
-    Visualize Dense layers in self.model.encoder and self.model.decoder as directed graphs.
+    &#34;&#34;&#34;Visualize Dense layers in self.model.encoder and self.model.decoder as directed
+    graphs.
     &#34;&#34;&#34;
 
     def get_top_k_edges(weights, labels_src, labels_dst_prefix, k):
@@ -1150,7 +1141,7 @@ connecting each Dense layer to the next.</p></div>
             return
 
         norm = Normalize(vmin=min(weights), vmax=max(weights))
-        cmap = cm.get_cmap(&#34;coolwarm&#34;)
+        cmap = matplotlib.colormaps[&#34;coolwarm&#34;]
 
         edge_colors = [cmap(norm(G[u][v][&#34;weight&#34;])) for u, v in G.edges()]
         edge_widths = [1.0 + 2.0 * norm(abs(G[u][v][&#34;weight&#34;])) for u, v in G.edges()]
@@ -1253,7 +1244,8 @@ connecting each Dense layer to the next.</p></div>
         plt.tight_layout()
         plt.show()</code></pre>
 </details>
-<div class="desc"><p>Visualize Dense layers in self.model.encoder and self.model.decoder as directed graphs.</p></div>
+<div class="desc"><p>Visualize Dense layers in self.model.encoder and self.model.decoder as directed
+graphs.</p></div>
 </dd>
 </dl>
 </dd>

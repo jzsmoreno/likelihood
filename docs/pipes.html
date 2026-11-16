@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>likelihood.pipes API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Likelihood: Data preprocessing pipelines and model training utilities …">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,6 +36,11 @@ el.replaceWith(d);
 <h1 class="title">Module <code>likelihood.pipes</code></h1>
 </header>
 <section id="section-intro">
+<p>Likelihood: Data preprocessing pipelines and model training utilities.</p>
+<p>This module assembles the individual preprocessing components
+(:class:<code>~likelihood.tools.impute.SimpleImputer</code>, encoders, scalers, and feature selectors) into an
+ordered :class:<code><a title="likelihood.pipes.Pipeline" href="#likelihood.pipes.Pipeline">Pipeline</a></code> that cleans and transforms tabular data prior to model training. It also
+provides helper functions to save and load fitted pipelines.</p>
 </section>
 <section>
 </section>
@@ -56,9 +61,36 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Pipeline:
+    &#34;&#34;&#34;A preprocessing pipeline that orchestrates a sequence of transformations applied to a tabular
+    dataset prior to model training.
+
+    The pipeline is configured through a JSON file that specifies the target
+    column and the ordered list of preprocessing steps (imputation, scaling,
+    encoding, feature selection, and so on). Upon instantiation it loads and
+    validates that configuration, and upon :meth:`fit` it runs the configured
+    steps over the input data and returns the cleaned feature matrix together
+    with the extracted target vector.
+
+    Attributes
+    ----------
+    config : `dict`
+        The validated JSON configuration dictionary.
+    target_col : `str`
+        Name of the target column.
+    steps : `list`
+        Ordered list of preprocessing step names.
+    compute_importance : `bool`
+        Whether feature importance should be computed.
+    fitted_components : `dict`
+        State of the fitted preprocessing components.
+    fitted_idx : `list`
+        Indices of the columns that were fitted.
+    columns_bin_sizes : `dict` or `None`
+        Bin sizes for range-encoded columns, if any.
+    &#34;&#34;&#34;
+
     def __init__(self, config_path: str) -&gt; None:
-        &#34;&#34;&#34;
-        Initialize the pipeline with a JSON configuration file.
+        &#34;&#34;&#34;Initialize the pipeline with a JSON configuration file.
 
         Parameters
         ----------
@@ -83,8 +115,7 @@ el.replaceWith(d);
         return config
 
     def fit(self, df: pd.DataFrame) -&gt; Tuple[pd.DataFrame, np.ndarray, Optional[np.ndarray]]:
-        &#34;&#34;&#34;
-        Fit preprocessing components on the input DataFrame and return cleaned X/y.
+        &#34;&#34;&#34;Fit preprocessing components on the input DataFrame and return cleaned X/y.
 
         Parameters
         ----------
@@ -172,8 +203,7 @@ el.replaceWith(d);
         return X, y, df_scores_norm
 
     def transform(self, df: pd.DataFrame) -&gt; pd.DataFrame:
-        &#34;&#34;&#34;
-        Apply fitted preprocessing steps to new data (no target column needed).
+        &#34;&#34;&#34;Apply fitted preprocessing steps to new data (no target column needed).
 
         Parameters
         ----------
@@ -195,8 +225,7 @@ el.replaceWith(d);
     def get_doc(
         self, save_to_file: bool = True, file_name: str = &#34;data_processing_report.html&#34;
     ) -&gt; None:
-        &#34;&#34;&#34;
-        Generate an HTML report from `self.documentation` for pipeline documentation.
+        &#34;&#34;&#34;Generate an HTML report from `self.documentation` for pipeline documentation.
 
         Parameters
         ----------
@@ -205,7 +234,6 @@ el.replaceWith(d);
         file_name : str, optional
             Filename for output when `save_to_file` is True. Default is &#34;data_processing_report.html&#34;.
         &#34;&#34;&#34;
-
         generate_html_pipeline(self.documentation, save_to_file=save_to_file, file_name=file_name)
 
     def _apply_step(
@@ -371,15 +399,13 @@ el.replaceWith(d);
             return imputer.transform(X, boundary=boundary)
 
     def save(self, filepath: str) -&gt; None:
-        &#34;&#34;&#34;
-        Save the fitted pipeline state to a file using pickle.
+        &#34;&#34;&#34;Save the fitted pipeline state to a file using pickle.
 
         Parameters
         ----------
         filepath : str
             Path where the serialized pipeline will be saved.
         &#34;&#34;&#34;
-
         save_dict = {
             &#34;config&#34;: self.config,
             &#34;fitted_components&#34;: self.fitted_components,
@@ -398,8 +424,7 @@ el.replaceWith(d);
 
     @classmethod
     def load(cls, filepath: str) -&gt; &#34;Pipeline&#34;:
-        &#34;&#34;&#34;
-        Load a fitted pipeline from a file.
+        &#34;&#34;&#34;Load a fitted pipeline from a file.
 
         Parameters
         ----------
@@ -411,7 +436,6 @@ el.replaceWith(d);
         pipeline : Pipeline
             Reconstructed pipeline instance with fitted components.
         &#34;&#34;&#34;
-
         filepath = filepath + &#34;.pkl&#34; if not filepath.endswith(&#34;.pkl&#34;) else filepath
 
         with open(filepath, &#34;rb&#34;) as f:
@@ -430,7 +454,32 @@ el.replaceWith(d);
 
         return pipeline</code></pre>
 </details>
-<div class="desc"><p>Initialize the pipeline with a JSON configuration file.</p>
+<div class="desc"><p>A preprocessing pipeline that orchestrates a sequence of transformations applied to a tabular
+dataset prior to model training.</p>
+<p>The pipeline is configured through a JSON file that specifies the target
+column and the ordered list of preprocessing steps (imputation, scaling,
+encoding, feature selection, and so on). Upon instantiation it loads and
+validates that configuration, and upon :meth:<code>fit</code> it runs the configured
+steps over the input data and returns the cleaned feature matrix together
+with the extracted target vector.</p>
+<h2 id="attributes">Attributes</h2>
+<dl>
+<dt><strong><code>config</code></strong> :&ensp;<code>dict</code></dt>
+<dd>The validated JSON configuration dictionary.</dd>
+<dt><strong><code>target_col</code></strong> :&ensp;<code>str</code></dt>
+<dd>Name of the target column.</dd>
+<dt><strong><code>steps</code></strong> :&ensp;<code>list</code></dt>
+<dd>Ordered list of preprocessing step names.</dd>
+<dt><strong><code>compute_importance</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Whether feature importance should be computed.</dd>
+<dt><strong><code>fitted_components</code></strong> :&ensp;<code>dict</code></dt>
+<dd>State of the fitted preprocessing components.</dd>
+<dt><strong><code>fitted_idx</code></strong> :&ensp;<code>list</code></dt>
+<dd>Indices of the columns that were fitted.</dd>
+<dt><strong><code>columns_bin_sizes</code></strong> :&ensp;<code>dict</code> or <code>None</code></dt>
+<dd>Bin sizes for range-encoded columns, if any.</dd>
+</dl>
+<p>Initialize the pipeline with a JSON configuration file.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>config_path</code></strong> :&ensp;<code>str</code></dt>
@@ -466,8 +515,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def fit(self, df: pd.DataFrame) -&gt; Tuple[pd.DataFrame, np.ndarray, Optional[np.ndarray]]:
-    &#34;&#34;&#34;
-    Fit preprocessing components on the input DataFrame and return cleaned X/y.
+    &#34;&#34;&#34;Fit preprocessing components on the input DataFrame and return cleaned X/y.
 
     Parameters
     ----------
@@ -581,8 +629,7 @@ el.replaceWith(d);
 <pre><code class="python">def get_doc(
     self, save_to_file: bool = True, file_name: str = &#34;data_processing_report.html&#34;
 ) -&gt; None:
-    &#34;&#34;&#34;
-    Generate an HTML report from `self.documentation` for pipeline documentation.
+    &#34;&#34;&#34;Generate an HTML report from `self.documentation` for pipeline documentation.
 
     Parameters
     ----------
@@ -591,7 +638,6 @@ el.replaceWith(d);
     file_name : str, optional
         Filename for output when `save_to_file` is True. Default is &#34;data_processing_report.html&#34;.
     &#34;&#34;&#34;
-
     generate_html_pipeline(self.documentation, save_to_file=save_to_file, file_name=file_name)</code></pre>
 </details>
 <div class="desc"><p>Generate an HTML report from <code>self.documentation</code> for pipeline documentation.</p>
@@ -612,15 +658,13 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def save(self, filepath: str) -&gt; None:
-    &#34;&#34;&#34;
-    Save the fitted pipeline state to a file using pickle.
+    &#34;&#34;&#34;Save the fitted pipeline state to a file using pickle.
 
     Parameters
     ----------
     filepath : str
         Path where the serialized pipeline will be saved.
     &#34;&#34;&#34;
-
     save_dict = {
         &#34;config&#34;: self.config,
         &#34;fitted_components&#34;: self.fitted_components,
@@ -653,8 +697,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def transform(self, df: pd.DataFrame) -&gt; pd.DataFrame:
-    &#34;&#34;&#34;
-    Apply fitted preprocessing steps to new data (no target column needed).
+    &#34;&#34;&#34;Apply fitted preprocessing steps to new data (no target column needed).
 
     Parameters
     ----------
