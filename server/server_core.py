@@ -1568,6 +1568,10 @@ def _safe(value, depth=0):
                 return _safe(converter(), depth + 1)
             except Exception:  # pragma: no cover - exotic objects
                 break
+    history = getattr(value, "history", None)
+    if isinstance(history, dict):
+        # ``keras.callbacks.History`` is the result of ``Model.fit``.
+        return {"history": _safe(history, depth + 1)}
     return None
 
 
@@ -1686,6 +1690,32 @@ def _prepare(instance, method_name, arguments):
         pass
 
 
+def _apply_compile(instance, options):
+    # Keras-style models need ``compile`` before ``fit``.  The options come from
+    # the training layer (server defaults or a user override), never from the
+    # model package itself.
+    if not isinstance(options, dict) or not options:
+        return
+    compile_method = getattr(instance, "compile", None)
+    if not callable(compile_method):
+        return
+    try:
+        compiled = getattr(instance, "compiled", None)
+        if compiled is None:
+            # Older Keras releases do not expose ``compiled``; a real optimizer
+            # object (not the string some models store in ``self.optimizer``)
+            # is the next best signal.
+            optimizer = getattr(instance, "optimizer", None)
+            compiled = hasattr(optimizer, "apply") or hasattr(optimizer, "minimize")
+        if compiled and not options.get("force"):
+            return
+    except BaseException:
+        pass
+    kwargs = {key: value for key, value in options.items() if key != "force"}
+    if kwargs:
+        compile_method(**kwargs)
+
+
 def _mark_prepared(instance, method_name):
     # An explicit ``build`` leaves the instance ready for the following calls.
     if method_name != "build":
@@ -1736,6 +1766,7 @@ try:
     instance = _load_instance(payload["load"]) if payload.get("load") else _build()
     arguments = _convert_all(payload.get("arguments"), argument_types)
     _prepare(instance, payload["method"], arguments)
+    _apply_compile(instance, payload.get("compile"))
     method = getattr(instance, payload["method"])
     started = time.monotonic()
     value = method(**arguments)
@@ -2519,11 +2550,14 @@ def run_invoke(
     timeout: Optional[float] = None,
     load: Optional[Dict[str, Any]] = None,
     save_path: Optional[str] = None,
+    compile_options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build (or load) ``model`` and call ``method`` in a throw-away child interpreter.
 
     No state survives the call: two requests always start from a fresh object,
     which is what makes the endpoint safe to expose next to the catalog.
+    ``compile_options`` is used by the training layer to compile a Keras model
+    before calling its inherited ``fit`` method.
     """
     timeout = INVOKE_TIMEOUT if timeout is None else timeout
     payload_data: Dict[str, Any] = {
@@ -2545,6 +2579,8 @@ def run_invoke(
         # The parent decides the destination (artifacts of a training job); the
         # child only pickles the live instance into that path after the call.
         payload_data["save"] = {"path": save_path}
+    if compile_options:
+        payload_data["compile"] = dict(compile_options)
     payload = json.dumps(payload_data)
     started = time.monotonic()
     try:

@@ -25,6 +25,7 @@ Design notes
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import os
@@ -56,6 +57,90 @@ MAX_PERSISTED = max(1, int(os.environ.get("LM_TRAINING_MAX_PERSISTED") or 500))
 #: Method names that fit a model, in the order the catalogue prefers them.
 FIT_METHODS = ("fit", "train", "fit_transform", "fit_predict", "fit_predict_transform")
 
+#: Framework base classes whose inherited ``fit`` is not part of the AST catalogue.
+FRAMEWORK_MODEL_BASES = frozenset({"Model"})
+
+#: Arguments exposed by the server-side Keras ``fit`` adapter.
+FRAMEWORK_FIT_PARAMETERS: Tuple[Dict[str, Any], ...] = (
+    {
+        "name": "x",
+        "type": "np.ndarray",
+        "default": None,
+        "required": True,
+        "kind": "positional",
+        "positional_only": False,
+        "variadic": False,
+        "description": "Datos de entrada (matriz JSON; el sandbox la convierte en ndarray).",
+        "widget": "raw",
+    },
+    {
+        "name": "y",
+        "type": "np.ndarray",
+        "default": None,
+        "required": True,
+        "kind": "positional",
+        "positional_only": False,
+        "variadic": False,
+        "description": "Etiquetas o valores objetivo (lista/matriz JSON).",
+        "widget": "raw",
+    },
+    {
+        "name": "epochs",
+        "type": "int",
+        "default": "1",
+        "required": False,
+        "kind": "keyword_only",
+        "positional_only": False,
+        "variadic": False,
+        "description": "Épocas de entrenamiento.",
+        "widget": "int",
+    },
+    {
+        "name": "batch_size",
+        "type": "int",
+        "default": "32",
+        "required": False,
+        "kind": "keyword_only",
+        "positional_only": False,
+        "variadic": False,
+        "description": "Tamaño de lote.",
+        "widget": "int",
+    },
+    {
+        "name": "validation_split",
+        "type": "float",
+        "default": "0.0",
+        "required": False,
+        "kind": "keyword_only",
+        "positional_only": False,
+        "variadic": False,
+        "description": "Fracción de datos reservada para validación.",
+        "widget": "float",
+    },
+    {
+        "name": "verbose",
+        "type": "int",
+        "default": "0",
+        "required": False,
+        "kind": "keyword_only",
+        "positional_only": False,
+        "variadic": False,
+        "description": "Nivel de salida de Keras (0 silencioso).",
+        "widget": "int",
+    },
+    {
+        "name": "shuffle",
+        "type": "bool",
+        "default": "True",
+        "required": False,
+        "kind": "keyword_only",
+        "positional_only": False,
+        "variadic": False,
+        "description": "Mezclar los datos en cada época.",
+        "widget": "bool",
+    },
+)
+
 
 def new_job_id() -> str:
     """Generate the unique identifier of one training job."""
@@ -76,12 +161,52 @@ def artifact_path(artifact_id: str, directory: Optional[Path] = None) -> Path:
     return Path(directory or STORE_DIR) / "artifacts" / f"{artifact_id}.pkl"
 
 
+def supports_framework_fit(model: Dict[str, Any]) -> bool:
+    """Whether ``model`` inherits a framework ``fit`` missing from the AST catalogue.
+
+    ``model_catalog`` only merges methods inherited from classes inside the
+    ``likelihood`` package, so ``keras.Model.fit`` never appears in
+    ``model["methods"]``.  The training layer adds a small adapter for those
+    models instead of modifying the package.
+    """
+    bases = {str(base or "").split(".")[-1] for base in model.get("bases") or []}
+    return bool(bases & FRAMEWORK_MODEL_BASES) and str(model.get("module") or "").startswith(
+        "likelihood.models"
+    )
+
+
+def framework_fit_method(model: Dict[str, Any]) -> Dict[str, Any]:
+    """Synthetic catalogue entry for the inherited Keras ``fit`` method."""
+    return {
+        "name": "fit",
+        "signature": "fit(x, y, epochs=1, batch_size=32, validation_split=0.0, verbose=0, shuffle=True)",
+        "description": (
+            "Entrena el modelo Keras con el compilador por defecto del servidor "
+            "(optimizer/loss/metrics) o con el objeto 'compile' del job."
+        ),
+        "parameters": [dict(parameter) for parameter in FRAMEWORK_FIT_PARAMETERS],
+        "kind": "method",
+        "decorators": [],
+        "inherited": False,
+        "framework": "keras",
+    }
+
+
+def training_fit_method(model: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Return the declared fitting method or the Keras adapter, if any."""
+    for name in FIT_METHODS:
+        method = core.find_method(model, name)
+        if method is not None:
+            return method
+    if supports_framework_fit(model):
+        return framework_fit_method(model)
+    return None
+
+
 def fit_method_name(model: Dict[str, Any]) -> str:
     """Name of the fitting method declared by ``model`` (``fit`` if none matches)."""
-    for name in FIT_METHODS:
-        if core.find_method(model, name) is not None:
-            return name
-    return "fit"
+    method = training_fit_method(model)
+    return method["name"] if method else "fit"
 
 
 def resolve_fit_method_name(model: Dict[str, Any], requested: str = "") -> str:
@@ -90,6 +215,138 @@ def resolve_fit_method_name(model: Dict[str, Any], requested: str = "") -> str:
     if cleaned and (cleaned.lower() != "fit" or core.find_method(model, cleaned) is not None):
         return cleaned
     return fit_method_name(model)
+
+
+def default_compile_options(model: Dict[str, Any], parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """Conservative Keras compile options for a framework ``fit``."""
+    activation = str(parameters.get("classifier_activation") or "").strip().lower()
+    classes = parameters.get("num_classes")
+    if activation == "sigmoid" and classes == 1:
+        return {
+            "optimizer": "adam",
+            "loss": "binary_crossentropy",
+            "metrics": ["accuracy"],
+        }
+    if activation in ("softmax", "sigmoid") and isinstance(classes, int) and classes > 1:
+        return {
+            "optimizer": "adam",
+            "loss": "sparse_categorical_crossentropy",
+            "metrics": ["accuracy"],
+        }
+    return {"optimizer": "adam", "loss": "mse"}
+
+
+def resolve_compile_options(
+    model: Dict[str, Any], parameters: Dict[str, Any], raw: Any
+) -> Dict[str, Any]:
+    """Merge the request's ``compile`` object with the server defaults."""
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise core.ValidationError("El campo 'compile' debe ser un objeto")
+    options = default_compile_options(model, parameters)
+    options.update(raw)
+    return options
+
+
+#: Curated examples for the framework models whose training objective is obvious.
+EXAMPLE_JOBS: Dict[str, Dict[str, Any]] = {
+    "AutoClassifier": {
+        "method": "fit",
+        "name": "AutoClassifier · clasificación",
+        "label": "Clasificación",
+        "note": "x: 12 filas × 4 variables; y: 3 clases (0, 1, 2).",
+        "parameters": {
+            "input_shape_parm": 4,
+            "num_classes": 3,
+            "units": 8,
+            "activation": "relu",
+            "classifier_activation": "softmax",
+            "num_layers": 1,
+        },
+        "arguments": {
+            "x": [
+                [0.1, 0.2, 0.3, 0.4],
+                [0.2, 0.1, 0.4, 0.3],
+                [0.3, 0.4, 0.1, 0.2],
+                [0.4, 0.3, 0.2, 0.1],
+                [0.5, 0.2, 0.1, 0.3],
+                [0.2, 0.5, 0.3, 0.1],
+                [0.1, 0.3, 0.5, 0.2],
+                [0.3, 0.1, 0.2, 0.5],
+                [0.4, 0.2, 0.5, 0.1],
+                [0.2, 0.4, 0.1, 0.5],
+                [0.5, 0.1, 0.4, 0.2],
+                [0.1, 0.5, 0.2, 0.4],
+            ],
+            "y": [0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2],
+            "epochs": 2,
+            "batch_size": 4,
+        },
+        "compile": {
+            "optimizer": "adam",
+            "loss": "sparse_categorical_crossentropy",
+            "metrics": ["accuracy"],
+        },
+    },
+    "GANRegressor": {
+        "method": "fit",
+        "name": "GANRegressor · regresión",
+        "label": "Regresión",
+        "note": "x: 8 filas × 3 variables; y: 8 valores continuos.",
+        "parameters": {
+            "input_shape_parm": 3,
+            "output_shape_parm": 1,
+            "num_neurons": 8,
+            "depth": 2,
+            "dropout": 0.0,
+        },
+        "arguments": {
+            "x": [
+                [0.1, 0.2, 0.3],
+                [0.2, 0.4, 0.1],
+                [0.3, 0.1, 0.5],
+                [0.4, 0.3, 0.2],
+                [0.5, 0.2, 0.4],
+                [0.2, 0.5, 0.3],
+                [0.3, 0.4, 0.1],
+                [0.1, 0.3, 0.5],
+            ],
+            "y": [[0.5], [0.7], [0.6], [0.8], [0.4], [0.9], [0.55], [0.65]],
+            "epochs": 2,
+            "batch_size": 4,
+        },
+        "compile": {"optimizer": "adam", "loss": "mse", "metrics": ["mae"]},
+    },
+}
+
+
+def training_example(model: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Return a ready-to-run example payload for ``model``, when available."""
+    if core.unsupported_parameters(model):
+        return None
+    fit = training_fit_method(model)
+    if fit is None:
+        return None
+    curated = EXAMPLE_JOBS.get(model["id"])
+    if curated:
+        example = copy.deepcopy(curated)
+        example["method"] = fit["name"]
+        return example
+    try:
+        parameters = core.constructor_samples(model)
+        arguments = core.sample_arguments(model, fit, parameters)
+    except (core.APIError, TypeError, ValueError):
+        return None
+    return {
+        "method": fit["name"],
+        "name": f"{model['id']} · ejemplo",
+        "label": "",
+        "note": "",
+        "parameters": parameters,
+        "arguments": arguments,
+        "compile": {},
+    }
 
 
 def _atomic_write(path: Path, text: str) -> None:
@@ -170,6 +427,8 @@ class TrainingStore:
             "method": str(record.get("method") or ""),
             "arguments": dict(record.get("arguments") or {}),
             "parameters": dict(record.get("parameters") or {}),
+            "compile": dict(record.get("compile") or {}),
+            "adapter": str(record.get("adapter") or ""),
             "timeout_seconds": float(record.get("timeout_seconds") or TRAIN_TIMEOUT),
             "attempts": int(record.get("attempts") or 0),
             "created_at": str(record.get("created_at") or iso()),
@@ -180,6 +439,7 @@ class TrainingStore:
             "error": str(record.get("error") or ""),
             "result_type": record.get("result_type"),
             "result_repr": record.get("result_repr"),
+            "result": record.get("result"),
             "instance": dict(record.get("instance") or {}),
             "artifact": record.get("artifact"),
             "log": list(record.get("log") or []),
@@ -218,6 +478,7 @@ class TrainingStore:
         if not model_id:
             raise core.ValidationError("El campo 'model_id' es obligatorio")
         model = self._find_model(model_id)
+        compile_options: Dict[str, Any] = {}
         if kind == "fit":
             method_name = resolve_fit_method_name(model, str(spec.get("method") or ""))
             method, arguments, parameters = self._prepare_invocation(model, spec, method_name)
@@ -225,6 +486,12 @@ class TrainingStore:
                 raise core.ValidationError(
                     f'El método "{method["name"]}" guarda o carga un modelo; '
                     "usa fit/train para entrenar."
+                )
+            if method.get("framework") == "keras":
+                compile_options = resolve_compile_options(
+                    model,
+                    parameters,
+                    spec.get("compile", spec.get("compile_options")),
                 )
         else:
             artifact_id = str(spec.get("artifact_id") or "").strip()
@@ -250,6 +517,8 @@ class TrainingStore:
                     "method": method["name"],
                     "arguments": arguments,
                     "parameters": parameters,
+                    "compile": compile_options,
+                    "adapter": method.get("framework") or "",
                     "timeout_seconds": timeout,
                     "created_at": now,
                     "updated_at": now,
@@ -271,6 +540,16 @@ class TrainingStore:
         self._executor.submit(self._run, job_id)
         return dict(job)
 
+    @staticmethod
+    def _training_method(model: Dict[str, Any], method_name: str) -> Dict[str, Any]:
+        """Resolve a catalog method, or the synthetic Keras ``fit`` adapter."""
+        try:
+            return core.method_for_invocation(model, method_name)
+        except core.ModelNotFound:
+            if str(method_name or "").strip().lower() == "fit" and supports_framework_fit(model):
+                return framework_fit_method(model)
+            raise
+
     def _prepare_invocation(
         self, model: Dict[str, Any], spec: Dict[str, Any], method_name: str
     ) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
@@ -286,7 +565,7 @@ class TrainingStore:
         constructor parameter and not a method argument (``datapoints`` for
         ``Arima.train``) is moved to ``parameters`` instead of being rejected.
         """
-        method = core.method_for_invocation(model, method_name)
+        method = self._training_method(model, method_name)
         raw_arguments = spec.get("arguments", spec.get("args"))
         if raw_arguments is None:
             raw_arguments = {}
@@ -345,6 +624,9 @@ class TrainingStore:
                 job["compute_seconds"] = outcome.get("compute_seconds")
                 job["result_type"] = outcome.get("result_type")
                 job["result_repr"] = outcome.get("result_repr")
+                result_value = outcome.get("result")
+                if isinstance(result_value, dict) and isinstance(result_value.get("history"), dict):
+                    job["result"] = {"history": result_value["history"]}
                 job["instance"] = {
                     "type": outcome.get("type"),
                     "module": outcome.get("module"),
@@ -394,7 +676,7 @@ class TrainingStore:
     def _run_fit(self, job: Dict[str, Any]) -> Dict[str, Any]:
         """Run the fitting call through the sandbox and save the instance."""
         model = self._find_model(job["model_id"])
-        method = core.find_method(model, job["method"])
+        method = self._training_method(model, job["method"])
         if method is None:
             raise core.ModelNotFound(
                 f'El modelo "{model["id"]}" ya no declara el método "{job["method"]}"'
@@ -409,6 +691,7 @@ class TrainingStore:
             dict(job["arguments"]),
             timeout=float(job["timeout_seconds"]),
             save_path=save_path,
+            compile_options=dict(job.get("compile") or {}) or None,
         )
         if result.get("module"):
             job["log"].append(

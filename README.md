@@ -240,6 +240,51 @@ remaining classes are not loadable by design: `Env`, `AutoQL` and `GetInsights`
 wrap live objects supplied by the caller, and `OptionCriticEnv` is a simulator
 derived from an episode dataset. Their docstrings state the reason.
 
+### Model Training
+
+The `/training` workspace creates fit/evaluate jobs, runs them through the same
+sandboxed child interpreter and stores the resulting instance as an artifact.
+`GET /api/training/models` lists the catalog models that can be trained. Models
+whose required constructor fields cannot be sent as JSON (for example `AutoQL`,
+which needs live `env`/`model` objects) are omitted from the selector.
+
+The job wizard can load curated examples: `AutoClassifier` for classification
+(`x` 12×4, `y` with 3 classes) and `GANRegressor` for regression (`x` 8×3, `y`
+with continuous targets). The examples also fill the Keras `compile` section with
+the appropriate loss/metrics.
+
+The AST catalog cannot see methods inherited from external frameworks, so
+`keras.Model.fit` is not part of `model["methods"]`. The training server adds a
+small **Keras adapter** for models whose base class is `Model` (currently
+`AutoClassifier` and `GANRegressor`): it exposes a synthetic `fit(x, y, ...)`,
+compiles the model with a conservative default (`adam` + `mse`, or
+`sparse_categorical_crossentropy` + `accuracy` for a softmax/sigmoid classifier)
+and then calls the inherited `fit`. A job can override the defaults:
+
+```json
+{
+  "model_id": "AutoClassifier",
+  "parameters": {
+    "input_shape_parm": 4,
+    "num_classes": 3,
+    "units": 8,
+    "activation": "relu"
+  },
+  "arguments": {"x": [[0.1, 0.2, 0.3, 0.4]], "y": [0], "epochs": 1},
+  "compile": {
+    "optimizer": "adam",
+    "loss": "sparse_categorical_crossentropy",
+    "metrics": ["accuracy"]
+  }
+}
+```
+
+`compile` is merged over the server defaults; `force: true` recompiles a model
+that is already compiled. The Keras training history is stored in the job result
+and shown in the training detail page. PyTorch models in the catalog (for example
+`MultiBanditNet`) do not define `fit`; use their native `forward`/training methods
+instead, because a generic optimizer/loss cannot be inferred from the model alone.
+
 ### Docker
 
 `deploy/Dockerfile` bundles the server, the scientific stack and the catalog

@@ -61,6 +61,7 @@ def captured(monkeypatch):
                 "method": method["name"],
                 "parameters": dict(parameters),
                 "arguments": dict(arguments),
+                "compile": kwargs.get("compile_options"),
                 "load": kwargs.get("load"),
                 "save_path": save_path,
             }
@@ -69,13 +70,15 @@ def captured(monkeypatch):
             target = Path(save_path)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(b"pickled-model")
+        history = {"loss": [0.5], "accuracy": [0.8]} if method["name"] == "fit" else None
         return {
             "type": model["id"],
             "module": model["module"],
             "repr": f"<{model['id']}>",
             "compute_seconds": 0.01,
-            "result_type": "NoneType",
-            "result_repr": "None",
+            "result": {"history": history} if history else None,
+            "result_type": "History" if history else "NoneType",
+            "result_repr": "History" if history else "None",
             "save_bytes": 13 if save_path else None,
         }
 
@@ -112,6 +115,69 @@ def test_generic_fit_method_falls_back_to_the_declared_train_method(store, captu
     assert finished["status"] == "succeeded", finished["error"]
     assert finished["method"] == "train"
     assert captured[0]["method"] == "train"
+
+
+def test_keras_models_expose_an_inherited_fit_adapter():
+    """Keras models get a synthetic fit because the AST catalog cannot see it."""
+    model = training_core.core.MODELS_BY_ID["AutoClassifier"]
+    fit = training_core.training_fit_method(model)
+
+    assert fit is not None
+    assert fit["name"] == "fit"
+    assert fit["framework"] == "keras"
+    assert [parameter["name"] for parameter in fit["parameters"]][:2] == ["x", "y"]
+
+
+def test_keras_fit_job_uses_the_server_compile_defaults(store, captured):
+    """A Keras fit job compiles the model before calling the inherited fit."""
+    job = store.start(
+        {
+            "model_id": "AutoClassifier",
+            "parameters": {
+                "input_shape_parm": 4,
+                "num_classes": 3,
+                "units": 8,
+                "activation": "relu",
+            },
+            "arguments": {"x": [[0.1, 0.2, 0.3, 0.4]] * 4, "y": [0, 1, 2, 0], "epochs": 1},
+        }
+    )
+
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    assert finished["adapter"] == "keras"
+    assert finished["method"] == "fit"
+    assert finished["compile"]["optimizer"] == "adam"
+    assert finished["compile"]["loss"] == "sparse_categorical_crossentropy"
+    assert finished["compile"]["metrics"] == ["accuracy"]
+    assert finished["result"]["history"]["loss"]
+
+    call = captured[0]
+    assert call["method"] == "fit"
+    assert call["compile"] == finished["compile"]
+
+
+def test_keras_compile_options_can_be_overridden(store, captured):
+    """The request's compile object wins over the server default."""
+    job = store.start(
+        {
+            "model_id": "AutoClassifier",
+            "parameters": {
+                "input_shape_parm": 4,
+                "num_classes": 4,
+                "units": 8,
+                "activation": "relu",
+            },
+            "arguments": {"x": [[0.1, 0.2, 0.3, 0.4]] * 4, "y": [0, 1, 2, 3]},
+            "compile": {"optimizer": "sgd", "loss": "categorical_crossentropy"},
+        }
+    )
+
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    assert finished["compile"]["optimizer"] == "sgd"
+    assert finished["compile"]["loss"] == "categorical_crossentropy"
+    assert finished["compile"]["metrics"] == ["accuracy"]
 
 
 def test_training_data_sent_as_arguments_moves_to_the_constructor(store, captured):

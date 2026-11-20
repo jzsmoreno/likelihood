@@ -106,6 +106,80 @@
   /* Back link to the job list. */
   .link-back { display: inline-block; margin-bottom: 14px; font-size: 13px; font-weight: 600; color: var(--db-blue); text-decoration: none; }
   .link-back:hover { text-decoration: underline; }
+
+  /* Training wizard: wider dialog, model summary and data grid. */
+  .training-wizard { width: min(980px, 100%); }
+  .training-wizard .lm-dialog-header {
+    background: linear-gradient(135deg, var(--db-surface) 0%, var(--db-surface-alt) 100%);
+  }
+  .training-wizard .lm-dialog-body { padding: 20px; }
+  .training-wizard .wizard-steps { margin-bottom: 20px; }
+
+  .wizard-model-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-top: 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--db-line);
+    border-radius: var(--db-r-md);
+    background: var(--db-surface-alt);
+  }
+  .wizard-model-card[hidden] { display: none; }
+  .wizard-model-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--db-line);
+    border-radius: 10px;
+    background: var(--db-surface);
+    font-size: 22px;
+  }
+  .wizard-model-body { min-width: 0; }
+  .wizard-model-name { color: var(--db-ink); font-size: 15px; font-weight: 700; }
+  .wizard-model-meta {
+    margin-top: 3px;
+    color: var(--db-muted);
+    font-family: var(--db-mono);
+    font-size: 11px;
+    overflow-wrap: anywhere;
+  }
+  .wizard-model-note { margin: 6px 0 0; color: var(--db-muted); font-size: 12px; }
+
+  .wizard-data-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .wizard-data-head .wizard-section-sub { margin-bottom: 0; }
+  .wizard-json-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .wizard-json-grid .wizard-field { min-width: 0; }
+  .wizard-example-note {
+    margin: 0 0 14px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--db-blue);
+    border-radius: 0 var(--db-r-sm) var(--db-r-sm) 0;
+    background: var(--db-blue-soft);
+    color: var(--db-text);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .wizard-example-note[hidden] { display: none; }
+
+  @media (max-width: 760px) {
+    .wizard-json-grid { grid-template-columns: 1fr; }
+    .training-wizard .lm-dialog-body { padding: 14px; }
+  }
 </style>
 <script>
   (function () {
@@ -306,7 +380,7 @@
 
 <!-- Create-job wizard -->
 <div class="lm-dialog-backdrop" id="create-dialog" hidden>
-  <section class="lm-dialog" role="dialog" aria-modal="true" aria-labelledby="create-title" aria-describedby="create-subtitle">
+  <section class="lm-dialog training-wizard" role="dialog" aria-modal="true" aria-labelledby="create-title" aria-describedby="create-subtitle">
     <header class="lm-dialog-header">
       <div class="lm-dialog-heading">
         <div class="lm-dialog-eyebrow">Model Training</div>
@@ -331,53 +405,77 @@
 
       <!-- Step 1 -->
       <div class="wizard-panel" id="wizard-panel-1" role="tabpanel">
-        <div class="field">
-          <label class="label" for="job-kind-select">Tipo</label>
-          <select class="select" id="job-kind-select">
-            <option value="fit">fit — construir y entrenar</option>
-            <option value="evaluate">evaluate — evaluar un artefacto</option>
-          </select>
-          <p class="hint" id="kind-hint"></p>
-        </div>
-        <div class="field">
-          <label class="label" for="job-model-select">Modelo</label>
-          <select class="select" id="job-model-select">
-            <option value="">— selecciona un modelo —</option>
-          </select>
-        </div>
-        <div class="field">
-          <label class="label" for="job-method-input">Método</label>
-          <input type="text" class="input mono" id="job-method-input" placeholder="fit">
-          <p class="hint">El método se invoca dentro del sandbox y guarda la instancia resultante como artefacto.</p>
-          <p class="hint" id="method-hint"></p>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label class="label" for="job-name">Nombre</label>
-            <input type="text" class="input" id="job-name" placeholder="fit-FourierRegression">
+        <div class="wizard-section-title">Configuración del job</div>
+        <p class="wizard-section-sub">Elige el tipo, el modelo y el método. La instancia se construye y entrena dentro del sandbox de invocación.</p>
+        <div class="wizard-fields">
+          <div class="wizard-field">
+            <label for="job-kind-select">Tipo</label>
+            <select class="select" id="job-kind-select">
+              <option value="fit">fit — construir y entrenar</option>
+              <option value="evaluate">evaluate — evaluar un artefacto</option>
+            </select>
+            <p class="hint" id="kind-hint"></p>
           </div>
-          <div class="field">
-            <label class="label" for="job-timeout">Timeout (segundos)</label>
+          <div class="wizard-field">
+            <label for="job-model-select">Modelo</label>
+            <select class="select" id="job-model-select">
+              <option value="">— selecciona un modelo —</option>
+            </select>
+          </div>
+          <div class="wizard-field">
+            <label for="job-method-input">Método</label>
+            <input type="text" class="input mono" id="job-method-input" placeholder="fit">
+            <p class="hint" id="method-hint"></p>
+          </div>
+          <div class="wizard-field">
+            <label for="job-name">Nombre</label>
+            <input type="text" class="input" id="job-name" placeholder="AutoClassifier · clasificación">
+          </div>
+          <div class="wizard-field">
+            <label for="job-timeout">Timeout (segundos)</label>
             <input type="number" class="input" id="job-timeout" min="1" placeholder="600">
+          </div>
+        </div>
+        <div class="wizard-model-card" id="wizard-model-card" hidden>
+          <span class="wizard-model-icon" id="wizard-model-icon" aria-hidden="true">🧪</span>
+          <div class="wizard-model-body">
+            <div class="wizard-model-name" id="wizard-model-name"></div>
+            <div class="wizard-model-meta" id="wizard-model-meta"></div>
+            <p class="wizard-model-note" id="wizard-model-note"></p>
           </div>
         </div>
       </div>
 
       <!-- Step 2 -->
       <div class="wizard-panel" id="wizard-panel-2" role="tabpanel" hidden>
-        <div class="field">
-          <label class="label" for="job-parameters">Parámetros del constructor</label>
-          <textarea class="textarea mono" id="job-parameters" rows="6" placeholder="{}"></textarea>
-          <p class="hint">JSON de los argumentos del constructor. Ej.: <code>{"datapoints": [[1, 2], [2, 3]]}</code></p>
-          <p class="hint" id="constructor-hint"></p>
+        <div class="wizard-data-head">
+          <div>
+            <div class="wizard-section-title">Datos de entrenamiento</div>
+            <p class="wizard-section-sub">Ajusta el constructor y los argumentos del método. Si no sabes por dónde empezar, carga el ejemplo del modelo.</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" type="button" id="wizard-example" hidden>Cargar ejemplo</button>
         </div>
-        <div class="field">
-          <label class="label" for="job-arguments">Argumentos del método</label>
-          <textarea class="textarea mono" id="job-arguments" rows="4" placeholder="{}"></textarea>
-          <p class="hint">JSON de los argumentos de <code>fit</code>/<code>train</code>. La mayor parte de los métodos no necesita nada.</p>
+        <div class="wizard-example-note" id="wizard-example-note" hidden></div>
+        <div class="wizard-json-grid">
+          <div class="wizard-field">
+            <label for="job-parameters">Parámetros del constructor</label>
+            <textarea class="wizard-json" id="job-parameters" rows="8" placeholder="{}"></textarea>
+            <p class="hint">JSON del constructor. Ej.: <code>{"datapoints": [[1, 2], [2, 3]]}</code></p>
+            <p class="hint" id="constructor-hint"></p>
+          </div>
+          <div class="wizard-field">
+            <label for="job-arguments">Argumentos del método</label>
+            <textarea class="wizard-json" id="job-arguments" rows="8" placeholder="{}"></textarea>
+            <p class="hint">JSON de los argumentos de <code>fit</code>/<code>train</code>. Para Keras: <code>x</code>, <code>y</code>, <code>epochs</code>, <code>batch_size</code>…</p>
+          </div>
         </div>
-        <div class="field" id="artifact-field" hidden>
-          <label class="label" for="job-artifact-id">Artefacto (opcional)</label>
+        <div class="wizard-field" id="compile-field" hidden>
+          <label for="job-compile">Compilación Keras (opcional)</label>
+          <textarea class="wizard-json" id="job-compile" rows="5" placeholder='{"optimizer": "adam", "loss": "sparse_categorical_crossentropy", "metrics": ["accuracy"]}'></textarea>
+          <p class="hint">Solo para modelos Keras con <code>fit</code> heredado. Se combina con la compilación por defecto del servidor; <code>force: true</code> recompila un modelo ya compilado.</p>
+        </div>
+        <div class="wizard-field" id="artifact-field" hidden>
+          <label for="job-artifact-id">Artefacto (opcional)</label>
           <input type="text" class="input mono" id="job-artifact-id" placeholder="art-…">
           <p class="hint">ID de un artefacto de fit previo para evaluarlo. Si se deja vacío, se evalúa sobre el constructor.</p>
         </div>

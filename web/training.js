@@ -412,6 +412,7 @@
     var instance = job.instance || {};
     var paramsText = JSON.stringify(job.parameters || {}, null, 2);
     var argsText = JSON.stringify(job.arguments || {}, null, 2);
+    var compileText = JSON.stringify(job.compile || {}, null, 2);
 
     var header =
       '<div class="job-detail-header">' +
@@ -434,6 +435,7 @@
       '<div class="meta-item"><span class="meta-label">Modelo</span><span class="meta-value">' +
         (model ? esc(model.name) : esc(job.model_name)) + '</span><span class="meta-sub mono">' + esc(job.model_id) + '</span></div>' +
       '<div class="meta-item"><span class="meta-label">Método</span><code>' + esc(job.method) + '</code></div>' +
+      (job.adapter ? '<div class="meta-item"><span class="meta-label">Adaptador</span><code>' + esc(job.adapter) + '</code></div>' : '') +
       '<div class="meta-item"><span class="meta-label">Creado</span><span class="meta-value">' + esc(isoDate(job.created_at)) + '</span></div>' +
       '<div class="meta-item"><span class="meta-label">Iniciado</span><span class="meta-value">' + esc(isoDate(job.started_at)) + '</span></div>' +
       '<div class="meta-item"><span class="meta-label">Finalizado</span><span class="meta-value">' + esc(isoDate(job.finished_at)) + '</span></div>' +
@@ -469,6 +471,14 @@
               '<pre class="code-block">' + esc(paramsText) + '</pre></details>' +
             '<details class="details-block"><summary>Argumentos del método (JSON)</summary>' +
               '<pre class="code-block">' + esc(argsText) + '</pre></details>' +
+            (job.result && job.result.history
+              ? '<details class="details-block"><summary>Historial de entrenamiento (JSON)</summary>' +
+                '<pre class="code-block">' + esc(JSON.stringify(job.result.history, null, 2)) + '</pre></details>'
+              : '') +
+            (Object.keys(job.compile || {}).length
+              ? '<details class="details-block"><summary>Compilación Keras (JSON)</summary>' +
+                '<pre class="code-block">' + esc(compileText) + '</pre></details>'
+              : '') +
           '</div>' +
         '</section>';
     }
@@ -599,8 +609,10 @@
       state.models = data.models || [];
       var options = ['<option value="">— selecciona un modelo —</option>'];
       state.models.forEach(function (model) {
-        options.push('<option value="' + esc(model.id) + '">' + esc(model.name) +
-          ' · ' + esc(model.id) + '</option>');
+        var suffix = model.example && model.example.label
+          ? ' · ' + esc(model.example.label)
+          : (model.category ? ' · ' + esc(model.category) : '');
+        options.push('<option value="' + esc(model.id) + '">' + esc(model.name) + suffix + '</option>');
       });
       dom.modelSelect.innerHTML = options.join('');
     }).catch(function (error) {
@@ -624,6 +636,7 @@
     if (dom.artifactField) {
       dom.artifactField.hidden = state.wKind !== 'evaluate';
     }
+    if (dom.compileField && state.wKind !== 'fit') dom.compileField.hidden = true;
     // reset method when switching kind
     if (dom.methodInput) dom.methodInput.value = state.wKind === 'evaluate' ? 'score' : '';
     updateWizardStatus();
@@ -637,6 +650,38 @@
     if (dom.methodInput) {
       dom.methodInput.value = model ? (state.wKind === 'evaluate' ? 'score' : model.fit_method) : '';
     }
+    if (dom.compileField) {
+      dom.compileField.hidden = !(state.wKind === 'fit' && model && model.adapter === 'keras');
+    }
+    if (dom.modelCard) {
+      dom.modelCard.hidden = !model;
+      if (model) {
+        if (dom.modelIcon) dom.modelIcon.textContent = model.icon || '🧪';
+        if (dom.modelName) dom.modelName.textContent = model.name || model.id;
+        if (dom.modelMeta) {
+          dom.modelMeta.textContent = [
+            model.example && model.example.label ? model.example.label : '',
+            model.fit_method ? 'método ' + model.fit_method : '',
+            model.adapter ? 'adapter ' + model.adapter : '',
+            model.category || '',
+          ].filter(Boolean).join(' · ');
+        }
+        if (dom.modelNote) {
+          dom.modelNote.textContent = model.example && model.example.note
+            ? model.example.note
+            : 'Selecciona el ejemplo o escribe los datos manualmente.';
+        }
+      }
+    }
+    if (dom.wizardExample) {
+      dom.wizardExample.hidden = !(state.wKind === 'fit' && model && model.example);
+      dom.wizardExample.textContent = 'Cargar ejemplo';
+    }
+    if (dom.exampleNote) {
+      var note = state.wKind === 'fit' && model && model.example ? model.example.note : '';
+      dom.exampleNote.hidden = !note;
+      dom.exampleNote.textContent = note || '';
+    }
     // constructor fields hint
     if (dom.constructorHint) {
       if (model && model.constructor_fields && model.constructor_fields.length) {
@@ -648,8 +693,9 @@
     if (dom.methodHint) {
       if (model && model.method_fields && model.method_fields.length) {
         var required = model.method_fields.filter(function (f) { return f.required; });
+        var adapter = model.adapter ? ' · adapter: ' + esc(model.adapter) : '';
         dom.methodHint.textContent = 'Método: ' + (model.fit_method || '') + ' · obligatorio: ' +
-          required.map(function (f) { return esc(f.name); }).join(', ');
+          required.map(function (f) { return esc(f.name); }).join(', ') + adapter;
       } else {
         dom.methodHint.textContent = 'El método no requiere argumentos adicionales.';
       }
@@ -680,7 +726,13 @@
       if (dom.timeoutInput) dom.timeoutInput.value = '';
       if (dom.parametersInput) dom.parametersInput.value = '{}';
       if (dom.argumentsInput) dom.argumentsInput.value = '{}';
+      if (dom.compileInput) dom.compileInput.value = '';
+      if (dom.compileField) dom.compileField.hidden = true;
       if (dom.artifactInput) dom.artifactInput.value = '';
+      if (dom.modelCard) dom.modelCard.hidden = true;
+      if (dom.wizardExample) { dom.wizardExample.hidden = true; dom.wizardExample.textContent = 'Cargar ejemplo'; }
+      if (dom.exampleNote) { dom.exampleNote.hidden = true; dom.exampleNote.textContent = ''; }
+      if (state.wModel) onModelChange();
       setStep(1);
     });
   }
@@ -727,20 +779,63 @@
     dom.wizardStatus.textContent = message || '';
   }
 
+  function loadExample() {
+    var model = modelById(state.wModel);
+    if (!model || !model.example) {
+      toast('Este modelo no tiene un ejemplo cargado.', true);
+      return;
+    }
+    var example = model.example;
+    if (example.method) state.wMethod = example.method;
+    if (dom.methodInput && example.method) dom.methodInput.value = example.method;
+    if (dom.nameInput && example.name) dom.nameInput.value = example.name;
+    if (dom.parametersInput) {
+      dom.parametersInput.value = JSON.stringify(example.parameters || {}, null, 2);
+    }
+    if (dom.argumentsInput) {
+      dom.argumentsInput.value = JSON.stringify(example.arguments || {}, null, 2);
+    }
+    if (dom.compileInput) {
+      dom.compileInput.value = example.compile && Object.keys(example.compile).length
+        ? JSON.stringify(example.compile, null, 2)
+        : '';
+    }
+    if (dom.compileField) {
+      dom.compileField.hidden = !(state.wKind === 'fit' && model.adapter === 'keras');
+    }
+    if (dom.exampleNote) {
+      dom.exampleNote.hidden = !example.note;
+      dom.exampleNote.textContent = example.note || '';
+    }
+    if (dom.wizardExample) dom.wizardExample.textContent = 'Ejemplo cargado';
+    toast('Ejemplo cargado: ' + (example.label || model.name));
+  }
+
   function createJob() {
+    var nameText = dom.nameInput ? dom.nameInput.value.trim() : state.wName;
+    var timeoutText = dom.timeoutInput ? dom.timeoutInput.value : state.wTimeout;
     var body = {
       kind: state.wKind,
       model_id: state.wModel,
       method: state.wMethod || undefined,
-      name: state.wName || undefined,
-      timeout: state.wTimeout || undefined,
+      name: nameText || undefined,
+      timeout: timeoutText || undefined,
     };
+    var paramsText = dom.parametersInput ? dom.parametersInput.value : state.wParams;
+    var argsText = dom.argumentsInput ? dom.argumentsInput.value : state.wArgs;
     var params = {};
-    try { params = JSON.parse(state.wParams || '{}'); } catch (error) { toast('Parámetros no es JSON válido', true); return; }
+    try { params = JSON.parse(paramsText || '{}'); } catch (error) { toast('Parámetros no es JSON válido', true); return; }
     body.parameters = params;
     var args = {};
-    try { args = JSON.parse(state.wArgs || '{}'); } catch (error) { toast('Argumentos no es JSON válido', true); return; }
+    try { args = JSON.parse(argsText || '{}'); } catch (error) { toast('Argumentos no es JSON válido', true); return; }
     body.arguments = args;
+    if (dom.compileField && !dom.compileField.hidden && dom.compileInput) {
+      var compileText = dom.compileInput.value.trim();
+      if (compileText) {
+        try { body.compile = JSON.parse(compileText); }
+        catch (error) { toast('Compilación no es JSON válido', true); return; }
+      }
+    }
     if (state.wKind === 'evaluate') body.artifact_id = state.wArtifact || undefined;
 
     var btn = dom.wizardCreate;
@@ -815,6 +910,7 @@
     }
     if (dom.kindSelect) dom.kindSelect.addEventListener('change', onKindChange);
     if (dom.modelSelect) dom.modelSelect.addEventListener('change', onModelChange);
+    if (dom.wizardExample) dom.wizardExample.addEventListener('click', loadExample);
     if (dom.createDialog) {
       dom.createDialog.addEventListener('click', function (event) {
         if (event.target === dom.createDialog) closeWizard();
@@ -884,11 +980,20 @@
     dom.timeoutInput = byId('job-timeout');
     dom.parametersInput = byId('job-parameters');
     dom.argumentsInput = byId('job-arguments');
+    dom.compileInput = byId('job-compile');
+    dom.compileField = byId('compile-field');
     dom.artifactInput = byId('job-artifact-id');
     dom.artifactField = byId('artifact-field');
     dom.constructorHint = byId('constructor-hint');
     dom.methodHint = byId('method-hint');
     dom.kindHint = byId('kind-hint');
+    dom.modelCard = byId('wizard-model-card');
+    dom.modelIcon = byId('wizard-model-icon');
+    dom.modelName = byId('wizard-model-name');
+    dom.modelMeta = byId('wizard-model-meta');
+    dom.modelNote = byId('wizard-model-note');
+    dom.wizardExample = byId('wizard-example');
+    dom.exampleNote = byId('wizard-example-note');
 
     bindSidebar();
     bindTheme();

@@ -311,6 +311,33 @@ def test_models_list_and_conditional_request(client):
     assert cached.content == b""
 
 
+def test_training_models_include_framework_fit_adapters(client):
+    """Keras models inherit fit from the framework and must appear in Training."""
+    response = client.get("/api/training/models")
+    assert response.status_code == 200, response.text
+    rows = {row["id"]: row for row in response.json()["models"]}
+
+    assert rows["AutoClassifier"]["fit_method"] == "fit"
+    assert rows["AutoClassifier"]["adapter"] == "keras"
+    assert [
+        field["name"] for field in rows["AutoClassifier"]["method_fields"] if field["required"]
+    ] == [
+        "x",
+        "y",
+    ]
+    assert rows["GANRegressor"]["adapter"] == "keras"
+    assert rows["Arima"]["fit_method"] == "train"
+    assert rows["Arima"]["adapter"] == ""
+    assert "AutoQL" not in rows
+
+    assert rows["AutoClassifier"]["example"]["label"] == "Clasificación"
+    assert rows["AutoClassifier"]["example"]["compile"]["loss"] == (
+        "sparse_categorical_crossentropy"
+    )
+    assert rows["GANRegressor"]["example"]["label"] == "Regresión"
+    assert rows["GANRegressor"]["example"]["compile"]["loss"] == "mse"
+
+
 def test_models_pagination(client):
     first = client.get("/api/models?limit=1")
     assert first.status_code == 200

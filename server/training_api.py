@@ -64,6 +64,16 @@ class TrainingRequest(BaseModel):
         default=None, description="Argumentos del constructor del modelo."
     )
     params: Optional[Dict[str, Any]] = Field(default=None, description="Alias de ``parameters``.")
+    compile: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description=(
+            "Opciones de compilación Keras para el adaptador fit "
+            "(optimizer, loss, metrics...). Se combinan con las del servidor."
+        ),
+    )
+    compile_options: Optional[Dict[str, Any]] = Field(
+        default=None, description="Alias de ``compile``."
+    )
     timeout: Optional[float] = Field(
         default=None, description="Segundos máximos (por defecto LM_TRAINING_TIMEOUT)."
     )
@@ -91,6 +101,7 @@ def _job_brief(job: Dict[str, Any]) -> Dict[str, Any]:
         "model_id": job.get("model_id") or "",
         "model_name": job.get("model_name") or job.get("model_id") or "",
         "method": job.get("method") or "",
+        "adapter": job.get("adapter") or "",
         "created_at": job.get("created_at") or "",
         "started_at": job.get("started_at"),
         "finished_at": job.get("finished_at"),
@@ -116,8 +127,10 @@ def _job_payload(settings: Any, job: Dict[str, Any]) -> Dict[str, Any]:
         "model_id": job.get("model_id") or "",
         "model_name": job.get("model_name") or job.get("model_id") or "",
         "method": job.get("method") or "",
+        "adapter": job.get("adapter") or "",
         "arguments": dict(job.get("arguments") or {}),
         "parameters": dict(job.get("parameters") or {}),
+        "compile": dict(job.get("compile") or {}),
         "timeout_seconds": job.get("timeout_seconds"),
         "attempts": job.get("attempts") or 0,
         "created_at": job.get("created_at") or "",
@@ -128,6 +141,7 @@ def _job_payload(settings: Any, job: Dict[str, Any]) -> Dict[str, Any]:
         "error": job.get("error") or "",
         "result_type": job.get("result_type"),
         "result_repr": job.get("result_repr"),
+        "result": job.get("result"),
         "instance": dict(job.get("instance") or {}),
         "log": list(job.get("log") or []),
         "updated_at": job.get("updated_at") or "",
@@ -188,14 +202,14 @@ def build_router() -> APIRouter:
         require_training(settings)
         rows: List[Dict[str, Any]] = []
         for model in settings.catalog:
-            methods = [
-                m
-                for m in model.get("methods") or []
-                if str(m.get("name") or "").lower() in training_core.FIT_METHODS
-            ]
-            if not methods:
+            # Models such as AutoQL require live Python objects in the
+            # constructor (env/model); they cannot be built from JSON.
+            if core.unsupported_parameters(model):
                 continue
-            fit = methods[0]
+            fit = training_core.training_fit_method(model)
+            if fit is None:
+                continue
+            example = training_core.training_example(model)
             model_parameters = model.get("parameters") or []
             constructor_fields = [p.get("name") for p in model_parameters if not p.get("variadic")]
             method_fields = [
@@ -210,8 +224,10 @@ def build_router() -> APIRouter:
                     "category": model.get("category"),
                     "icon": model.get("icon") or "🧪",
                     "fit_method": fit["name"],
+                    "adapter": fit.get("framework") or "",
                     "method_fields": method_fields,
                     "constructor_fields": constructor_fields,
+                    "example": example,
                 }
             )
         rows.sort(key=lambda item: item["name"].lower())
