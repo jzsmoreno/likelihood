@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Model Training: entrena modelos del catálogo como jobs remotos, sigue su estado y guarda los resultados como artefactos.">
+<meta name="theme-color" content="#ff3621">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/platform.css">
+<title>Model Training · Likelihood</title>
+<!--
+  Model Training workspace.
+
+  Endpoints used:
+    GET    /api/training/overview            job totals + recent jobs
+    GET    /api/training/models              fit-capable models
+    GET    /api/training/jobs                job list (kind/status filters)
+    GET    /api/training/jobs/<id>           job detail (polled while running)
+    POST   /api/training/jobs                create job (202 + job)
+    POST   /api/training/jobs/<id>/cancel    cancel a pending job
+    DELETE /api/training/jobs/<id>           delete a job (and its artifact, if fit)
+    GET    /api/training/artifacts           artifact list
+    GET    /api/training/artifacts/<id>      artifact detail
+    DELETE /api/training/artifacts/<id>     delete an artifact
+-->
+<style>
+  /* Page-specific status colors (the shared stylesheet only defines
+     running/stopped/failed/deleted/deploying). */
+  .status-badge.status-pending .dot { background: var(--db-amber); }
+  .status-badge.status-succeeded .dot { background: var(--db-green); }
+  .status-badge.status-cancelled .dot { background: var(--db-faint); }
+
+  /* Kind badges (fit / evaluate). */
+  .kind-badge {
+    display: inline-block; padding: 2px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; letter-spacing: .02em;
+    border: 1px solid var(--db-line); background: var(--db-surface);
+  }
+  .kind-badge.kind-fit { color: var(--db-blue); background: var(--db-blue-soft); border-color: var(--db-blue); }
+  .kind-badge.kind-evaluate { color: var(--db-green); background: var(--db-green-soft); border-color: var(--db-green); }
+
+  /* Job detail header. */
+  .job-detail-header { display: flex; align-items: flex-start; gap: 18px; flex-wrap: wrap; margin-bottom: 22px; }
+  .job-header-main { flex: 1 1 340px; min-width: 0; }
+  .job-title { display: flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 700; line-height: 1.2; margin: 6px 0 2px; color: var(--db-ink); }
+  .job-title-icon { font-size: 18px; opacity: .85; }
+  .job-id-line { font-family: var(--db-mono); font-size: 12px; color: var(--db-muted); }
+  .job-meta-row { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .job-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* Meta grid in the job detail. */
+  .meta-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  .meta-item { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .meta-sub { font-family: var(--db-mono); font-size: 11px; color: var(--db-muted); }
+  .meta-item code { max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+
+  /* Artifact panel: the absolute path is long and must never overflow into
+     the "Estado" badge or the header action. */
+  .artifact-path { grid-column: 1 / -1; }
+  .artifact-path-value {
+    display: block;
+    max-width: 100%;
+    padding: 9px 11px;
+    border: 1px solid var(--db-line-soft);
+    border-radius: 6px;
+    background: var(--db-surface-alt);
+    color: var(--db-text);
+    font-family: var(--db-mono);
+    font-size: 11.5px;
+    line-height: 1.55;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* Job list table cells. */
+  .cell-main { font-weight: 600; color: var(--db-ink); }
+  .cell-link { color: var(--db-ink); font-weight: 600; text-decoration: none; }
+  .cell-link:hover { color: var(--db-blue); }
+  .cell-sub { display: block; margin-top: 3px; font-family: var(--db-mono); font-size: 11px; color: var(--db-muted); }
+
+  /* Detail panels (icon + title). */
+  .panel-icon { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; background: var(--db-surface); border: 1px solid var(--db-line); color: var(--db-text); font-size: 13px; }
+  .panel-title { font-size: 15px; font-weight: 600; color: var(--db-ink); }
+  .panel-error { border: 1px solid var(--db-lava); background: var(--db-lava-soft); }
+  .panel-error .panel-title { color: var(--db-lava); }
+  .error-pre { margin: 0; font-family: var(--db-mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; color: var(--db-lava); background: var(--db-surface); border: 1px solid var(--db-line); border-radius: 6px; padding: 12px; }
+
+  /* Log list. */
+  .log-list { display: flex; flex-direction: column; gap: 6px; margin: 0; list-style: none; font-family: var(--db-mono); font-size: 12px; }
+  .log-item { display: flex; gap: 10px; padding: 5px 8px; border-radius: 5px; background: var(--db-surface); border: 1px solid var(--db-line); }
+  .log-time { white-space: nowrap; color: var(--db-muted); }
+  .log-msg { word-break: break-word; color: var(--db-text); }
+  .log-error .log-msg { color: var(--db-lava); font-weight: 600; }
+  .log-info .log-msg { color: var(--db-text); }
+
+  /* Native <details> blocks. */
+  .details-block { margin-top: 12px; }
+  .details-block summary { cursor: pointer; font-weight: 600; color: var(--db-ink); }
+
+  /* Destructive button variant. */
+  .btn-danger { color: var(--db-lava) !important; background: var(--db-lava-soft) !important; border-color: var(--db-lava) !important; }
+  .btn-danger:hover { background: var(--db-lava-soft) !important; }
+
+  /* Back link to the job list. */
+  .link-back { display: inline-block; margin-bottom: 14px; font-size: 13px; font-weight: 600; color: var(--db-blue); text-decoration: none; }
+  .link-back:hover { text-decoration: underline; }
+</style>
+<script>
+  (function () {
+    try {
+      var stored = window.localStorage.getItem('lm-theme');
+      if (stored === 'light' || stored === 'dark') {
+        document.documentElement.setAttribute('data-theme', stored);
+      }
+    } catch (error) { /* storage is optional */ }
+  })();
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Saltar al contenido</a>
+
+<header class="db-topbar">
+  <button class="icon-btn" id="sidebar-toggle" type="button" aria-label="Mostrar u ocultar la navegación"
+          aria-expanded="true" aria-controls="sidebar" title="Mostrar u ocultar la navegación">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path d="M2 4h12M2 8h12M2 12h12" stroke-linecap="round"/>
+    </svg>
+  </button>
+  <a class="db-brand" href="/">
+    <span class="db-brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path d="M6.2 1.6h3.6v1.1h-.8v2.7l3 5.1a2 2 0 0 1-1.8 3H5.8a2 2 0 0 1-1.8-3l3-5.1V2.7h-.8zM5.1 9.2h5.8l1.1 1.9a.9.9 0 0 1-.8 1.4H4.8a.9.9 0 0 1-.8-1.4z" opacity=".95"/>
+      </svg>
+    </span>
+    <span>Likelihood</span>
+    <span class="db-brand-suffix">/ Model Training</span>
+  </a>
+  <span class="topbar-divider" aria-hidden="true"></span>
+  <nav class="db-crumbs" aria-label="Ruta de navegación">
+    <a href="/">Catálogo</a>
+    <span class="sep" aria-hidden="true">/</span>
+    <a href="/training">Training</a>
+    <span class="sep hide-xs" aria-hidden="true">/</span>
+    <span class="current hide-xs" id="crumb-current">Jobs</span>
+  </nav>
+  <div class="topbar-actions">
+    <span class="status-pill" id="server-status" title="Estado del servicio">
+      <span class="dot dot--off" aria-hidden="true"></span>
+      <span id="server-status-text">Comprobando…</span>
+    </span>
+    <a class="topbar-link" href="/serving" title="Abrir Model Serving">Serving</a>
+    <a class="topbar-link" href="/docs" title="Documentación interactiva de la API">API</a>
+    <button class="icon-btn" id="theme-toggle" type="button" aria-label="Cambiar el tema de color" title="Cambiar el tema de color">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+        <circle cx="8" cy="8" r="3.2"/>
+        <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<div class="db-shell">
+  <aside class="db-sidebar" id="sidebar" aria-label="Navegación de la plataforma">
+    <div class="db-sidebar-nav">
+      <div class="side-section">
+        <div class="side-title">Plataforma</div>
+        <a class="side-link" href="/">
+          <span class="side-icon" aria-hidden="true">▦</span>
+          <span class="side-label">Catálogo de modelos</span>
+        </a>
+        <a class="side-link" href="/serving">
+          <span class="side-icon" aria-hidden="true">⇢</span>
+          <span class="side-label">Model Serving</span>
+        </a>
+        <a class="side-link" href="/monitoring">
+          <span class="side-icon" aria-hidden="true">◫</span>
+          <span class="side-label">Model Monitoring</span>
+        </a>
+        <a class="side-link is-current" href="/training" aria-current="page">
+          <span class="side-icon" aria-hidden="true">◔</span>
+          <span class="side-label">Model Training</span>
+        </a>
+      </div>
+      <div class="side-section">
+        <div class="side-title">Training</div>
+        <a class="side-link is-active" href="/training" data-training-nav="jobs">
+          <span class="side-icon" aria-hidden="true">☰</span>
+          <span class="side-label">Jobs de entrenamiento</span>
+          <span class="side-count" id="count-jobs">—</span>
+        </a>
+        <button class="side-link" type="button" id="side-new-job">
+          <span class="side-icon" aria-hidden="true">＋</span>
+          <span class="side-label">Crear job</span>
+        </button>
+        <a class="side-link" href="/api/training/artifacts" target="_blank" rel="noopener">
+          <span class="side-icon" aria-hidden="true">{ }</span>
+          <span class="side-label">Artefactos</span>
+          <span class="side-count" id="count-artifacts">—</span>
+        </a>
+      </div>
+      <div class="side-section">
+        <div class="side-title">Recursos</div>
+        <a class="side-link" href="/docs" target="_blank" rel="noopener">
+          <span class="side-icon" aria-hidden="true">↗</span>
+          <span class="side-label">Documentación de la API</span>
+        </a>
+        <a class="side-link" href="/api/health" target="_blank" rel="noopener">
+          <span class="side-icon" aria-hidden="true">♥</span>
+          <span class="side-label">Estado del servicio</span>
+        </a>
+      </div>
+    </div>
+    <div class="side-footer">
+      <strong>Entrenamiento por invocación</strong>
+      <span id="side-version">likelihood</span> · <code>/api/training</code>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay" hidden></div>
+
+  <main class="db-main" id="main">
+    <div class="db-main-inner">
+      <div id="training-list-view">
+        <div class="page-header">
+          <div class="page-header-main">
+            <div class="page-eyebrow">Plataforma · Training</div>
+            <h1 class="page-title"><span class="page-icon" aria-hidden="true">◔</span> Model Training</h1>
+            <p class="page-subtitle">
+              Lanza un entrenamiento (o una evaluación) de un método del catálogo como job remoto,
+              sigue su avance en tiempo real y conserva el resultado como un artefacto reutilizable.
+            </p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-secondary" type="button" id="refresh-training">Actualizar</button>
+            <button class="btn btn-primary" type="button" id="create-job">＋ Crear job</button>
+          </div>
+        </div>
+
+        <section class="kpi-grid is-dense" id="training-kpis" aria-label="Resumen de training">
+          <div class="kpi"><div class="kpi-body"><div class="skeleton" style="height:16px;width:70px"></div><div class="skeleton" style="height:10px;width:100px;margin-top:6px"></div></div></div>
+          <div class="kpi"><div class="kpi-body"><div class="skeleton" style="height:16px;width:70px"></div><div class="skeleton" style="height:10px;width:100px;margin-top:6px"></div></div></div>
+          <div class="kpi"><div class="kpi-body"><div class="skeleton" style="height:16px;width:70px"></div><div class="skeleton" style="height:10px;width:100px;margin-top:6px"></div></div></div>
+          <div class="kpi"><div class="kpi-body"><div class="skeleton" style="height:16px;width:70px"></div><div class="skeleton" style="height:10px;width:100px;margin-top:6px"></div></div></div>
+        </section>
+
+        <section class="panel" aria-label="Jobs de entrenamiento">
+          <div class="toolbar">
+            <div class="search-field">
+              <span class="search-icon" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <circle cx="7" cy="7" r="4.4"/><path d="M10.3 10.3 14 14" stroke-linecap="round"/>
+                </svg>
+              </span>
+              <label class="sr-only" for="job-search">Buscar jobs</label>
+              <input type="search" id="job-search" placeholder="Buscar por job, modelo o método…" autocomplete="off">
+            </div>
+            <div class="toolbar-group">
+              <span class="toolbar-label">Tipo</span>
+              <select class="select" id="job-kind" aria-label="Filtrar por tipo">
+                <option value="">Todos</option>
+                <option value="fit">fit</option>
+                <option value="evaluate">evaluate</option>
+              </select>
+            </div>
+            <div class="toolbar-group">
+              <span class="toolbar-label">Estado</span>
+              <select class="select" id="job-status" aria-label="Filtrar por estado">
+                <option value="">Todos</option>
+                <option value="pending">Pendientes</option>
+                <option value="running">En ejecución</option>
+                <option value="succeeded">Completados</option>
+                <option value="failed">Fallidos</option>
+                <option value="cancelled">Cancelados</option>
+              </select>
+            </div>
+            <span class="spacer"></span>
+            <a class="btn btn-ghost btn-sm" href="/monitoring">Ver monitorización</a>
+          </div>
+          <div id="job-results" aria-busy="true" aria-live="polite">
+            <div class="skeleton-list">
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
+            </div>
+          </div>
+          <div class="panel-footer" id="job-result-bar" hidden>
+            <span id="job-result-count"></span>
+            <span class="result-note" id="job-result-hint"></span>
+          </div>
+        </section>
+      </div>
+
+      <div id="training-detail-view" hidden>
+        <div id="job-detail" aria-live="polite"></div>
+      </div>
+
+      <footer class="site-footer">
+        <span>Likelihood · jobs entrenados por el sandbox de invocación</span>
+        <span><a href="/serving">Serving</a> · <a href="/api/health">Estado</a></span>
+      </footer>
+    </div>
+  </main>
+</div>
+
+<!-- Create-job wizard -->
+<div class="lm-dialog-backdrop" id="create-dialog" hidden>
+  <section class="lm-dialog" role="dialog" aria-modal="true" aria-labelledby="create-title" aria-describedby="create-subtitle">
+    <header class="lm-dialog-header">
+      <div class="lm-dialog-heading">
+        <div class="lm-dialog-eyebrow">Model Training</div>
+        <h2 class="lm-dialog-title" id="create-title">Crear un job de entrenamiento</h2>
+        <p class="lm-dialog-sub" id="create-subtitle">Elige el modelo y el método, y define los datos del entrenamiento.</p>
+      </div>
+      <button class="icon-btn" type="button" id="create-close" aria-label="Cerrar el asistente">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </header>
+    <div class="lm-dialog-body">
+      <div class="wizard-steps" id="wizard-steps" role="tablist" aria-label="Pasos del job">
+        <button class="wizard-step is-active" type="button" data-step="1" role="tab" aria-selected="true">
+          <span class="step-index">1</span><span>Configurar</span>
+        </button>
+        <button class="wizard-step" type="button" data-step="2" role="tab" aria-selected="false" disabled>
+          <span class="step-index">2</span><span>Datos</span>
+        </button>
+      </div>
+
+      <!-- Step 1 -->
+      <div class="wizard-panel" id="wizard-panel-1" role="tabpanel">
+        <div class="field">
+          <label class="label" for="job-kind-select">Tipo</label>
+          <select class="select" id="job-kind-select">
+            <option value="fit">fit — construir y entrenar</option>
+            <option value="evaluate">evaluate — evaluar un artefacto</option>
+          </select>
+          <p class="hint" id="kind-hint"></p>
+        </div>
+        <div class="field">
+          <label class="label" for="job-model-select">Modelo</label>
+          <select class="select" id="job-model-select">
+            <option value="">— selecciona un modelo —</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label" for="job-method-input">Método</label>
+          <input type="text" class="input mono" id="job-method-input" placeholder="fit">
+          <p class="hint">El método se invoca dentro del sandbox y guarda la instancia resultante como artefacto.</p>
+          <p class="hint" id="method-hint"></p>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label class="label" for="job-name">Nombre</label>
+            <input type="text" class="input" id="job-name" placeholder="fit-FourierRegression">
+          </div>
+          <div class="field">
+            <label class="label" for="job-timeout">Timeout (segundos)</label>
+            <input type="number" class="input" id="job-timeout" min="1" placeholder="600">
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="wizard-panel" id="wizard-panel-2" role="tabpanel" hidden>
+        <div class="field">
+          <label class="label" for="job-parameters">Parámetros del constructor</label>
+          <textarea class="textarea mono" id="job-parameters" rows="6" placeholder="{}"></textarea>
+          <p class="hint">JSON de los argumentos del constructor. Ej.: <code>{"datapoints": [[1, 2], [2, 3]]}</code></p>
+          <p class="hint" id="constructor-hint"></p>
+        </div>
+        <div class="field">
+          <label class="label" for="job-arguments">Argumentos del método</label>
+          <textarea class="textarea mono" id="job-arguments" rows="4" placeholder="{}"></textarea>
+          <p class="hint">JSON de los argumentos de <code>fit</code>/<code>train</code>. La mayor parte de los métodos no necesita nada.</p>
+        </div>
+        <div class="field" id="artifact-field" hidden>
+          <label class="label" for="job-artifact-id">Artefacto (opcional)</label>
+          <input type="text" class="input mono" id="job-artifact-id" placeholder="art-…">
+          <p class="hint">ID de un artefacto de fit previo para evaluarlo. Si se deja vacío, se evalúa sobre el constructor.</p>
+        </div>
+      </div>
+    </div>
+    <footer class="lm-dialog-footer">
+      <button class="btn btn-secondary" type="button" id="wizard-back">Atrás</button>
+      <span class="status-note" id="wizard-status" role="status" aria-live="polite"></span>
+      <button class="btn btn-primary" type="button" id="wizard-create">Siguiente paso</button>
+    </footer>
+  </section>
+</div>
+
+<!-- Confirmation dialog -->
+<div class="lm-dialog-backdrop" id="confirm-dialog" hidden>
+  <section class="lm-dialog" style="width:min(440px,100%)" role="alertdialog" aria-modal="true"
+           aria-labelledby="confirm-title" aria-describedby="confirm-text">
+    <header class="lm-dialog-header">
+      <div class="lm-dialog-heading">
+        <div class="lm-dialog-eyebrow">Confirmación</div>
+        <h2 class="lm-dialog-title" id="confirm-title">Confirmar acción</h2>
+      </div>
+    </header>
+    <div class="lm-dialog-body">
+      <p class="confirm-text" id="confirm-text"></p>
+    </div>
+    <footer class="lm-dialog-footer">
+      <button class="btn btn-secondary" type="button" id="confirm-cancel">Cancelar</button>
+      <button class="btn btn-primary" type="button" id="confirm-accept">Confirmar</button>
+    </footer>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="/training.js" defer></script>
+</body>
+</html>

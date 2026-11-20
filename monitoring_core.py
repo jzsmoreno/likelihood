@@ -183,6 +183,7 @@ def aggregate(events: Sequence[Dict[str, Any]], minutes: Optional[float] = None)
     successes = sum(1 for event in events if event.get("status") == "success")
     failures = sum(1 for event in events if event.get("status") == "error")
     latencies: List[float] = []
+    compute: List[float] = []
     statuses: Dict[str, int] = {}
     error_types: Dict[str, int] = {}
     endpoints = set()
@@ -194,6 +195,12 @@ def aggregate(events: Sequence[Dict[str, Any]], minutes: Optional[float] = None)
             latencies.append(float(event.get("latency_ms") or 0.0))
         except (TypeError, ValueError):
             pass
+        if event.get("status") == "success":
+            try:
+                if event.get("compute_seconds") is not None:
+                    compute.append(float(event.get("compute_seconds")))
+            except (TypeError, ValueError):
+                pass
         status = str(event.get("http_status") or 0)
         statuses[status] = statuses.get(status, 0) + 1
         if event.get("status") == "error":
@@ -220,6 +227,11 @@ def aggregate(events: Sequence[Dict[str, Any]], minutes: Optional[float] = None)
         "p95_latency_ms": percentile(latencies, 0.95),
         "p99_latency_ms": percentile(latencies, 0.99),
         "max_latency_ms": round(max(latencies), 2) if latencies else 0.0,
+        "avg_compute_seconds": round(sum(compute) / len(compute), 3) if compute else 0.0,
+        "p50_compute_seconds": percentile(compute, 0.50),
+        "p95_compute_seconds": percentile(compute, 0.95),
+        "max_compute_seconds": round(max(compute), 3) if compute else 0.0,
+        "compute_seconds_total": round(sum(compute), 2) if compute else 0.0,
         "requests_per_minute": (round(requests / window_minutes, 3) if window_minutes else 0.0),
         "statuses": dict(sorted(statuses.items(), key=lambda item: item[0])),
         "error_types": dict(sorted(error_types.items(), key=lambda item: (-item[1], item[0]))),
@@ -258,8 +270,10 @@ def bucketize(
                 "p90_latency_ms": None,
                 "p95_latency_ms": None,
                 "p99_latency_ms": None,
+                "avg_compute_seconds": None,
             }
         )
+    compute_samples: List[List[float]] = [[] for _ in range(count)]
     for event in events:
         try:
             stamp = float(event.get("timestamp"))
@@ -276,8 +290,13 @@ def bucketize(
         elif event.get("status") == "error":
             point["failed"] += 1
         samples[index].append(latency)
+        try:
+            if event.get("compute_seconds") is not None:
+                compute_samples[index].append(float(event.get("compute_seconds")))
+        except (TypeError, ValueError):
+            pass
     bucket_minutes = bucket / 60.0
-    for point, values in zip(points, samples):
+    for point, values, compute_values in zip(points, samples, compute_samples):
         if point["requests"]:
             point["error_rate"] = round(point["failed"] / point["requests"] * 100.0, 2)
             point["throughput"] = round(point["requests"] / bucket_minutes, 3)
@@ -286,6 +305,9 @@ def bucketize(
             point["p90_latency_ms"] = percentile(values, 0.90)
             point["p95_latency_ms"] = percentile(values, 0.95)
             point["p99_latency_ms"] = percentile(values, 0.99)
+            point["avg_compute_seconds"] = (
+                round(sum(compute_values) / len(compute_values), 3) if compute_values else None
+            )
     return points
 
 
@@ -356,6 +378,8 @@ def latency_comparison(endpoints: Sequence[Dict[str, Any]]) -> List[Dict[str, An
             "p50_latency_ms": endpoint["p50_latency_ms"],
             "p95_latency_ms": endpoint["p95_latency_ms"],
             "p99_latency_ms": endpoint["p99_latency_ms"],
+            "avg_compute_seconds": endpoint.get("avg_compute_seconds", 0.0),
+            "p95_compute_seconds": endpoint.get("p95_compute_seconds", 0.0),
             "error_rate": endpoint["error_rate"],
         }
         for endpoint in endpoints
@@ -639,6 +663,9 @@ def overview(
         ),
         "failed_requests": _kpi(totals["failed"], previous_totals["failed"], "peticiones"),
         "avg_latency_ms": _kpi(totals["avg_latency_ms"], previous_totals["avg_latency_ms"], "ms"),
+        "avg_compute_seconds": _kpi(
+            totals["avg_compute_seconds"], previous_totals["avg_compute_seconds"], "s"
+        ),
         "error_rate": _kpi(totals["error_rate"], previous_totals["error_rate"], "%"),
         "requests_per_minute": _kpi(
             totals["requests_per_minute"],
@@ -708,6 +735,12 @@ def endpoint_detail(
         "error_rate": _kpi(totals["error_rate"], previous_totals["error_rate"], "%"),
         "avg_latency_ms": _kpi(totals["avg_latency_ms"], previous_totals["avg_latency_ms"], "ms"),
         "p95_latency_ms": _kpi(totals["p95_latency_ms"], previous_totals["p95_latency_ms"], "ms"),
+        "avg_compute_seconds": _kpi(
+            totals["avg_compute_seconds"], previous_totals["avg_compute_seconds"], "s"
+        ),
+        "p95_compute_seconds": _kpi(
+            totals["p95_compute_seconds"], previous_totals["p95_compute_seconds"], "s"
+        ),
         "requests_per_minute": _kpi(
             totals["requests_per_minute"],
             previous_totals["requests_per_minute"],

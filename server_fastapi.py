@@ -128,6 +128,8 @@ import notebook_generator
 import server_core as core
 import serving_api
 import serving_core
+import training_api
+import training_core
 from model_catalog import (
     category_index,
     facet_counts,
@@ -190,6 +192,7 @@ class ServerSettings:
         self.jobs = core.JobQueue()
         self.sessions = core.SessionStore()
         self.serving = serving_core.ServingStore()
+        self.training = training_core.TrainingStore()
         self.invoke_slots = threading.BoundedSemaphore(core.INVOKE_MAX_CONCURRENCY)
         self.playground_enabled = core.PLAYGROUND_ENABLED
         self.invoke_enabled = core.INVOKE_ENABLED
@@ -861,6 +864,8 @@ def build_router() -> APIRouter:
     # Serving and monitoring keep their routes in a separate module, but share
     # the application middleware, error handlers and authentication.
     router.include_router(serving_api.build_router())
+    # Training keeps its routes in a separate module, sharing the same middleware.
+    router.include_router(training_api.build_router())
 
     # -- catalogue metadata -------------------------------------------------
 
@@ -1797,6 +1802,16 @@ def build_router() -> APIRouter:
         """Endpoint-level monitoring view."""
         return serve_asset(core.ASSETS_DIR / "monitoring.html", request)
 
+    @router.get("/training", tags=["pages"])
+    def training_page(request: Request) -> Response:
+        """Model Training workspace (job list, create wizard and artifacts)."""
+        return serve_asset(core.ASSETS_DIR / "training.html", request)
+
+    @router.get("/training/{job_id}", tags=["pages"])
+    def training_job_page(job_id: str, request: Request) -> Response:
+        """Training job detail: progress, log, artifact and result."""
+        return serve_asset(core.ASSETS_DIR / "training.html", request)
+
     @router.get("/{asset_path:path}", tags=["pages"])
     def static_asset(asset_path: str, request: Request) -> Response:
         """Any other path is resolved inside ``models/`` (traversal proof)."""
@@ -1830,6 +1845,7 @@ def create_app(
         state.jobs.shutdown()
         state.sessions.shutdown()
         state.serving.shutdown()
+        state.training.shutdown()
 
     app = FastAPI(
         title="Likelihood catalogue",

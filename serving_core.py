@@ -1333,6 +1333,12 @@ class ServingStore:
                 timeout=timeout,
                 load=invoke_load,
             )
+            compute = result.get("compute_seconds")
+            if compute is not None:
+                try:
+                    compute = round(float(compute), 3)
+                except (TypeError, ValueError):
+                    compute = None
             elapsed_ms = round(
                 float(result.get("elapsed") or (time.monotonic() - started)) * 1000.0, 2
             )
@@ -1342,6 +1348,7 @@ class ServingStore:
                 result,
                 elapsed_ms,
                 request_bytes=request_bytes,
+                compute_seconds=compute,
             )
             return {
                 "success": True,
@@ -1356,6 +1363,7 @@ class ServingStore:
                 "prediction_type": result.get("result_type"),
                 "prediction_repr": result.get("result_repr"),
                 "latency_ms": elapsed_ms,
+                "compute_seconds": compute,
                 "request_id": event["id"],
                 "timestamp": event["at"],
                 "source": ("loaded_model" if snapshot["load"].get("enabled") else "constructor"),
@@ -1392,6 +1400,7 @@ class ServingStore:
         result: Dict[str, Any],
         elapsed_ms: float,
         request_bytes: int = 0,
+        compute_seconds: Optional[float] = None,
     ) -> Dict[str, Any]:
         event = self._event(deployment, "success", 200, elapsed_ms)
         event.update(
@@ -1402,6 +1411,8 @@ class ServingStore:
                 "output_preview": _preview(result.get("result")) if LOG_INPUTS else "",
             }
         )
+        if compute_seconds is not None:
+            event["compute_seconds"] = round(float(compute_seconds), 3)
         return self.events.record(event)
 
     def _record_error(

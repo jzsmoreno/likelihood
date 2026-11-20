@@ -1730,12 +1730,16 @@ _emit(result)
 #: Same isolation, but it also calls one method of the freshly built instance, so
 #: every ``POST /api/models/<id>/invoke`` request starts from a clean object.
 _INVOKE_BOOTSTRAP = _SANDBOX_PRELUDE + r"""
+import time
+
 try:
     instance = _load_instance(payload["load"]) if payload.get("load") else _build()
     arguments = _convert_all(payload.get("arguments"), argument_types)
     _prepare(instance, payload["method"], arguments)
     method = getattr(instance, payload["method"])
+    started = time.monotonic()
     value = method(**arguments)
+    compute = round(time.monotonic() - started, 3)
     _mark_prepared(instance, payload["method"])
 except BaseException as exc:
     import traceback as _traceback
@@ -1751,9 +1755,23 @@ except BaseException as exc:
 
 result = _describe(instance)
 result["ok"] = True
+result["compute_seconds"] = compute
 result["result"] = _safe(value)
 result["result_type"] = type(value).__name__
 result["result_repr"] = repr(value)[:2000]
+
+save_path = payload.get("save", {}).get("path") if isinstance(payload.get("save"), dict) else None
+if save_path:
+    try:
+        import pickle
+
+        os.makedirs(os.path.dirname(str(save_path)), exist_ok=True)
+        with open(str(save_path), "wb") as _handle:
+            pickle.dump(instance, _handle)
+        result["save_path"] = str(save_path)
+        result["save_bytes"] = os.path.getsize(str(save_path))
+    except BaseException as save_exc:
+        result["save_error"] = "%s: %s" % (type(save_exc).__name__, save_exc)
 _emit(result)
 """
 
@@ -2500,6 +2518,7 @@ def run_invoke(
     arguments: Dict[str, Any],
     timeout: Optional[float] = None,
     load: Optional[Dict[str, Any]] = None,
+    save_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Build (or load) ``model`` and call ``method`` in a throw-away child interpreter.
 
@@ -2522,6 +2541,10 @@ def run_invoke(
             for key in ("name", "path", "path_parameter", "requires_instance", "module")
             if key in load
         }
+    if save_path:
+        # The parent decides the destination (artifacts of a training job); the
+        # child only pickles the live instance into that path after the call.
+        payload_data["save"] = {"path": save_path}
     payload = json.dumps(payload_data)
     started = time.monotonic()
     try:

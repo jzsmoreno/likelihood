@@ -1,0 +1,307 @@
+"""HTTP routes for Model Training.
+
+The router lives in its own module to keep :mod:`server_fastapi` focused on the
+catalogue.  It reuses the same exception hierarchy (``server_core.APIError``), so
+the application error handlers, the authentication middleware, the rate limiter and
+the Prometheus counters apply to the training endpoints without extra wiring.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
+
+import server_core as core
+import training_core
+
+#: Tags used by the OpenAPI document.
+TRAINING_TAG = "training"
+
+
+def get_settings(request: Request) -> Any:
+    """Return the runtime settings of the running application."""
+    return request.app.state.settings
+
+
+def json_response(
+    status: int, payload: Dict[str, Any], headers: Optional[Dict[str, str]] = None
+) -> JSONResponse:
+    """JSON response with the same envelope used by the catalogue."""
+    final_headers = {"Cache-Control": "no-store"}
+    final_headers.update(headers or {})
+    return JSONResponse(status_code=status, content=payload, headers=final_headers)
+
+
+def _no_store(payload: Dict[str, Any], status: int = 200) -> JSONResponse:
+    return json_response(status, payload)
+
+
+def require_training(settings: Any) -> None:
+    """Training reuses the invocation sandbox, so the invoke switch must be on."""
+    if not settings.invoke_enabled:
+        raise core.APIError(
+            "La invocación de métodos está deshabilitada en este servidor", status=403
+        )
+
+
+class TrainingRequest(BaseModel):
+    """Body of ``POST /api/training/jobs``."""
+
+    model_config = ConfigDict(extra="allow")
+
+    kind: Optional[str] = Field(default=None, description="'fit' (por defecto) o 'evaluate'.")
+    model_id: str = Field(default="", description="Id del modelo del catálogo.")
+    method: Optional[str] = Field(default=None, description="Método a ejecutar (fit por defecto).")
+    arguments: Optional[Dict[str, Any]] = Field(
+        default=None, description="Argumentos del método (datos de entrenamiento)."
+    )
+    args: Optional[Dict[str, Any]] = Field(default=None, description="Alias de ``arguments``.")
+    parameters: Optional[Dict[str, Any]] = Field(
+        default=None, description="Argumentos del constructor del modelo."
+    )
+    params: Optional[Dict[str, Any]] = Field(default=None, description="Alias de ``parameters``.")
+    timeout: Optional[float] = Field(
+        default=None, description="Segundos máximos (por defecto LM_TRAINING_TIMEOUT)."
+    )
+    timeout_seconds: Optional[float] = Field(default=None, description="Alias de ``timeout``.")
+    artifact_id: Optional[str] = Field(
+        default=None, description="Artefacto a cargar (solo kind='evaluate')."
+    )
+    name: Optional[str] = Field(default=None, description="Nombre visible del trabajo.")
+
+    def payload(self) -> Dict[str, Any]:
+        """Plain dict without the ``None`` placeholders (legacy aliases included)."""
+        data = {key: value for key, value in self.model_dump().items() if value is not None}
+        data.update(self.model_extra or {})
+        return data
+
+
+def _job_brief(job: Dict[str, Any]) -> Dict[str, Any]:
+    """Small job projection used by lists and filters."""
+    artifact = job.get("artifact") or {}
+    return {
+        "job_id": job["job_id"],
+        "kind": job["kind"],
+        "status": job["status"],
+        "name": job.get("name") or "",
+        "model_id": job.get("model_id") or "",
+        "model_name": job.get("model_name") or job.get("model_id") or "",
+        "method": job.get("method") or "",
+        "created_at": job.get("created_at") or "",
+        "started_at": job.get("started_at"),
+        "finished_at": job.get("finished_at"),
+        "elapsed": job.get("elapsed"),
+        "compute_seconds": job.get("compute_seconds"),
+        "attempts": job.get("attempts") or 0,
+        "error": job.get("error") or "",
+        "artifact_id": artifact.get("artifact_id") if artifact else None,
+        "artifact_path": artifact.get("path") if artifact else None,
+        "artifact_size_bytes": artifact.get("size_bytes") if artifact else None,
+        "result_type": job.get("result_type"),
+        "result_repr": job.get("result_repr"),
+    }
+
+
+def _job_payload(settings: Any, job: Dict[str, Any]) -> Dict[str, Any]:
+    """Full job payload with model metadata and artifact details."""
+    payload = {
+        "job_id": job["job_id"],
+        "kind": job["kind"],
+        "status": job["status"],
+        "name": job.get("name") or "",
+        "model_id": job.get("model_id") or "",
+        "model_name": job.get("model_name") or job.get("model_id") or "",
+        "method": job.get("method") or "",
+        "arguments": dict(job.get("arguments") or {}),
+        "parameters": dict(job.get("parameters") or {}),
+        "timeout_seconds": job.get("timeout_seconds"),
+        "attempts": job.get("attempts") or 0,
+        "created_at": job.get("created_at") or "",
+        "started_at": job.get("started_at"),
+        "finished_at": job.get("finished_at"),
+        "elapsed": job.get("elapsed"),
+        "compute_seconds": job.get("compute_seconds"),
+        "error": job.get("error") or "",
+        "result_type": job.get("result_type"),
+        "result_repr": job.get("result_repr"),
+        "instance": dict(job.get("instance") or {}),
+        "log": list(job.get("log") or []),
+        "updated_at": job.get("updated_at") or "",
+    }
+    artifact = job.get("artifact") or {}
+    payload["artifact"] = dict(artifact) if artifact else None
+    if artifact:
+        path = str(artifact.get("path") or "")
+        # Artifacts live under ``LM_TRAINING_STORE`` (outside ``models/``), so the
+        # browser asset resolver cannot see them: check the file itself.
+        payload["artifact"]["exists"] = Path(path).is_file() if path else False
+    catalog_model = None
+    for item in settings.catalog:
+        if item.get("id") == job.get("model_id"):
+            catalog_model = item
+            break
+    if catalog_model is not None:
+        payload["model"] = core.model_brief(catalog_model)
+    payload.update(
+        {
+            "page_url": f"/training/{job['job_id']}",
+            "auth_required": bool(settings.api_token),
+        }
+    )
+    return payload
+
+
+def build_router() -> APIRouter:
+    """Build the training router."""
+    router = APIRouter()
+
+    @router.get("/api/training/overview", tags=[TRAINING_TAG])
+    def training_overview(settings: Any = Depends(get_settings)) -> JSONResponse:
+        """Training job counters and recent jobs."""
+        require_training(settings)
+        jobs = settings.training.list()
+        statuses: Dict[str, int] = {}
+        models = set()
+        for job in jobs:
+            statuses[job["status"]] = statuses.get(job["status"], 0) + 1
+            models.add(job.get("model_id") or "")
+        recent = [_job_brief(job) for job in jobs[:5]]
+        return _no_store(
+            {
+                "success": True,
+                "counts": {
+                    "jobs": len(jobs),
+                    "models_trained": len(models - {""}),
+                    "statuses": statuses,
+                },
+                "recent": recent,
+            }
+        )
+
+    @router.get("/api/training/models", tags=[TRAINING_TAG])
+    def training_models(settings: Any = Depends(get_settings)) -> JSONResponse:
+        """Fit-capable models with their fitting method and number of constructor fields."""
+        require_training(settings)
+        rows: List[Dict[str, Any]] = []
+        for model in settings.catalog:
+            methods = [
+                m
+                for m in model.get("methods") or []
+                if str(m.get("name") or "").lower() in training_core.FIT_METHODS
+            ]
+            if not methods:
+                continue
+            fit = methods[0]
+            model_parameters = model.get("parameters") or []
+            constructor_fields = [p.get("name") for p in model_parameters if not p.get("variadic")]
+            method_fields = [
+                {"name": p.get("name"), "type": p.get("type"), "required": bool(p.get("required"))}
+                for p in (fit.get("parameters") or [])
+                if not p.get("variadic")
+            ]
+            rows.append(
+                {
+                    "id": model["id"],
+                    "name": model.get("name") or model["id"],
+                    "category": model.get("category"),
+                    "icon": model.get("icon") or "🧪",
+                    "fit_method": fit["name"],
+                    "method_fields": method_fields,
+                    "constructor_fields": constructor_fields,
+                }
+            )
+        rows.sort(key=lambda item: item["name"].lower())
+        return _no_store({"success": True, "count": len(rows), "models": rows})
+
+    @router.get("/api/training/jobs", tags=[TRAINING_TAG])
+    def list_jobs(
+        settings: Any = Depends(get_settings),
+        kind: str = Query("", description="fit, evaluate o vacío para todos."),
+        status: str = Query("", description="pending, running, succeeded, failed o cancelled."),
+    ) -> JSONResponse:
+        """All training jobs, newest first (optionally filtered)."""
+        require_training(settings)
+        wanted_kind = (kind or "").strip().lower()
+        wanted_status = (status or "").strip().lower()
+        rows: List[Dict[str, Any]] = []
+        for job in settings.training.list():
+            if wanted_kind and job["kind"] != wanted_kind:
+                continue
+            if wanted_status and job["status"] != wanted_status:
+                continue
+            rows.append(_job_brief(job))
+        return _no_store({"success": True, "count": len(rows), "jobs": rows})
+
+    @router.get("/api/training/jobs/{job_id}", tags=[TRAINING_TAG])
+    def get_job(job_id: str, settings: Any = Depends(get_settings)) -> JSONResponse:
+        """Full job payload with model metadata, artifact and log."""
+        require_training(settings)
+        job = settings.training.job(job_id)
+        if not job:
+            raise core.ModelNotFound(f'Trabajo no encontrado: "{job_id}"')
+        payload = _job_payload(settings, job)
+        return _no_store({"success": True, "job": payload, **payload})
+
+    @router.post("/api/training/jobs", status_code=202, tags=[TRAINING_TAG])
+    def create_job(
+        body: TrainingRequest,
+        settings: Any = Depends(get_settings),
+    ) -> JSONResponse:
+        """Start a training job that runs in the background."""
+        require_training(settings)
+        data = body.payload()
+        job = settings.training.start(data)
+        payload = _job_payload(settings, job)
+        location = payload["page_url"]
+        return json_response(
+            202,
+            {"success": True, "job": payload, **payload},
+            {"Location": location, "Cache-Control": "no-store"},
+        )
+
+    @router.post("/api/training/jobs/{job_id}/cancel", tags=[TRAINING_TAG])
+    def cancel_job(job_id: str, settings: Any = Depends(get_settings)) -> JSONResponse:
+        """Cancel a pending job."""
+        require_training(settings)
+        if not settings.training.cancel(job_id):
+            raise core.ValidationError(f'No se puede cancelar: "{job_id}" no está pendiente.')
+        job = settings.training.job(job_id)
+        return _no_store(
+            {"success": True, "cancelled": True, "job": _job_brief(job) if job else None}
+        )
+
+    @router.delete("/api/training/jobs/{job_id}", tags=[TRAINING_TAG])
+    def delete_job(job_id: str, settings: Any = Depends(get_settings)) -> JSONResponse:
+        """Delete a training job (and its artifact, for fit jobs)."""
+        require_training(settings)
+        result = settings.training.delete(job_id)
+        return _no_store({"success": True, "deleted": True, **result})
+
+    @router.get("/api/training/artifacts", tags=[TRAINING_TAG])
+    def list_artifacts(settings: Any = Depends(get_settings)) -> JSONResponse:
+        """All artifacts of succeeded fit jobs, newest first."""
+        require_training(settings)
+        artifacts = settings.training.list_artifacts()
+        return _no_store({"success": True, "count": len(artifacts), "artifacts": artifacts})
+
+    @router.get("/api/training/artifacts/{artifact_id}", tags=[TRAINING_TAG])
+    def get_artifact(artifact_id: str, settings: Any = Depends(get_settings)) -> JSONResponse:
+        """One artifact produced by a fit job."""
+        require_training(settings)
+        artifact = settings.training.artifact(artifact_id)
+        if not artifact:
+            raise core.ModelNotFound(f'Artefacto no encontrado: "{artifact_id}"')
+        return _no_store({"success": True, "artifact": artifact, **artifact})
+
+    @router.delete("/api/training/artifacts/{artifact_id}", tags=[TRAINING_TAG])
+    def delete_artifact(artifact_id: str, settings: Any = Depends(get_settings)) -> JSONResponse:
+        """Delete an artifact and clear its reference."""
+        require_training(settings)
+        result = settings.training.delete_artifact(artifact_id)
+        return _no_store({"success": True, "deleted": result["deleted"], **result})
+
+    return router

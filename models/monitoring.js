@@ -71,6 +71,7 @@
   function compact(value) { return window.LMCharts ? LMCharts.fmtCompact(value) : String(value); }
   function ms(value) { return window.LMCharts ? LMCharts.fmtMs(value) : (value + ' ms'); }
   function percent(value, digits) { return window.LMCharts ? LMCharts.fmtPercent(value, digits) : (value + '%'); }
+  function sec(value) { return window.LMCharts ? LMCharts.fmtNumber(value, 3) + ' s' : (String(value) + ' s'); }
 
   function isoDate(value) {
     if (!value) return '—';
@@ -321,6 +322,7 @@
         kpiCard(kpis.successful_requests, 'Correctas', '✓', 'green', fmt) +
         kpiCard(kpis.failed_requests, 'Fallidas', '✕', 'lava', fmt, true) +
         kpiCard(kpis.avg_latency_ms, 'Latencia media', '◷', '', ms, true) +
+        kpiCard(kpis.avg_compute_seconds, 'Cómputo medio', '⏱', 'blue', sec, true) +
         kpiCard(kpis.error_rate, 'Tasa de error', '⚠', 'lava', function (value) { return percent(value, 2); }, true) +
         kpiCard(kpis.requests_per_minute, 'Peticiones / minuto', '↗', 'blue', fmt);
     }
@@ -478,6 +480,8 @@
         kpiCard(kpis.error_rate, 'Tasa de error', '⚠', 'lava', function (value) { return percent(value, 2); }, true) +
         kpiCard(kpis.avg_latency_ms, 'Latencia media', '◷', '', ms, true) +
         kpiCard(kpis.p95_latency_ms, 'Latencia P95', '◷', 'lava', ms, true) +
+        kpiCard(kpis.avg_compute_seconds, 'Cómputo medio', '⏱', 'blue', sec, true) +
+        kpiCard(kpis.p95_compute_seconds, 'Cómputo P95', '⏱', 'lava', sec, true) +
         kpiCard(kpis.requests_per_minute, 'Peticiones / minuto', '↗', 'blue', fmt);
     }
     var points = (detail.series && detail.series.activity) || [];
