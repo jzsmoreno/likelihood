@@ -30,6 +30,7 @@ import re
 import threading
 import time
 import uuid
+import zipfile
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -242,6 +243,26 @@ def _preview(value: Any, limit: int = 180) -> str:
     except (TypeError, ValueError):  # pragma: no cover - defensive
         text = str(value)
     return text[:limit]
+
+
+def _value_shape(value: Any) -> str:
+    """Human-friendly shape of one event argument (``[3 × 30]``)."""
+    if isinstance(value, (list, tuple)):
+        if value and isinstance(value[0], (list, tuple)):
+            return f"[{len(value)} × {len(value[0])}]"
+        return f"[{len(value)}]"
+    if isinstance(value, dict):
+        return f"{{{len(value)}}}"
+    if isinstance(value, str):
+        return value if len(value) <= 32 else value[:32] + "…"
+    return str(value)
+
+
+def _input_summary(arguments: Any) -> str:
+    """One-line shape summary of the arguments stored in an event."""
+    if not isinstance(arguments, dict) or not arguments:
+        return ""
+    return " · ".join(f"{name} {_value_shape(value)}" for name, value in arguments.items())
 
 
 def _atomic_write(path: Path, text: str) -> None:
@@ -762,6 +783,7 @@ class ServingStore:
             load.update(
                 {
                     "loader": prepared["name"],
+                    "module": prepared.get("module"),
                     "path": prepared["path"],
                     "path_parameter": prepared.get("path_parameter"),
                     "parameters": prepared["parameters"],
@@ -891,6 +913,7 @@ class ServingStore:
                 load.update(
                     {
                         "loader": prepared["name"],
+                        "module": prepared.get("module"),
                         "path": prepared["path"],
                         "path_parameter": prepared.get("path_parameter"),
                         "parameters": prepared["parameters"],
@@ -1124,6 +1147,8 @@ class ServingStore:
                     "type": result.get("type"),
                     "module": result.get("module"),
                     "repr": result.get("repr"),
+                    "attributes": result.get("attributes") or [],
+                    "attribute_values": result.get("attribute_values") or {},
                     "elapsed": result.get("elapsed"),
                     "loaded_at": iso(),
                 }
@@ -1316,12 +1341,15 @@ class ServingStore:
         started = time.monotonic()
         request_bytes = _json_bytes(body)
         invoke_load = _invoke_load(snapshot["load"])
-        if invoke_load and not invoke_load.get("path_parameter"):
+        if invoke_load and (not invoke_load.get("path_parameter") or not invoke_load.get("module")):
             # Records persisted by an older version may not carry the loader
-            # parameter name; resolve it from the live catalog.
+            # module/parameter name; resolve them from the live catalog.
             try:
                 loader = core.resolve_loader(model, invoke_load.get("name") or "")
-                invoke_load["path_parameter"] = loader.get("path_parameter")
+                invoke_load["path_parameter"] = invoke_load.get("path_parameter") or loader.get(
+                    "path_parameter"
+                )
+                invoke_load["module"] = invoke_load.get("module") or loader.get("module")
             except core.APIError:
                 pass
         try:
@@ -1408,6 +1436,7 @@ class ServingStore:
                 "request_bytes": request_bytes,
                 "response_bytes": _json_bytes(result.get("result")),
                 "input_preview": _preview(arguments) if LOG_INPUTS else "",
+                "input_summary": _input_summary(arguments) if LOG_INPUTS else "",
                 "output_preview": _preview(result.get("result")) if LOG_INPUTS else "",
             }
         )
@@ -1431,6 +1460,7 @@ class ServingStore:
                 "request_bytes": _json_bytes(arguments or {}),
                 "response_bytes": 0,
                 "input_preview": _preview(arguments or {}) if LOG_INPUTS else "",
+                "input_summary": _input_summary(arguments or {}) if LOG_INPUTS else "",
                 "output_preview": "",
                 "error_type": error_type or "Error",
                 "error_message": str(message)[:1000],
@@ -1479,7 +1509,77 @@ class ServingStore:
 def _artifact_path(path: str) -> Path:
     """Resolve a saved-model path the same way the sandbox does."""
     candidate = Path(path).expanduser()
-    return candidate if candidate.is_absolute() else core.LOAD_ROOT / candidate
+    if not candidate.is_absolute():
+        candidate = core.LOAD_ROOT / candidate
+    for spelling in core._load_candidates(candidate):
+        if spelling.exists():
+            return spelling
+    return candidate
+
+
+def _artifact_json(candidate: Path) -> Any:
+    """Read a JSON metadata file, including the ``config.json`` inside ``.keras``."""
+    if candidate.suffix.lower() == ".keras":
+        try:
+            with zipfile.ZipFile(candidate) as archive:
+                names = archive.namelist()
+                config_name = (
+                    "config.json"
+                    if "config.json" in names
+                    else next((name for name in names if name.endswith("/config.json")), None)
+                )
+                if config_name is None:
+                    return None
+                return json.loads(archive.read(config_name).decode("utf-8"))
+        except (OSError, ValueError, KeyError, zipfile.BadZipFile):
+            return None
+    try:
+        return json.loads(candidate.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _artifact_parameters(model: Dict[str, Any], path: str) -> Dict[str, Any]:
+    """Read scalar constructor values from a training artifact or Keras config.
+
+    ``artifact.json`` is written by the training worker and carries the
+    constructor parameters.  Older artifacts and models saved with their native
+    Keras saver only have ``config.json``; a ``.keras`` archive embeds that file.
+    All are inspected so a loaded model can generate a payload with the right
+    feature count.  Loading itself does not depend on any of these files.
+    """
+    target = _artifact_path(path)
+    candidates: List[Path] = []
+    if target.is_file():
+        if target.suffix.lower() in (".json", ".keras"):
+            candidates.append(target)
+        candidates.extend([target.parent / "artifact.json", target.parent / "config.json"])
+    else:
+        candidates.extend([target / "artifact.json", target / "config.json"])
+    known = {
+        parameter.get("name")
+        for parameter in model.get("parameters") or []
+        if parameter.get("name")
+    }
+    found: Dict[str, Any] = {}
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        data = _artifact_json(candidate)
+        if not isinstance(data, dict):
+            continue
+        sources = [data]
+        nested = data.get("config")
+        if isinstance(nested, dict):
+            sources.append(nested)
+        for source in sources:
+            parameter_source = source.get("parameters")
+            if isinstance(parameter_source, dict):
+                source = parameter_source
+            for name, value in source.items():
+                if name in known and (isinstance(value, (bool, int, float, str)) or value is None):
+                    found[name] = value
+    return found
 
 
 def _normalise_config(raw: Any) -> Dict[str, Any]:
@@ -1537,11 +1637,17 @@ def _normalise_load(raw: Any, parameters: Dict[str, Any], model: Dict[str, Any])
     loader_parameters = raw.get("parameters")
     if loader_parameters is not None and not isinstance(loader_parameters, dict):
         raise core.ValidationError("El campo 'load.parameters' debe ser un objeto")
+    inferred = _artifact_parameters(model, path)
+    load_parameters = {**parameters, **inferred}
+    if loader_parameters is not None:
+        load_parameters.update(loader_parameters)
     return {
         "enabled": True,
         "loader": loader["name"],
+        "module": loader.get("module"),
         "path": path,
-        "parameters": dict(loader_parameters if loader_parameters is not None else parameters),
+        "path_parameter": loader.get("path_parameter"),
+        "parameters": load_parameters,
         "requires_instance": bool(loader.get("requires_instance")),
     }
 
@@ -1552,6 +1658,7 @@ def _invoke_load(load: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
     return {
         "name": load.get("loader"),
+        "module": load.get("module"),
         "path": load.get("path"),
         "path_parameter": load.get("path_parameter"),
         "requires_instance": bool(load.get("requires_instance")),
@@ -1598,6 +1705,44 @@ def method_example(method_fields: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     return {"arguments": {}}
 
 
+def example_parameters(deployment: Dict[str, Any], model: Dict[str, Any]) -> Dict[str, Any]:
+    """Constructor values used to build realistic method examples.
+
+    The deployment form provides these values for newly-built models.  Loaded
+    models (and older deployments) may not have them, so scalar public
+    attributes exposed by ``run_load`` are used as a fallback.  This is what
+    makes the Probar payload use the feature count of the actual artifact.
+    """
+    parameters = dict(deployment.get("parameters") or {})
+    load = deployment.get("load") or {}
+    load_parameters = load.get("parameters")
+    if isinstance(load_parameters, dict):
+        # Loaded deployments may keep the inferred values in ``load.parameters``.
+        parameters = {**load_parameters, **parameters}
+    if not model:
+        return parameters
+    known = {
+        parameter.get("name")
+        for parameter in model.get("parameters") or []
+        if parameter.get("name")
+    }
+    loaded = deployment.get("loaded_artifact") or {}
+    inferred = dict(loaded.get("attribute_values") or {})
+    if load.get("enabled") and load.get("path"):
+        missing_shape = any(
+            name in known and name not in inferred for name in core.WIDTH_PARAMETERS
+        )
+        if not inferred or missing_shape:
+            # Old deployments predate ``attribute_values`` in ``loaded_artifact``.
+            # Re-read the artifact metadata/config so their examples also reflect
+            # the actual saved model instead of the form defaults.
+            inferred = {**_artifact_parameters(model, load["path"]), **inferred}
+    for name, value in inferred.items():
+        if name in known:
+            parameters[name] = value
+    return parameters
+
+
 def build_docs(
     deployment: Dict[str, Any],
     model: Dict[str, Any],
@@ -1610,7 +1755,7 @@ def build_docs(
     Everything is derived from the deployed model, the deployed method and the
     constructor values of the deployment; there is no hardcoded example.
     """
-    fields = core.method_fields(method, deployment.get("parameters") or {})
+    fields = core.method_fields(method, example_parameters(deployment, model))
     payload = method_example(fields)
     path = f"/api/serving/endpoints/{deployment['id']}/predict"
     endpoint_url = (base_url.rstrip("/") + path) if base_url else path

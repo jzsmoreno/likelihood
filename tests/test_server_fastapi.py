@@ -334,8 +334,53 @@ def test_training_models_include_framework_fit_adapters(client):
     assert rows["AutoClassifier"]["example"]["compile"]["loss"] == (
         "sparse_categorical_crossentropy"
     )
+    assert rows["AutoClassifier"]["dataset_mode"] == "xy"
+    assert rows["AutoClassifier"]["dataset_task"] == "classification"
     assert rows["GANRegressor"]["example"]["label"] == "Regresión"
     assert rows["GANRegressor"]["example"]["compile"]["loss"] == "mse"
+    assert rows["GANRegressor"]["dataset_mode"] == "xy"
+    assert rows["GANRegressor"]["dataset_task"] == "regression"
+    assert rows["Arima"]["dataset_mode"] == "datapoints"
+
+
+def test_training_page_loads_charts_and_dataset_controls(client):
+    """The training workspace ships the chart library and dataset panel."""
+    response = client.get("/training")
+    assert response.status_code == 200
+    assert "/charts.js" in response.text
+    assert 'id="dataset-panel"' in response.text
+    assert 'id="dataset-x"' in response.text
+    assert 'id="dataset-y"' in response.text
+
+
+def test_training_dataset_upload_and_inspection(client):
+    """CSV uploads are parsed and described for the column selectors."""
+    payload = b"x1,x2,target\n1,0.1,a\n2,0.2,b\n3,0.3,a\n"
+    response = client.post(
+        "/api/training/datasets/upload",
+        files={"file": ("sample.csv", payload, "text/csv")},
+    )
+    assert response.status_code == 200, response.text
+    dataset = response.json()["dataset"]
+    assert dataset["name"] == "sample.csv"
+    assert dataset["format"] == "csv"
+    assert dataset["rows"] == 3
+    assert [column["name"] for column in dataset["columns"]] == ["x1", "x2", "target"]
+    assert dataset["preview"][0]["target"] == "a"
+
+
+def test_training_dataset_upload_allows_more_than_json_body_limit(client):
+    """Dataset uploads have their own larger limit than JSON requests."""
+    rows = ["a,b,target"] + [f"{index},0.1,label_{index % 2}_{'x' * 40}" for index in range(20_000)]
+    payload = ("\n".join(rows)).encode("utf-8")
+    assert len(payload) > server.MAX_BODY_BYTES
+
+    response = client.post(
+        "/api/training/datasets/upload",
+        files={"file": ("large.csv", payload, "text/csv")},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["dataset"]["rows"] == 20_000
 
 
 def test_models_pagination(client):

@@ -29,6 +29,8 @@
     wParams: '{}',
     wArgs: '{}',
     wArtifact: '',
+    dataset: null,
+    datasetSelection: null,
   };
 
   var dom = {};
@@ -44,6 +46,20 @@
 
   function each(list, callback) { Array.prototype.forEach.call(list || [], callback); }
 
+  function handleResponse(response) {
+    return response.text().then(function (text) {
+      var data = null;
+      try { data = text ? JSON.parse(text) : {}; } catch (error) { data = { error: text }; }
+      if (!response.ok || (data && data.success === false)) {
+        var failure = new Error((data && data.error) || ('HTTP ' + response.status));
+        failure.status = response.status;
+        failure.data = data || {};
+        throw failure;
+      }
+      return data;
+    });
+  }
+
   function api(path, options) {
     var config = options || {};
     var headers = { Accept: 'application/json' };
@@ -53,19 +69,23 @@
       headers: headers,
       body: config.body === undefined ? undefined : JSON.stringify(config.body),
       credentials: 'same-origin',
-    }).then(function (response) {
-      return response.text().then(function (text) {
-        var data = null;
-        try { data = text ? JSON.parse(text) : {}; } catch (error) { data = { error: text }; }
-        if (!response.ok || (data && data.success === false)) {
-          var failure = new Error((data && data.error) || ('HTTP ' + response.status));
-          failure.status = response.status;
-          failure.data = data || {};
-          throw failure;
-        }
-        return data;
-      });
-    });
+    }).then(handleResponse);
+  }
+
+  function apiForm(path, form) {
+    return fetch(path, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      body: form,
+      credentials: 'same-origin',
+    }).then(handleResponse);
+  }
+
+  function selectedValues(select) {
+    if (!select) return [];
+    return Array.prototype.filter.call(select.options, function (option) {
+      return option.selected;
+    }).map(function (option) { return option.value; });
   }
 
   function toast(message, isError) {
@@ -404,6 +424,116 @@
     });
   }
 
+  function historyKeys(history) {
+    return Object.keys(history || {}).filter(function (key) {
+      var values = history[key];
+      return Array.isArray(values) && values.some(function (value) {
+        return value !== null && value !== undefined && isFinite(Number(value));
+      });
+    });
+  }
+
+  function latestValue(values) {
+    if (!Array.isArray(values)) return null;
+    for (var index = values.length - 1; index >= 0; index -= 1) {
+      var value = values[index];
+      if (value !== null && value !== undefined && isFinite(Number(value))) {
+        return Number(value);
+      }
+    }
+    return null;
+  }
+
+  function metricLabel(key) {
+    return String(key).replace(/_/g, ' ');
+  }
+
+  function metricTile(label, value, sub) {
+    return '<div class="training-metric">' +
+      '<span class="training-metric-label">' + esc(label) + '</span>' +
+      '<span class="training-metric-value">' + esc(value) + '</span>' +
+      (sub ? '<span class="training-metric-sub">' + esc(sub) + '</span>' : '') +
+      '</div>';
+  }
+
+  function trainingMetricsPanel(job) {
+    var history = job.result && job.result.history;
+    var keys = historyKeys(history);
+    if (!keys.length) return '';
+    var lossKey = keys.indexOf('loss') >= 0 ? 'loss' : keys[0];
+    var losses = history[lossKey];
+    var best = null;
+    var bestEpoch = null;
+    losses.forEach(function (value, index) {
+      if (value === null || value === undefined || !isFinite(Number(value))) return;
+      var numeric = Number(value);
+      if (best === null || numeric < best) {
+        best = numeric;
+        bestEpoch = index + 1;
+      }
+    });
+    var latestLoss = latestValue(losses);
+    var epochs = keys.reduce(function (maximum, key) {
+      return Math.max(maximum, history[key].length);
+    }, 0);
+    var tiles = [
+      metricTile('Épocas', fmt(epochs), 'total'),
+      metricTile(metricLabel(lossKey), latestLoss === null ? '—' : fmt(latestLoss), 'último valor'),
+      metricTile('Mejor ' + metricLabel(lossKey), best === null ? '—' : fmt(best),
+        bestEpoch ? 'época ' + bestEpoch : ''),
+    ];
+    keys.filter(function (key) { return key !== lossKey; }).slice(0, 3).forEach(function (key) {
+      tiles.push(metricTile(metricLabel(key), fmt(latestValue(history[key])), 'último valor'));
+    });
+    return '<section class="panel training-metrics-panel" aria-label="Monitor de entrenamiento">' +
+      '<div class="panel-header"><span class="panel-icon" aria-hidden="true">◔</span>' +
+        '<h2 class="panel-title">Monitor de entrenamiento</h2>' +
+        '<span class="training-metrics-badge">' + esc(epochs) + ' épocas</span></div>' +
+      '<div class="panel-body">' +
+        '<div class="training-metric-grid">' + tiles.join('') + '</div>' +
+        '<div class="training-loss-chart" id="training-loss-chart"></div>' +
+        '<p class="hint">Evolución de <code>' + esc(lossKey) + '</code> por época.</p>' +
+      '</div>' +
+    '</section>';
+  }
+
+  function renderTrainingChart(job) {
+    var container = dom.detail ? dom.detail.querySelector('#training-loss-chart') : null;
+    var history = job.result && job.result.history;
+    if (!container || !history || !window.LMCharts) return;
+    var keys = historyKeys(history);
+    if (!keys.length) return;
+    var epochs = keys.reduce(function (maximum, key) {
+      return Math.max(maximum, history[key].length);
+    }, 0);
+    var points = [];
+    for (var epoch = 0; epoch < epochs; epoch += 1) {
+      var point = { t: epoch + 1, epoch: epoch + 1 };
+      keys.forEach(function (key) {
+        var value = history[key][epoch];
+        point[key] = value === null || value === undefined || !isFinite(Number(value))
+          ? null
+          : Number(value);
+      });
+      points.push(point);
+    }
+    var colors = ['lava', 'blue', 'green', 'amber', 'navy'];
+    var series = keys.map(function (key, index) {
+      return { key: key, label: metricLabel(key), color: colors[index % colors.length] };
+    });
+    window.LMCharts.line(container, {
+      points: points,
+      series: series,
+      height: 220,
+      title: 'Loss / métricas por época',
+      tooltipTitle: function (point) { return 'Época ' + point.epoch; },
+      formatXAxis: function (point) { return 'Época ' + point.epoch; },
+      formatAxis: function (value) { return window.LMCharts.fmtCompact(value); },
+      formatValue: function (value) { return window.LMCharts.fmtNumber(value, 4); },
+      ariaLabel: 'Evolución de la pérdida y métricas por época',
+    });
+  }
+
   function renderJobDetail(job) {
     if (!dom.detail) return;
     var isFit = job.kind === 'fit';
@@ -436,6 +566,8 @@
         (model ? esc(model.name) : esc(job.model_name)) + '</span><span class="meta-sub mono">' + esc(job.model_id) + '</span></div>' +
       '<div class="meta-item"><span class="meta-label">Método</span><code>' + esc(job.method) + '</code></div>' +
       (job.adapter ? '<div class="meta-item"><span class="meta-label">Adaptador</span><code>' + esc(job.adapter) + '</code></div>' : '') +
+      (job.dataset ? '<div class="meta-item"><span class="meta-label">Dataset</span><span class="meta-value">' +
+        esc(job.dataset.name) + '</span><span class="meta-sub mono">' + esc(job.dataset.summary || '') + '</span></div>' : '') +
       '<div class="meta-item"><span class="meta-label">Creado</span><span class="meta-value">' + esc(isoDate(job.created_at)) + '</span></div>' +
       '<div class="meta-item"><span class="meta-label">Iniciado</span><span class="meta-value">' + esc(isoDate(job.started_at)) + '</span></div>' +
       '<div class="meta-item"><span class="meta-label">Finalizado</span><span class="meta-value">' + esc(isoDate(job.finished_at)) + '</span></div>' +
@@ -483,6 +615,8 @@
         '</section>';
     }
 
+    var metricsPanel = job.status === 'succeeded' ? trainingMetricsPanel(job) : '';
+
     var artifactPanel = '';
     if (artifact) {
       var exists = artifact.exists === true;
@@ -502,11 +636,21 @@
               '<div class="meta-item"><span class="meta-label">Estado</span>' +
                 (exists ? '<span class="status-badge status-succeeded"><span class="dot"></span>En disk</span>'
                         : '<span class="status-badge status-failed"><span class="dot"></span>Perdido</span>') + '</div>' +
-              '<div class="meta-item artifact-path"><span class="meta-label">Archivo</span>' +
+              '<div class="meta-item artifact-path"><span class="meta-label">Carpeta</span>' +
                 '<code class="artifact-path-value" title="' + esc(artifact.path || '') + '">' +
                   esc(artifact.path || '') + '</code></div>' +
+              (artifact.load_path && artifact.load_path !== artifact.path
+                ? '<div class="meta-item artifact-path"><span class="meta-label">Ruta de carga (Serving)</span>' +
+                  '<code class="artifact-path-value" title="' + esc(artifact.load_path) + '">' +
+                    esc(artifact.load_path) + '</code></div>'
+                : '') +
             '</div>' +
-            (exists ? '' : '<p class="hint">El archivo del artefacto ya no existe (puede haberse borrado al eliminar el job).</p>') +
+            (artifact.files && artifact.files.length
+              ? '<details class="details-block"><summary>Archivos del artefacto (' +
+                esc(artifact.files.length) + ')</summary><pre class="code-block">' +
+                esc(artifact.files.join('\n')) + '</pre></details>'
+              : '') +
+            (exists ? '' : '<p class="hint">La carpeta del artefacto ya no existe (puede haberse borrado al eliminar el job).</p>') +
           '</div>' +
         '</section>';
     }
@@ -527,8 +671,10 @@
     var backLink =
       '<a class="link-back" href="/training">← Todos los jobs</a>';
 
-    dom.detail.innerHTML = backLink + header + metaGrid + errorBox + resultPanel + artifactPanel + logPanel;
+    dom.detail.innerHTML = backLink + header + metaGrid + errorBox + resultPanel +
+      metricsPanel + artifactPanel + logPanel;
     wireDetailActions(job);
+    renderTrainingChart(job);
     if (job.status === 'pending' || job.status === 'running') pollJob(job.job_id);
   }
 
@@ -564,7 +710,7 @@
     if (delArtifact) delArtifact.addEventListener('click', function () {
       var aid = job.artifact && job.artifact.artifact_id;
       confirmCallback = function () { return deleteArtifact(aid); };
-      openConfirm('Borrar artefacto', 'El archivo .pkl se borrará del disk. El job sigue en la lista.');
+      openConfirm('Borrar artefacto', 'La carpeta del artefacto se borrará del disk. El job sigue en la lista.');
     });
   }
 
@@ -637,6 +783,7 @@
       dom.artifactField.hidden = state.wKind !== 'evaluate';
     }
     if (dom.compileField && state.wKind !== 'fit') dom.compileField.hidden = true;
+    if (dom.datasetPanel && state.wKind !== 'fit') dom.datasetPanel.hidden = true;
     // reset method when switching kind
     if (dom.methodInput) dom.methodInput.value = state.wKind === 'evaluate' ? 'score' : '';
     updateWizardStatus();
@@ -644,14 +791,35 @@
   }
 
   function onModelChange() {
+    var previous = state.wModel;
     var id = dom.modelSelect ? dom.modelSelect.value : '';
     state.wModel = id;
+    if (previous !== id) resetDataset();
     var model = modelById(id);
     if (dom.methodInput) {
       dom.methodInput.value = model ? (state.wKind === 'evaluate' ? 'score' : model.fit_method) : '';
     }
     if (dom.compileField) {
       dom.compileField.hidden = !(state.wKind === 'fit' && model && model.adapter === 'keras');
+    }
+    var datasetMode = model && model.dataset_mode;
+    var datasetVisible = state.wKind === 'fit' && datasetMode && datasetMode !== 'generic';
+    if (dom.datasetPanel) dom.datasetPanel.hidden = !datasetVisible;
+    if (dom.datasetModeBadge) {
+      dom.datasetModeBadge.textContent = datasetMode === 'xy'
+        ? 'X + Y'
+        : (datasetMode === 'datapoints' ? 'datapoints' : '');
+    }
+    if (dom.datasetXField) dom.datasetXField.hidden = datasetMode === 'datapoints';
+    if (dom.datasetYLabel) {
+      dom.datasetYLabel.textContent = datasetMode === 'datapoints'
+        ? 'Columna de datapoints'
+        : 'Columna Y / objetivo';
+    }
+    if (state.dataset) {
+      renderDatasetColumns(state.dataset);
+    } else {
+      syncDatasetTarget();
     }
     if (dom.modelCard) {
       dom.modelCard.hidden = !model;
@@ -732,6 +900,7 @@
       if (dom.modelCard) dom.modelCard.hidden = true;
       if (dom.wizardExample) { dom.wizardExample.hidden = true; dom.wizardExample.textContent = 'Cargar ejemplo'; }
       if (dom.exampleNote) { dom.exampleNote.hidden = true; dom.exampleNote.textContent = ''; }
+      resetDataset();
       if (state.wModel) onModelChange();
       setStep(1);
     });
@@ -777,6 +946,212 @@
   function updateWizardStatus(message) {
     if (!dom.wizardStatus) return;
     dom.wizardStatus.textContent = message || '';
+  }
+
+  function setDatasetStatus(message, isError) {
+    if (!dom.datasetStatus) return;
+    dom.datasetStatus.textContent = message || '';
+    dom.datasetStatus.classList.toggle('is-error', Boolean(isError));
+  }
+
+  function resetDataset() {
+    state.dataset = null;
+    state.datasetSelection = null;
+    if (dom.datasetPanel) dom.datasetPanel.hidden = true;
+    if (dom.datasetConfig) dom.datasetConfig.hidden = true;
+    if (dom.datasetSummary) dom.datasetSummary.textContent = '';
+    if (dom.datasetPreview) dom.datasetPreview.innerHTML = '';
+    if (dom.datasetX) dom.datasetX.innerHTML = '';
+    if (dom.datasetY) dom.datasetY.innerHTML = '';
+    if (dom.datasetApplyNote) dom.datasetApplyNote.textContent = '';
+    if (dom.datasetFile) dom.datasetFile.value = '';
+    setDatasetStatus('');
+  }
+
+  function renderDatasetPreview(dataset) {
+    if (!dom.datasetPreview || !dataset || !dataset.columns) return;
+    var columns = dataset.columns.map(function (column) { return column.name; });
+    var head = '<thead><tr>' + columns.map(function (name) {
+      return '<th>' + esc(name) + '</th>';
+    }).join('') + '</tr></thead>';
+    var body = '<tbody>' + (dataset.preview || []).map(function (row) {
+      return '<tr>' + columns.map(function (name) {
+        var value = row[name];
+        return '<td>' + esc(value === null || value === undefined ? '—' : value) + '</td>';
+      }).join('') + '</tr>';
+    }).join('') + '</tbody>';
+    dom.datasetPreview.innerHTML = head + body;
+  }
+
+  function preferredTarget(dataset, model) {
+    var columns = dataset.columns || [];
+    var numeric = columns.filter(function (column) { return column.numeric; });
+    var mode = model && model.dataset_mode;
+    var task = model && model.dataset_task;
+    var preferred;
+    if (mode === 'datapoints') {
+      preferred = ['close', 'value', 'price', 'target', 'y'];
+    } else if (task === 'classification') {
+      preferred = ['species', 'target', 'class', 'label', 'y'];
+    } else {
+      preferred = ['median_house_value', 'target', 'price', 'value', 'y'];
+    }
+    var candidates = (mode === 'datapoints' || task === 'regression') ? numeric : columns;
+    for (var index = 0; index < preferred.length; index += 1) {
+      var found = candidates.find(function (column) { return column.name === preferred[index]; });
+      if (found) return found;
+    }
+    return candidates.length ? candidates[candidates.length - 1] : null;
+  }
+
+  function renderDatasetColumns(dataset) {
+    var model = modelById(state.wModel);
+    if (!model || !dataset || !dataset.columns) return;
+    var mode = model.dataset_mode;
+    var numeric = dataset.columns.filter(function (column) { return column.numeric; });
+    var target = preferredTarget(dataset, model);
+    var targetCandidates = (mode === 'datapoints' || model.dataset_task === 'regression')
+      ? numeric
+      : dataset.columns;
+    if (dom.datasetY) {
+      dom.datasetY.innerHTML = targetCandidates.map(function (column) {
+        return '<option value="' + esc(column.name) + '">' + esc(column.name) +
+          ' · ' + esc(column.dtype) + '</option>';
+      }).join('');
+      if (target) dom.datasetY.value = target.name;
+    }
+    if (dom.datasetXField) dom.datasetXField.hidden = mode === 'datapoints';
+    if (mode !== 'datapoints' && dom.datasetX) {
+      var targetName = target ? target.name : '';
+      dom.datasetX.innerHTML = numeric.map(function (column) {
+        var selected = column.name !== targetName;
+        return '<option value="' + esc(column.name) + '"' + (selected ? ' selected' : '') +
+          '>' + esc(column.name) + ' · ' + esc(column.dtype) + '</option>';
+      }).join('');
+    }
+    syncDatasetTarget();
+  }
+
+  function syncDatasetTarget() {
+    var model = modelById(state.wModel);
+    var mode = model && model.dataset_mode;
+    var target = dom.datasetY ? dom.datasetY.value : '';
+    if (mode === 'xy' && dom.datasetX) {
+      Array.prototype.forEach.call(dom.datasetX.options, function (option) {
+        if (option.value === target) option.selected = false;
+      });
+    }
+    if (dom.datasetTargetHint) {
+      if (mode === 'datapoints') {
+        dom.datasetTargetHint.textContent = 'La columna se usará como secuencia de datapoints.';
+      } else if (model && model.dataset_task === 'classification') {
+        dom.datasetTargetHint.textContent = 'Las etiquetas de texto se codifican como enteros (0..n-1).';
+      } else if (model && model.dataset_task === 'auto') {
+        dom.datasetTargetHint.textContent = 'Se detecta automáticamente: texto → clasificación, numérico → regresión.';
+      } else {
+        dom.datasetTargetHint.textContent = 'La columna objetivo debe ser numérica.';
+      }
+    }
+    if (dom.datasetApplyNote) dom.datasetApplyNote.textContent = '';
+  }
+
+  function setDataset(dataset) {
+    if (!dataset) {
+      setDatasetStatus('La respuesta no contiene un dataset válido.', true);
+      return;
+    }
+    state.dataset = dataset;
+    state.datasetSelection = null;
+    if (dom.datasetConfig) dom.datasetConfig.hidden = false;
+    if (dom.datasetSummary) {
+      dom.datasetSummary.textContent = dataset.name + ' · ' + dataset.rows + ' filas · ' +
+        dataset.columns.length + ' columnas · ' + String(dataset.format || '').toUpperCase();
+    }
+    renderDatasetPreview(dataset);
+    renderDatasetColumns(dataset);
+    setDatasetStatus('Dataset cargado. Selecciona las columnas y pulsa «Aplicar selección».');
+  }
+
+  function loadDatasetUrl(url) {
+    var text = String(url || '').trim();
+    if (!text) {
+      toast('Escribe una URL de dataset.', true);
+      return;
+    }
+    setDatasetStatus('Descargando y analizando el dataset…');
+    api('/api/training/datasets/inspect', { method: 'POST', body: { url: text } }).then(function (data) {
+      setDataset(data.dataset);
+      toast('Dataset cargado: ' + (data.dataset ? data.dataset.name : text));
+    }).catch(function (error) {
+      setDatasetStatus(error.message, true);
+      toast(error.message, true);
+    });
+  }
+
+  function loadDatasetFile() {
+    var file = dom.datasetFile && dom.datasetFile.files ? dom.datasetFile.files[0] : null;
+    if (!file) {
+      toast('Selecciona un archivo CSV, XLSX o Parquet.', true);
+      return;
+    }
+    var form = new FormData();
+    form.append('file', file);
+    setDatasetStatus('Subiendo y analizando ' + file.name + '…');
+    apiForm('/api/training/datasets/upload', form).then(function (data) {
+      setDataset(data.dataset);
+      toast('Dataset cargado: ' + (data.dataset ? data.dataset.name : file.name));
+    }).catch(function (error) {
+      setDatasetStatus(error.message, true);
+      toast(error.message, true);
+    });
+  }
+
+  function datasetSelection() {
+    var model = modelById(state.wModel);
+    if (!state.dataset || !model) return null;
+    var mode = model.dataset_mode || 'xy';
+    return {
+      dataset_id: state.dataset.dataset_id,
+      mode: mode,
+      task: model.dataset_task || 'auto',
+      features: mode === 'datapoints' ? [] : selectedValues(dom.datasetX),
+      target: dom.datasetY ? dom.datasetY.value : '',
+    };
+  }
+
+  function validateDatasetSelection() {
+    var selection = datasetSelection();
+    if (!selection) {
+      toast('Carga un dataset antes de lanzar el job.', true);
+      return null;
+    }
+    if (!selection.target) {
+      toast('Selecciona la columna Y u objetivo.', true);
+      return null;
+    }
+    if (selection.mode === 'xy' && !selection.features.length) {
+      toast('Selecciona al menos una columna X.', true);
+      return null;
+    }
+    if (selection.mode === 'xy' && selection.features.indexOf(selection.target) >= 0) {
+      toast('La columna objetivo no puede formar parte de X.', true);
+      return null;
+    }
+    return selection;
+  }
+
+  function applyDataset() {
+    var selection = validateDatasetSelection();
+    if (!selection) return;
+    state.datasetSelection = selection;
+    if (dom.datasetApplyNote) {
+      dom.datasetApplyNote.textContent = (selection.mode === 'datapoints'
+        ? 'Selección lista: datapoints ← ' + selection.target
+        : 'Selección lista: ' + selection.features.length + ' columnas X → ' + selection.target) +
+        '. Se usará al lanzar el job.';
+    }
+    setDatasetStatus('Selección lista. Revisa los argumentos y lanza el job.');
+    toast('Selección de dataset aplicada.');
   }
 
   function loadExample() {
@@ -836,6 +1211,11 @@
         catch (error) { toast('Compilación no es JSON válido', true); return; }
       }
     }
+    if (state.dataset && dom.datasetPanel && !dom.datasetPanel.hidden) {
+      var selection = validateDatasetSelection();
+      if (!selection) return;
+      body.dataset = selection;
+    }
     if (state.wKind === 'evaluate') body.artifact_id = state.wArtifact || undefined;
 
     var btn = dom.wizardCreate;
@@ -889,6 +1269,38 @@
   /* ------------------------------------------------------------------ */
   /* Wiring and startup                                                  */
   /* ------------------------------------------------------------------ */
+
+  function bindDataset() {
+    if (dom.datasetLoadUrl) dom.datasetLoadUrl.addEventListener('click', function () {
+      loadDatasetUrl(dom.datasetUrl ? dom.datasetUrl.value : '');
+    });
+    if (dom.datasetUrl) dom.datasetUrl.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        loadDatasetUrl(dom.datasetUrl.value);
+      }
+    });
+    if (dom.datasetLoadFile) dom.datasetLoadFile.addEventListener('click', loadDatasetFile);
+    if (dom.datasetFile) dom.datasetFile.addEventListener('change', loadDatasetFile);
+    if (dom.datasetExamples) dom.datasetExamples.addEventListener('click', function (event) {
+      var chip = event.target.closest('[data-dataset-url]');
+      if (!chip) return;
+      var model = modelById(state.wModel);
+      var chipTask = chip.getAttribute('data-dataset-task');
+      if (model && chipTask && model.dataset_task && model.dataset_task !== 'auto' &&
+          model.dataset_task !== chipTask) {
+        toast('Este ejemplo es de ' + chipTask + '; el modelo espera ' + model.dataset_task + '.', true);
+        return;
+      }
+      if (dom.datasetUrl) dom.datasetUrl.value = chip.getAttribute('data-dataset-url') || '';
+      loadDatasetUrl(chip.getAttribute('data-dataset-url') || '');
+    });
+    if (dom.datasetY) dom.datasetY.addEventListener('change', syncDatasetTarget);
+    if (dom.datasetX) dom.datasetX.addEventListener('change', function () {
+      if (dom.datasetApplyNote) dom.datasetApplyNote.textContent = '';
+    });
+    if (dom.datasetApply) dom.datasetApply.addEventListener('click', applyDataset);
+  }
 
   function bindWizard() {
     var create = byId('create-job');
@@ -994,9 +1406,28 @@
     dom.modelNote = byId('wizard-model-note');
     dom.wizardExample = byId('wizard-example');
     dom.exampleNote = byId('wizard-example-note');
+    dom.datasetPanel = byId('dataset-panel');
+    dom.datasetModeBadge = byId('dataset-mode-badge');
+    dom.datasetUrl = byId('dataset-url');
+    dom.datasetLoadUrl = byId('dataset-load-url');
+    dom.datasetFile = byId('dataset-file');
+    dom.datasetLoadFile = byId('dataset-load-file');
+    dom.datasetExamples = document.querySelector('.dataset-examples');
+    dom.datasetStatus = byId('dataset-status');
+    dom.datasetConfig = byId('dataset-config');
+    dom.datasetSummary = byId('dataset-summary');
+    dom.datasetPreview = byId('dataset-preview');
+    dom.datasetX = byId('dataset-x');
+    dom.datasetXField = byId('dataset-x-field');
+    dom.datasetY = byId('dataset-y');
+    dom.datasetYLabel = byId('dataset-y-label');
+    dom.datasetTargetHint = byId('dataset-target-hint');
+    dom.datasetApply = byId('dataset-apply');
+    dom.datasetApplyNote = byId('dataset-apply-note');
 
     bindSidebar();
     bindTheme();
+    bindDataset();
     bindWizard();
     bindDialogs();
     bindFilters();

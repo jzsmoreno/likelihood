@@ -208,7 +208,7 @@
         fill: colors.faint,
         'font-size': 10
       });
-      text.textContent = fmtAxisDate(point.t, geometry.span);
+      text.textContent = spec.formatXAxis ? spec.formatXAxis(point) : fmtAxisDate(point.t, geometry.span);
       group.appendChild(text);
     }
   }
@@ -256,7 +256,8 @@
     });
     var scaleSpec = {
       maxValue: niceMax(maxValue * 1.08 || 1),
-      formatAxis: spec.formatAxis || fmtCompact
+      formatAxis: spec.formatAxis || fmtCompact,
+      formatXAxis: spec.formatXAxis
     };
     var background = svg('g', {});
     axes(background, scaleSpec, geometry);

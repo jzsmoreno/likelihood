@@ -608,6 +608,8 @@ button.side-link {
 .wizard-json {
   width: 100%;
   min-height: 130px;
+  max-height: 300px;
+  overflow: auto;
   padding: 9px 10px;
   border: 1px solid var(--db-line);
   border-radius: var(--db-r-sm);
@@ -1117,6 +1119,14 @@ button.side-link {
   background: var(--db-surface-hover);
 }
 
+.event-input {
+  max-width: 260px;
+  overflow: hidden;
+  color: var(--db-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .event-status {
   display: inline-flex;
   align-items: center;
@@ -1237,6 +1247,129 @@ button.side-link {
 
 .schema-table tr:last-child td {
   border-bottom: 0;
+}
+
+.schema-sample {
+  max-width: 360px;
+}
+
+.sample-inline {
+  display: inline-block;
+  max-width: 100%;
+  color: var(--db-muted);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.sample-empty {
+  color: var(--db-faint);
+}
+
+.sample-description {
+  margin-top: 2px;
+  color: var(--db-faint);
+  font-size: 10.5px;
+}
+
+.sample-description .sample-inline {
+  color: var(--db-muted);
+}
+
+.sample-details,
+.payload-details {
+  margin: 0;
+}
+
+.sample-details > summary,
+.payload-details > summary {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  max-width: 100%;
+  gap: 6px;
+  color: var(--db-muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.payload-details > summary .payload-shape,
+.payload-summary .payload-shape {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.sample-details > summary::-webkit-details-marker,
+.payload-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sample-details > summary::before,
+.payload-details > summary::before {
+  content: "▸";
+  color: var(--db-faint);
+  font-size: 10px;
+}
+
+.sample-details[open] > summary::before,
+.payload-details[open] > summary::before {
+  content: "▾";
+}
+
+.payload-shape {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border: 1px solid var(--db-line);
+  border-radius: 999px;
+  background: var(--db-surface-alt);
+  color: var(--db-ink);
+  font-family: var(--db-mono);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sample-link {
+  color: var(--db-blue);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.sample-json,
+.payload-json {
+  max-height: 260px;
+  overflow: auto;
+  margin-top: 8px;
+}
+
+.payload-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  max-width: 100%;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--db-line-soft);
+  border-radius: var(--db-r-sm);
+  background: var(--db-surface-alt);
+}
+
+.payload-summary-label {
+  color: var(--db-faint);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.payload-editor {
+  margin-top: 4px;
+}
+
+.payload-editor > summary {
+  margin-bottom: 8px;
 }
 
 .schema-required {

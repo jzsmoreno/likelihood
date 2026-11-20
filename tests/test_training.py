@@ -13,10 +13,12 @@ Run with::
 
 from __future__ import annotations
 
+import json
 import sys
 import time
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -66,10 +68,12 @@ def captured(monkeypatch):
                 "save_path": save_path,
             }
         )
+        saved = None
         if save_path:
             target = Path(save_path)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(b"pickled-model")
+            target.mkdir(parents=True, exist_ok=True)
+            saved = target / "model.pkl"
+            saved.write_bytes(b"pickled-model")
         history = {"loss": [0.5], "accuracy": [0.8]} if method["name"] == "fit" else None
         return {
             "type": model["id"],
@@ -79,7 +83,10 @@ def captured(monkeypatch):
             "result": {"history": history} if history else None,
             "result_type": "History" if history else "NoneType",
             "result_repr": "History" if history else "None",
-            "save_bytes": 13 if save_path else None,
+            "save_path": str(saved) if saved else None,
+            "load_path": str(saved) if saved else None,
+            "save_method": "pickle" if saved else None,
+            "save_bytes": 13 if saved else None,
         }
 
     monkeypatch.setattr(training_core.core, "run_invoke", fake_run_invoke)
@@ -103,7 +110,9 @@ def test_arima_fit_resolves_the_required_constructor_data(store, captured):
     assert call["arguments"] == {}
 
     artifact = finished["artifact"]
-    assert Path(artifact["path"]).is_file()
+    assert Path(artifact["path"]).is_dir()
+    assert Path(artifact["load_path"]).is_file()
+    assert (Path(artifact["path"]) / "artifact.json").is_file()
     assert Path(artifact["path"]).is_relative_to(store.directory)
 
 
@@ -115,6 +124,22 @@ def test_generic_fit_method_falls_back_to_the_declared_train_method(store, captu
     assert finished["status"] == "succeeded", finished["error"]
     assert finished["method"] == "train"
     assert captured[0]["method"] == "train"
+
+
+def test_artifact_savers_are_detected_for_serving():
+    """Native savers and the AutoClassifier component layout are selected."""
+    assert training_core.save_method_for(training_core.core.MODELS_BY_ID["GANRegressor"]) == (
+        "save_model",
+        "path",
+    )
+    assert training_core.save_method_for(training_core.core.MODELS_BY_ID["Arima"]) == (
+        "save_model",
+        "name",
+    )
+    assert training_core.save_layout_for(training_core.core.MODELS_BY_ID["AutoClassifier"]) == (
+        "components"
+    )
+    assert training_core.save_layout_for(training_core.core.MODELS_BY_ID["Arima"]) == ""
 
 
 def test_keras_models_expose_an_inherited_fit_adapter():
@@ -180,6 +205,69 @@ def test_keras_compile_options_can_be_overridden(store, captured):
     assert finished["compile"]["metrics"] == ["accuracy"]
 
 
+def test_dataset_backed_job_keeps_only_a_compact_reference(store, captured):
+    """A dataset job rebuilds X/Y in the worker instead of storing them in jobs.json."""
+    frame = pd.DataFrame(
+        {
+            "x1": [1.0, 2.0, 3.0, 4.0],
+            "x2": [0.1, 0.2, 0.3, 0.4],
+            "species": ["a", "b", "a", "c"],
+        }
+    )
+    dataset = store.datasets.put("iris.csv", frame, "iris.csv", "csv")
+    job = store.start(
+        {
+            "model_id": "AutoClassifier",
+            "dataset": {
+                "dataset_id": dataset["dataset_id"],
+                "mode": "xy",
+                "task": "classification",
+                "features": ["x1", "x2"],
+                "target": "species",
+            },
+        }
+    )
+
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    assert finished["dataset"]["rows"] == 4
+    assert finished["dataset"]["classes"] == {"a": 0, "b": 1, "c": 2}
+    assert finished["parameters"]["input_shape_parm"] == 2
+    assert finished["parameters"]["num_classes"] == 3
+    metadata = json.loads(
+        (Path(finished["artifact"]["path"]) / "artifact.json").read_text(encoding="utf-8")
+    )
+    assert metadata["parameters"]["input_shape_parm"] == 2
+    assert metadata["parameters"]["num_classes"] == 3
+    assert "x" not in finished["arguments"]
+    assert "y" not in finished["arguments"]
+
+    call = captured[0]
+    assert call["arguments"]["x"] == [[1.0, 0.1], [2.0, 0.2], [3.0, 0.3], [4.0, 0.4]]
+    assert call["arguments"]["y"] == [0, 1, 0, 2]
+
+
+def test_dataset_datapoints_mode_rebuilds_the_sequence(store, captured):
+    """A datapoints selection is removed from the stored parameters and rebuilt."""
+    frame = pd.DataFrame({"value": [1.0, 2.0, 3.0, 4.0]})
+    dataset = store.datasets.put("series.csv", frame, "series.csv", "csv")
+    job = store.start(
+        {
+            "model_id": "Arima",
+            "dataset": {
+                "dataset_id": dataset["dataset_id"],
+                "mode": "datapoints",
+                "target": "value",
+            },
+        }
+    )
+
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    assert "datapoints" not in finished["parameters"]
+    assert captured[0]["parameters"]["datapoints"] == [1.0, 2.0, 3.0, 4.0]
+
+
 def test_training_data_sent_as_arguments_moves_to_the_constructor(store, captured):
     """``arguments: {datapoints: ...}`` is accepted for models such as ``Arima``."""
     job = store.start(
@@ -217,6 +305,7 @@ def test_jobs_and_artifacts_are_persisted_in_the_store_directory(store, captured
         restored = reloaded.job(job["job_id"])
         assert restored is not None
         assert restored["status"] == "succeeded"
-        assert Path(restored["artifact"]["path"]).is_file()
+        assert Path(restored["artifact"]["path"]).is_dir()
+        assert Path(restored["artifact"]["load_path"]).is_file()
     finally:
         reloaded.shutdown()

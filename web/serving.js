@@ -39,6 +39,8 @@
   };
 
   var dom = {};
+  var parameterRefreshToken = 0;
+  var methodExampleToken = 0;
 
   function byId(id) { return document.getElementById(id); }
 
@@ -50,6 +52,130 @@
 
   function each(list, callback) {
     Array.prototype.forEach.call(list || [], callback);
+  }
+
+  function valueShape(value) {
+    if (value === null || value === undefined) return '—';
+    if (Array.isArray(value)) {
+      if (value.length && Array.isArray(value[0])) {
+        var columns = value[0].length;
+        return '[' + value.length + ' × ' + columns + ']';
+      }
+      return '[' + value.length + ']';
+    }
+    if (typeof value === 'object') {
+      var objectKeys = Object.keys(value);
+      if (objectKeys.length === 1) {
+        return objectKeys[0] + ' ' + valueShape(value[objectKeys[0]]);
+      }
+      return '{' + objectKeys.length + '}';
+    }
+    if (typeof value === 'string') {
+      return value.length > 24 ? '"' + value.slice(0, 24) + '…"' : JSON.stringify(value);
+    }
+    return String(value);
+  }
+
+  function isLargeValue(value, depth) {
+    if (depth > 3) return false;
+    if (typeof value === 'string') return value.length > 240;
+    if (Array.isArray(value)) {
+      if (value.length > 8) return true;
+      for (var index = 0; index < value.length; index += 1) {
+        if (isLargeValue(value[index], (depth || 0) + 1)) return true;
+      }
+      return false;
+    }
+    if (value && typeof value === 'object') {
+      var keys = Object.keys(value);
+      if (keys.length > 8) return true;
+      for (var key = 0; key < keys.length; key += 1) {
+        if (isLargeValue(value[keys[key]], (depth || 0) + 1)) return true;
+      }
+    }
+    return false;
+  }
+
+  function payloadSummary(value, limit) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      var keys = Object.keys(value);
+      // Response envelopes carry transport/identity metadata that is irrelevant
+      // to the shape summary; keep only the payload-bearing fields.
+      var metadata = [
+        'success',
+        'deployment_id',
+        'endpoint_id',
+        'endpoint_name',
+        'model_id',
+        'model_instance_id',
+        'model_type_id',
+        'catalog_model_id',
+        'method',
+        'prediction_type',
+        'latency_ms',
+        'request_id',
+        'timestamp',
+        'source',
+        'stats'
+      ];
+      var candidates = keys.filter(function (key) {
+        return metadata.indexOf(key) === -1;
+      });
+      if (!candidates.length) return 'JSON';
+      var priority = ['prediction', 'arguments', 'input', 'inputs', 'result', 'data'];
+      var ordered = [];
+      priority.forEach(function (key) {
+        if (candidates.indexOf(key) !== -1) ordered.push(key);
+      });
+      candidates.forEach(function (key) {
+        if (ordered.indexOf(key) === -1) ordered.push(key);
+      });
+      var shown = ordered.slice(0, limit || 4);
+      var text = shown.map(function (key) {
+        return key + ' ' + valueShape(value[key]);
+      }).join(' · ');
+      if (ordered.length > shown.length) {
+        text += ' · +' + (ordered.length - shown.length) + ' más';
+      }
+      return text;
+    }
+    return valueShape(value);
+  }
+
+  function sampleCell(sample) {
+    if (sample === null || sample === undefined) return '<span class="sample-empty">—</span>';
+    if (!isLargeValue(sample)) {
+      return '<code class="sample-inline">' + esc(JSON.stringify(sample)) + '</code>';
+    }
+    return '<details class="sample-details"><summary>' +
+      '<span class="payload-shape">' + esc(valueShape(sample)) + '</span>' +
+      '<span class="sample-link">Ver JSON</span></summary>' +
+      '<pre class="code-highlight sample-json">' + esc(JSON.stringify(sample, null, 2)) + '</pre></details>';
+  }
+
+  function payloadView(payload, elementId) {
+    var json = JSON.stringify(payload, null, 2);
+    if (!isLargeValue(payload)) {
+      return '<pre id="' + esc(elementId) + '" class="code-highlight">' + esc(json) + '</pre>';
+    }
+    return '<details class="payload-details"><summary>' +
+      '<span class="payload-shape">' + esc(payloadSummary(payload)) + '</span>' +
+      '<span class="sample-link">Ver JSON</span></summary>' +
+      '<pre id="' + esc(elementId) + '" class="code-highlight payload-json">' + esc(json) + '</pre></details>';
+  }
+
+  function codeView(code, language, elementId) {
+    var source = String(code || '');
+    var lines = source.split('\n').length;
+    var large = source.length > 900 || lines > 20;
+    var highlighted = highlightCode(source, language);
+    if (!large) {
+      return '<pre id="' + esc(elementId) + '" class="code-highlight">' + highlighted + '</pre>';
+    }
+    return '<details class="payload-details code-details"><summary>' +
+      '<span class="payload-shape">' + lines + ' líneas</span>' +
+      '<span class="sample-link">Ver código</span></summary>' +
+      '<pre id="' + esc(elementId) + '" class="code-highlight payload-json">' + highlighted + '</pre></details>';
   }
 
   function api(path, options) {
@@ -512,6 +638,7 @@
     if (step > 2 && !state.method) return;
     state.step = step;
     renderWizard();
+    if (step === 3) refreshMethodExample();
   }
 
   function renderWizard() {
@@ -623,6 +750,7 @@
       }
       setStatus(dom.wizardStatus, '');
       renderWizard();
+      refreshMethodExample();
     }).catch(function (error) {
       setStatus(dom.wizardStatus, error.message, 'is-error');
     });
@@ -790,11 +918,11 @@
       '<div class="wizard-field"><label for="wizard-load-path">Ruta del modelo guardado</label>' +
       '<div style="display:flex;gap:6px"><input class="input" type="text" id="wizard-load-path" value="' + esc(state.loadPath) + '" placeholder="output/model.pkl">' +
       '<button class="btn btn-secondary" type="button" id="wizard-browse">Examinar…</button></div>' +
-      '<span class="hint">Relativa a LM_LOAD_ROOT o absoluta.</span></div>' +
+      '<span class="hint">Relativa a LM_LOAD_ROOT o absoluta. Se aceptan <code>.pkl</code>, <code>.keras</code>, <code>.h5</code> y carpetas de componentes.</span></div>' +
       '</div></div>' +
       '<div class="wizard-field" style="margin-top:14px"><label for="wizard-parameters">Parámetros del constructor (JSON)</label>' +
       '<textarea class="wizard-json" id="wizard-parameters" spellcheck="false">' + esc(state.parametersText) + '</textarea>' +
-      '<span class="hint">Valores reales del catálogo. Los loaders estáticos los ignoran; un loader que necesita instancia los usa para construirla.</span></div>' +
+      '<span class="hint">Valores reales del catálogo. Al indicar un artefacto se completan desde su <code>config.json</code> o <code>artifact.json</code>; un loader que necesita instancia los usa para construirla.</span></div>' +
       '<div class="form-actions"><button class="btn btn-secondary btn-sm" type="button" id="wizard-reset-parameters">Restablecer desde el catálogo</button></div>';
 
     var enabled = byId('wizard-load-enabled');
@@ -803,6 +931,41 @@
         state.loadEnabled = enabled.checked;
         var fields = byId('wizard-load-fields');
         if (fields) fields.hidden = !enabled.checked;
+        if (enabled.checked) refreshParametersFromLoad();
+      });
+    }
+    var loadPathInput = byId('wizard-load-path');
+    if (loadPathInput) {
+      var loadPathTimer = 0;
+      loadPathInput.addEventListener('input', function () {
+        state.loadPath = loadPathInput.value;
+        window.clearTimeout(loadPathTimer);
+        loadPathTimer = window.setTimeout(refreshParametersFromLoad, 400);
+      });
+      loadPathInput.addEventListener('change', function () {
+        state.loadPath = loadPathInput.value;
+        window.clearTimeout(loadPathTimer);
+        refreshParametersFromLoad();
+      });
+    }
+    var loaderSelect = byId('wizard-loader');
+    if (loaderSelect) {
+      loaderSelect.addEventListener('change', function () {
+        state.loader = loaderSelect.value;
+        refreshParametersFromLoad();
+      });
+    }
+    var parameters = byId('wizard-parameters');
+    if (parameters) {
+      var exampleTimer = 0;
+      parameters.addEventListener('input', function () {
+        state.parametersText = parameters.value;
+        window.clearTimeout(exampleTimer);
+        exampleTimer = window.setTimeout(refreshMethodExample, 350);
+      });
+      parameters.addEventListener('change', function () {
+        window.clearTimeout(exampleTimer);
+        refreshMethodExample();
       });
     }
     var browse = byId('wizard-browse');
@@ -812,6 +975,7 @@
           state.loadPath = path;
           var input = byId('wizard-load-path');
           if (input) input.value = path;
+          refreshParametersFromLoad();
         });
       });
     }
@@ -821,8 +985,77 @@
         state.parametersText = defaultParameters();
         var area = byId('wizard-parameters');
         if (area) area.value = state.parametersText;
+        refreshMethodExample();
       });
     }
+  }
+
+
+  function refreshParametersFromLoad() {
+    if (!state.loadEnabled || !state.loadPath.trim() || !state.method || !state.modelDetail) return;
+    var expectedPath = state.loadPath.trim();
+    var expectedMethod = state.method.name;
+    var token = ++parameterRefreshToken;
+    var payload;
+    try {
+      payload = wizardPayload();
+    } catch (error) {
+      return;
+    }
+    api('/api/serving/validate', { method: 'POST', body: payload }).then(function (result) {
+      if (token !== parameterRefreshToken) return;
+      if (!state.loadEnabled || state.loadPath.trim() !== expectedPath) return;
+      if (!state.method || state.method.name !== expectedMethod) return;
+      if (!result.valid || !result.parameters) return;
+      state.parametersText = JSON.stringify(result.parameters, null, 2);
+      var area = byId('wizard-parameters');
+      if (area && document.activeElement !== area) area.value = state.parametersText;
+      applyMethodExample(result);
+    }).catch(function () {
+      // The path may be incomplete while the user is typing; deployment will
+      // show the real validation error when requested.
+    });
+  }
+
+
+  function applyMethodExample(result) {
+    if (!result || !result.valid || !state.method) return;
+    var methodInfo = result.method || {};
+    var fields = methodInfo.fields;
+    if (!fields || !fields.length) return;
+    var selected = null;
+    state.methods.forEach(function (method) {
+      if (method.name === state.method.name) {
+        method.fields = fields;
+        method.signature = methodInfo.signature || method.signature;
+        selected = method;
+      }
+    });
+    if (selected) state.method = selected;
+    if (state.step === 3) renderStepMethod();
+  }
+
+
+  function refreshMethodExample() {
+    if (!state.modelDetail || !state.method) return;
+    var expectedModel = state.modelDetail.id;
+    var expectedMethod = state.method.name;
+    var token = ++methodExampleToken;
+    var payload;
+    try {
+      payload = wizardPayload();
+    } catch (error) {
+      return;
+    }
+    api('/api/serving/validate', { method: 'POST', body: payload }).then(function (result) {
+      if (token !== methodExampleToken) return;
+      if (!state.modelDetail || state.modelDetail.id !== expectedModel) return;
+      if (!state.method || state.method.name !== expectedMethod) return;
+      if (!result || !result.valid) return;
+      applyMethodExample(result);
+    }).catch(function () {
+      // Keep the last valid example while the constructor JSON is incomplete.
+    });
   }
 
 
@@ -844,6 +1077,7 @@
           state.name = slug(state.modelDetail.id) + '-' + slug(state.method.name);
         }
         renderWizard();
+        refreshMethodExample();
       });
     });
   }
@@ -865,6 +1099,7 @@
   function methodDetail() {
     if (!state.method) return '';
     var fields = state.method.fields || [];
+    var example = exampleForMethod(state.method);
     return '<div class="panel" style="margin-top:12px"><div class="panel-header"><h3>Contrato del método</h3>' +
       '<span class="mono" style="font-size:10.5px;color:var(--db-faint)">' + esc(state.method.signature) + '</span></div>' +
       '<div class="panel-body" style="padding:0"><table class="schema-table"><thead><tr><th>Argumento</th><th>Tipo</th><th>Obligatorio</th><th>Ejemplo</th></tr></thead><tbody>' +
@@ -872,13 +1107,13 @@
         ? fields.map(function (field) {
             return '<tr><td class="mono">' + esc(field.name) + '</td><td class="mono">' + esc(field.type || 'Any') + '</td>' +
               '<td>' + (field.required ? '<span class="schema-required">Sí</span>' : 'No') + '</td>' +
-              '<td class="mono">' + esc(JSON.stringify(field.sample)) + '</td></tr>';
+              '<td class="schema-sample">' + sampleCell(field.sample) + '</td></tr>';
           }).join('')
         : '<tr><td colspan="4">El método no declara argumentos.</td></tr>') +
       '</tbody></table></div></div>' +
       '<div class="code-head" style="margin-top:12px"><span class="code-label">Ejemplo de payload</span>' +
       '<button class="btn btn-ghost btn-xs" type="button" id="copy-method-example">Copiar</button></div>' +
-      '<pre class="code-highlight" id="method-example">' + esc(JSON.stringify(exampleForMethod(state.method), null, 2)) + '</pre>';
+      payloadView(example, 'method-example');
   }
 
   function exampleForMethod(method) {
@@ -1331,7 +1566,7 @@
         ? fields.map(function (field) {
             return '<tr><td class="mono">' + esc(field.name) + '</td><td class="mono">' + esc(field.type || 'Any') + '</td>' +
               '<td>' + (field.required ? '<span class="schema-required">Sí</span>' : 'No') + '</td>' +
-              '<td class="mono">' + esc(JSON.stringify(field.sample)) + '</td></tr>';
+              '<td class="schema-sample">' + sampleCell(field.sample) + '</td></tr>';
           }).join('')
         : '<tr><td colspan="4">El método no declara argumentos.</td></tr>') +
       '</tbody></table></div></section></div>';
@@ -1358,6 +1593,19 @@
     var fields = endpoint.method_fields || [];
     var example = endpoint.example_payload || {};
     var running = endpoint.status === 'running';
+    var exampleJson = JSON.stringify(example, null, 2);
+    var exampleLarge = isLargeValue(example);
+    var exampleEditor = '<textarea class="wizard-json" id="invoke-payload" spellcheck="false" style="min-height:150px">' +
+      esc(exampleJson) + '</textarea>';
+    if (exampleLarge) {
+      exampleEditor = '<div class="payload-summary">' +
+        '<span class="payload-summary-label">Ejemplo</span>' +
+        '<span class="payload-shape">' + esc(payloadSummary(example)) + '</span>' +
+        '<span class="sample-link">JSON plegado por tamaño</span></div>' +
+        '<details class="payload-details payload-editor"><summary>' +
+        '<span class="sample-link">Ver / editar JSON</span></summary>' +
+        exampleEditor + '</details>';
+    }
     panel.innerHTML =
       '<p class="form-note">La petición se envía al endpoint real y queda registrada en Model Monitoring. ' +
       (fields.length === 1
@@ -1368,8 +1616,7 @@
         esc(endpoint.status) + '</b>: reinícialo para aceptar peticiones.</div>') +
       '<div class="inline-controls"><label for="invoke-payload">Payload JSON</label>' +
       '<span class="signature">' + esc(endpoint.method_signature || '') + '</span></div>' +
-      '<textarea class="wizard-json" id="invoke-payload" spellcheck="false" style="min-height:150px">' +
-      esc(JSON.stringify(example, null, 2)) + '</textarea>' +
+      exampleEditor +
       '<p class="meta-line">Atajos aceptados: <code>input</code>, <code>inputs</code> o <code>arguments</code>. ' +
       'También puedes añadir <code>timeout</code> en segundos.</p>' +
       '<div class="form-actions">' +
@@ -1513,7 +1760,7 @@
         : '') +
       '<div class="code-head" style="margin-top:12px"><span class="code-label">Ejemplo listo para ejecutar · ' + esc(sample.label) + '</span>' +
       '<button class="btn btn-ghost btn-xs" type="button" data-docs-copy-code="' + esc(sample.code) + '">Copiar código</button></div>' +
-      '<pre class="code-highlight" id="docs-code">' + highlightCode(sample.code, sample.language) + '</pre>' +
+      codeView(sample.code, sample.language, 'docs-code') +
       '<div class="chart-grid is-2" style="margin-top:16px">' +
       '<section class="panel"><div class="panel-header"><h2>Solicitud</h2>' +
       '<span class="panel-sub">' + esc(docs.method.signature || docs.method.name) + '</span></div>' +
@@ -1522,8 +1769,8 @@
         ? fields.map(function (field) {
             return '<tr><td class="mono">' + esc(field.name) + '</td><td class="mono">' + esc(field.type || 'Any') +
               '</td><td>' + (field.required ? '<span class="schema-required">Sí</span>' : 'No') + '</td>' +
-              '<td>' + esc(field.description || '—') + '<div class="mono" style="color:var(--db-faint);margin-top:2px">ej: ' +
-              esc(JSON.stringify(field.example)) + '</div></td></tr>';
+              '<td>' + esc(field.description || '—') + '<div class="sample-description">ej: ' +
+              sampleCell(field.example) + '</div></td></tr>';
           }).join('')
         : '<tr><td colspan="4">El método no declara argumentos.</td></tr>') +
       '</tbody></table></div>' +
@@ -1533,13 +1780,13 @@
       '<section class="panel"><div class="panel-header"><h2>Respuesta</h2><span class="panel-sub">JSON</span></div>' +
       '<div class="panel-body"><div class="code-head"><span class="code-label">Ejemplo de respuesta</span>' +
       '<button class="btn btn-ghost btn-xs" type="button" data-docs-copy="' + esc(JSON.stringify(docs.response_example, null, 2)) + '">Copiar</button></div>' +
-      '<pre class="code-highlight">' + esc(JSON.stringify(docs.response_example, null, 2)) + '</pre>' +
+      payloadView(docs.response_example, 'docs-response') +
       '<p class="meta-line" style="margin-top:8px">El campo <code>prediction</code> contiene la proyección JSON real del valor devuelto por ' +
       '<span class="mono">' + esc(docs.method.name) + '</span>; el tipo se informa en <code>prediction_type</code>.</p>' +
       '</div></section></div>' +
       '<div class="code-head" style="margin-top:14px"><span class="code-label">Ejemplo de payload generado</span>' +
       '<button class="btn btn-ghost btn-xs" type="button" data-docs-copy="' + esc(JSON.stringify(docs.payload_example, null, 2)) + '">Copiar payload</button></div>' +
-      '<pre class="code-highlight">' + esc(JSON.stringify(docs.payload_example, null, 2)) + '</pre>';
+      payloadView(docs.payload_example, 'docs-payload');
 
     each(panel.querySelectorAll('[data-docs-language]'), function (button) {
       button.addEventListener('click', function () {
@@ -1597,6 +1844,27 @@
   /* Request history                                                     */
   /* ------------------------------------------------------------------ */
 
+  function eventInputSummary(event) {
+    if (event.input_summary) return event.input_summary;
+    var preview = String(event.input_preview || '');
+    if (!preview) return '—';
+    try {
+      return payloadSummary(JSON.parse(preview));
+    } catch (error) {
+      return preview.length > 64 ? 'Vista previa truncada' : preview;
+    }
+  }
+
+  function eventInputView(event) {
+    var preview = event.input_preview || '—';
+    return '<div class="payload-summary">' +
+      '<span class="payload-summary-label">Forma</span>' +
+      '<span class="payload-shape">' + esc(eventInputSummary(event)) + '</span>' +
+      '<span class="sample-link">Vista previa registrada</span></div>' +
+      '<details class="payload-details"><summary><span class="sample-link">Ver vista previa</span></summary>' +
+      '<pre class="code-highlight payload-json">' + esc(preview) + '</pre></details>';
+  }
+
   function renderActivity() {
     var panel = byId('detail-panel-actividad');
     if (!panel) return;
@@ -1646,7 +1914,7 @@
           '<td class="cell-num">' + esc(event.http_status || '—') + '</td>' +
           '<td class="cell-num">' + fmtMs(event.latency_ms || 0) + '</td>' +
           '<td class="mono">' + esc(event.method || '—') + '</td>' +
-          '<td class="mono" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(event.input_preview || '—') + '</td>' +
+          '<td class="mono event-input" title="' + esc(event.input_preview || '') + '">' + esc(eventInputSummary(event)) + '</td>' +
           '<td class="event-error" title="' + esc(event.error_message || '') + '">' + esc(event.error_message || '') + '</td></tr>';
       }).join('') + '</tbody></table></div>';
   }
@@ -1666,7 +1934,7 @@
       reviewCard('Modelo', event.model_id || '—') +
       '</div>' +
       '<div class="code-head" style="margin-top:12px"><span class="code-label">Entrada</span></div>' +
-      '<pre class="code-highlight">' + esc(event.input_preview || '—') + '</pre>' +
+      eventInputView(event) +
       (event.output_preview ? '<div class="code-head" style="margin-top:10px"><span class="code-label">Salida</span></div>' +
         '<pre class="code-highlight">' + esc(event.output_preview) + '</pre>' : '') +
       (event.error_message ? '<div class="wizard-alert is-error" style="margin-top:10px"><strong>' + esc(event.error_type || 'Error') +

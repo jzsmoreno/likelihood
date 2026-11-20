@@ -130,6 +130,7 @@ import serving_api
 import serving_core
 import training_api
 import training_core
+import training_datasets
 from model_catalog import (
     category_index,
     facet_counts,
@@ -1939,9 +1940,14 @@ def create_app(
                 response = preflight_response(state, request)
             else:
                 declared = (request.headers.get("content-length") or "").strip()
-                if declared.isdigit() and int(declared) > MAX_BODY_BYTES:
+                body_limit = (
+                    training_datasets.MAX_BYTES
+                    if request.url.path.rstrip("/") == "/api/training/datasets/upload"
+                    else MAX_BODY_BYTES
+                )
+                if declared.isdigit() and int(declared) > body_limit:
                     raise core.RequestBodyTooLarge(
-                        f"El cuerpo supera el máximo permitido de {MAX_BODY_BYTES} bytes"
+                        f"El cuerpo supera el máximo permitido de {body_limit} bytes"
                     )
                 authenticate(state, request)
                 enforce_rate_limit(state, request)

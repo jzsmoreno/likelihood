@@ -672,6 +672,43 @@
     };
   }
 
+  function eventValueShape(value) {
+    if (value === null || value === undefined) return '—';
+    if (Array.isArray(value)) {
+      if (value.length && Array.isArray(value[0])) return '[' + value.length + ' × ' + value[0].length + ']';
+      return '[' + value.length + ']';
+    }
+    if (typeof value === 'object') return '{' + Object.keys(value).length + '}';
+    return String(value);
+  }
+
+  function eventInputSummary(event) {
+    if (event.input_summary) return event.input_summary;
+    var preview = String(event.input_preview || '');
+    if (!preview) return '—';
+    try {
+      var parsed = JSON.parse(preview);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return Object.keys(parsed).map(function (key) {
+          return key + ' ' + eventValueShape(parsed[key]);
+        }).join(' · ');
+      }
+      return eventValueShape(parsed);
+    } catch (error) {
+      return preview.length > 64 ? 'Vista previa truncada' : preview;
+    }
+  }
+
+  function eventInputView(event) {
+    var preview = event.input_preview || '—';
+    return '<div class="payload-summary">' +
+      '<span class="payload-summary-label">Forma</span>' +
+      '<span class="payload-shape">' + esc(eventInputSummary(event)) + '</span>' +
+      '<span class="sample-link">Vista previa registrada</span></div>' +
+      '<details class="payload-details"><summary><span class="sample-link">Ver vista previa</span></summary>' +
+      '<pre class="code-highlight payload-json">' + esc(preview) + '</pre></details>';
+  }
+
   function renderEventDetail(event, targetId) {
     var box = byId(targetId);
     if (!box) return;
@@ -688,7 +725,7 @@
       review('Latencia', ms(event.latency_ms || 0)) +
       '</div>' +
       '<div class="code-head" style="margin-top:12px"><span class="code-label">Entrada</span></div>' +
-      '<pre class="code-highlight">' + esc(event.input_preview || '—') + '</pre>' +
+      eventInputView(event) +
       (event.output_preview ? '<div class="code-head" style="margin-top:8px"><span class="code-label">Salida</span></div>' +
         '<pre class="code-highlight">' + esc(event.output_preview) + '</pre>' : '') +
       (event.error_message ? '<div class="wizard-alert is-error" style="margin-top:8px"><strong>' +

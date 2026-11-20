@@ -825,7 +825,9 @@ CONTAINER_HINTS = ("ndarray", "array", "list", "tuple", "set", "series", "sequen
 DUMMY_ROWS = 3
 DUMMY_COLUMNS = 2
 DUMMY_ROWS_RANGE = (2, 10)
-DUMMY_COLUMNS_RANGE = (1, 8)
+#: An explicit constructor width (for example ``input_shape_parm=30``) must be
+#: preserved; only pathological values are capped to keep the sample JSON small.
+DUMMY_COLUMNS_RANGE = (1, 4096)
 DUMMY_CATEGORIES_RANGE = (2, 10)
 
 
@@ -1103,12 +1105,14 @@ def resolve_loader(model: Dict[str, Any], name: str = "") -> Dict[str, Any]:
 
 
 def _load_candidates(path: Path) -> List[Path]:
-    """Path spellings a loader may expect (``model`` / ``model.pkl``)."""
+    """Path spellings a loader may expect (``model`` / ``model.pkl`` / archive)."""
     candidates = [path]
     if path.suffix.lower() != ".pkl":
         candidates.append(Path(str(path) + ".pkl"))
     else:
         candidates.append(path.with_suffix(""))
+    for suffix in (".keras", ".h5", ".zip"):
+        candidates.append(Path(str(path) + suffix))
     return candidates
 
 
@@ -1138,7 +1142,7 @@ def normalize_load_path(value: Any) -> str:
         )
     if not any(candidate_path.exists() for candidate_path in _load_candidates(resolved)):
         raise ValidationError(
-            f'No existe el modelo "{text}" (se probó también con la extensión .pkl)',
+            f'No existe el modelo "{text}" (se probaron también .pkl, .keras, .h5 y .zip)',
             path=text,
         )
     return str(resolved)
@@ -1580,11 +1584,28 @@ def _describe(instance):
         attributes = sorted(name for name in vars(instance) if not name.startswith("_"))[:25]
     except TypeError:
         attributes = []
+    attribute_values = {}
+    for name in attributes:
+        try:
+            raw = getattr(instance, name, None)
+            # Only scalar configuration values are needed for payload inference;
+            # never materialise large arrays or nested model state here.
+            if not (
+                isinstance(raw, (bool, int, float, str))
+                or (hasattr(raw, "item") and getattr(raw, "ndim", 1) == 0)
+            ):
+                continue
+            safe = _safe(raw)
+        except BaseException:
+            continue
+        if isinstance(safe, (bool, int, float, str)):
+            attribute_values[name] = safe
     return {
         "type": type(instance).__name__,
         "module": type(instance).__module__,
         "repr": repr(instance)[:2000],
         "attributes": attributes,
+        "attribute_values": attribute_values,
     }
 
 
@@ -1595,16 +1616,79 @@ def _build():
 
 
 def _load_paths(path):
-    # Different loaders append/remove ``.pkl`` on their own, so both spellings
-    # are tried before giving up.
+    # Different loaders append/remove extensions on their own.  Yield the
+    # original path first (a loader like ``load_model(name)`` appends ``.pkl``
+    # itself), then the common file spellings.
     import pathlib
 
     candidate = pathlib.Path(str(path)).expanduser()
-    yield str(candidate)
+    seen = set()
+
+    def _yield(value):
+        text = str(value)
+        if text not in seen:
+            seen.add(text)
+            return text
+        return None
+
+    first = _yield(candidate)
+    if first:
+        yield first
     if candidate.suffix.lower() != ".pkl":
-        yield str(candidate) + ".pkl"
+        extra = _yield(str(candidate) + ".pkl")
+        if extra:
+            yield extra
     else:
-        yield str(candidate.with_suffix(""))
+        extra = _yield(str(candidate.with_suffix("")))
+        if extra:
+            yield extra
+    for suffix in (".keras", ".h5", ".zip"):
+        extra = _yield(str(candidate) + suffix)
+        if extra:
+            yield extra
+
+
+def _with_inference_aliases(instance):
+    # The legacy component loaders (notably AutoClassifier.load) return objects
+    # with ``predict`` but without the ``call`` method exposed by the modern
+    # catalog class.  Serving can still use them through the documented
+    # inference aliases.
+    predict = getattr(instance, "predict", None)
+    if callable(predict):
+        for alias in ("call", "forward"):
+            if not callable(getattr(instance, alias, None)):
+                try:
+                    setattr(instance, alias, predict)
+                except BaseException:
+                    pass
+    return instance
+
+
+def _load_generic_artifact(path):
+    # Last-resort support for a bare ``.pkl`` or ``.keras`` file when the
+    # model's own loader expects a different layout or a missing config file.
+    # The declared catalog loader is always tried first.
+    import os
+    import pickle
+
+    text = str(path or "")
+    suffix = os.path.splitext(text.lower())[1]
+    if suffix in (".pkl", ".pickle"):
+        with open(text, "rb") as handle:
+            return pickle.load(handle)
+    if suffix in (".keras", ".h5"):
+        try:
+            import keras
+        except BaseException:
+            try:
+                from tensorflow import keras  # type: ignore
+            except BaseException:
+                return None
+        try:
+            return keras.models.load_model(text, compile=False)
+        except BaseException:
+            return None
+    return None
 
 
 def _load_instance(spec):
@@ -1616,22 +1700,27 @@ def _load_instance(spec):
     instance = _build() if spec.get("requires_instance") else None
     holder = instance if instance is not None else target
     loader = getattr(holder, name)
-    found = False
+    last_error = None
     for candidate in _load_paths(spec.get("path") or ""):
-        if not os.path.exists(candidate):
+        try:
+            result = loader(**{path_parameter: candidate})
+        except BaseException as exc:
+            last_error = exc
             continue
-        found = True
-        result = loader(**{path_parameter: candidate})
         if result is not None:
-            instance = result
-        break
-    if not found:
-        raise FileNotFoundError(str(spec.get("path") or ""))
-    if instance is None:
-        raise TypeError(
-            "El método %s no devolvió una instancia del modelo" % name
-        )
-    return instance
+            return _with_inference_aliases(result)
+        if instance is not None:
+            # ``Arima.load_model``/``FourierRegression.load_model`` mutate the
+            # instance built from the constructor and return ``None``.
+            return _with_inference_aliases(instance)
+        last_error = TypeError("El método %s no devolvió una instancia del modelo" % name)
+    if last_error is not None:
+        for fallback_path in _load_paths(spec.get("path") or ""):
+            fallback = _load_generic_artifact(fallback_path)
+            if fallback is not None:
+                return _with_inference_aliases(fallback)
+        raise last_error
+    raise FileNotFoundError(str(spec.get("path") or ""))
 
 
 def _input_shape(value):
@@ -1791,16 +1880,105 @@ result["result"] = _safe(value)
 result["result_type"] = type(value).__name__
 result["result_repr"] = repr(value)[:2000]
 
-save_path = payload.get("save", {}).get("path") if isinstance(payload.get("save"), dict) else None
-if save_path:
+save_spec = payload.get("save") if isinstance(payload.get("save"), dict) else {}
+save_dir = save_spec.get("path") if save_spec else None
+if save_dir:
     try:
         import pickle
 
-        os.makedirs(os.path.dirname(str(save_path)), exist_ok=True)
-        with open(str(save_path), "wb") as _handle:
-            pickle.dump(instance, _handle)
-        result["save_path"] = str(save_path)
-        result["save_bytes"] = os.path.getsize(str(save_path))
+        save_dir = str(save_dir)
+        os.makedirs(save_dir, exist_ok=True)
+        target = os.path.join(save_dir, str(save_spec.get("filename") or "model"))
+        method_name = str(save_spec.get("method") or "")
+        path_parameter = str(save_spec.get("path_parameter") or "path")
+        saved_path = ""
+        save_method = ""
+        save_warning = ""
+        if method_name:
+            saver = getattr(instance, method_name, None)
+            if callable(saver):
+                try:
+                    saver(**{path_parameter: target})
+                    save_method = method_name
+                except BaseException as _save_exc:
+                    save_warning = "%s: %s" % (type(_save_exc).__name__, _save_exc)
+                if save_method:
+                    for candidate in (
+                        target,
+                        target + ".keras",
+                        target + ".pkl",
+                        target + ".h5",
+                    ):
+                        if os.path.exists(candidate):
+                            saved_path = candidate
+                            break
+        if not saved_path and str(save_spec.get("layout") or "") == "components":
+            try:
+                import json
+                from likelihood.models.deep._keras_io import save_keras_model
+
+                components = (
+                    ("encoder", getattr(instance, "encoder", None)),
+                    ("decoder", getattr(instance, "decoder", None)),
+                    ("classifier", getattr(instance, "classifier", None)),
+                    ("main_model", instance),
+                )
+                if all(component is not None for _name, component in components):
+                    config = instance.get_config()
+                    with open(
+                        os.path.join(save_dir, "config.json"), "w", encoding="utf-8"
+                    ) as _handle:
+                        json.dump(config, _handle, ensure_ascii=False, indent=2, default=str)
+                    for _name, component in components:
+                        save_keras_model(component, os.path.join(save_dir, _name))
+                    saved_path = save_dir
+                    save_method = "components"
+            except BaseException as _save_exc:
+                save_warning = save_warning or "%s: %s" % (
+                    type(_save_exc).__name__,
+                    _save_exc,
+                )
+        if not saved_path:
+            native_save = getattr(instance, "save", None)
+            if callable(native_save) and method_name != "save":
+                keras_target = target + ".keras"
+                try:
+                    native_save(keras_target)
+                    if os.path.exists(keras_target):
+                        saved_path = keras_target
+                        save_method = "keras"
+                except BaseException as _save_exc:
+                    save_warning = save_warning or "%s: %s" % (
+                        type(_save_exc).__name__,
+                        _save_exc,
+                    )
+        if not saved_path:
+            saved_path = os.path.join(
+                save_dir, str(save_spec.get("pickle_name") or "model.pkl")
+            )
+            with open(saved_path, "wb") as _handle:
+                pickle.dump(instance, _handle)
+            save_method = "pickle"
+        result["save_path"] = saved_path
+        result["save_method"] = save_method
+        if method_name and save_method == method_name:
+            # Loaders such as Arima/Simulation append ``.pkl`` themselves, so
+            # they receive the extensionless base.  Keras uses the real archive.
+            result["load_path"] = (
+                target if saved_path.lower().endswith(".pkl") else saved_path
+            )
+        else:
+            result["load_path"] = saved_path
+        if save_warning:
+            result["save_warning"] = save_warning
+        total = 0
+        for _root, _dirs, _files in os.walk(save_dir):
+            for _name in _files:
+                try:
+                    total += os.path.getsize(os.path.join(_root, _name))
+                except OSError:
+                    pass
+        result["save_bytes"] = total
     except BaseException as save_exc:
         result["save_error"] = "%s: %s" % (type(save_exc).__name__, save_exc)
 _emit(result)
@@ -2550,6 +2728,7 @@ def run_invoke(
     timeout: Optional[float] = None,
     load: Optional[Dict[str, Any]] = None,
     save_path: Optional[str] = None,
+    save_options: Optional[Dict[str, Any]] = None,
     compile_options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build (or load) ``model`` and call ``method`` in a throw-away child interpreter.
@@ -2577,8 +2756,11 @@ def run_invoke(
         }
     if save_path:
         # The parent decides the destination (artifacts of a training job); the
-        # child only pickles the live instance into that path after the call.
-        payload_data["save"] = {"path": save_path}
+        # child saves the live instance inside that folder after the call.
+        save_data = {"path": save_path}
+        if save_options:
+            save_data.update(save_options)
+        payload_data["save"] = save_data
     if compile_options:
         payload_data["compile"] = dict(compile_options)
     payload = json.dumps(payload_data)

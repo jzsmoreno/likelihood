@@ -14,7 +14,10 @@ tabulate
 graphviz
 seaborn
 pyyaml
-pandas 
+pandas
+openpyxl>=3.1
+pyarrow>=15
+python-multipart>=0.0.9
 corner
 scipy
 tqdm

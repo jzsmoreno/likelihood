@@ -180,6 +180,181 @@
     .wizard-json-grid { grid-template-columns: 1fr; }
     .training-wizard .lm-dialog-body { padding: 14px; }
   }
+
+  /* Compact metrics monitor in the job detail. */
+  .training-metrics-panel .panel-body { padding: 14px 16px; }
+  .training-metrics-badge {
+    display: inline-flex;
+    padding: 2px 8px;
+    border: 1px solid var(--db-line);
+    border-radius: 999px;
+    background: var(--db-surface);
+    color: var(--db-muted);
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .training-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 9px;
+    margin-bottom: 12px;
+  }
+  .training-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 9px 11px;
+    border: 1px solid var(--db-line-soft);
+    border-radius: var(--db-r-sm);
+    background: var(--db-surface-alt);
+  }
+  .training-metric-label {
+    color: var(--db-faint);
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+  .training-metric-value {
+    color: var(--db-ink);
+    font-family: var(--db-mono);
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .training-metric-sub { color: var(--db-muted); font-size: 10px; }
+  .training-loss-chart { min-height: 220px; }
+
+  /* Dataset loader inside the training wizard. */
+  .dataset-panel {
+    margin-bottom: 18px;
+    padding: 14px;
+    border: 1px solid var(--db-line);
+    border-radius: var(--db-r-md);
+    background: var(--db-surface-alt);
+  }
+  .dataset-panel[hidden] { display: none; }
+  .dataset-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .dataset-head .wizard-section-sub { margin-bottom: 0; }
+  .dataset-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border: 1px solid var(--db-blue);
+    border-radius: 999px;
+    background: var(--db-blue-soft);
+    color: var(--db-blue);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .dataset-source-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .dataset-input-row { display: flex; align-items: center; gap: 8px; }
+  .dataset-input-row .input { flex: 1 1 auto; min-width: 0; }
+  .dataset-input-row input[type="file"] {
+    height: auto;
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+  .dataset-examples {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px;
+    margin-top: 10px;
+  }
+  .dataset-examples-label {
+    color: var(--db-faint);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+  }
+  .dataset-chip {
+    padding: 4px 10px;
+    border: 1px solid var(--db-line);
+    border-radius: 999px;
+    background: var(--db-surface);
+    color: var(--db-ink);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .dataset-chip:hover { border-color: var(--db-blue); color: var(--db-blue); }
+  .dataset-config { margin-top: 14px; }
+  .dataset-config[hidden] { display: none; }
+  .dataset-summary {
+    padding: 9px 11px;
+    border: 1px solid var(--db-line-soft);
+    border-radius: var(--db-r-sm);
+    background: var(--db-surface);
+    color: var(--db-text);
+    font-size: 12px;
+  }
+  .dataset-preview-wrap {
+    max-height: 220px;
+    margin-top: 10px;
+    overflow: auto;
+    border: 1px solid var(--db-line-soft);
+    border-radius: var(--db-r-sm);
+    background: var(--db-surface);
+  }
+  .dataset-preview {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--db-mono);
+    font-size: 10.5px;
+  }
+  .dataset-preview th,
+  .dataset-preview td {
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--db-line-soft);
+    white-space: nowrap;
+    text-align: left;
+  }
+  .dataset-preview th {
+    position: sticky;
+    top: 0;
+    background: var(--db-surface-alt);
+    color: var(--db-muted);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .dataset-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .dataset-columns .wizard-field { min-width: 0; }
+  .dataset-multi { height: auto; min-height: 142px; padding: 4px; }
+  .dataset-apply-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .dataset-status { margin: 8px 0 0; }
+  .dataset-status.is-error { color: var(--db-lava); }
+
+  @media (max-width: 760px) {
+    .dataset-source-grid,
+    .dataset-columns { grid-template-columns: 1fr; }
+  }
 </style>
 <script>
   (function () {
@@ -448,6 +623,59 @@
 
       <!-- Step 2 -->
       <div class="wizard-panel" id="wizard-panel-2" role="tabpanel" hidden>
+        <section class="dataset-panel" id="dataset-panel" hidden>
+          <div class="dataset-head">
+            <div>
+              <div class="wizard-section-title">Cargar dataset</div>
+              <p class="wizard-section-sub">CSV, XLSX o Parquet desde un archivo o una URL. Después elige las columnas de entrada y el objetivo.</p>
+            </div>
+            <span class="dataset-badge" id="dataset-mode-badge"></span>
+          </div>
+          <div class="dataset-source-grid">
+            <div class="wizard-field">
+              <label for="dataset-url">URL del dataset</label>
+              <div class="dataset-input-row">
+                <input class="input mono" id="dataset-url" placeholder="https://.../iris.csv">
+                <button class="btn btn-secondary btn-sm" id="dataset-load-url" type="button">Cargar</button>
+              </div>
+            </div>
+            <div class="wizard-field">
+              <label for="dataset-file">Archivo local</label>
+              <div class="dataset-input-row">
+                <input class="input" type="file" id="dataset-file" accept=".csv,.tsv,.xlsx,.parquet">
+                <button class="btn btn-secondary btn-sm" id="dataset-load-file" type="button">Subir</button>
+              </div>
+            </div>
+          </div>
+          <div class="dataset-examples">
+            <span class="dataset-examples-label">Ejemplos</span>
+            <button class="dataset-chip" type="button" data-dataset-url="https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" data-dataset-task="classification">Iris · clasificación</button>
+            <button class="dataset-chip" type="button" data-dataset-url="https://raw.githubusercontent.com/ageron/handson-ml2/master/datasets/housing/housing.csv" data-dataset-task="regression">Housing · regresión</button>
+          </div>
+          <p class="hint dataset-status" id="dataset-status" role="status"></p>
+          <div class="dataset-config" id="dataset-config" hidden>
+            <div class="dataset-summary" id="dataset-summary"></div>
+            <div class="dataset-preview-wrap">
+              <table class="dataset-preview" id="dataset-preview"></table>
+            </div>
+            <div class="dataset-columns">
+              <div class="wizard-field" id="dataset-x-field">
+                <label for="dataset-x">Columnas X</label>
+                <select class="select dataset-multi" id="dataset-x" multiple size="7"></select>
+                <p class="hint">Variables numéricas de entrada (Ctrl/Cmd para seleccionar varias).</p>
+              </div>
+              <div class="wizard-field">
+                <label for="dataset-y" id="dataset-y-label">Columna Y / objetivo</label>
+                <select class="select" id="dataset-y"></select>
+                <p class="hint" id="dataset-target-hint"></p>
+              </div>
+            </div>
+            <div class="dataset-apply-row">
+              <span class="hint" id="dataset-apply-note"></span>
+              <button class="btn btn-primary btn-sm" type="button" id="dataset-apply">Aplicar selección</button>
+            </div>
+          </div>
+        </section>
         <div class="wizard-data-head">
           <div>
             <div class="wizard-section-title">Datos de entrenamiento</div>
@@ -511,6 +739,7 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<script src="/charts.js" defer></script>
 <script src="/training.js" defer></script>
 </body>
 </html>

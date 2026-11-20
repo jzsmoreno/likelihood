@@ -18,6 +18,7 @@ import json
 import pickle
 import sys
 import time
+import zipfile
 from pathlib import Path
 
 import httpx
@@ -28,7 +29,9 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(SERVER_DIR))
 
 import monitoring_core  # noqa: E402
+import server_core as core  # noqa: E402
 import server_fastapi  # noqa: E402
+import serving_api  # noqa: E402
 import serving_core  # noqa: E402
 
 PROBE = '''
@@ -62,6 +65,22 @@ class Calculator:
 
         with open(filename, "rb") as handle:
             return pickle.load(handle)
+
+
+class BrokenLoader:
+    """Model whose declared loader rejects a bare pickle file."""
+
+    def __init__(self, value: int = 0) -> None:
+        self.value = value
+
+    def predict(self, amount: int = 1) -> int:
+        """Predict by adding ``amount`` to the current value."""
+        return self.value + amount
+
+    @staticmethod
+    def load(filename: str = "./broken") -> "BrokenLoader":
+        """Simulate a loader that requires a config.json folder."""
+        raise RuntimeError("config.json is required by this loader")
 '''
 
 
@@ -262,6 +281,42 @@ def test_lifecycle_saved_model_and_monitoring_errors(tmp_path, monkeypatch):
         settings.serving.shutdown()
 
 
+def test_bare_pickle_loads_when_declared_loader_rejects_it(tmp_path, monkeypatch):
+    """A .pkl without config.json works even if the catalog loader needs config."""
+    app, settings = make_app(tmp_path, monkeypatch)
+
+    async def scenario():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            probe = __import__("pkg.models.probe", fromlist=["BrokenLoader"])
+            artifact = tmp_path / "broken.pkl"
+            with open(artifact, "wb") as handle:
+                pickle.dump(probe.BrokenLoader(value=40), handle)
+            payload = deployment_payload(
+                model_id="BrokenLoader",
+                endpoint_name="broken-loaded",
+                method="predict",
+                parameters={"value": 40},
+                load={"enabled": True, "loader": "load", "path": str(artifact)},
+            )
+            created = await client.post("/api/serving/endpoints", json=payload)
+            assert created.status_code == 202, created.text
+            loaded = await wait_running(client, "broken-loaded")
+            assert loaded["status"] == "running", loaded
+            assert loaded["loaded_artifact"]["type"] == "BrokenLoader"
+            prediction = await client.post(
+                "/api/serving/endpoints/broken-loaded/predict", json={"input": 2}
+            )
+            assert prediction.status_code == 200, prediction.text
+            assert prediction.json()["prediction"] == 42
+            await client.delete("/api/serving/endpoints/broken-loaded")
+
+    try:
+        run(scenario)
+    finally:
+        settings.serving.shutdown()
+
+
 def test_deployment_validation_rejects_bad_configuration(tmp_path, monkeypatch):
     """Unknown methods, training methods and missing constructor arguments."""
     app, settings = make_app(tmp_path, monkeypatch)
@@ -352,6 +407,119 @@ def test_monitoring_core_aggregates_the_event_log(tmp_path):
     index = monitoring_core.endpoint_index(deployments, events)
     assert index[0]["id"] == "ep"
     assert index[0]["exists"] is True
+
+
+def test_loader_module_survives_the_serving_inference_payload():
+    """AutoClassifier's loader lives in a private module; predictions need it."""
+    model = core.MODELS_BY_ID["AutoClassifier"]
+    load = serving_core._normalise_load(
+        {"enabled": True, "loader": "load", "path": "/tmp/model"}, {}, model
+    )
+    assert load["module"] == "likelihood.models.deep._autoencoders"
+    invoke_load = serving_core._invoke_load(load)
+    assert invoke_load["module"] == "likelihood.models.deep._autoencoders"
+    assert invoke_load["path_parameter"] == "filepath"
+
+
+def test_example_payload_uses_model_input_shape_for_new_and_loaded(tmp_path):
+    """The Probar example must use the actual feature count in both modes."""
+    model = core.MODELS_BY_ID["AutoClassifier"]
+    method = core.find_method(model, "call")
+
+    new_fields = core.method_fields(method, {"input_shape_parm": 5})
+    new_example = serving_core.method_example(new_fields)
+    assert len(new_example["input"][0]) == 5
+
+    artifact = tmp_path / "trained"
+    artifact.mkdir()
+    (artifact / "artifact.json").write_text(
+        json.dumps({"parameters": {"input_shape_parm": 7, "num_classes": 2}}),
+        encoding="utf-8",
+    )
+    load = serving_core._normalise_load(
+        {"enabled": True, "loader": "load", "path": str(artifact)}, {}, model
+    )
+    loaded_fields = core.method_fields(
+        method,
+        serving_core.example_parameters(
+            {"parameters": {}, "loaded_artifact": {"attribute_values": load["parameters"]}},
+            model,
+        ),
+    )
+    loaded_example = serving_core.method_example(loaded_fields)
+    assert len(loaded_example["input"][0]) == 7
+
+    # A normal (non-training) Keras save only has config.json.
+    config_dir = tmp_path / "native"
+    config_dir.mkdir()
+    (config_dir / "config.json").write_text(
+        json.dumps({"input_shape_parm": 3, "num_classes": 2}), encoding="utf-8"
+    )
+    config_load = serving_core._normalise_load(
+        {"enabled": True, "loader": "load", "path": str(config_dir)}, {}, model
+    )
+    assert config_load["parameters"]["input_shape_parm"] == 3
+
+    # A .keras archive does not need an adjacent config.json; Keras embeds it.
+    keras_path = tmp_path / "model.keras"
+    with zipfile.ZipFile(keras_path, "w") as archive:
+        archive.writestr(
+            "config.json",
+            json.dumps(
+                {
+                    "class_name": "AutoClassifier",
+                    "config": {"input_shape_parm": 6, "num_classes": 2},
+                }
+            ),
+        )
+    keras_load = serving_core._normalise_load(
+        {"enabled": True, "loader": "load", "path": str(keras_path)}, {}, model
+    )
+    assert keras_load["parameters"]["input_shape_parm"] == 6
+
+    # Bare .pkl paths are valid even when no config/metadata file exists.
+    pickle_path = tmp_path / "model.pkl"
+    pickle_path.write_bytes(b"not-a-real-pickle")
+    pickle_load = serving_core._normalise_load(
+        {"enabled": True, "loader": "load", "path": str(pickle_path)}, {}, model
+    )
+    assert pickle_load["enabled"] is True
+    assert pickle_load["path"].endswith("model.pkl")
+
+    deployment = {
+        "id": "ep-loaded",
+        "name": "ep-loaded",
+        "model_id": "ca-loaded",
+        "model_type_id": "AutoClassifier",
+        "method": "call",
+        "parameters": {"input_shape_parm": 2},
+        "loaded_artifact": {"attribute_values": {"input_shape_parm": 4}},
+    }
+    docs = serving_core.build_docs(deployment, model, method)
+    assert len(docs["payload_example"]["input"][0]) == 4
+
+    # The API projection used by the Probar panel must agree with docs.
+    parameters = serving_api._example_parameters(model, deployment)
+    assert len(serving_core.method_example(core.method_fields(method, parameters))["input"][0]) == 4
+
+    # The wizard preview must use constructor values, not catalog defaults.
+    preview = serving_core.ServingStore(tmp_path / "preview-store")
+    try:
+        params = core.constructor_samples(model)
+        params["input_shape_parm"] = 5
+        result = preview.preview(
+            model,
+            {
+                "endpoint_name": "auto-preview",
+                "method": "call",
+                "parameters": params,
+                "load": {"enabled": False},
+            },
+        )
+        assert result["valid"] is True
+        assert len(result["payload_example"]["input"][0]) == 5
+    finally:
+        preview.shutdown()
 
 
 def test_inference_method_policy():

@@ -152,6 +152,9 @@ def test_dummy_json_value_reads_the_input_shape_parameter():
     """``input_shape_parm`` is the name several models use for their feature count."""
     matrix = core.dummy_json_value("X", "np.ndarray", {"input_shape_parm": 4})
     assert matrix and all(len(row) == 4 for row in matrix)
+    # The sample must not be clamped to the small generic demo width.
+    wide = core.dummy_json_value("X", "np.ndarray", {"input_shape_parm": 30})
+    assert wide and all(len(row) == 30 for row in wide)
 
 
 def test_tensor_arguments_are_jsonable_and_sampled_as_matrices():

@@ -14,10 +14,11 @@ Design notes
   worker of a ``ThreadPoolExecutor`` that calls ``core.run_invoke`` in a fresh
   child interpreter.  If the server restarts, running jobs are marked ``failed``
   (a worker that dies with the process cannot resume a fitting loop).
-* Artifacts live under ``STORE_DIR/artifacts`` with a deterministic name
-  (``<artifact_id>.pkl``); they are plain pickle files written by the child,
-  never by this module.  Deleting a fit job deletes its artifact; the job history
-  of an evaluate job keeps the artifact reference of the fit job that owns it.
+* Artifacts live under ``STORE_DIR/artifacts/<artifact_id>/``; the child writes
+  the model using its native saver when available (or a Keras/pickle fallback)
+  and this module adds ``artifact.json`` and the serving ``load_path``.  Deleting
+  a fit job deletes its folder; an evaluate job keeps the artifact reference of
+  the fit job that owns it.
 * Nothing here duplicates model loading: artifacts are only *paths* that a later
   deployment (``serving_core``) or an evaluation job resolves through the
   catalog model's declared loaders.
@@ -29,6 +30,7 @@ import copy
 import json
 import logging
 import os
+import shutil
 import threading
 import time
 import uuid
@@ -37,6 +39,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import server_core as core
+import training_datasets
 from serving_core import iso
 
 LOGGER = logging.getLogger("likelihood.training")
@@ -153,12 +156,94 @@ def new_artifact_id() -> str:
 
 
 def artifact_path(artifact_id: str, directory: Optional[Path] = None) -> Path:
-    """Absolute location of the ``.pkl`` file of ``artifact_id``.
+    """Directory that contains every file of ``artifact_id``.
 
+    Each artifact gets its own folder so a model saved with its native
+    ``save``/``save_model`` layout (a SavedModel directory, a ``.keras`` archive
+    next to metadata, a pickle...) can be consumed later by Serving.
     ``directory`` lets a :class:`TrainingStore` injected with its own directory
-    (tests, a mounted volume) keep its artifacts next to ``jobs.json``.
+    keep artifacts next to ``jobs.json``.
     """
-    return Path(directory or STORE_DIR) / "artifacts" / f"{artifact_id}.pkl"
+    return Path(directory or STORE_DIR) / "artifacts" / artifact_id
+
+
+def save_method_for(model: Dict[str, Any]) -> Tuple[str, str]:
+    """Return ``(method_name, path_parameter)`` of the model's native save method."""
+    for name in ("save", "save_model"):
+        method = core.find_method(model, name)
+        if method is None or method.get("kind") not in ("method", "static"):
+            continue
+        parameters = [
+            parameter
+            for parameter in method.get("parameters") or []
+            if not parameter.get("variadic")
+        ]
+        if parameters:
+            return name, parameters[0]["name"]
+    return "", ""
+
+
+def save_layout_for(model: Dict[str, Any]) -> str:
+    """Return a special folder layout required by the model's Serving loader."""
+    if save_method_for(model)[0]:
+        return ""
+    for loader in model.get("loaders") or []:
+        if loader.get("name") == "load" and "autoencoders" in str(loader.get("module") or ""):
+            # legacy AutoClassifier.load() expects config.json + component files.
+            return "components"
+    return ""
+
+
+def remove_artifact(path: Path) -> bool:
+    """Delete an artifact file or directory, returning whether it existed."""
+    target = Path(path)
+    try:
+        if target.is_dir():
+            shutil.rmtree(target)
+            return True
+        if target.is_file():
+            target.unlink()
+            return True
+    except OSError:
+        return False
+    return False
+
+
+def artifact_stats(path: Path) -> Tuple[int, List[str]]:
+    """Size and relative filenames of a file or artifact directory."""
+    target = Path(path)
+    if target.is_file():
+        try:
+            return target.stat().st_size, [target.name]
+        except OSError:
+            return 0, []
+    total = 0
+    files: List[str] = []
+    if not target.is_dir():
+        return 0, []
+    for item in sorted(target.rglob("*")):
+        if not item.is_file():
+            continue
+        try:
+            total += item.stat().st_size
+        except OSError:
+            continue
+        files.append(str(item.relative_to(target)))
+    return total, files
+
+
+def artifact_parameters(parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """Small constructor values worth persisting for serving inference.
+
+    Training datasets and large arrays are intentionally omitted; the artifact
+    metadata only needs scalar shape/architecture values so Serving can build a
+    payload example without loading the model in the API process.
+    """
+    kept: Dict[str, Any] = {}
+    for name, value in (parameters or {}).items():
+        if isinstance(value, (bool, int, float, str)) or value is None:
+            kept[name] = value
+    return kept
 
 
 def supports_framework_fit(model: Dict[str, Any]) -> bool:
@@ -349,6 +434,30 @@ def training_example(model: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     }
 
 
+def training_dataset_mode(model: Dict[str, Any]) -> str:
+    """How a dataset maps onto ``model``: ``xy``, ``datapoints`` or ``generic``."""
+    fit = training_fit_method(model)
+    if fit is None:
+        return "generic"
+    names = {parameter["name"] for parameter in fit.get("parameters") or []}
+    if {"x", "y"} <= names or {"X", "y"} <= names:
+        return "xy"
+    if any(parameter.get("name") == "datapoints" for parameter in model.get("parameters") or []):
+        return "datapoints"
+    return "generic"
+
+
+def training_dataset_task(model: Dict[str, Any]) -> str:
+    """The task implied by a curated example, if the model has one."""
+    example = training_example(model) or {}
+    label = str(example.get("label") or "").lower()
+    if label.startswith("clas"):
+        return "classification"
+    if label.startswith("regres"):
+        return "regression"
+    return "auto"
+
+
 def _atomic_write(path: Path, text: str) -> None:
     """Write ``text`` to ``path`` atomically (readers never see a half file)."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -377,6 +486,7 @@ class TrainingStore:
         self.artifacts_dir = self.directory / "artifacts"
         self._lock = threading.RLock()
         self._jobs: Dict[str, Dict[str, Any]] = {}
+        self.datasets = training_datasets.DatasetStore()
         self._executor = ThreadPoolExecutor(
             max_workers=TRAIN_WORKERS, thread_name_prefix="lm-training"
         )
@@ -429,6 +539,7 @@ class TrainingStore:
             "parameters": dict(record.get("parameters") or {}),
             "compile": dict(record.get("compile") or {}),
             "adapter": str(record.get("adapter") or ""),
+            "dataset": dict(record.get("dataset") or {}) or None,
             "timeout_seconds": float(record.get("timeout_seconds") or TRAIN_TIMEOUT),
             "attempts": int(record.get("attempts") or 0),
             "created_at": str(record.get("created_at") or iso()),
@@ -479,9 +590,30 @@ class TrainingStore:
             raise core.ValidationError("El campo 'model_id' es obligatorio")
         model = self._find_model(model_id)
         compile_options: Dict[str, Any] = {}
+        dataset_meta: Optional[Dict[str, Any]] = None
+        dataset_args: Dict[str, Any] = {}
+        dataset_params: Dict[str, Any] = {}
         if kind == "fit":
             method_name = resolve_fit_method_name(model, str(spec.get("method") or ""))
-            method, arguments, parameters = self._prepare_invocation(model, spec, method_name)
+            dataset_spec = spec.get("dataset")
+            if dataset_spec:
+                dataset_args, dataset_params, dataset_meta = self._dataset_values(
+                    model, dataset_spec
+                )
+                raw_arguments = spec.get("arguments", spec.get("args")) or {}
+                raw_parameters = spec.get("parameters", spec.get("params")) or {}
+                if not isinstance(raw_arguments, dict):
+                    raise core.ValidationError("El campo 'arguments' debe ser un objeto")
+                if not isinstance(raw_parameters, dict):
+                    raise core.ValidationError("El campo 'parameters' debe ser un objeto")
+                validation_spec = dict(spec)
+                validation_spec["arguments"] = {**raw_arguments, **dataset_args}
+                validation_spec["parameters"] = {**raw_parameters, **dataset_params}
+            else:
+                validation_spec = spec
+            method, arguments, parameters = self._prepare_invocation(
+                model, validation_spec, method_name
+            )
             if method["name"].lower() in ("save", "load", "load_model", "save_model"):
                 raise core.ValidationError(
                     f'El método "{method["name"]}" guarda o carga un modelo; '
@@ -504,6 +636,14 @@ class TrainingStore:
             method, arguments, parameters = self._prepare_invocation(model, spec, method_name)
         timeout = core.requested_timeout(spec, TRAIN_TIMEOUT)
         now = iso()
+        stored_arguments = dict(arguments)
+        for key in dataset_args:
+            stored_arguments.pop(key, None)
+        stored_parameters = dict(parameters)
+        # ``datapoints`` can be long (a whole CSV column); keep it in the
+        # dataset reference and rebuild it in the worker.
+        if "datapoints" in dataset_params:
+            stored_parameters.pop("datapoints", None)
         with self._lock:
             job_id = new_job_id()
             job = self._normalise_record(
@@ -515,10 +655,11 @@ class TrainingStore:
                     "model_id": model["id"],
                     "model_name": model.get("name") or model["id"],
                     "method": method["name"],
-                    "arguments": arguments,
-                    "parameters": parameters,
+                    "arguments": stored_arguments,
+                    "parameters": stored_parameters,
                     "compile": compile_options,
                     "adapter": method.get("framework") or "",
+                    "dataset": dataset_meta,
                     "timeout_seconds": timeout,
                     "created_at": now,
                     "updated_at": now,
@@ -549,6 +690,59 @@ class TrainingStore:
             if str(method_name or "").strip().lower() == "fit" and supports_framework_fit(model):
                 return framework_fit_method(model)
             raise
+
+    def _dataset_values(
+        self, model: Dict[str, Any], dataset_spec: Dict[str, Any]
+    ) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[Dict[str, Any]]]:
+        """Expand a dataset reference into method arguments and constructor overrides."""
+        if not isinstance(dataset_spec, dict):
+            raise core.ValidationError("El campo 'dataset' debe ser un objeto")
+        dataset_id = str(dataset_spec.get("dataset_id") or "").strip()
+        record = self.datasets.get(dataset_id)
+        if record is None:
+            raise core.ModelNotFound(f'Dataset no encontrado: "{dataset_id}"')
+        mode = str(dataset_spec.get("mode") or "").strip().lower()
+        task = str(dataset_spec.get("task") or "auto").strip().lower()
+        target = str(dataset_spec.get("target") or "").strip()
+        features = dataset_spec.get("features") or []
+        if not isinstance(features, list):
+            raise core.ValidationError("El campo 'features' del dataset debe ser una lista")
+        frame = record["frame"]
+        args: Dict[str, Any] = {}
+        params: Dict[str, Any] = {}
+        if mode == "datapoints":
+            built = training_datasets.build_datapoints(frame, target)
+            params = {"datapoints": built["datapoints"]}
+            summary = (
+                f"{record['name']} · {built['rows']} valores → "
+                f"datapoints desde '{built['target']}'"
+            )
+        elif mode == "xy":
+            built = training_datasets.build_xy(frame, features, target, task)
+            args = {"x": built["x"], "y": built["y"]}
+            params = training_datasets.parameter_overrides(
+                model, built["features"], built["task"], built.get("classes")
+            )
+            summary = (
+                f"{record['name']} · {built['rows']} filas · "
+                f"X: {len(built['features'])} columnas → {built['target']}"
+            )
+        else:
+            raise core.ValidationError("El modo del dataset debe ser 'xy' o 'datapoints'")
+        meta = {
+            "dataset_id": dataset_id,
+            "name": record.get("name") or "",
+            "source": record.get("source") or "",
+            "format": record.get("format") or "",
+            "mode": mode,
+            "task": built.get("task") or task,
+            "features": built.get("features") or [],
+            "target": built.get("target") or target,
+            "rows": built.get("rows") or 0,
+            "classes": built.get("classes"),
+            "summary": summary,
+        }
+        return args, params, meta
 
     def _prepare_invocation(
         self, model: Dict[str, Any], spec: Dict[str, Any], method_name: str
@@ -645,12 +839,69 @@ class TrainingStore:
                     job["log"].append(
                         {"at": iso(), "level": "warning", "message": outcome["save_error"]}
                     )
-                if job["kind"] == "fit" and outcome.get("save_bytes"):
-                    job["artifact"]["size_bytes"] = int(outcome["save_bytes"])
-                    job["artifact"]["model_id"] = job["model_id"]
-                    job["artifact"]["model_name"] = job.get("model_name") or ""
-                    job["artifact"]["method"] = job["method"]
-                    job["artifact"]["created_at"] = iso()
+                if outcome.get("save_warning"):
+                    job["log"].append(
+                        {"at": iso(), "level": "warning", "message": outcome["save_warning"]}
+                    )
+                if outcome.get("save_method"):
+                    job["log"].append(
+                        {
+                            "at": iso(),
+                            "level": "info",
+                            "message": f"Artefacto guardado con {outcome['save_method']}",
+                        }
+                    )
+                if job["kind"] == "fit":
+                    artifact_dir = str((job.get("artifact") or {}).get("path") or "")
+                    if artifact_dir:
+                        folder = Path(artifact_dir)
+                        size, files = artifact_stats(folder)
+                        load_path = str(outcome.get("load_path") or "")
+                        if not load_path and files:
+                            load_path = artifact_dir
+                        try:
+                            folder.mkdir(parents=True, exist_ok=True)
+                            loader_name = ""
+                            try:
+                                model_entry = self._find_model(job["model_id"])
+                                loader_name = core.resolve_loader(model_entry).get("name") or ""
+                            except core.APIError:
+                                pass
+                            metadata = {
+                                "artifact_id": job["artifact"].get("artifact_id"),
+                                "job_id": job["job_id"],
+                                "model_id": job["model_id"],
+                                "model_name": job.get("model_name") or "",
+                                "method": job["method"],
+                                "parameters": artifact_parameters(job.get("parameters") or {}),
+                                "created_at": iso(),
+                                "load_path": load_path,
+                                "loader": loader_name,
+                                "files": files,
+                                "size_bytes": size,
+                            }
+                            _atomic_write(
+                                folder / "artifact.json",
+                                json.dumps(metadata, ensure_ascii=False, indent=2),
+                            )
+                            size, files = artifact_stats(folder)
+                        except OSError as exc:
+                            job["log"].append(
+                                {
+                                    "at": iso(),
+                                    "level": "warning",
+                                    "message": f"No se pudo escribir artifact.json: {exc}",
+                                }
+                            )
+                        job["artifact"]["size_bytes"] = size
+                        job["artifact"]["files"] = files
+                        job["artifact"]["load_path"] = load_path or artifact_dir
+                        job["artifact"]["save_method"] = outcome.get("save_method") or ""
+                        job["artifact"]["metadata_path"] = str(folder / "artifact.json")
+                        job["artifact"]["model_id"] = job["model_id"]
+                        job["artifact"]["model_name"] = job.get("model_name") or ""
+                        job["artifact"]["method"] = job["method"]
+                        job["artifact"]["created_at"] = iso()
                 self._persist_locked()
         except core.APIError as exc:
             with self._lock:
@@ -684,13 +935,27 @@ class TrainingStore:
         save_path = str((job.get("artifact") or {}).get("path") or "")
         if not save_path:
             raise core.ValidationError("El trabajo no tiene una ruta de artefacto")
+        parameters = dict(job["parameters"])
+        arguments = dict(job["arguments"])
+        if job.get("dataset"):
+            data_args, data_params, _ = self._dataset_values(model, job["dataset"])
+            arguments.update(data_args)
+            parameters.update(data_params)
+        save_method, save_parameter = save_method_for(model)
         result = core.run_invoke(
             model,
             method,
-            dict(job["parameters"]),
-            dict(job["arguments"]),
+            parameters,
+            arguments,
             timeout=float(job["timeout_seconds"]),
             save_path=save_path,
+            save_options={
+                "method": save_method,
+                "path_parameter": save_parameter,
+                "layout": save_layout_for(model),
+                "filename": "model",
+                "pickle_name": "model.pkl",
+            },
             compile_options=dict(job.get("compile") or {}) or None,
         )
         if result.get("module"):
@@ -703,7 +968,7 @@ class TrainingStore:
         """Load an artifact (when given) and run a scoring method on the model."""
         model = self._find_model(job["model_id"])
         artifact = job["artifact"] or {}
-        path = str(artifact.get("path") or "")
+        path = str(artifact.get("load_path") or artifact.get("path") or "")
         load = None
         if path:
             loader = core.resolve_loader(model)
@@ -712,7 +977,7 @@ class TrainingStore:
                 "path": path,
                 "path_parameter": loader.get("path_parameter") or "path",
                 "requires_instance": bool(loader.get("requires_instance")),
-                "module": model["module"],
+                "module": loader.get("module") or model["module"],
             }
         method = core.find_method(model, job["method"])
         if method is None:
@@ -776,18 +1041,15 @@ class TrainingStore:
             if job["kind"] == "fit" and isinstance(job.get("artifact"), dict):
                 path_value = str(job["artifact"].get("path") or "")
                 if path_value:
-                    try:
-                        target = Path(path_value)
-                        if target.is_file():
-                            target.unlink()
-                            deleted_artifact = True
-                        job["artifact"].pop("size_bytes", None)
-                    except OSError as exc:
+                    deleted_artifact = remove_artifact(Path(path_value))
+                    for key in ("size_bytes", "files", "load_path", "save_method", "metadata_path"):
+                        job["artifact"].pop(key, None)
+                    if not deleted_artifact:
                         job["log"].append(
                             {
                                 "at": iso(),
                                 "level": "warning",
-                                "message": f"No se pudo borrar el artefacto: {exc}",
+                                "message": "No se pudo borrar el artefacto",
                             }
                         )
             del self._jobs[job["job_id"]]
@@ -821,7 +1083,7 @@ class TrainingStore:
                 record = dict(artifact)
                 record["job_id"] = job["job_id"]
                 record["status"] = (
-                    "ok" if Path(str(record.get("path") or "")).is_file() else "missing"
+                    "ok" if Path(str(record.get("path") or "")).exists() else "missing"
                 )
                 found.append(record)
         found.sort(key=lambda item: item.get("created_at") or "", reverse=True)
@@ -842,14 +1104,17 @@ class TrainingStore:
                     or str(artifact.get("artifact_id") or "") != wanted
                 ):
                     continue
-                path = Path(str(artifact.get("path") or ""))
-                if path.is_file():
-                    try:
-                        path.unlink()
-                        deleted = True
-                    except OSError as exc:
-                        job["log"].append({"at": iso(), "level": "warning", "message": str(exc)})
-                artifact.pop("size_bytes", None)
+                deleted = remove_artifact(Path(str(artifact.get("path") or "")))
+                for key in ("size_bytes", "files", "load_path", "save_method", "metadata_path"):
+                    artifact.pop(key, None)
+                if not deleted:
+                    job["log"].append(
+                        {
+                            "at": iso(),
+                            "level": "warning",
+                            "message": "No se pudo borrar el artefacto",
+                        }
+                    )
                 break
         return {"id": wanted, "deleted": deleted}
 

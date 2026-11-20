@@ -11,12 +11,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 import server_core as core
 import training_core
+import training_datasets
 
 #: Tags used by the OpenAPI document.
 TRAINING_TAG = "training"
@@ -74,6 +75,13 @@ class TrainingRequest(BaseModel):
     compile_options: Optional[Dict[str, Any]] = Field(
         default=None, description="Alias de ``compile``."
     )
+    dataset: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description=(
+            "Referencia de dataset: dataset_id, mode ('xy'/'datapoints'), "
+            "features, target y task."
+        ),
+    )
     timeout: Optional[float] = Field(
         default=None, description="Segundos máximos (por defecto LM_TRAINING_TIMEOUT)."
     )
@@ -90,6 +98,12 @@ class TrainingRequest(BaseModel):
         return data
 
 
+class DatasetURLRequest(BaseModel):
+    """Body of ``POST /api/training/datasets/inspect``."""
+
+    url: str = Field(default="", description="URL HTTP(S) de un CSV, XLSX o Parquet.")
+
+
 def _job_brief(job: Dict[str, Any]) -> Dict[str, Any]:
     """Small job projection used by lists and filters."""
     artifact = job.get("artifact") or {}
@@ -102,6 +116,7 @@ def _job_brief(job: Dict[str, Any]) -> Dict[str, Any]:
         "model_name": job.get("model_name") or job.get("model_id") or "",
         "method": job.get("method") or "",
         "adapter": job.get("adapter") or "",
+        "dataset_name": (job.get("dataset") or {}).get("name") or "",
         "created_at": job.get("created_at") or "",
         "started_at": job.get("started_at"),
         "finished_at": job.get("finished_at"),
@@ -128,6 +143,7 @@ def _job_payload(settings: Any, job: Dict[str, Any]) -> Dict[str, Any]:
         "model_name": job.get("model_name") or job.get("model_id") or "",
         "method": job.get("method") or "",
         "adapter": job.get("adapter") or "",
+        "dataset": job.get("dataset"),
         "arguments": dict(job.get("arguments") or {}),
         "parameters": dict(job.get("parameters") or {}),
         "compile": dict(job.get("compile") or {}),
@@ -151,8 +167,8 @@ def _job_payload(settings: Any, job: Dict[str, Any]) -> Dict[str, Any]:
     if artifact:
         path = str(artifact.get("path") or "")
         # Artifacts live under ``LM_TRAINING_STORE`` (outside ``web/``), so the
-        # browser asset resolver cannot see them: check the file itself.
-        payload["artifact"]["exists"] = Path(path).is_file() if path else False
+        # browser asset resolver cannot see them: check the path itself.
+        payload["artifact"]["exists"] = Path(path).exists() if path else False
     catalog_model = None
     for item in settings.catalog:
         if item.get("id") == job.get("model_id"):
@@ -210,6 +226,8 @@ def build_router() -> APIRouter:
             if fit is None:
                 continue
             example = training_core.training_example(model)
+            dataset_mode = training_core.training_dataset_mode(model)
+            dataset_task = training_core.training_dataset_task(model)
             model_parameters = model.get("parameters") or []
             constructor_fields = [p.get("name") for p in model_parameters if not p.get("variadic")]
             method_fields = [
@@ -228,10 +246,40 @@ def build_router() -> APIRouter:
                     "method_fields": method_fields,
                     "constructor_fields": constructor_fields,
                     "example": example,
+                    "dataset_mode": dataset_mode,
+                    "dataset_task": dataset_task,
                 }
             )
         rows.sort(key=lambda item: item["name"].lower())
         return _no_store({"success": True, "count": len(rows), "models": rows})
+
+    @router.post("/api/training/datasets/inspect", tags=[TRAINING_TAG])
+    def inspect_dataset(
+        body: DatasetURLRequest, settings: Any = Depends(get_settings)
+    ) -> JSONResponse:
+        """Download and inspect a CSV/XLSX/Parquet URL."""
+        require_training(settings)
+        frame, name, source, fmt = training_datasets.load_url(body.url)
+        dataset = settings.training.datasets.put(name, frame, source, fmt)
+        return _no_store({"success": True, "dataset": dataset})
+
+    @router.post("/api/training/datasets/upload", tags=[TRAINING_TAG])
+    async def upload_dataset(
+        file: UploadFile = File(...), settings: Any = Depends(get_settings)
+    ) -> JSONResponse:
+        """Upload and inspect a CSV/XLSX/Parquet file."""
+        require_training(settings)
+        data = await file.read(training_datasets.MAX_BYTES + 1)
+        if len(data) > training_datasets.MAX_BYTES:
+            raise core.ValidationError(
+                f"El dataset supera el máximo de "
+                f"{training_datasets.MAX_BYTES // (1024 * 1024)} MiB"
+            )
+        frame, name, source, fmt = training_datasets.load_bytes(
+            data, file.filename or "dataset.csv"
+        )
+        dataset = settings.training.datasets.put(name, frame, source, fmt)
+        return _no_store({"success": True, "dataset": dataset})
 
     @router.get("/api/training/jobs", tags=[TRAINING_TAG])
     def list_jobs(

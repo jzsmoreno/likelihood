@@ -117,7 +117,10 @@ The API usage tab is generated from the deployed method (`GET
 /api/serving/endpoints/<id>/docs`): Python, cURL, JavaScript and raw HTTP samples, the
 real parameter schema, the payload example, the expected response and the Bearer
 token instructions when `LM_API_TOKEN` protects the API. Samples and copy buttons are
-dynamic; there is no hardcoded model or endpoint name.
+dynamic; there is no hardcoded model or endpoint name. The payload example is shaped
+from the deployment's constructor parameters and, for loaded endpoints, from the
+artifact metadata or the loaded instance's public scalar attributes, so the Probar
+JSON uses the model's real feature count in both modes.
 
 #### Model instances and deployments
 
@@ -244,6 +247,18 @@ derived from an episode dataset. Their docstrings state the reason.
 
 The `/training` workspace creates fit/evaluate jobs, runs them through the same
 sandboxed child interpreter and stores the resulting instance as an artifact.
+Each fit job gets its own folder under
+`data/output/training/artifacts/<artifact_id>/` with an `artifact.json` and the
+files written by the model's native `save`/`save_model` method (or a Keras /
+pickle fallback). The metadata also stores the scalar constructor parameters
+(for example `input_shape_parm` and `num_classes`) so Serving can infer the
+expected input shape without loading the artifact first. The job exposes
+`artifact.load_path`, which is the path to use
+when creating a Serving deployment; folder layouts such as
+`AutoClassifier` components and `EnsembleClassifier` directories are preserved.
+The legacy `AutoClassifier.load()` object exposes `predict`; Serving maps the
+catalog's `call`/`forward` aliases to it when the loaded class does not define
+them.
 `GET /api/training/models` lists the catalog models that can be trained. Models
 whose required constructor fields cannot be sent as JSON (for example `AutoQL`,
 which needs live `env`/`model` objects) are omitted from the selector.
@@ -252,6 +267,31 @@ The job wizard can load curated examples: `AutoClassifier` for classification
 (`x` 12×4, `y` with 3 classes) and `GANRegressor` for regression (`x` 8×3, `y`
 with continuous targets). The examples also fill the Keras `compile` section with
 the appropriate loss/metrics.
+
+Datasets can be loaded from an uploaded CSV, XLSX or Parquet file, or from an
+HTTP(S) URL (`POST /api/training/datasets/inspect` and
+`POST /api/training/datasets/upload`). The wizard previews the first rows and
+lets you select the numeric
+X columns plus the Y/target column (or a single `datapoints` column for models
+such as `Arima` and `FourierRegression`). Text classification labels are encoded
+as integers and the class mapping is shown in the job. The parsed dataset stays
+on the server; the job stores only a compact reference and the column selection,
+so large files (for example the 20k-row housing dataset) do not bloat
+`jobs.json`.
+
+Validated dataset examples:
+
+```text
+https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv
+  AutoClassifier: 150 rows, 4 X columns → species (3 classes)
+
+https://raw.githubusercontent.com/ageron/handson-ml2/master/datasets/housing/housing.csv
+  GANRegressor: 20,433 valid rows, 8 X columns → median_house_value
+```
+
+Set `LM_TRAINING_DATASET_BYTES`, `LM_TRAINING_DATASET_ROWS`,
+`LM_TRAINING_DATASET_COLUMNS` or `LM_TRAINING_DATASETS` to tune the upload size,
+row/column limits and the number of datasets kept in memory.
 
 The AST catalog cannot see methods inherited from external frameworks, so
 `keras.Model.fit` is not part of `model["methods"]`. The training server adds a
@@ -281,7 +321,8 @@ and then calls the inherited `fit`. A job can override the defaults:
 
 `compile` is merged over the server defaults; `force: true` recompiles a model
 that is already compiled. The Keras training history is stored in the job result
-and shown in the training detail page. PyTorch models in the catalog (for example
+and shown in the training detail page with a compact metrics monitor and a
+loss-per-epoch chart. PyTorch models in the catalog (for example
 `MultiBanditNet`) do not define `fit`; use their native `forward`/training methods
 instead, because a generic optimizer/loss cannot be inferred from the model alone.
 
@@ -501,9 +542,14 @@ curl -s 'localhost:8000/api/monitoring/overview?range=24h'
 
 A deployment created with `load.enabled=true` stores the loader and path, calls the
 existing saved-model loader during deployment, and uses that loaded instance for
-every prediction. `loaded_artifact` in the endpoint payload records the loader, path,
-type and load time. Set `LM_API_TOKEN` to require `Authorization: Bearer <token>` on
-every serving and monitoring route (the generated docs include the header).
+every prediction. The path may be a `.pkl`, `.keras`, `.h5`, `.zip` file or a
+component directory; an adjacent `config.json`/`artifact.json` is **not** required
+to load it — those files are only used to infer constructor values for the payload
+example. If a declared loader cannot consume a bare `.pkl` or `.keras` file, the
+sandbox makes a last-resort direct pickle/Keras load. `loaded_artifact` in the
+endpoint payload records the loader, path, type and load time. Set `LM_API_TOKEN`
+to require `Authorization: Bearer <token>` on every serving and monitoring route
+(the generated docs include the header).
 
 ### Long running calls
 
@@ -548,6 +594,7 @@ python3 -m pytest tests/test_server_core.py -v    # catalog, coercion and invoke
 python3 -m pytest tests/test_server_fastapi.py -v # FastAPI server, API and playground
 python3 -m pytest tests/test_serving.py -v        # serving lifecycle, inference, docs and monitoring
 python3 -m pytest tests/test_training.py -v       # training jobs, constructor resolution and artifacts
+python3 -m pytest tests/test_training_datasets.py -v # CSV/XLSX/Parquet loading and column selection
 python3 -m pytest tests/test_hmm.py -v            # model tests (requires the full extras)
 ```
 

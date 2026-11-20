@@ -214,6 +214,13 @@ def _stats_by_endpoint(events: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]
     }
 
 
+def _example_parameters(
+    model: Optional[Dict[str, Any]], deployment: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Compatibility wrapper around :func:`serving_core.example_parameters`."""
+    return serving_core.example_parameters(deployment, model or {})
+
+
 def deployment_payload(
     settings: Any,
     deployment: Dict[str, Any],
@@ -228,7 +235,7 @@ def deployment_payload(
     if model is not None:
         method = core.find_method(model, deployment["method"])
     fields = (
-        core.method_fields(method, deployment.get("parameters") or {})
+        core.method_fields(method, _example_parameters(model, deployment))
         if method is not None
         else list(deployment.get("method_fields") or [])
     )
