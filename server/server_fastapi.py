@@ -14,7 +14,7 @@ Endpoints
 ---------
 The routes are the same as the previous standard-library implementation::
 
-    GET    /                          the interactive catalogue (models/index.html)
+    GET    /                          the interactive catalogue (web/index.html)
     GET    /preview/<model_id>        server rendered HTML preview of a model
     GET    /api/health                liveness probe, counters, metrics and jobs
     GET    /api/metrics               the same counters in Prometheus text format
@@ -91,8 +91,8 @@ Running
 -------
 ::
 
-    python3 server_fastapi.py                       # uses uvicorn
-    uvicorn server_fastapi:app --host 0.0.0.0 --port 8000
+    python3 server/server_fastapi.py                       # uses uvicorn
+    uvicorn server_fastapi:app --app-dir server --host 0.0.0.0 --port 8000
 
 ``uvicorn`` is an optional dependency: install it with ``pip install
 likelihood[server]`` (or ``pip install "fastapi[standard]" uvicorn``).
@@ -1730,7 +1730,7 @@ def build_router() -> APIRouter:
 
     @router.get("/", tags=["pages"])
     def index(request: Request) -> Response:
-        """Load the interactive catalogue shipped in ``models/index.html``."""
+        """Load the interactive catalogue shipped in ``web/index.html``."""
         return serve_asset(core.INDEX_FILE, request)
 
     @router.get("/index.html", tags=["pages"])
@@ -1814,7 +1814,7 @@ def build_router() -> APIRouter:
 
     @router.get("/{asset_path:path}", tags=["pages"])
     def static_asset(asset_path: str, request: Request) -> Response:
-        """Any other path is resolved inside ``models/`` (traversal proof)."""
+        """Any other path is resolved inside ``web/`` (traversal proof)."""
         asset = core.resolve_asset("/" + asset_path)
         if asset is None:
             return html_error(404, "No encontrado", f'No existe el recurso "/{asset_path}".')

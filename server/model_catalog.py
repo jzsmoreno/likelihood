@@ -25,8 +25,8 @@ Usage
 
 CLI::
 
-    python3 model_catalog.py --list
-    python3 model_catalog.py --json
+    python3 server/model_catalog.py --list
+    python3 server/model_catalog.py --json
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-REPO_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PACKAGE_DIR = REPO_ROOT / "likelihood" / "models"
 
 # Presentation-only metadata.  Categories themselves are discovered from the

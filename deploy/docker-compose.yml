@@ -1,8 +1,8 @@
 # Likelihood model catalog.
 #
-#   docker compose up --build            # http://localhost:8000
-#   LM_API_TOKEN=secret docker compose up --build
-#   LM_PORT=9000 docker compose up       # container and published port
+#   docker compose -f deploy/docker-compose.yml up --build            # http://localhost:8000
+#   LM_API_TOKEN=secret docker compose -f deploy/docker-compose.yml up --build
+#   LM_PORT=9000 docker compose -f deploy/docker-compose.yml up       # container and published port
 #
 # Every value can also be exported in the shell or written to a `.env` file next
 # to this compose file (Compose reads it automatically).
@@ -12,7 +12,8 @@ name: likelihood-catalog
 services:
   catalog:
     build:
-      context: .
+      context: ..
+      dockerfile: deploy/Dockerfile
       args:
         # "true" adds tensorflow, torch, keras-tuner, scikit-learn, pyvis.
         INSTALL_FULL_EXTRAS: "${INSTALL_FULL_EXTRAS:-true}"
@@ -50,7 +51,7 @@ services:
       # Live catalog: editing a model source refreshes the catalogue without
       # rebuilding the image (LM_CATALOG_TTL controls how often it is checked).
       # Read-only because the server only introspects the sources.
-      - ./likelihood/models:/app/likelihood/models:ro
+      - ../likelihood/models:/app/likelihood/models:ro
       # Saved models for POST /api/models/<id>/load and the "Cargar y usar"
       # panel. Pair it with LM_LOAD_ROOT=/models and LM_LOAD_RESTRICT=1.
       # - ./saved-models:/models:ro

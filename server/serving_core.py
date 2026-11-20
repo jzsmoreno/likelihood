@@ -43,7 +43,7 @@ LOGGER = logging.getLogger("likelihood.serving")
 #: Directory that keeps ``deployments.json`` and ``events.jsonl``.  Tests inject a
 #: temporary directory; production can point ``LM_SERVING_STORE`` to a volume.
 STORE_DIR = Path(
-    os.environ.get("LM_SERVING_STORE") or (core.REPO_ROOT / "output" / "serving")
+    os.environ.get("LM_SERVING_STORE") or (core.REPO_ROOT / "data" / "output" / "serving")
 ).expanduser()
 
 #: Maximum number of requests kept in memory and replayed on startup.

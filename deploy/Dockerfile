@@ -2,16 +2,16 @@
 #
 # Likelihood model catalog.
 #
-# The server introspects the package sources with `model_catalog.py` at runtime,
+# The server introspects the package sources with `server/model_catalog.py` at runtime,
 # so the repository is copied into the image (there is no build step) and the
 # catalog is re-introspected whenever a model file changes (`LM_CATALOG_TTL`).
 #
-# Build:
-#   docker build -t likelihood-catalog .
+# Build (from the repository root, so the build context keeps the sources):
+#   docker build -f deploy/Dockerfile -t likelihood-catalog .
 #   docker run --rm -p 8000:8000 likelihood-catalog
 #
 # Models that need TensorFlow, PyTorch, Keras Tuner or scikit-learn are optional:
-#   docker build --build-arg INSTALL_FULL_EXTRAS=true -t likelihood-catalog:full .
+#   docker build -f deploy/Dockerfile --build-arg INSTALL_FULL_EXTRAS=true -t likelihood-catalog:full .
 
 FROM python:3.12-slim AS runtime
 
@@ -23,6 +23,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     HOME=/home/likelihood \
+    PYTHONPATH=/app/server \
     LM_HOST=0.0.0.0 \
     LM_PORT=8000
 
@@ -71,4 +72,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
     CMD python -c "import json,os,urllib.request; port=os.environ.get('LM_PORT','8000'); r=urllib.request.urlopen('http://127.0.0.1:'+port+'/api/health', timeout=4); raise SystemExit(0 if json.load(r).get('status')=='ok' else 1)"
 
 # LM_HOST / LM_PORT are the defaults of the CLI, so `-e LM_PORT=9000` works.
-CMD ["python", "server_fastapi.py"]
+CMD ["python", "server/server_fastapi.py"]

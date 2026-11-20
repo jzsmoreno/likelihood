@@ -138,10 +138,10 @@ errores_d401.txt
 pytest_output.txt
 
 # Model Serving runtime store (deployments.json + events.jsonl)
-/output/serving/
+/data/output/serving/
 
 # Model Training runtime store (jobs.json + artifacts/*.pkl)
-/output/training/
+/data/output/training/
 
 # Ignore <files>.png for testing
 /examples/*.png

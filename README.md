@@ -27,43 +27,59 @@ You can check the [examples](https://github.com/jzsmoreno/likelihood/tree/main/e
 
 More examples will be added soon.
 
+## Repository layout
+
+```text
+likelihood/          # installable machine-learning package
+server/              # FastAPI catalogue and its domain layers
+web/                 # browser assets served by the catalogue
+data/
+  notebooks/         # generated Jupyter notebooks
+  output/            # runtime stores (serving events, training artifacts)
+deploy/              # Dockerfile and docker-compose.yml
+tests/               # pytest suites
+examples/            # example notebooks
+docs/                # generated API documentation
+```
+
 ## Model catalog web server
 
-The repository includes a FastAPI catalogue (`server_fastapi.py`) backed by the
-shared domain layer in `server_core.py`, which introspects the package sources
-through `model_catalog.py`. Nothing is hardcoded: the model list, signatures,
-parameters, methods, examples and notebooks are all derived from the real
-implementation.
+The repository includes a FastAPI catalogue (`server/server_fastapi.py`) backed by
+the shared domain layer in `server/server_core.py`, which introspects the package
+sources through `server/model_catalog.py`. Nothing is hardcoded: the model list,
+signatures, parameters, methods, examples and notebooks are all derived from the
+real implementation.
 
 Install the optional server dependencies and start it:
 
 ```bash
-pip install "likelihood[server]"              # fastapi + uvicorn
-uvicorn server_fastapi:app --port 8000        # http://127.0.0.1:8000
-python3 server_fastapi.py --port 8080 -v      # custom port, log every request
-python3 server_fastapi.py --list              # print the catalog and exit
-python3 server_fastapi.py --version           # package version and exit
+pip install "likelihood[server]"                              # fastapi + uvicorn
+uvicorn server_fastapi:app --app-dir server --port 8000       # http://127.0.0.1:8000
+python3 server/server_fastapi.py --port 8080 -v               # custom port, log every request
+python3 server/server_fastapi.py --list                       # print the catalog and exit
+python3 server/server_fastapi.py --version                    # package version and exit
 ```
 
 The browser UI is available at `/`, `/preview/<model_id>`, `/serving` and
 `/monitoring` (plus `/serving/<endpoint_id>` and `/monitoring/<endpoint_id>`).
 `/docs` is the FastAPI Swagger UI and `/api/openapi.json` the generated OpenAPI
-document. Assets live in `models/` and are served with `ETag` and `Cache-Control`
+document. Assets live in `web/` and are served with `ETag` and `Cache-Control`
 headers.
 
 The interface follows one design system inspired by the Databricks platform:
 
 | File | Purpose |
 | --- | --- |
-| `models/app.css` | Shared design tokens and components (top bar, sidebar, panels, tables, badges, buttons, forms, drawer, dark theme, responsive rules). |
-| `models/index.html` | Catalog workspace: collapsible navigation, KPI tiles, table and card views, filters, an info panel for descriptions and a model details drawer. |
-| `models/catalog.js` | Catalog behaviour (search, facets, ordering, URL state, drawer). |
-| `models/preview.html`, `models/preview.css` | Model page rendered by the server from the introspection catalog. |
-| `models/preview.js` | Playground, method invocation and saved-model loading on the model page. |
-| `models/serving.html`, `models/serving.js` | Model Serving workspace: endpoint list, deployment wizard, inference playground and generated API docs. |
-| `models/monitoring.html`, `models/monitoring.js` | Model Monitoring dashboard: KPIs, latency, errors, usage and endpoint-level analytics. |
-| `models/charts.js` | Dependency-free SVG/HTML chart library (lines, stacked bars, horizontal bars, donuts). |
-| `models/platform.css` | Serving/monitoring components layered on the shared design tokens. |
+| `web/app.css` | Shared design tokens and components (top bar, sidebar, panels, tables, badges, buttons, forms, drawer, dark theme, responsive rules). |
+| `web/index.html` | Catalog workspace: collapsible navigation, KPI tiles, table and card views, filters, an info panel for descriptions and a model details drawer. |
+| `web/catalog.js` | Catalog behaviour (search, facets, ordering, URL state, drawer). |
+| `web/preview.html`, `web/preview.css` | Model page rendered by the server from the introspection catalog. |
+| `web/preview.js` | Playground, method invocation and saved-model loading on the model page. |
+| `web/serving.html`, `web/serving.js` | Model Serving workspace: endpoint list, deployment wizard, inference playground and generated API docs. |
+| `web/monitoring.html`, `web/monitoring.js` | Model Monitoring dashboard: KPIs, latency, errors, usage and endpoint-level analytics. |
+| `web/training.html`, `web/training.js` | Model Training workspace: fit/evaluate jobs, sandboxed execution, artifacts and job history. |
+| `web/charts.js` | Dependency-free SVG/HTML chart library (lines, stacked bars, horizontal bars, donuts). |
+| `web/platform.css` | Serving/monitoring components layered on the shared design tokens. |
 
 The catalog is re-introspected when a model source changes (`LM_CATALOG_TTL`), so
 editing `likelihood/models` is reflected without restarting the server.
@@ -133,7 +149,7 @@ the same instance keeps its metrics and keeps working. Manual cleanup is also
 available through `DELETE /api/serving/endpoints/<deployment_id>/metrics` (and the
 alias `DELETE /api/monitoring/endpoints/<deployment_id>/metrics`).
 
-Deployments and events are persisted in `output/serving/` (override with
+Deployments and events are persisted in `data/output/serving/` (override with
 `LM_SERVING_STORE`). `deployments.json` survives a restart; the event log is a bounded
 JSONL file that is rotated when it grows beyond 16 MiB. Inference runs in short-lived
 child processes, so per-endpoint CPU/GPU sampling is not available: the resources panel
@@ -226,20 +242,20 @@ derived from an episode dataset. Their docstrings state the reason.
 
 ### Docker
 
-The `Dockerfile` bundles the server, the scientific stack and the catalog
-sources; `docker-compose.yml` runs it with the usual `LM_*` settings.
+`deploy/Dockerfile` bundles the server, the scientific stack and the catalog
+sources; `deploy/docker-compose.yml` runs it with the usual `LM_*` settings.
 
 ```bash
-docker build -t likelihood-catalog .
+docker build -f deploy/Dockerfile -t likelihood-catalog .
 docker run --rm -p 8000:8000 likelihood-catalog     # http://localhost:8000
 
 # Optional: models that need TensorFlow / PyTorch / scikit-learn
-docker build --build-arg INSTALL_FULL_EXTRAS=true -t likelihood-catalog:full .
+docker build -f deploy/Dockerfile --build-arg INSTALL_FULL_EXTRAS=true -t likelihood-catalog:full .
 
 # Compose (reads a local .env file, if present)
-docker compose up --build
-LM_API_TOKEN=change-me docker compose up --build     # protected /api
-LM_PORT=9000 docker compose up                       # container + published port
+docker compose -f deploy/docker-compose.yml up --build
+LM_API_TOKEN=change-me docker compose -f deploy/docker-compose.yml up --build     # protected /api
+LM_PORT=9000 docker compose -f deploy/docker-compose.yml up                       # container + published port
 ```
 
 Notes:
@@ -282,7 +298,7 @@ the equivalent `--` CLI flag). They let you secure the API or tune its behaviour
 | `LM_INVOKE` | Enable invoking model methods (still requires authentication when a token is set). | true |
 | `LM_SESSIONS` | Enable long-lived model sessions. | true |
 | `LM_SERVING` | Enable Model Serving and Model Monitoring (`0`/`--no-serving` keeps only the catalog). | true |
-| `LM_SERVING_STORE` | Directory that keeps `deployments.json` and `events.jsonl`. | `output/serving` |
+| `LM_SERVING_STORE` | Directory that keeps `deployments.json` and `events.jsonl`. | `data/output/serving` |
 | `LM_SERVING_TIMEOUT` | Default per-request timeout of a deployed endpoint, in seconds (capped by `LM_INVOKE_MAX_TIMEOUT`). | `LM_INVOKE_TIMEOUT` |
 | `LM_SERVING_CONCURRENCY` | Default simultaneous predictions per endpoint. | 1 |
 | `LM_SERVING_DEPLOY_TIMEOUT` | Seconds the background saved-model validation/load may take. | 600 |
@@ -316,22 +332,22 @@ flags can also be passed directly to `uvicorn`:
 
 ```bash
 # Prefer the API token over any LM_API_TOKEN set in the shell
-python3 server_fastapi.py --token <my-secret-token>
+python3 server/server_fastapi.py --token <my-secret-token>
 
 # Allow the frontend on *.example.com (overrides LM_CORS_ORIGINS)
-python3 server_fastapi.py --cors-origin http://*.example.com
+python3 server/server_fastapi.py --cors-origin http://*.example.com
 
 # Rate limit every client to 60 requests/minute (overrides LM_RATE_LIMIT)
-python3 server_fastapi.py --rate-limit 60
+python3 server/server_fastapi.py --rate-limit 60
 
 # Trust the reverse proxy (overrides LM_TRUST_PROXY)
-python3 server_fastapi.py --trust-proxy
+python3 server/server_fastapi.py --trust-proxy
 
 # Disable the playground and invoke (overrides LM_PLAYGROUND=0 / LM_INVOKE=0)
-python3 server_fastapi.py --no-playground --no-invoke
+python3 server/server_fastapi.py --no-playground --no-invoke
 
 # Disable gzip compression (overrides LM_GZIP_MIN_BYTES=0)
-python3 server_fastapi.py --no-compression
+python3 server/server_fastapi.py --no-compression
 ```
 
 The negated flags (`--no-playground`, `--no-invoke`, `--no-serving`) turn a feature
@@ -471,10 +487,10 @@ When `LM_API_TOKEN` is set, every `/api` route requires a valid bearer token.
 Notebooks are generated from the same introspection catalog:
 
 ```bash
-python3 notebook_generator.py --all
-python3 notebook_generator.py --single Arima
-python3 notebook_generator.py --category deep
-python3 notebook_generator.py --list
+python3 server/notebook_generator.py --all
+python3 server/notebook_generator.py --single Arima
+python3 server/notebook_generator.py --category deep
+python3 server/notebook_generator.py --list
 ```
 
 Each notebook includes the documentation, the parameter table, an executable
@@ -486,6 +502,7 @@ example and `ipywidgets` controls derived from the constructor signature.
 python3 -m pytest tests/test_server_core.py -v    # catalog, coercion and invoke helpers
 python3 -m pytest tests/test_server_fastapi.py -v # FastAPI server, API and playground
 python3 -m pytest tests/test_serving.py -v        # serving lifecycle, inference, docs and monitoring
+python3 -m pytest tests/test_training.py -v       # training jobs, constructor resolution and artifacts
 python3 -m pytest tests/test_hmm.py -v            # model tests (requires the full extras)
 ```
 

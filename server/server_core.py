@@ -8,8 +8,8 @@ FastAPI application in :mod:`server_fastapi` builds its routes on top of it.
 The standard-library HTTP server that used to live here was removed; run the
 catalogue with :mod:`server_fastapi` instead::
 
-    uvicorn server_fastapi:app
-    python3 server_fastapi.py
+    uvicorn server_fastapi:app --app-dir server
+    python3 server/server_fastapi.py
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from urllib.parse import quote, unquote
 from model_catalog import DEFAULT_PACKAGE_DIR, REPO_ROOT, build_catalog, category_meta, guess_widget
 
 LOGGER = logging.getLogger("likelihood.server")
-ASSETS_DIR = REPO_ROOT / "models"
+ASSETS_DIR = REPO_ROOT / "web"
 PREVIEW_TEMPLATE = ASSETS_DIR / "preview.html"
 INDEX_FILE = ASSETS_DIR / "index.html"
 
@@ -64,7 +64,7 @@ MAX_BODY_BYTES = 1_048_576
 BODY_CHUNK_BYTES = 65_536
 #: Largest page returned by ``GET /api/models``.
 MAX_PAGE_SIZE = 200
-#: ``Cache-Control`` used for the static assets under ``models/``.
+#: ``Cache-Control`` used for the static assets under ``web/``.
 STATIC_CACHE_CONTROL = "public, max-age=300, must-revalidate"
 #: ``Cache-Control`` used for the JSON endpoints derived from the catalog.
 API_CACHE_CONTROL = os.environ.get("LM_API_CACHE_CONTROL") or "public, max-age=60, must-revalidate"

@@ -17,12 +17,12 @@ Usage
 -----
 Generate every notebook::
 
-    python3 notebook_generator.py --all
+    python3 server/notebook_generator.py --all
 
 Generate a single model, or a whole category::
 
-    python3 notebook_generator.py --single Arima
-    python3 notebook_generator.py --category deep
+    python3 server/notebook_generator.py --single Arima
+    python3 server/notebook_generator.py --category deep
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ from model_catalog import (
     summarize,
 )
 
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "notebooks"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "data" / "notebooks"
 NOTEBOOK_FORMAT = 4
 NOTEBOOK_FORMAT_MINOR = 5
 KERNEL_DISPLAY_NAME = "Python 3 (likelihood library)"

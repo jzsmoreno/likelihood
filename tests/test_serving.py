@@ -23,7 +23,9 @@ from pathlib import Path
 import httpx
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SERVER_DIR = REPO_ROOT / "server"
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(SERVER_DIR))
 
 import monitoring_core  # noqa: E402
 import server_fastapi  # noqa: E402

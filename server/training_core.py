@@ -43,7 +43,7 @@ LOGGER = logging.getLogger("likelihood.training")
 #: Directory that keeps ``jobs.json`` and the ``artifacts/`` folder.  Tests inject a
 #: temporary directory; production can point ``LM_TRAINING_STORE`` to a volume.
 STORE_DIR = Path(
-    os.environ.get("LM_TRAINING_STORE") or (core.REPO_ROOT / "output" / "training")
+    os.environ.get("LM_TRAINING_STORE") or (core.REPO_ROOT / "data" / "output" / "training")
 ).expanduser()
 
 #: Seconds a fitting call may spend before the sandbox kills the child.

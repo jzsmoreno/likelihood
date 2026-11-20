@@ -22,7 +22,7 @@ dist
 
 # Not needed by the running server
 docs
-notebooks
+data
 tests
 
 # Local configuration, secrets and logs
@@ -31,6 +31,6 @@ tests
 *.log
 
 # Container files themselves
-Dockerfile
-docker-compose*.yml
+deploy/Dockerfile
+deploy/docker-compose*.yml
 .dockerignore

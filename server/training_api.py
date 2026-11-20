@@ -136,7 +136,7 @@ def _job_payload(settings: Any, job: Dict[str, Any]) -> Dict[str, Any]:
     payload["artifact"] = dict(artifact) if artifact else None
     if artifact:
         path = str(artifact.get("path") or "")
-        # Artifacts live under ``LM_TRAINING_STORE`` (outside ``models/``), so the
+        # Artifacts live under ``LM_TRAINING_STORE`` (outside ``web/``), so the
         # browser asset resolver cannot see them: check the file itself.
         payload["artifact"]["exists"] = Path(path).is_file() if path else False
     catalog_model = None
