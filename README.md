@@ -268,6 +268,39 @@ The job wizard can load curated examples: `AutoClassifier` for classification
 with continuous targets). The examples also fill the Keras `compile` section with
 the appropriate loss/metrics.
 
+For Keras fits, the optional `control` field enables a predefined target metric
+(`loss`, `val_loss`, `accuracy`, `val_accuracy`, `precision`, `val_precision`,
+`recall`, `val_recall`, `f1_score`, `val_f1_score`, `mae`, `val_mae`,
+`mean_absolute_percentage_error`/`mape`, etc.). The
+action can stop at a target value (the target callback stops as soon as the
+metric reaches it), reduce the learning rate on a plateau (`ReduceLROnPlateau`),
+or do both. The wizard exposes it as an opt-in checkbox, with a `max_epochs`
+budget (50 by default) so the callback has time to act; a normal Keras fit is
+unchanged unless the control is enabled.
+
+Dataset classification labels are factorized to integer codes (`0..n-1`); they
+are **not** one-hot encoded. The default Keras compilation therefore uses
+`sparse_categorical_crossentropy` for multiclass targets. Direct
+`arguments.y` values are passed through as JSON data, so use integer class
+labels for the sparse loss or send one-hot targets only with
+`categorical_crossentropy` explicitly.
+
+The training form can normalize input features before `fit` with `standard`
+(z-score), `minmax` (0..1) or `minmax_symmetric` (-1..1). Normalization applies
+to `x`/`X` and `datapoints`.
+
+Regression targets can be normalized too with `target_normalization`
+(`auto`, `none`, `standard`, `minmax`, `minmax_symmetric`). `auto` (the default)
+reuses the feature method when the resolved task is a regression, so one
+selection scales both sides; classification labels are never scaled. The job and
+`artifact.json` store the scaler under `target_normalization`, because a saved
+regressor predicts in normalized units. Invert with
+`y = prediction * std + mean` (`standard`),
+`y = prediction * (max - min) + min` (`minmax`) or
+`y = (prediction + 1) / 2 * (max - min) + min` (`minmax_symmetric`). A
+multi-output regression stores one entry per output under
+`target_normalization.columns`.
+
 Datasets can be loaded from an uploaded CSV, XLSX or Parquet file, or from an
 HTTP(S) URL (`POST /api/training/datasets/inspect` and
 `POST /api/training/datasets/upload`). The wizard previews the first rows and
@@ -293,13 +326,22 @@ Set `LM_TRAINING_DATASET_BYTES`, `LM_TRAINING_DATASET_ROWS`,
 `LM_TRAINING_DATASET_COLUMNS` or `LM_TRAINING_DATASETS` to tune the upload size,
 row/column limits and the number of datasets kept in memory.
 
+A training child is bounded by the wall-clock `LM_TRAINING_TIMEOUT` (60 s by
+default) and, unlike a playground run, is **not** subject to the playground CPU
+cap (`LM_PLAYGROUND_CPU`, 30 s by default). `RLIMIT_CPU` counts CPU time across
+every TensorFlow thread, so that cap could kill a multi-threaded fit with exit
+code `-24` (`SIGXCPU`) long before its wall-clock budget, leaving no artifact.
+Set `LM_TRAINING_CPU` to re-enable a CPU cap for training children (`0`, the
+default, disables it).
+
 The AST catalog cannot see methods inherited from external frameworks, so
 `keras.Model.fit` is not part of `model["methods"]`. The training server adds a
 small **Keras adapter** for models whose base class is `Model` (currently
 `AutoClassifier` and `GANRegressor`): it exposes a synthetic `fit(x, y, ...)`,
-compiles the model with a conservative default (`adam` + `mse`, or
-`sparse_categorical_crossentropy` + `accuracy` for a softmax/sigmoid classifier)
-and then calls the inherited `fit`. A job can override the defaults:
+compiles the model with a conservative default (`adam` + `mse` for regression, or
+`sparse_categorical_crossentropy` + `accuracy`/`precision`/`recall`/`f1_score`/`auc`
+for a softmax/sigmoid classifier) and then calls the inherited `fit`. A job can
+override the defaults:
 
 ```json
 {
@@ -314,15 +356,29 @@ and then calls the inherited `fit`. A job can override the defaults:
   "compile": {
     "optimizer": "adam",
     "loss": "sparse_categorical_crossentropy",
-    "metrics": ["accuracy"]
+    "metrics": ["accuracy", "precision", "recall", "f1_score", "auc"]
   }
 }
 ```
 
 `compile` is merged over the server defaults; `force: true` recompiles a model
 that is already compiled. The Keras training history is stored in the job result
-and shown in the training detail page with a compact metrics monitor and a
-loss-per-epoch chart. PyTorch models in the catalog (for example
+and shown in the training detail page with a compact metrics monitor, a
+loss-per-epoch chart, a metrics-per-epoch chart and a summary table (latest
+value, best value and best epoch for every metric).
+
+Classification jobs log accuracy, precision, recall, F1 and AUC by default. The
+sandbox maps those names to sparse-aware wrappers, so the same metric names work
+for binary classifiers and for multiclass classifiers trained with sparse
+integer labels (Keras' built-in precision/recall/F1/AUC expect one-hot targets).
+
+For regression, `mean_absolute_percentage_error` (alias `mape`) is available as
+a `compile.loss` and/or a `compile.metrics` entry, and the target-metric control
+offers both spellings. Keras logs the metric under the exact name used in
+`metrics`, so the control metric must match it. MAPE divides by the target
+magnitude: use it with strictly positive targets, and prefer `mae`/`mse` when
+`target_normalization` produces values around zero (for example `standard`).
+PyTorch models in the catalog (for example
 `MultiBanditNet`) do not define `fit`; use their native `forward`/training methods
 instead, because a generic optimizer/loss cannot be inferred from the model alone.
 

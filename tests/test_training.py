@@ -65,6 +65,8 @@ def captured(monkeypatch):
                 "arguments": dict(arguments),
                 "compile": kwargs.get("compile_options"),
                 "load": kwargs.get("load"),
+                "training_controls": kwargs.get("training_controls"),
+                "limits": kwargs.get("limits"),
                 "save_path": save_path,
             }
         )
@@ -126,6 +128,253 @@ def test_generic_fit_method_falls_back_to_the_declared_train_method(store, captu
     assert captured[0]["method"] == "train"
 
 
+def test_keras_target_metric_control_is_normalized_and_forwarded(store, captured):
+    """A target metric reaches the child as EarlyStopping/ReduceLROnPlateau options."""
+    job = store.start(
+        {
+            "model_id": "AutoClassifier",
+            "arguments": {
+                "x": [[0.1, 0.2, 0.3, 0.4], [0.2, 0.1, 0.4, 0.3]],
+                "y": [0, 1],
+                "epochs": 2,
+            },
+            "control": {
+                "metric": "val_loss",
+                "action": "stop",
+                "mode": "min",
+                "value": 0.2,
+                "patience": 2,
+                "min_delta": 0.01,
+            },
+        }
+    )
+
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    assert finished["control"]["metric"] == "val_loss"
+    assert finished["control"]["action"] == "stop"
+    assert finished["control"]["value"] == 0.2
+    assert finished["control"]["max_epochs"] == 50
+    assert captured[0]["training_controls"]["patience"] == 2
+    assert captured[0]["arguments"]["epochs"] == 50
+
+
+def test_training_normalization_scales_features_without_touching_targets():
+    """Standard, 0..1 and -1..1 scaling apply only to feature arguments."""
+    arguments = {"x": [[0.0, 1.0], [2.0, 3.0]], "y": [1, 2]}
+    standard_args, _ = training_core.apply_normalization(arguments, {}, "standard")
+    assert standard_args["x"] == [[-1.0, -1.0], [1.0, 1.0]]
+    assert standard_args["y"] == [1, 2]
+
+    minmax_args, _ = training_core.apply_normalization(arguments, {}, "minmax")
+    assert minmax_args["x"] == [[0.0, 0.0], [1.0, 1.0]]
+
+    symmetric_args, _ = training_core.apply_normalization(arguments, {}, "minmax_symmetric")
+    assert symmetric_args["x"] == [[-1.0, -1.0], [1.0, 1.0]]
+    assert symmetric_args["y"] == [1, 2]
+
+
+def test_training_normalization_rejects_unknown_methods():
+    with pytest.raises(training_core.core.ValidationError):
+        training_core.normalization_method("unknown")
+
+
+def test_training_normalization_is_applied_to_job_arguments(store, captured):
+    """The normalized values reach the sandbox, not just the UI preview."""
+    job = store.start(
+        {
+            "model_id": "AutoClassifier",
+            "arguments": {
+                "x": [[0.0, 1.0, 2.0, 3.0], [2.0, 3.0, 4.0, 5.0]],
+                "y": [0, 1],
+            },
+            "normalization": "minmax",
+        }
+    )
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    assert finished["normalization"] == "minmax"
+    assert captured[0]["arguments"]["x"] == [[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]]
+    assert captured[0]["arguments"]["y"] == [0, 1]
+
+
+def test_dataset_normalization_is_applied_by_the_worker(store, captured):
+    """A dataset-backed job rebuilds and scales ``x`` inside the worker."""
+    frame = pd.DataFrame(
+        {
+            "x1": [1.0, 2.0, 3.0, 4.0],
+            "x2": [10.0, 20.0, 30.0, 40.0],
+            "y": [0, 1, 0, 1],
+        }
+    )
+    dataset = store.datasets.put("training.csv", frame, "training.csv", "csv")
+    job = store.start(
+        {
+            "model_id": "AutoClassifier",
+            "dataset": {
+                "dataset_id": dataset["dataset_id"],
+                "mode": "xy",
+                "task": "classification",
+                "features": ["x1", "x2"],
+                "target": "y",
+            },
+            "normalization": "minmax",
+        }
+    )
+
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    assert captured[0]["arguments"]["x"] == [
+        [0.0, 0.0],
+        [1 / 3, 1 / 3],
+        [2 / 3, 2 / 3],
+        [1.0, 1.0],
+    ]
+    assert captured[0]["arguments"]["y"] == [0, 1, 0, 1]
+
+
+def test_target_normalization_auto_only_applies_to_regression():
+    """``auto`` mirrors the feature method for regression, never for labels."""
+    assert training_core.target_normalization_method("auto", "regression", "standard") == "standard"
+    assert training_core.target_normalization_method("auto", "classification", "standard") == "none"
+    assert training_core.target_normalization_method("none", "regression", "standard") == "none"
+    assert training_core.target_normalization_method("minmax", "regression", "none") == "minmax"
+
+
+def test_classification_target_normalization_is_rejected(store):
+    """Class codes are not a continuous quantity, so scaling them is an error."""
+    with pytest.raises(training_core.core.ValidationError):
+        store.start(
+            {
+                "model_id": "AutoClassifier",
+                "arguments": {"x": [[0.1, 0.2], [0.2, 0.1]], "y": [0, 1]},
+                "target_normalization": "standard",
+            }
+        )
+
+
+def test_direct_regression_arguments_normalize_the_target(store, captured):
+    """``target_normalization: auto`` scales ``y`` for a regressor model."""
+    job = store.start(
+        {
+            "model_id": "GANRegressor",
+            "arguments": {
+                "x": [[0.0, 0.0], [1.0, 1.0]],
+                "y": [[10.0], [20.0]],
+                "epochs": 1,
+            },
+            "normalization": "minmax",
+        }
+    )
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    assert finished["target_normalization"]["method"] == "minmax"
+    assert finished["target_normalization"]["columns"][0]["min"] == 10.0
+    assert finished["target_normalization"]["columns"][0]["max"] == 20.0
+    assert captured[0]["arguments"]["y"] == [[0.0], [1.0]]
+    assert captured[0]["arguments"]["x"] == [[0.0, 0.0], [1.0, 1.0]]
+
+
+def test_regression_dataset_target_scaler_is_written_to_the_artifact(store, captured):
+    """A dataset regression job scales y and persists the scaler for inference."""
+    frame = pd.DataFrame(
+        {
+            "x1": [1.0, 2.0, 3.0, 4.0],
+            "x2": [10.0, 20.0, 30.0, 40.0],
+            "y": [10.0, 20.0, 30.0, 40.0],
+        }
+    )
+    dataset = store.datasets.put("regression.csv", frame, "regression.csv", "csv")
+    job = store.start(
+        {
+            "model_id": "GANRegressor",
+            "dataset": {
+                "dataset_id": dataset["dataset_id"],
+                "mode": "xy",
+                "task": "regression",
+                "features": ["x1", "x2"],
+                "target": "y",
+            },
+            "normalization": "minmax",
+        }
+    )
+
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    assert finished["target_normalization"] == {
+        "method": "minmax",
+        "min": 10.0,
+        "max": 40.0,
+    }
+    assert captured[0]["arguments"]["y"] == [0.0, 1 / 3, 2 / 3, 1.0]
+    metadata = json.loads(
+        (Path(finished["artifact"]["path"]) / "artifact.json").read_text(encoding="utf-8")
+    )
+    assert metadata["target_normalization"] == {
+        "method": "minmax",
+        "min": 10.0,
+        "max": 40.0,
+    }
+
+
+def test_training_jobs_bypass_the_playground_cpu_cap(store, captured):
+    """Multi-threaded training must not die from the playground's 30 s CPU cap.
+
+    ``RLIMIT_CPU`` counts CPU time across every thread, so a TensorFlow fit can
+    exhaust it long before its wall-clock timeout (the symptom is exit code
+    ``-24``, ``SIGXCPU``).  Training therefore sends an explicit CPU budget.
+    """
+    job = store.start(
+        {
+            "model_id": "AutoClassifier",
+            "arguments": {"x": [[0.1, 0.2], [0.2, 0.1]], "y": [0, 1], "epochs": 1},
+        }
+    )
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    assert captured[0]["limits"] == {"cpu": training_core.TRAIN_CPU_SECONDS}
+
+
+def test_run_invoke_merges_sandbox_limit_overrides(monkeypatch):
+    """``run_invoke(limits=...)`` overrides one limit and keeps the rest."""
+    model = training_core.core.MODELS_BY_ID["AutoClassifier"]
+    method = training_core.framework_fit_method(model)
+    sent = {}
+
+    def fake_run(argv, **kwargs):
+        sent.update(json.loads(kwargs["input"]))
+        marker = training_core.core._PLAYGROUND_MARKER
+        payload = {"ok": True, "type": model["id"], "module": model["module"]}
+        stdout = "\n" + marker + json.dumps(payload) + "\n"
+        return type("Completed", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
+
+    monkeypatch.setattr(training_core.core.subprocess, "run", fake_run)
+    result = training_core.core.run_invoke(
+        model,
+        method,
+        {},
+        {"x": [[0.1, 0.2], [0.2, 0.1]], "y": [0, 1]},
+        limits={"cpu": 0},
+    )
+
+    assert result["method"] == "fit"
+    assert sent["limits"]["cpu"] == 0
+    expected = training_core.core.playground_limits()
+    assert sent["limits"]["memory"] == expected["memory"]
+    assert sent["limits"]["files"] == expected["files"]
+
+
+def test_non_keras_models_reject_target_metric_controls(store):
+    """The callback contract is Keras-specific and fails clearly on other models."""
+    with pytest.raises(training_core.core.ValidationError):
+        store.start(
+            {
+                "model_id": "Arima",
+                "control": {"metric": "loss", "action": "stop", "value": 0.1},
+            }
+        )
+
+
 def test_artifact_savers_are_detected_for_serving():
     """Native savers and the AutoClassifier component layout are selected."""
     assert training_core.save_method_for(training_core.core.MODELS_BY_ID["GANRegressor"]) == (
@@ -174,7 +423,7 @@ def test_keras_fit_job_uses_the_server_compile_defaults(store, captured):
     assert finished["method"] == "fit"
     assert finished["compile"]["optimizer"] == "adam"
     assert finished["compile"]["loss"] == "sparse_categorical_crossentropy"
-    assert finished["compile"]["metrics"] == ["accuracy"]
+    assert finished["compile"]["metrics"] == list(training_core.CLASSIFICATION_METRICS)
     assert finished["result"]["history"]["loss"]
 
     call = captured[0]
@@ -202,7 +451,68 @@ def test_keras_compile_options_can_be_overridden(store, captured):
     assert finished["status"] == "succeeded", finished["error"]
     assert finished["compile"]["optimizer"] == "sgd"
     assert finished["compile"]["loss"] == "categorical_crossentropy"
-    assert finished["compile"]["metrics"] == ["accuracy"]
+    assert finished["compile"]["metrics"] == list(training_core.CLASSIFICATION_METRICS)
+
+
+def test_regression_default_compile_stays_on_mse():
+    """MAPE is opt-in; the conservative regression default remains MSE."""
+    assert training_core.default_compile_options({}, {}) == {
+        "optimizer": "adam",
+        "loss": "mse",
+    }
+
+
+def test_classification_defaults_include_popular_metrics():
+    """Binary and multiclass classifiers log accuracy, precision, recall, F1 and AUC."""
+    expected = ["accuracy", "precision", "recall", "f1_score", "auc"]
+    multiclass = training_core.default_compile_options(
+        {}, {"classifier_activation": "softmax", "num_classes": 3}
+    )
+    binary = training_core.default_compile_options(
+        {}, {"classifier_activation": "sigmoid", "num_classes": 1}
+    )
+    assert list(training_core.CLASSIFICATION_METRICS) == expected
+    assert multiclass["loss"] == "sparse_categorical_crossentropy"
+    assert multiclass["metrics"] == expected
+    assert binary["loss"] == "binary_crossentropy"
+    assert binary["metrics"] == expected
+
+
+def test_regression_compile_accepts_mape_loss_and_metric(store, captured):
+    """MAPE can be selected as the regression loss and/or metric."""
+    job = store.start(
+        {
+            "model_id": "GANRegressor",
+            "arguments": {
+                "x": [[0.0, 0.0], [1.0, 1.0]],
+                "y": [[10.0], [20.0]],
+                "epochs": 1,
+            },
+            "compile": {
+                "optimizer": "adam",
+                "loss": "mean_absolute_percentage_error",
+                "metrics": ["mae", "mean_absolute_percentage_error"],
+            },
+        }
+    )
+
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    assert finished["compile"]["loss"] == "mean_absolute_percentage_error"
+    assert finished["compile"]["metrics"] == ["mae", "mean_absolute_percentage_error"]
+    assert captured[0]["compile"]["loss"] == "mean_absolute_percentage_error"
+    assert captured[0]["compile"]["metrics"] == ["mae", "mean_absolute_percentage_error"]
+
+
+def test_target_metric_control_offers_mape():
+    """The control accepts MAPE under both Keras spellings."""
+    assert "mape" in training_core.TARGET_METRICS
+    assert "mean_absolute_percentage_error" in training_core.TARGET_METRICS
+    control = training_core.normalize_training_control(
+        {"metric": "val_mean_absolute_percentage_error", "action": "stop", "value": 5.0}
+    )
+    assert control["metric"] == "val_mean_absolute_percentage_error"
+    assert control["action"] == "stop"
 
 
 def test_dataset_backed_job_keeps_only_a_compact_reference(store, captured):

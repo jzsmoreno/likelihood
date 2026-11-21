@@ -75,6 +75,29 @@ class TrainingRequest(BaseModel):
     compile_options: Optional[Dict[str, Any]] = Field(
         default=None, description="Alias de ``compile``."
     )
+    control: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description=(
+            "Control Keras por métrica objetivo: metric, mode, action "
+            "('stop'/'reduce_lr'/'both'), value, patience, min_delta, factor, min_lr."
+        ),
+    )
+    normalization: Optional[str] = Field(
+        default=None,
+        description=(
+            "Normalización de X/datapoints: none, standard, minmax (0..1) o "
+            "minmax_symmetric (-1..1). No modifica y; usa target_normalization "
+            "para regresión."
+        ),
+    )
+    target_normalization: Optional[str] = Field(
+        default=None,
+        description=(
+            "Normalización de y para regresión: auto (misma que X), none, "
+            "standard, minmax o minmax_symmetric. Las etiquetas de "
+            "clasificación nunca se escalan."
+        ),
+    )
     dataset: Optional[Dict[str, Any]] = Field(
         default=None,
         description=(
@@ -147,6 +170,9 @@ def _job_payload(settings: Any, job: Dict[str, Any]) -> Dict[str, Any]:
         "arguments": dict(job.get("arguments") or {}),
         "parameters": dict(job.get("parameters") or {}),
         "compile": dict(job.get("compile") or {}),
+        "control": dict(job.get("control") or {}),
+        "normalization": str(job.get("normalization") or "none"),
+        "target_normalization": dict(job.get("target_normalization") or {}),
         "timeout_seconds": job.get("timeout_seconds"),
         "attempts": job.get("attempts") or 0,
         "created_at": job.get("created_at") or "",
@@ -155,6 +181,7 @@ def _job_payload(settings: Any, job: Dict[str, Any]) -> Dict[str, Any]:
         "elapsed": job.get("elapsed"),
         "compute_seconds": job.get("compute_seconds"),
         "error": job.get("error") or "",
+        "error_detail": job.get("error_detail") or "",
         "result_type": job.get("result_type"),
         "result_repr": job.get("result_repr"),
         "result": job.get("result"),

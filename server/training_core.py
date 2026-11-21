@@ -29,6 +29,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import math
 import os
 import shutil
 import threading
@@ -56,9 +57,53 @@ TRAIN_TIMEOUT = float(os.environ.get("LM_TRAINING_TIMEOUT") or core.INVOKE_TIMEO
 TRAIN_WORKERS = max(1, int(os.environ.get("LM_TRAINING_WORKERS") or 1))
 #: Maximum number of finished jobs persisted to ``jobs.json``.
 MAX_PERSISTED = max(1, int(os.environ.get("LM_TRAINING_MAX_PERSISTED") or 500))
+#: CPU seconds a training child may consume before the kernel sends ``SIGXCPU``
+#: (``LM_TRAINING_CPU``).  ``0`` (the default) disables the limit: the
+#: wall-clock :data:`TRAIN_TIMEOUT` already bounds the job, while the playground
+#: cap (30 s by default) kills multi-threaded TensorFlow long before its
+#: wall-clock budget because the kernel counts CPU time across every thread.
+TRAIN_CPU_SECONDS = max(0, int(os.environ.get("LM_TRAINING_CPU") or 0))
 
 #: Method names that fit a model, in the order the catalogue prefers them.
 FIT_METHODS = ("fit", "train", "fit_transform", "fit_predict", "fit_predict_transform")
+
+#: Metrics offered by the training UI for target-based stopping / LR control.
+TARGET_METRICS = (
+    "loss",
+    "val_loss",
+    "accuracy",
+    "val_accuracy",
+    "mae",
+    "val_mae",
+    "mse",
+    "val_mse",
+    "mape",
+    "val_mape",
+    "mean_absolute_percentage_error",
+    "val_mean_absolute_percentage_error",
+    "precision",
+    "val_precision",
+    "recall",
+    "val_recall",
+    "f1",
+    "val_f1",
+    "f1_score",
+    "val_f1_score",
+    "auc",
+    "val_auc",
+)
+
+#: Metrics compiled into a Keras classifier by default.
+CLASSIFICATION_METRICS = ("accuracy", "precision", "recall", "f1_score", "auc")
+
+#: Actions available for a target metric control.
+TARGET_ACTIONS = ("stop", "reduce_lr", "both")
+
+#: Supported input-data normalizations.  Targets (``y``) are never changed.
+NORMALIZATIONS = ("none", "standard", "minmax", "minmax_symmetric")
+
+#: Method arguments that contain training features (not targets).
+NORMALIZABLE_ARGUMENTS = ("x", "X", "datapoints")
 
 #: Framework base classes whose inherited ``fit`` is not part of the AST catalogue.
 FRAMEWORK_MODEL_BASES = frozenset({"Model"})
@@ -246,6 +291,190 @@ def artifact_parameters(parameters: Dict[str, Any]) -> Dict[str, Any]:
     return kept
 
 
+def normalization_method(raw: Any) -> str:
+    """Normalize the friendly names accepted by the training UI/API."""
+    value = str(raw or "none").strip().lower()
+    aliases = {
+        "std": "standard",
+        "zscore": "standard",
+        "z-score": "standard",
+        "0-1": "minmax",
+        "01": "minmax",
+        "min-max": "minmax",
+        "zero-one": "minmax",
+        "-1-1": "minmax_symmetric",
+        "minus-one-one": "minmax_symmetric",
+        "symmetric": "minmax_symmetric",
+    }
+    value = aliases.get(value, value)
+    if value not in NORMALIZATIONS:
+        raise core.ValidationError(
+            "El campo 'normalization' debe ser none, standard, minmax o minmax_symmetric"
+        )
+    return value
+
+
+def _numeric_column(values: List[Any]) -> List[float]:
+    """Validate one numeric column and return its finite float values."""
+    numbers: List[float] = []
+    for value in values:
+        if isinstance(value, bool) or value is None:
+            raise core.ValidationError(
+                "La normalización requiere datos numéricos en x/y/datapoints"
+            )
+        item = getattr(value, "item", None)
+        if callable(item):
+            try:
+                value = item()
+            except (TypeError, ValueError):
+                pass
+        if isinstance(value, str):
+            try:
+                value = float(value.strip())
+            except ValueError as exc:
+                raise core.ValidationError(
+                    "La normalización requiere datos numéricos en x/y/datapoints"
+                ) from exc
+        if not isinstance(value, (int, float)):
+            raise core.ValidationError(
+                "La normalización requiere datos numéricos en x/y/datapoints"
+            )
+        number = float(value)
+        if not math.isfinite(number):
+            raise core.ValidationError(
+                "La normalización requiere valores finitos en x/y/datapoints"
+            )
+        numbers.append(number)
+    return numbers
+
+
+def _scale_column(values: List[Any], method: str) -> Tuple[List[float], Dict[str, Any]]:
+    """Scale one numeric column and return the metadata needed to invert it."""
+    numbers = _numeric_column(values)
+    if method == "none" or not numbers:
+        return numbers, {"method": "none"}
+    minimum = min(numbers)
+    maximum = max(numbers)
+    if method == "standard":
+        mean = sum(numbers) / len(numbers)
+        variance = sum((value - mean) ** 2 for value in numbers) / len(numbers)
+        std = math.sqrt(variance)
+        if std == 0:
+            std = 1.0
+        return [(value - mean) / std for value in numbers], {
+            "method": "standard",
+            "mean": mean,
+            "std": std,
+        }
+    span = maximum - minimum
+    stats: Dict[str, Any] = {"method": method, "min": minimum, "max": maximum}
+    if span == 0:
+        return [0.0 for _ in numbers], stats
+    if method == "minmax":
+        return [(value - minimum) / span for value in numbers], stats
+    return [2.0 * (value - minimum) / span - 1.0 for value in numbers], stats
+
+
+def _normalise_column(values: List[Any], method: str) -> List[float]:
+    """Scale one numeric column with the selected normalization."""
+    return _scale_column(values, method)[0]
+
+
+def _scale_value(value: Any, method: str) -> Tuple[Any, Dict[str, Any]]:
+    """Scale a flat sequence or a rectangular matrix, returning scaler metadata."""
+    if method == "none" or not isinstance(value, list) or not value:
+        return value, {"method": "none"}
+    if all(not isinstance(item, (list, tuple)) for item in value):
+        return _scale_column(value, method)
+    rows: List[List[Any]] = []
+    for row in value:
+        if not isinstance(row, (list, tuple)):
+            raise core.ValidationError(
+                "La normalización espera una matriz rectangular en x/y/datapoints"
+            )
+        rows.append(list(row))
+    width = len(rows[0])
+    if any(len(row) != width for row in rows):
+        raise core.ValidationError(
+            "La normalización espera una matriz rectangular en x/y/datapoints"
+        )
+    columns: List[List[float]] = []
+    stats: List[Dict[str, Any]] = []
+    for index in range(width):
+        scaled, column_stats = _scale_column([row[index] for row in rows], method)
+        columns.append(scaled)
+        stats.append(column_stats)
+    scaled_rows = [[columns[index][row] for index in range(width)] for row in range(len(rows))]
+    return scaled_rows, {"method": method, "columns": stats}
+
+
+def _normalise_value(value: Any, method: str) -> Any:
+    """Normalize a flat sequence or a rectangular matrix of features."""
+    return _scale_value(value, method)[0]
+
+
+def apply_normalization(
+    arguments: Dict[str, Any], parameters: Dict[str, Any], method: str
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Return copies of the feature arguments/parameters after scaling.
+
+    ``y`` is deliberately excluded here: :func:`apply_target_normalization`
+    scales a regression target only after the caller has resolved the task, so
+    classification labels stay as integer codes.
+    """
+    if method == "none":
+        return dict(arguments), dict(parameters)
+    normalized_args = dict(arguments)
+    normalized_params = dict(parameters)
+    for name in NORMALIZABLE_ARGUMENTS:
+        if name in normalized_args:
+            normalized_args[name] = _normalise_value(normalized_args[name], method)
+        if name in normalized_params:
+            normalized_params[name] = _normalise_value(normalized_params[name], method)
+    return normalized_args, normalized_params
+
+
+#: Values of ``target_normalization`` that reuse the feature method on regression.
+TARGET_NORMALIZATION_AUTO = ("", "auto", "same", "feature")
+
+
+def target_normalization_method(raw: Any, task: str, feature_method: str) -> str:
+    """Resolve the optional target scaling; only regression targets are scaled.
+
+    ``auto`` (the default) reuses the feature normalization when the resolved
+    task is a regression, and does nothing for classification labels (which are
+    integer codes, not a continuous quantity).
+    """
+    task_name = str(task or "").strip().lower()
+    value = str(raw or "").strip().lower()
+    if value in TARGET_NORMALIZATION_AUTO:
+        method = feature_method if task_name == "regression" else "none"
+    else:
+        method = normalization_method(value)
+    if task_name == "classification" and method != "none":
+        raise core.ValidationError(
+            "La normalización de y solo está disponible para problemas de regresión"
+        )
+    return method
+
+
+def apply_target_normalization(
+    arguments: Dict[str, Any], method: str
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Scale the regression target ``y`` and return the scaler metadata.
+
+    Classification labels are integer codes, so callers must resolve ``method``
+    to ``none`` for a classification task before calling this helper.  The
+    metadata is persisted in ``artifact.json`` so predictions can be mapped back
+    to the original target units.
+    """
+    if method == "none" or "y" not in arguments:
+        return dict(arguments), {}
+    normalized = dict(arguments)
+    normalized["y"], stats = _scale_value(normalized["y"], method)
+    return normalized, stats
+
+
 def supports_framework_fit(model: Dict[str, Any]) -> bool:
     """Whether ``model`` inherits a framework ``fit`` missing from the AST catalogue.
 
@@ -303,20 +532,25 @@ def resolve_fit_method_name(model: Dict[str, Any], requested: str = "") -> str:
 
 
 def default_compile_options(model: Dict[str, Any], parameters: Dict[str, Any]) -> Dict[str, Any]:
-    """Conservative Keras compile options for a framework ``fit``."""
+    """Conservative Keras compile options for a framework ``fit``.
+
+    Regression stays on ``mse`` by default.  ``mean_absolute_percentage_error``
+    (alias ``mape``) is available as an explicit ``compile.loss`` and/or
+    ``compile.metrics`` entry, and the target-metric control offers both names.
+    """
     activation = str(parameters.get("classifier_activation") or "").strip().lower()
     classes = parameters.get("num_classes")
     if activation == "sigmoid" and classes == 1:
         return {
             "optimizer": "adam",
             "loss": "binary_crossentropy",
-            "metrics": ["accuracy"],
+            "metrics": list(CLASSIFICATION_METRICS),
         }
     if activation in ("softmax", "sigmoid") and isinstance(classes, int) and classes > 1:
         return {
             "optimizer": "adam",
             "loss": "sparse_categorical_crossentropy",
-            "metrics": ["accuracy"],
+            "metrics": list(CLASSIFICATION_METRICS),
         }
     return {"optimizer": "adam", "loss": "mse"}
 
@@ -332,6 +566,88 @@ def resolve_compile_options(
     options = default_compile_options(model, parameters)
     options.update(raw)
     return options
+
+
+def normalize_training_control(raw: Any) -> Dict[str, Any]:
+    """Validate the optional target-metric control of a Keras fit job.
+
+    ``action`` may be ``stop`` (EarlyStopping at ``value``), ``reduce_lr``
+    (ReduceLROnPlateau) or ``both``.  An empty control is allowed and means no
+    callback is added.
+    """
+    if raw is None or raw == {}:
+        return {}
+    if not isinstance(raw, dict):
+        raise core.ValidationError("El campo 'control' debe ser un objeto")
+    metric = str(raw.get("metric") or raw.get("monitor") or "").strip()
+    if not metric:
+        return {}
+    action = str(raw.get("action") or "stop").strip().lower()
+    action = {"early_stopping": "stop", "reduce": "reduce_lr"}.get(action, action)
+    if action not in TARGET_ACTIONS:
+        raise core.ValidationError(
+            "El campo 'control.action' debe ser 'stop', 'reduce_lr' o 'both'"
+        )
+    mode = str(raw.get("mode") or "auto").strip().lower()
+    if mode not in ("auto", "min", "max"):
+        raise core.ValidationError("El campo 'control.mode' debe ser auto, min o max")
+
+    def _optional_float(name: str, value: Any) -> Optional[float]:
+        if value is None or value == "":
+            return None
+        if isinstance(value, bool):
+            raise core.ValidationError(f"El campo 'control.{name}' debe ser un número")
+        try:
+            return float(value)
+        except (TypeError, ValueError) as exc:
+            raise core.ValidationError(f"El campo 'control.{name}' debe ser un número") from exc
+
+    def _float_value(
+        name: str, value: Any, default: float, *, minimum: Optional[float] = None
+    ) -> float:
+        parsed = _optional_float(name, value)
+        result = default if parsed is None else parsed
+        if minimum is not None and result < minimum:
+            raise core.ValidationError(f"El campo 'control.{name}' debe ser >= {minimum:g}")
+        return result
+
+    def _int_value(name: str, value: Any, default: int, *, minimum: int = 0) -> int:
+        if value is None or value == "":
+            return default
+        if isinstance(value, bool):
+            raise core.ValidationError(f"El campo 'control.{name}' debe ser un entero")
+        try:
+            result = int(value)
+        except (TypeError, ValueError) as exc:
+            raise core.ValidationError(f"El campo 'control.{name}' debe ser un entero") from exc
+        if result < minimum:
+            raise core.ValidationError(f"El campo 'control.{name}' debe ser >= {minimum}")
+        return result
+
+    value = _optional_float("value", raw.get("value", raw.get("target")))
+    if action in ("stop", "both") and value is None:
+        raise core.ValidationError(
+            "El campo 'control.value' es obligatorio cuando la acción detiene el entrenamiento"
+        )
+    factor = _float_value("factor", raw.get("factor"), 0.5, minimum=0.000001)
+    if factor >= 1:
+        raise core.ValidationError("El campo 'control.factor' debe ser menor que 1")
+    patience = _int_value("patience", raw.get("patience"), 3)
+    min_delta = _float_value("min_delta", raw.get("min_delta"), 0.0, minimum=0.0)
+    min_lr = _float_value("min_lr", raw.get("min_lr"), 0.000001, minimum=0.0)
+    max_epochs = _int_value("max_epochs", raw.get("max_epochs", raw.get("epochs")), 50, minimum=1)
+    return {
+        "metric": metric,
+        "mode": mode,
+        "action": action,
+        "value": value,
+        "patience": patience,
+        "min_delta": min_delta,
+        "factor": factor,
+        "min_lr": min_lr,
+        "max_epochs": max_epochs,
+        "restore_best_weights": bool(raw.get("restore_best_weights", False)),
+    }
 
 
 #: Curated examples for the framework models whose training objective is obvious.
@@ -371,7 +687,7 @@ EXAMPLE_JOBS: Dict[str, Dict[str, Any]] = {
         "compile": {
             "optimizer": "adam",
             "loss": "sparse_categorical_crossentropy",
-            "metrics": ["accuracy"],
+            "metrics": list(CLASSIFICATION_METRICS),
         },
     },
     "GANRegressor": {
@@ -538,6 +854,9 @@ class TrainingStore:
             "arguments": dict(record.get("arguments") or {}),
             "parameters": dict(record.get("parameters") or {}),
             "compile": dict(record.get("compile") or {}),
+            "control": dict(record.get("control") or {}),
+            "normalization": str(record.get("normalization") or "none"),
+            "target_normalization": dict(record.get("target_normalization") or {}),
             "adapter": str(record.get("adapter") or ""),
             "dataset": dict(record.get("dataset") or {}) or None,
             "timeout_seconds": float(record.get("timeout_seconds") or TRAIN_TIMEOUT),
@@ -548,6 +867,7 @@ class TrainingStore:
             "elapsed": record.get("elapsed"),
             "compute_seconds": record.get("compute_seconds"),
             "error": str(record.get("error") or ""),
+            "error_detail": str(record.get("error_detail") or ""),
             "result_type": record.get("result_type"),
             "result_repr": record.get("result_repr"),
             "result": record.get("result"),
@@ -590,6 +910,9 @@ class TrainingStore:
             raise core.ValidationError("El campo 'model_id' es obligatorio")
         model = self._find_model(model_id)
         compile_options: Dict[str, Any] = {}
+        control: Dict[str, Any] = {}
+        normalization = "none"
+        target_normalization: Dict[str, Any] = {}
         dataset_meta: Optional[Dict[str, Any]] = None
         dataset_args: Dict[str, Any] = {}
         dataset_params: Dict[str, Any] = {}
@@ -614,6 +937,20 @@ class TrainingStore:
             method, arguments, parameters = self._prepare_invocation(
                 model, validation_spec, method_name
             )
+            normalization = normalization_method(spec.get("normalization"))
+            arguments, parameters = apply_normalization(arguments, parameters, normalization)
+            task = (
+                str((dataset_meta or {}).get("task") or "")
+                if dataset_meta
+                else training_dataset_task(model)
+            )
+            target_method = target_normalization_method(
+                spec.get("target_normalization"), task, normalization
+            )
+            if target_method != "none":
+                arguments, target_stats = apply_target_normalization(arguments, target_method)
+                if target_stats:
+                    target_normalization = {"method": target_method, **target_stats}
             if method["name"].lower() in ("save", "load", "load_model", "save_model"):
                 raise core.ValidationError(
                     f'El método "{method["name"]}" guarda o carga un modelo; '
@@ -624,6 +961,12 @@ class TrainingStore:
                     model,
                     parameters,
                     spec.get("compile", spec.get("compile_options")),
+                )
+                control = normalize_training_control(spec.get("control"))
+            elif spec.get("control"):
+                raise core.ValidationError(
+                    "El control por métrica objetivo solo está disponible para "
+                    "entrenamientos Keras con fit"
                 )
         else:
             artifact_id = str(spec.get("artifact_id") or "").strip()
@@ -639,6 +982,11 @@ class TrainingStore:
         stored_arguments = dict(arguments)
         for key in dataset_args:
             stored_arguments.pop(key, None)
+        if control.get("max_epochs"):
+            # The target control implies a larger training budget than the
+            # Keras adapter default (epochs=1), otherwise the callback would
+            # never have a chance to stop later.
+            stored_arguments["epochs"] = int(control["max_epochs"])
         stored_parameters = dict(parameters)
         # ``datapoints`` can be long (a whole CSV column); keep it in the
         # dataset reference and rebuild it in the worker.
@@ -658,6 +1006,9 @@ class TrainingStore:
                     "arguments": stored_arguments,
                     "parameters": stored_parameters,
                     "compile": compile_options,
+                    "control": control,
+                    "normalization": normalization,
+                    "target_normalization": target_normalization,
                     "adapter": method.get("framework") or "",
                     "dataset": dataset_meta,
                     "timeout_seconds": timeout,
@@ -874,6 +1225,8 @@ class TrainingStore:
                                 "model_name": job.get("model_name") or "",
                                 "method": job["method"],
                                 "parameters": artifact_parameters(job.get("parameters") or {}),
+                                "normalization": job.get("normalization") or "none",
+                                "target_normalization": dict(job.get("target_normalization") or {}),
                                 "created_at": iso(),
                                 "load_path": load_path,
                                 "loader": loader_name,
@@ -910,8 +1263,22 @@ class TrainingStore:
                 job["finished_at"] = iso()
                 job["elapsed"] = round(time.monotonic() - started, 3)
                 job["error"] = str(exc)
+                detail = str(getattr(exc, "detail", "") or "")
+                if detail:
+                    job["error_detail"] = detail[-8000:]
                 job["updated_at"] = iso()
                 job["log"].append({"at": iso(), "level": "error", "message": str(exc)})
+                if detail:
+                    # Full tracebacks are available in ``error_detail`` (shown
+                    # in the error card); keeping them out of the timeline
+                    # avoids mixing Keras progress with real log events.
+                    job["log"].append(
+                        {
+                            "at": iso(),
+                            "level": "error",
+                            "message": "Detalle técnico disponible en la tarjeta de error",
+                        }
+                    )
                 self._persist_locked()
         except BaseException as exc:  # pragma: no cover - unexpected sandbox failure
             with self._lock:
@@ -937,10 +1304,21 @@ class TrainingStore:
             raise core.ValidationError("El trabajo no tiene una ruta de artefacto")
         parameters = dict(job["parameters"])
         arguments = dict(job["arguments"])
+        control = dict(job.get("control") or {})
+        if control.get("max_epochs"):
+            arguments["epochs"] = int(control["max_epochs"])
+        normalization = str(job.get("normalization") or "none")
         if job.get("dataset"):
             data_args, data_params, _ = self._dataset_values(model, job["dataset"])
             arguments.update(data_args)
             parameters.update(data_params)
+            if normalization != "none":
+                arguments, parameters = apply_normalization(arguments, parameters, normalization)
+            target_method = str((job.get("target_normalization") or {}).get("method") or "none")
+            if target_method != "none":
+                arguments, target_stats = apply_target_normalization(arguments, target_method)
+                if target_stats:
+                    job["target_normalization"] = {"method": target_method, **target_stats}
         save_method, save_parameter = save_method_for(model)
         result = core.run_invoke(
             model,
@@ -957,6 +1335,8 @@ class TrainingStore:
                 "pickle_name": "model.pkl",
             },
             compile_options=dict(job.get("compile") or {}) or None,
+            training_controls=dict(job.get("control") or {}) or None,
+            limits={"cpu": TRAIN_CPU_SECONDS},
         )
         if result.get("module"):
             job["log"].append(
@@ -991,6 +1371,7 @@ class TrainingStore:
             dict(job["arguments"]),
             timeout=float(job["timeout_seconds"]),
             load=load,
+            limits={"cpu": TRAIN_CPU_SECONDS},
         )
         return result
 

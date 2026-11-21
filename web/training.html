@@ -91,7 +91,7 @@
   .log-list { display: flex; flex-direction: column; gap: 6px; margin: 0; list-style: none; font-family: var(--db-mono); font-size: 12px; }
   .log-item { display: flex; gap: 10px; padding: 5px 8px; border-radius: 5px; background: var(--db-surface); border: 1px solid var(--db-line); }
   .log-time { white-space: nowrap; color: var(--db-muted); }
-  .log-msg { word-break: break-word; color: var(--db-text); }
+  .log-msg { word-break: break-word; overflow-wrap: anywhere; white-space: pre-wrap; color: var(--db-text); }
   .log-error .log-msg { color: var(--db-lava); font-weight: 600; }
   .log-info .log-msg { color: var(--db-text); }
 
@@ -164,6 +164,13 @@
     gap: 14px;
   }
   .wizard-json-grid .wizard-field { min-width: 0; }
+  .training-control-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .training-control-grid .wizard-field { min-width: 0; }
   .wizard-example-note {
     margin: 0 0 14px;
     padding: 10px 12px;
@@ -223,6 +230,34 @@
   }
   .training-metric-sub { color: var(--db-muted); font-size: 10px; }
   .training-loss-chart { min-height: 220px; }
+  .training-metrics-chart { min-height: 220px; margin-top: 8px; }
+  .training-metric-table-wrap { margin-top: 14px; overflow-x: auto; }
+  .training-metric-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .training-metric-table th,
+  .training-metric-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--db-line-soft);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .training-metric-table th:first-child,
+  .training-metric-table td:first-child { text-align: left; }
+  .training-metric-table thead th {
+    color: var(--db-faint);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+  .training-metric-table td { color: var(--db-text); font-family: var(--db-mono); }
+  .training-metric-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    border-radius: 50%;
+    vertical-align: middle;
+  }
 
   /* Dataset loader inside the training wizard. */
   .dataset-panel {
@@ -676,6 +711,27 @@
             </div>
           </div>
         </section>
+        <div class="wizard-field" id="normalization-field">
+          <label for="job-normalization">Normalización de datos</label>
+          <select class="select" id="job-normalization">
+            <option value="none">Ninguna</option>
+            <option value="standard">Estandarizar · media 0, desviación 1</option>
+            <option value="minmax">Min-Max · 0 a 1</option>
+            <option value="minmax_symmetric">Min-Max · -1 a 1</option>
+          </select>
+          <p class="hint">Se aplica a <code>x</code>/<code>X</code> y <code>datapoints</code>. Las etiquetas de clasificación nunca se escalan.</p>
+        </div>
+        <div class="wizard-field" id="target-normalization-field">
+          <label for="job-target-normalization">Normalización de Y (regresión)</label>
+          <select class="select" id="job-target-normalization">
+            <option value="auto">Auto · misma que X si el objetivo es continuo</option>
+            <option value="none">Ninguna</option>
+            <option value="standard">Estandarizar · media 0, desviación 1</option>
+            <option value="minmax">Min-Max · 0 a 1</option>
+            <option value="minmax_symmetric">Min-Max · -1 a 1</option>
+          </select>
+          <p class="hint">Solo para regresión. La escala (media/desviación o mín/máx) queda en <code>artifact.json</code> para invertir las predicciones del artefacto.</p>
+        </div>
         <div class="wizard-data-head">
           <div>
             <div class="wizard-section-title">Datos de entrenamiento</div>
@@ -700,7 +756,79 @@
         <div class="wizard-field" id="compile-field" hidden>
           <label for="job-compile">Compilación Keras (opcional)</label>
           <textarea class="wizard-json" id="job-compile" rows="5" placeholder='{"optimizer": "adam", "loss": "sparse_categorical_crossentropy", "metrics": ["accuracy"]}'></textarea>
-          <p class="hint">Solo para modelos Keras con <code>fit</code> heredado. Se combina con la compilación por defecto del servidor; <code>force: true</code> recompila un modelo ya compilado.</p>
+          <p class="hint">Solo para modelos Keras con <code>fit</code> heredado. Se combina con la compilación por defecto del servidor; <code>force: true</code> recompila un modelo ya compilado. En regresión puedes usar <code>mean_absolute_percentage_error</code> (o <code>mape</code>) como <code>loss</code> y/o en <code>metrics</code>; requiere objetivos positivos.</p>
+        </div>
+        <div class="wizard-field" id="control-field" hidden>
+          <label>Control por métrica objetivo (Keras)</label>
+          <p class="hint" style="margin-top:2px">Detiene el entrenamiento al alcanzar el valor objetivo y/o reduce el learning rate cuando la métrica deja de mejorar. Las métricas <code>val_*</code> requieren <code>validation_split &gt; 0</code> en los argumentos y el nombre debe coincidir con la métrica de <code>compile.metrics</code>.</p>
+          <label class="check-row" for="job-control-enabled"><input type="checkbox" id="job-control-enabled"><span>Activar control por métrica</span></label>
+          <div class="training-control-grid" id="control-options" hidden>
+            <div class="wizard-field">
+              <label for="job-target-metric">Métrica</label>
+              <select class="select" id="job-target-metric">
+                <option value="loss">loss</option>
+                <option value="val_loss">val_loss</option>
+                <option value="accuracy">accuracy</option>
+                <option value="val_accuracy">val_accuracy</option>
+                <option value="mae">mae</option>
+                <option value="val_mae">val_mae</option>
+                <option value="mse">mse</option>
+                <option value="val_mse">val_mse</option>
+                <option value="mape">mape</option>
+                <option value="val_mape">val_mape</option>
+                <option value="mean_absolute_percentage_error">mean_absolute_percentage_error</option>
+                <option value="val_mean_absolute_percentage_error">val_mean_absolute_percentage_error</option>
+                <option value="precision">precision</option>
+                <option value="val_precision">val_precision</option>
+                <option value="recall">recall</option>
+                <option value="val_recall">val_recall</option>
+                <option value="f1_score">f1_score</option>
+                <option value="val_f1_score">val_f1_score</option>
+                <option value="auc">auc</option>
+                <option value="val_auc">val_auc</option>
+              </select>
+            </div>
+            <div class="wizard-field">
+              <label for="job-target-mode">Dirección</label>
+              <select class="select" id="job-target-mode">
+                <option value="auto">Automática</option>
+                <option value="min">Minimizar</option>
+                <option value="max">Maximizar</option>
+              </select>
+            </div>
+            <div class="wizard-field">
+              <label for="job-target-epochs">Máximo de épocas</label>
+              <input type="number" class="input" id="job-target-epochs" min="1" step="1" value="50">
+            </div>
+            <div class="wizard-field" id="target-value-field">
+              <label for="job-target-value">Valor objetivo</label>
+              <input type="number" class="input" id="job-target-value" step="any" placeholder="0.01">
+            </div>
+            <div class="wizard-field">
+              <label for="job-target-patience">Paciencia (épocas)</label>
+              <input type="number" class="input" id="job-target-patience" min="0" step="1" value="3">
+            </div>
+            <div class="wizard-field">
+              <label for="job-target-min-delta">Delta mínimo</label>
+              <input type="number" class="input" id="job-target-min-delta" min="0" step="any" value="0">
+            </div>
+            <div class="wizard-field">
+              <label for="job-target-action">Acción</label>
+              <select class="select" id="job-target-action">
+                <option value="stop">Detener al alcanzar objetivo</option>
+                <option value="reduce_lr">Reducir learning rate</option>
+                <option value="both">Detener y reducir LR</option>
+              </select>
+            </div>
+            <div class="wizard-field" id="target-factor-field">
+              <label for="job-target-factor">Factor de reducción LR</label>
+              <input type="number" class="input" id="job-target-factor" min="0.000001" max="0.999999" step="any" value="0.5">
+            </div>
+            <div class="wizard-field" id="target-min-lr-field">
+              <label for="job-target-min-lr">Learning rate mínimo</label>
+              <input type="number" class="input" id="job-target-min-lr" min="0" step="any" value="0.000001">
+            </div>
+          </div>
         </div>
         <div class="wizard-field" id="artifact-field" hidden>
           <label for="job-artifact-id">Artefacto (opcional)</label>

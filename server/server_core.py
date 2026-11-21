@@ -24,6 +24,7 @@ import math
 import os
 import queue
 import re
+import signal
 import subprocess
 import sys
 import threading
@@ -1779,6 +1780,122 @@ def _prepare(instance, method_name, arguments):
         pass
 
 
+def _compile_metric_objects(instance, metrics):
+    # Keras' built-in precision/recall/F1/AUC expect binary or one-hot targets,
+    # while the catalog trains classifiers with sparse integer labels.  Map the
+    # familiar metric names to sparse-aware wrappers so the history and the
+    # training dashboard expose precision, recall, F1 and AUC for every task.
+    if not isinstance(metrics, (list, tuple)):
+        return metrics
+    try:
+        import keras
+        import tensorflow as tf
+    except BaseException:
+        return metrics
+
+    def _prepare(y_true, y_pred):
+        y_pred = tf.convert_to_tensor(y_pred)
+        y_true = tf.convert_to_tensor(y_true)
+        if len(y_pred.shape) > 1 and y_pred.shape[-1] is not None and y_pred.shape[-1] > 1:
+            return (
+                tf.one_hot(tf.cast(y_true, tf.int32), depth=tf.shape(y_pred)[-1]),
+                y_pred,
+                True,
+            )
+        return tf.cast(y_true, tf.float32), y_pred, False
+
+    class _SparsePrecision(keras.metrics.Precision):
+        def update_state(self, y_true, y_pred, sample_weight=None):
+            prepared, y_pred, _ = _prepare(y_true, y_pred)
+            return super().update_state(prepared, y_pred, sample_weight)
+
+    class _SparseRecall(keras.metrics.Recall):
+        def update_state(self, y_true, y_pred, sample_weight=None):
+            prepared, y_pred, _ = _prepare(y_true, y_pred)
+            return super().update_state(prepared, y_pred, sample_weight)
+
+    class _SparseF1(keras.metrics.F1Score):
+        def __init__(self, name="f1_score", **kwargs):
+            kwargs.setdefault("average", "macro")
+            super().__init__(name=name, **kwargs)
+
+        def update_state(self, y_true, y_pred, sample_weight=None):
+            prepared, y_pred, multi = _prepare(y_true, y_pred)
+            if not multi:
+                prepared = tf.expand_dims(prepared, -1)
+            return super().update_state(prepared, y_pred, sample_weight)
+
+    class _MacroAUC(keras.metrics.Metric):
+        def __init__(self, num_labels, name="auc", **kwargs):
+            super().__init__(name=name, **kwargs)
+            self.num_labels = int(num_labels)
+            self.aucs = [
+                keras.metrics.AUC(name="auc_%d" % index)
+                for index in range(self.num_labels)
+            ]
+
+        def update_state(self, y_true, y_pred, sample_weight=None):
+            y_true = tf.cast(tf.reshape(y_true, [-1]), tf.int32)
+            y_pred = tf.convert_to_tensor(y_pred)
+            for index, auc in enumerate(self.aucs):
+                auc.update_state(
+                    tf.cast(tf.equal(y_true, index), tf.float32),
+                    y_pred[:, index],
+                    sample_weight,
+                )
+
+        def result(self):
+            return tf.reduce_mean(tf.stack([auc.result() for auc in self.aucs]))
+
+        def reset_state(self):
+            for auc in self.aucs:
+                auc.reset_state()
+
+    output_dim = 0
+    try:
+        shape = getattr(instance, "output_shape", None)
+        if isinstance(shape, list) and shape and isinstance(shape[0], (list, tuple)):
+            shape = shape[0]
+        if isinstance(shape, (list, tuple)) and shape and isinstance(shape[-1], int):
+            output_dim = shape[-1]
+    except BaseException:
+        output_dim = 0
+    if not output_dim:
+        for name in ("num_classes", "output_shape_parm", "output_dim"):
+            value = constructor_parameters.get(name)
+            if isinstance(value, int) and value > 0:
+                output_dim = value
+                break
+    multi = output_dim > 1
+    resolved = []
+    for metric in metrics:
+        if not isinstance(metric, str):
+            resolved.append(metric)
+            continue
+        key = metric.strip().lower()
+        if key == "precision":
+            resolved.append(
+                _SparsePrecision(name="precision")
+                if multi
+                else keras.metrics.Precision(name="precision")
+            )
+        elif key == "recall":
+            resolved.append(
+                _SparseRecall(name="recall")
+                if multi
+                else keras.metrics.Recall(name="recall")
+            )
+        elif key in ("f1", "f1_score"):
+            resolved.append(_SparseF1(name=key))
+        elif key == "auc":
+            resolved.append(
+                _MacroAUC(output_dim) if multi else keras.metrics.AUC(name="auc")
+            )
+        else:
+            resolved.append(metric)
+    return resolved
+
+
 def _apply_compile(instance, options):
     # Keras-style models need ``compile`` before ``fit``.  The options come from
     # the training layer (server defaults or a user override), never from the
@@ -1801,6 +1918,8 @@ def _apply_compile(instance, options):
     except BaseException:
         pass
     kwargs = {key: value for key, value in options.items() if key != "force"}
+    if "metrics" in kwargs:
+        kwargs["metrics"] = _compile_metric_objects(instance, kwargs["metrics"])
     if kwargs:
         compile_method(**kwargs)
 
@@ -1813,6 +1932,112 @@ def _mark_prepared(instance, method_name):
         instance._lm_prepared = True
     except BaseException:
         pass
+
+
+def _training_callbacks(options):
+    # Keras callbacks are created inside the child so the parent can keep only
+    # JSON-friendly target values in the job record.
+    if not isinstance(options, dict) or not options.get("metric"):
+        return []
+    try:
+        import keras
+    except BaseException:
+        try:
+            from tensorflow import keras  # type: ignore
+        except BaseException:
+            return []
+    action = str(options.get("action") or "stop").lower()
+    metric = str(options["metric"])
+    mode = str(options.get("mode") or "auto").lower()
+    if mode == "auto":
+        mode = "max" if any(
+            token in metric.lower()
+            for token in ("acc", "auc", "precision", "recall", "f1")
+        ) else "min"
+    patience = int(options.get("patience") or 0)
+    min_delta = float(options.get("min_delta") or 0.0)
+    restore_best_weights = bool(options.get("restore_best_weights", False))
+
+    class _TargetMetricStopping(keras.callbacks.Callback):
+        # Stop when a target is reached, or after patience without improvement.
+
+        def __init__(self):
+            super().__init__()
+            self.best = None
+            self.wait = 0
+            self.best_weights = None
+            self.target = (
+                float(options["value"]) if options.get("value") is not None else None
+            )
+
+        def _better(self, current, previous):
+            if mode == "max":
+                return current > previous + min_delta
+            return current < previous - min_delta
+
+        def _reached(self, current):
+            if self.target is None:
+                return False
+            if mode == "max":
+                return current >= self.target
+            return current <= self.target
+
+        def _snapshot_weights(self):
+            try:
+                self.best_weights = self.model.get_weights()
+            except BaseException:
+                # Some custom Keras subclasses do not expose weights cleanly;
+                # stopping must never turn into a training failure.
+                self.best_weights = None
+
+        def on_epoch_end(self, epoch, logs=None):
+            current = (logs or {}).get(metric)
+            if current is None:
+                return
+            try:
+                current = float(current)
+            except (TypeError, ValueError):
+                return
+            if self._reached(current):
+                if restore_best_weights:
+                    self._snapshot_weights()
+                self.model.stop_training = True
+                return
+            if self.best is None or self._better(current, self.best):
+                self.best = current
+                self.wait = 0
+                if restore_best_weights:
+                    self._snapshot_weights()
+                return
+            self.wait += 1
+            if self.wait >= patience:
+                self.model.stop_training = True
+
+        def on_train_end(self, logs=None):
+            if restore_best_weights and self.best_weights is not None:
+                try:
+                    self.model.set_weights(self.best_weights)
+                except BaseException:
+                    # Restoration is best effort; the trained model is still
+                    # valid if a custom subclass cannot apply the snapshot.
+                    pass
+
+    callbacks = []
+    if action in ("stop", "both"):
+        callbacks.append(_TargetMetricStopping())
+    if action in ("reduce_lr", "both"):
+        callbacks.append(
+            keras.callbacks.ReduceLROnPlateau(
+                monitor=metric,
+                mode=mode,
+                factor=float(options.get("factor") or 0.5),
+                patience=patience,
+                min_delta=min_delta,
+                min_lr=float(options.get("min_lr") or 0.0),
+                verbose=0,
+            )
+        )
+    return callbacks
 """
 
 
@@ -1854,6 +2079,10 @@ import time
 try:
     instance = _load_instance(payload["load"]) if payload.get("load") else _build()
     arguments = _convert_all(payload.get("arguments"), argument_types)
+    if payload.get("training_controls"):
+        callbacks = _training_callbacks(payload["training_controls"])
+        if callbacks:
+            arguments["callbacks"] = callbacks
     _prepare(instance, payload["method"], arguments)
     _apply_compile(instance, payload.get("compile"))
     method = getattr(instance, payload["method"])
@@ -2730,13 +2959,17 @@ def run_invoke(
     save_path: Optional[str] = None,
     save_options: Optional[Dict[str, Any]] = None,
     compile_options: Optional[Dict[str, Any]] = None,
+    training_controls: Optional[Dict[str, Any]] = None,
+    limits: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build (or load) ``model`` and call ``method`` in a throw-away child interpreter.
 
     No state survives the call: two requests always start from a fresh object,
     which is what makes the endpoint safe to expose next to the catalog.
     ``compile_options`` is used by the training layer to compile a Keras model
-    before calling its inherited ``fit`` method.
+    before calling its inherited ``fit`` method.  ``limits`` overrides individual
+    sandbox resource limits (for example ``{"cpu": 0}`` to let a long training
+    ignore the playground's CPU cap; the wall-clock ``timeout`` still applies).
     """
     timeout = INVOKE_TIMEOUT if timeout is None else timeout
     payload_data: Dict[str, Any] = {
@@ -2748,6 +2981,8 @@ def run_invoke(
         **sandbox_payload(model, constructor_types(model)),
         "argument_types": {field["name"]: field["type"] for field in method_fields(method)},
     }
+    if limits:
+        payload_data["limits"] = {**payload_data.get("limits", {}), **limits}
     if load:
         payload_data["load"] = {
             key: load[key]
@@ -2763,6 +2998,8 @@ def run_invoke(
         payload_data["save"] = save_data
     if compile_options:
         payload_data["compile"] = dict(compile_options)
+    if training_controls:
+        payload_data["training_controls"] = dict(training_controls)
     payload = json.dumps(payload_data)
     started = time.monotonic()
     try:
@@ -2790,14 +3027,37 @@ def run_invoke(
         if payload_line is not None:
             result_line = payload_line
     if not result_line:
-        raise InvocationError(
-            friendly_invocation_error(
-                _last_error_line(stderr) or "No se pudo construir el modelo",
+        tail = stderr or stdout
+        last_line = _last_error_line(tail)
+        # Keras progress is written to stderr and can be the last line even when
+        # the process was killed (for example by the memory limit).  Do not
+        # present that progress as the exception.
+        if last_line and not ("step" in last_line.lower() and "loss" in last_line.lower()):
+            message = friendly_invocation_error(
+                last_line,
                 method["name"],
                 method_fields(method),
-            ),
-            detail=stderr[-4000:],
-        )
+            )
+        else:
+            code = completed.returncode
+            message = (
+                f"El proceso de entrenamiento terminó sin respuesta " f"(código de salida {code})"
+            )
+            if code < 0:
+                try:
+                    signame = signal.Signals(-code).name
+                except ValueError:
+                    signame = f"señal {-code}"
+                if signame == "SIGXCPU":
+                    message += (
+                        "; superó el límite de CPU del sandbox "
+                        "(LM_TRAINING_CPU / LM_PLAYGROUND_CPU)"
+                    )
+                elif signame in ("SIGKILL", "SIGSEGV", "SIGABRT", "SIGBUS"):
+                    message += "; puede haber sido cancelado por falta de memoria"
+                else:
+                    message += f"; terminado por {signame}"
+        raise InvocationError(message, detail=tail[-4000:])
     try:
         result = json.loads(result_line)
     except json.JSONDecodeError as exc:

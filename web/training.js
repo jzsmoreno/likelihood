@@ -44,6 +44,26 @@
       .replace(/[&<>"']/g, function (ch) { return map[ch]; });
   }
 
+  function cleanLog(value) {
+    return String(value === null || value === undefined ? '' : value)
+      .replace(/\x1b\[[0-9;]*m/g, '')
+      .replace(/\r/g, '\n');
+  }
+
+  function compactLog(value) {
+    var text = cleanLog(value);
+    var lines = text.split('\n').map(function (line) {
+      return line.trim();
+    }).filter(function (line) {
+      if (!line) return false;
+      if (/^\d+\/\d+\b/.test(line)) return false;
+      if (/\d+\/\d+.*step/.test(line)) return false;
+      if (/^Epoch \d+\/\d+$/.test(line)) return false;
+      return true;
+    });
+    return lines.join('\n').trim() || text.trim();
+  }
+
   function each(list, callback) { Array.prototype.forEach.call(list || [], callback); }
 
   function handleResponse(response) {
@@ -448,6 +468,52 @@
     return String(key).replace(/_/g, ' ');
   }
 
+  var METRIC_COLORS = ['lava', 'blue', 'green', 'amber', 'navy', 'muted', 'faint'];
+
+  function metricColorMap(keys) {
+    var map = {};
+    keys.forEach(function (key, index) {
+      map[key] = METRIC_COLORS[index % METRIC_COLORS.length];
+    });
+    return map;
+  }
+
+  function isLossMetric(key) {
+    return String(key).toLowerCase().indexOf('loss') >= 0;
+  }
+
+  function metricDirection(key) {
+    var name = String(key).toLowerCase();
+    return /(loss|error|mae|mse|rmse|mape)/.test(name) ? 'min' : 'max';
+  }
+
+  function isRateMetric(key) {
+    var name = String(key).toLowerCase().replace(/^val_/, '');
+    return name.indexOf('accuracy') >= 0 || name.indexOf('precision') >= 0 ||
+      name.indexOf('recall') >= 0 || name.indexOf('f1') >= 0 ||
+      name.indexOf('auc') >= 0;
+  }
+
+  function formatMetric(key, value) {
+    if (value === null || value === undefined || !isFinite(Number(value))) return '—';
+    if (isRateMetric(key)) return (Number(value) * 100).toFixed(2) + '%';
+    return fmt(value);
+  }
+
+  function metricBest(values, direction) {
+    var best = null;
+    var epoch = null;
+    (values || []).forEach(function (value, index) {
+      if (value === null || value === undefined || !isFinite(Number(value))) return;
+      var numeric = Number(value);
+      if (best === null || (direction === 'min' ? numeric < best : numeric > best)) {
+        best = numeric;
+        epoch = index + 1;
+      }
+    });
+    return { value: best, epoch: epoch };
+  }
+
   function metricTile(label, value, sub) {
     return '<div class="training-metric">' +
       '<span class="training-metric-label">' + esc(label) + '</span>' +
@@ -460,78 +526,122 @@
     var history = job.result && job.result.history;
     var keys = historyKeys(history);
     if (!keys.length) return '';
-    var lossKey = keys.indexOf('loss') >= 0 ? 'loss' : keys[0];
-    var losses = history[lossKey];
-    var best = null;
-    var bestEpoch = null;
-    losses.forEach(function (value, index) {
-      if (value === null || value === undefined || !isFinite(Number(value))) return;
-      var numeric = Number(value);
-      if (best === null || numeric < best) {
-        best = numeric;
-        bestEpoch = index + 1;
-      }
-    });
-    var latestLoss = latestValue(losses);
+    var lossKeys = keys.filter(isLossMetric);
+    var metricKeys = keys.filter(function (key) { return !isLossMetric(key); });
+    var lossKey = lossKeys.indexOf('loss') >= 0 ? 'loss' : (lossKeys.length ? lossKeys[0] : keys[0]);
+    var lossSummary = metricBest(history[lossKey], 'min');
     var epochs = keys.reduce(function (maximum, key) {
       return Math.max(maximum, history[key].length);
     }, 0);
+    var colorMap = metricColorMap(keys);
     var tiles = [
       metricTile('Épocas', fmt(epochs), 'total'),
-      metricTile(metricLabel(lossKey), latestLoss === null ? '—' : fmt(latestLoss), 'último valor'),
-      metricTile('Mejor ' + metricLabel(lossKey), best === null ? '—' : fmt(best),
-        bestEpoch ? 'época ' + bestEpoch : ''),
+      metricTile(metricLabel(lossKey), formatMetric(lossKey, latestValue(history[lossKey])),
+        'último valor'),
+      metricTile('Mejor ' + metricLabel(lossKey), formatMetric(lossKey, lossSummary.value),
+        lossSummary.epoch ? 'época ' + lossSummary.epoch : ''),
     ];
-    keys.filter(function (key) { return key !== lossKey; }).slice(0, 3).forEach(function (key) {
-      tiles.push(metricTile(metricLabel(key), fmt(latestValue(history[key])), 'último valor'));
+    metricKeys.forEach(function (key) {
+      tiles.push(metricTile(metricLabel(key), formatMetric(key, latestValue(history[key])),
+        'último valor'));
     });
+    var control = job.control || {};
+    var actionLabel = {
+      stop: 'detener al alcanzar el objetivo',
+      reduce_lr: 'reducir learning rate',
+      both: 'detener y reducir learning rate',
+    }[control.action] || control.action;
+    var controlHint = control.metric
+      ? '<p class="hint">Control: <code>' + esc(control.metric) + '</code>' +
+        (control.value !== null && control.value !== undefined ? ' · objetivo ' + esc(control.value) : '') +
+        (actionLabel ? ' · ' + esc(actionLabel) : '') + '</p>'
+      : '';
+    var tableRows = keys.map(function (key) {
+      var summary = metricBest(history[key], metricDirection(key));
+      return '<tr>' +
+        '<td><span class="training-metric-dot" style="background: var(--db-' +
+          esc(colorMap[key] || 'blue') + ')"></span>' + esc(metricLabel(key)) + '</td>' +
+        '<td>' + esc(formatMetric(key, latestValue(history[key]))) + '</td>' +
+        '<td>' + esc(formatMetric(key, summary.value)) + '</td>' +
+        '<td>' + (summary.epoch ? esc(summary.epoch) : '—') + '</td>' +
+        '</tr>';
+    }).join('');
     return '<section class="panel training-metrics-panel" aria-label="Monitor de entrenamiento">' +
       '<div class="panel-header"><span class="panel-icon" aria-hidden="true">◔</span>' +
         '<h2 class="panel-title">Monitor de entrenamiento</h2>' +
         '<span class="training-metrics-badge">' + esc(epochs) + ' épocas</span></div>' +
       '<div class="panel-body">' +
         '<div class="training-metric-grid">' + tiles.join('') + '</div>' +
-        '<div class="training-loss-chart" id="training-loss-chart"></div>' +
-        '<p class="hint">Evolución de <code>' + esc(lossKey) + '</code> por época.</p>' +
+        (lossKeys.length
+          ? '<div class="training-loss-chart" id="training-loss-chart"></div>' +
+            '<p class="hint">Pérdida por época.</p>'
+          : '') +
+        (metricKeys.length
+          ? '<div class="training-metrics-chart" id="training-metrics-chart"></div>' +
+            '<p class="hint">Métricas por época.</p>'
+          : '') +
+        '<div class="training-metric-table-wrap">' +
+          '<table class="training-metric-table">' +
+            '<thead><tr><th>Métrica</th><th>Último</th><th>Mejor</th><th>Época</th></tr></thead>' +
+            '<tbody>' + tableRows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+        controlHint +
       '</div>' +
     '</section>';
   }
 
   function renderTrainingChart(job) {
-    var container = dom.detail ? dom.detail.querySelector('#training-loss-chart') : null;
     var history = job.result && job.result.history;
-    if (!container || !history || !window.LMCharts) return;
+    if (!dom.detail || !history || !window.LMCharts) return;
     var keys = historyKeys(history);
     if (!keys.length) return;
     var epochs = keys.reduce(function (maximum, key) {
       return Math.max(maximum, history[key].length);
     }, 0);
-    var points = [];
-    for (var epoch = 0; epoch < epochs; epoch += 1) {
-      var point = { t: epoch + 1, epoch: epoch + 1 };
-      keys.forEach(function (key) {
-        var value = history[key][epoch];
-        point[key] = value === null || value === undefined || !isFinite(Number(value))
-          ? null
-          : Number(value);
-      });
-      points.push(point);
+    var colorMap = metricColorMap(keys);
+
+    function pointsFor(seriesKeys) {
+      var points = [];
+      for (var epoch = 0; epoch < epochs; epoch += 1) {
+        var point = { t: epoch + 1, epoch: epoch + 1 };
+        seriesKeys.forEach(function (key) {
+          var value = history[key][epoch];
+          point[key] = value === null || value === undefined || !isFinite(Number(value))
+            ? null
+            : Number(value);
+        });
+        points.push(point);
+      }
+      return points;
     }
-    var colors = ['lava', 'blue', 'green', 'amber', 'navy'];
-    var series = keys.map(function (key, index) {
-      return { key: key, label: metricLabel(key), color: colors[index % colors.length] };
-    });
-    window.LMCharts.line(container, {
-      points: points,
-      series: series,
-      height: 220,
-      title: 'Loss / métricas por época',
-      tooltipTitle: function (point) { return 'Época ' + point.epoch; },
-      formatXAxis: function (point) { return 'Época ' + point.epoch; },
-      formatAxis: function (value) { return window.LMCharts.fmtCompact(value); },
-      formatValue: function (value) { return window.LMCharts.fmtNumber(value, 4); },
-      ariaLabel: 'Evolución de la pérdida y métricas por época',
-    });
+
+    function seriesFor(seriesKeys) {
+      return seriesKeys.map(function (key) {
+        return { key: key, label: metricLabel(key), color: colorMap[key] || 'blue' };
+      });
+    }
+
+    function draw(containerId, seriesKeys, title, ariaLabel, height) {
+      var container = dom.detail.querySelector('#' + containerId);
+      if (!container || !seriesKeys.length) return;
+      window.LMCharts.line(container, {
+        points: pointsFor(seriesKeys),
+        series: seriesFor(seriesKeys),
+        height: height || 220,
+        title: title,
+        tooltipTitle: function (point) { return 'Época ' + point.epoch; },
+        formatXAxis: function (point) { return 'Época ' + point.epoch; },
+        formatAxis: function (value) { return window.LMCharts.fmtCompact(value); },
+        formatValue: function (value) { return window.LMCharts.fmtNumber(value, 4); },
+        ariaLabel: ariaLabel,
+      });
+    }
+
+    draw('training-loss-chart', keys.filter(isLossMetric), 'Pérdida por época',
+      'Evolución de la pérdida por época', 200);
+    draw('training-metrics-chart', keys.filter(function (key) { return !isLossMetric(key); }),
+      'Métricas por época', 'Evolución de las métricas por época', 220);
   }
 
   function renderJobDetail(job) {
@@ -568,6 +678,15 @@
       (job.adapter ? '<div class="meta-item"><span class="meta-label">Adaptador</span><code>' + esc(job.adapter) + '</code></div>' : '') +
       (job.dataset ? '<div class="meta-item"><span class="meta-label">Dataset</span><span class="meta-value">' +
         esc(job.dataset.name) + '</span><span class="meta-sub mono">' + esc(job.dataset.summary || '') + '</span></div>' : '') +
+      (job.normalization && job.normalization !== 'none'
+        ? '<div class="meta-item"><span class="meta-label">Normalización</span><code>' +
+          esc(job.normalization) + '</code></div>'
+        : '') +
+      (job.target_normalization && job.target_normalization.method &&
+       job.target_normalization.method !== 'none'
+        ? '<div class="meta-item"><span class="meta-label">Normalización Y</span><code>' +
+          esc(job.target_normalization.method) + '</code></div>'
+        : '') +
       '<div class="meta-item"><span class="meta-label">Creado</span><span class="meta-value">' + esc(isoDate(job.created_at)) + '</span></div>' +
       '<div class="meta-item"><span class="meta-label">Iniciado</span><span class="meta-value">' + esc(isoDate(job.started_at)) + '</span></div>' +
       '<div class="meta-item"><span class="meta-label">Finalizado</span><span class="meta-value">' + esc(isoDate(job.finished_at)) + '</span></div>' +
@@ -583,7 +702,12 @@
         '<section class="panel panel-error" aria-label="Error del job">' +
           '<div class="panel-header"><span class="panel-icon" aria-hidden="true">⚠</span>' +
           '<h2 class="panel-title">El job falló</h2></div>' +
-          '<div class="panel-body"><pre class="error-pre">' + esc(job.error) + '</pre></div>' +
+          '<div class="panel-body"><pre class="error-pre">' + esc(cleanLog(job.error)) + '</pre>' +
+          (job.error_detail
+            ? '<details class="details-block"><summary>Detalle técnico</summary>' +
+              '<pre class="code-block">' + esc(cleanLog(job.error_detail)) + '</pre></details>'
+            : '') +
+          '</div>' +
         '</section>';
     }
 
@@ -610,6 +734,11 @@
             (Object.keys(job.compile || {}).length
               ? '<details class="details-block"><summary>Compilación Keras (JSON)</summary>' +
                 '<pre class="code-block">' + esc(compileText) + '</pre></details>'
+              : '') +
+            (job.target_normalization && Object.keys(job.target_normalization).length
+              ? '<details class="details-block"><summary>Escala de Y (JSON)</summary>' +
+                '<pre class="code-block">' +
+                esc(JSON.stringify(job.target_normalization, null, 2)) + '</pre></details>'
               : '') +
           '</div>' +
         '</section>';
@@ -663,7 +792,7 @@
           (job.log || []).slice().reverse().map(function (entry) {
             return '<li class="log-item log-' + esc(entry.level) + '">' +
               '<span class="log-time mono">' + esc(isoDate(entry.at)) + '</span>' +
-              '<span class="log-msg">' + esc(entry.message) + '</span></li>';
+              '<span class="log-msg">' + esc(compactLog(entry.message)) + '</span></li>';
           }).join('') +
         '</ul></div>' +
       '</section>';
@@ -770,6 +899,86 @@
     return state.models.find(function (model) { return model.id === id; });
   }
 
+  function controlAction() {
+    return dom.targetAction ? dom.targetAction.value : 'stop';
+  }
+
+  function syncControlFields() {
+    var enabled = dom.controlEnabled && dom.controlEnabled.checked;
+    if (dom.controlOptions) dom.controlOptions.hidden = !enabled;
+    var action = controlAction();
+    var stop = action === 'stop' || action === 'both';
+    var reduce = action === 'reduce_lr' || action === 'both';
+    if (dom.targetValueField) dom.targetValueField.hidden = !enabled || !stop;
+    if (dom.targetFactorField) dom.targetFactorField.hidden = !enabled || !reduce;
+    if (dom.targetMinLrField) dom.targetMinLrField.hidden = !enabled || !reduce;
+  }
+
+  function syncControlVisibility() {
+    var model = modelById(state.wModel);
+    if (dom.controlField) {
+      dom.controlField.hidden = !(
+        state.wKind === 'fit' &&
+        model &&
+        model.adapter === 'keras'
+      );
+    }
+    syncControlFields();
+  }
+
+  function readTrainingControl() {
+    if (!dom.controlField || dom.controlField.hidden) return null;
+    if (!dom.controlEnabled || !dom.controlEnabled.checked) return null;
+    var metric = dom.targetMetric ? dom.targetMetric.value : '';
+    if (!metric) return null;
+    var action = controlAction();
+    var stop = action === 'stop' || action === 'both';
+    var reduce = action === 'reduce_lr' || action === 'both';
+    var control = {
+      metric: metric,
+      mode: dom.targetMode ? dom.targetMode.value : 'auto',
+      action: action,
+      patience: dom.targetPatience ? Number(dom.targetPatience.value || 3) : 3,
+      min_delta: dom.targetMinDelta ? Number(dom.targetMinDelta.value || 0) : 0,
+      max_epochs: dom.targetEpochs ? Number(dom.targetEpochs.value || 50) : 50,
+    };
+    if (stop) {
+      var valueText = dom.targetValue ? String(dom.targetValue.value).trim() : '';
+      if (!valueText) {
+        throw new Error('Indica el valor objetivo de la métrica o cambia la acción a reducir LR.');
+      }
+      control.value = Number(valueText);
+      if (!isFinite(control.value)) {
+        throw new Error('El valor objetivo debe ser un número.');
+      }
+    }
+    if (reduce) {
+      control.factor = dom.targetFactor ? Number(dom.targetFactor.value || 0.5) : 0.5;
+      control.min_lr = dom.targetMinLr ? Number(dom.targetMinLr.value || 0.000001) : 0.000001;
+      if (!isFinite(control.factor) || control.factor <= 0 || control.factor >= 1) {
+        throw new Error('El factor de reducción LR debe estar entre 0 y 1.');
+      }
+      if (!isFinite(control.min_lr) || control.min_lr < 0) {
+        throw new Error('El learning rate mínimo debe ser un número no negativo.');
+      }
+    }
+    return control;
+  }
+
+  function resetTrainingControl() {
+    if (dom.controlEnabled) dom.controlEnabled.checked = false;
+    if (dom.targetMetric) dom.targetMetric.value = 'loss';
+    if (dom.targetMode) dom.targetMode.value = 'auto';
+    if (dom.targetValue) dom.targetValue.value = '';
+    if (dom.targetPatience) dom.targetPatience.value = '3';
+    if (dom.targetMinDelta) dom.targetMinDelta.value = '0';
+    if (dom.targetEpochs) dom.targetEpochs.value = '50';
+    if (dom.targetAction) dom.targetAction.value = 'stop';
+    if (dom.targetFactor) dom.targetFactor.value = '0.5';
+    if (dom.targetMinLr) dom.targetMinLr.value = '0.000001';
+    syncControlFields();
+  }
+
   function onKindChange() {
     state.wKind = dom.kindSelect ? dom.kindSelect.value : 'fit';
     state.wMethod = state.wKind === 'fit' ? '' : 'score';
@@ -783,6 +992,9 @@
       dom.artifactField.hidden = state.wKind !== 'evaluate';
     }
     if (dom.compileField && state.wKind !== 'fit') dom.compileField.hidden = true;
+    if (dom.normalizationField) dom.normalizationField.hidden = state.wKind !== 'fit';
+    if (dom.targetNormalizationField) dom.targetNormalizationField.hidden = state.wKind !== 'fit';
+    syncControlVisibility();
     if (dom.datasetPanel && state.wKind !== 'fit') dom.datasetPanel.hidden = true;
     // reset method when switching kind
     if (dom.methodInput) dom.methodInput.value = state.wKind === 'evaluate' ? 'score' : '';
@@ -802,6 +1014,19 @@
     if (dom.compileField) {
       dom.compileField.hidden = !(state.wKind === 'fit' && model && model.adapter === 'keras');
     }
+    if (dom.compileInput) {
+      var compileTask = model && model.dataset_task;
+      dom.compileInput.placeholder = compileTask === 'regression'
+        ? '{"optimizer": "adam", "loss": "mse", "metrics": ["mae", "mean_absolute_percentage_error"]}'
+        : (compileTask === 'classification'
+          ? '{"optimizer": "adam", "loss": "sparse_categorical_crossentropy", "metrics": ["accuracy", "precision", "recall", "f1_score", "auc"]}'
+          : '{"optimizer": "adam", "loss": "mse", "metrics": ["mae"]}');
+    }
+    if (dom.targetNormalizationField) {
+      dom.targetNormalizationField.hidden =
+        !(state.wKind === 'fit' && model && model.dataset_task !== 'classification');
+    }
+    syncControlVisibility();
     var datasetMode = model && model.dataset_mode;
     var datasetVisible = state.wKind === 'fit' && datasetMode && datasetMode !== 'generic';
     if (dom.datasetPanel) dom.datasetPanel.hidden = !datasetVisible;
@@ -896,6 +1121,9 @@
       if (dom.argumentsInput) dom.argumentsInput.value = '{}';
       if (dom.compileInput) dom.compileInput.value = '';
       if (dom.compileField) dom.compileField.hidden = true;
+      if (dom.normalizationSelect) dom.normalizationSelect.value = 'none';
+      if (dom.targetNormalizationSelect) dom.targetNormalizationSelect.value = 'auto';
+      resetTrainingControl();
       if (dom.artifactInput) dom.artifactInput.value = '';
       if (dom.modelCard) dom.modelCard.hidden = true;
       if (dom.wizardExample) { dom.wizardExample.hidden = true; dom.wizardExample.textContent = 'Cargar ejemplo'; }
@@ -1211,6 +1439,19 @@
         catch (error) { toast('Compilación no es JSON válido', true); return; }
       }
     }
+    try {
+      var control = readTrainingControl();
+      if (control) body.control = control;
+    } catch (error) {
+      toast(error.message, true);
+      return;
+    }
+    if (state.wKind === 'fit' && dom.normalizationSelect) {
+      body.normalization = dom.normalizationSelect.value;
+    }
+    if (state.wKind === 'fit' && dom.targetNormalizationSelect) {
+      body.target_normalization = dom.targetNormalizationSelect.value;
+    }
     if (state.dataset && dom.datasetPanel && !dom.datasetPanel.hidden) {
       var selection = validateDatasetSelection();
       if (!selection) return;
@@ -1322,6 +1563,8 @@
     }
     if (dom.kindSelect) dom.kindSelect.addEventListener('change', onKindChange);
     if (dom.modelSelect) dom.modelSelect.addEventListener('change', onModelChange);
+    if (dom.controlEnabled) dom.controlEnabled.addEventListener('change', syncControlFields);
+    if (dom.targetAction) dom.targetAction.addEventListener('change', syncControlFields);
     if (dom.wizardExample) dom.wizardExample.addEventListener('click', loadExample);
     if (dom.createDialog) {
       dom.createDialog.addEventListener('click', function (event) {
@@ -1394,6 +1637,25 @@
     dom.argumentsInput = byId('job-arguments');
     dom.compileInput = byId('job-compile');
     dom.compileField = byId('compile-field');
+    dom.normalizationSelect = byId('job-normalization');
+    dom.normalizationField = byId('normalization-field');
+    dom.targetNormalizationSelect = byId('job-target-normalization');
+    dom.targetNormalizationField = byId('target-normalization-field');
+    dom.controlField = byId('control-field');
+    dom.controlEnabled = byId('job-control-enabled');
+    dom.controlOptions = byId('control-options');
+    dom.targetMetric = byId('job-target-metric');
+    dom.targetMode = byId('job-target-mode');
+    dom.targetValue = byId('job-target-value');
+    dom.targetValueField = byId('target-value-field');
+    dom.targetPatience = byId('job-target-patience');
+    dom.targetMinDelta = byId('job-target-min-delta');
+    dom.targetEpochs = byId('job-target-epochs');
+    dom.targetAction = byId('job-target-action');
+    dom.targetFactor = byId('job-target-factor');
+    dom.targetFactorField = byId('target-factor-field');
+    dom.targetMinLr = byId('job-target-min-lr');
+    dom.targetMinLrField = byId('target-min-lr-field');
     dom.artifactInput = byId('job-artifact-id');
     dom.artifactField = byId('artifact-field');
     dom.constructorHint = byId('constructor-hint');
