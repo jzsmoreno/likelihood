@@ -1825,6 +1825,17 @@ def _compile_metric_objects(instance, metrics):
                 prepared = tf.expand_dims(prepared, -1)
             return super().update_state(prepared, y_pred, sample_weight)
 
+    class _FlatR2(keras.metrics.R2Score):
+        # R2Score requires 2D inputs; some regressors emit 1D predictions.
+        def update_state(self, y_true, y_pred, sample_weight=None):
+            y_true = tf.convert_to_tensor(y_true)
+            y_pred = tf.convert_to_tensor(y_pred)
+            if len(y_true.shape) == 1:
+                y_true = tf.expand_dims(y_true, -1)
+            if len(y_pred.shape) == 1:
+                y_pred = tf.expand_dims(y_pred, -1)
+            return super().update_state(y_true, y_pred, sample_weight)
+
     class _MacroAUC(keras.metrics.Metric):
         def __init__(self, num_labels, name="auc", **kwargs):
             super().__init__(name=name, **kwargs)
@@ -1891,6 +1902,8 @@ def _compile_metric_objects(instance, metrics):
             resolved.append(
                 _MacroAUC(output_dim) if multi else keras.metrics.AUC(name="auc")
             )
+        elif key in ("r2", "r2_score"):
+            resolved.append(_FlatR2(name=key))
         else:
             resolved.append(metric)
     return resolved

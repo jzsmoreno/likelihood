@@ -271,7 +271,8 @@ the appropriate loss/metrics.
 For Keras fits, the optional `control` field enables a predefined target metric
 (`loss`, `val_loss`, `accuracy`, `val_accuracy`, `precision`, `val_precision`,
 `recall`, `val_recall`, `f1_score`, `val_f1_score`, `mae`, `val_mae`,
-`mean_absolute_percentage_error`/`mape`, etc.). The
+`mse`, `val_mse`, `root_mean_squared_error`, `val_root_mean_squared_error`,
+`r2_score`, `val_r2_score`, `mean_absolute_percentage_error`/`mape`, etc.). The
 action can stop at a target value (the target callback stops as soon as the
 metric reaches it), reduce the learning rate on a plateau (`ReduceLROnPlateau`),
 or do both. The wizard exposes it as an opt-in checkbox, with a `max_epochs`
@@ -338,7 +339,8 @@ The AST catalog cannot see methods inherited from external frameworks, so
 `keras.Model.fit` is not part of `model["methods"]`. The training server adds a
 small **Keras adapter** for models whose base class is `Model` (currently
 `AutoClassifier` and `GANRegressor`): it exposes a synthetic `fit(x, y, ...)`,
-compiles the model with a conservative default (`adam` + `mse` for regression, or
+compiles the model with a conservative default (`adam` + `mse` plus
+`mae`/`mse`/`root_mean_squared_error`/`r2_score` metrics for regression, or
 `sparse_categorical_crossentropy` + `accuracy`/`precision`/`recall`/`f1_score`/`auc`
 for a softmax/sigmoid classifier) and then calls the inherited `fit`. A job can
 override the defaults:
@@ -379,12 +381,14 @@ sandbox maps those names to sparse-aware wrappers, so the same metric names work
 for binary classifiers and for multiclass classifiers trained with sparse
 integer labels (Keras' built-in precision/recall/F1/AUC expect one-hot targets).
 
-For regression, `mean_absolute_percentage_error` (alias `mape`) is available as
-a `compile.loss` and/or a `compile.metrics` entry, and the target-metric control
-offers both spellings. Keras logs the metric under the exact name used in
-`metrics`, so the control metric must match it. MAPE divides by the target
-magnitude: use it with strictly positive targets, and prefer `mae`/`mse` when
-`target_normalization` produces values around zero (for example `standard`).
+For regression, the default compile logs `mae`, `mse`,
+`root_mean_squared_error` and `r2_score`. `mean_absolute_percentage_error`
+(alias `mape`) remains an opt-in `compile.loss` and/or `compile.metrics` entry,
+and the target-metric control offers all of them. Keras logs the metric under
+the exact name used in `metrics`, so the control metric must match it. MAPE
+divides by the target magnitude: use it with strictly positive targets, and
+prefer `mae`/`mse` when `target_normalization` produces values around zero (for
+example `standard`).
 PyTorch models in the catalog (for example
 `MultiBanditNet`) do not define `fit`; use their native `forward`/training methods
 instead, because a generic optimizer/loss cannot be inferred from the model alone.

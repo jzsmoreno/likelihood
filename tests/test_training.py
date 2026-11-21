@@ -454,12 +454,18 @@ def test_keras_compile_options_can_be_overridden(store, captured):
     assert finished["compile"]["metrics"] == list(training_core.CLASSIFICATION_METRICS)
 
 
-def test_regression_default_compile_stays_on_mse():
-    """MAPE is opt-in; the conservative regression default remains MSE."""
-    assert training_core.default_compile_options({}, {}) == {
-        "optimizer": "adam",
-        "loss": "mse",
-    }
+def test_regression_default_compile_includes_popular_metrics():
+    """Regression logs MAE, MSE, RMSE and R² by default; MAPE stays opt-in."""
+    options = training_core.default_compile_options({}, {})
+    assert options["optimizer"] == "adam"
+    assert options["loss"] == "mse"
+    assert options["metrics"] == list(training_core.REGRESSION_METRICS)
+    assert list(training_core.REGRESSION_METRICS) == [
+        "mae",
+        "mse",
+        "root_mean_squared_error",
+        "r2_score",
+    ]
 
 
 def test_classification_defaults_include_popular_metrics():

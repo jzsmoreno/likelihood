@@ -170,6 +170,9 @@
   function axes(group, spec, geometry) {
     var colors = palette();
     var ticks = 4;
+    var minValue = spec.minValue || 0;
+    var maxValue = spec.maxValue || 1;
+    var range = spec.range || (maxValue - minValue) || 1;
     for (var index = 0; index <= ticks; index += 1) {
       var y = geometry.top + geometry.height - (geometry.height * index / ticks);
       group.appendChild(
@@ -182,7 +185,7 @@
           'stroke-width': 1
         })
       );
-      var value = (spec.maxValue || 1) * index / ticks;
+      var value = minValue + range * index / ticks;
       var label = svg('text', {
         x: geometry.left - 8,
         y: y + 4,
@@ -248,14 +251,21 @@
       ? Number(points[points.length - 1].t) - Number(points[0].t)
       : 60;
     var maxValue = 0;
+    var minValue = 0;
     points.forEach(function (point) {
       series.forEach(function (entry) {
         var value = Number(point[entry.key]);
-        if (isFinite(value) && value > maxValue) maxValue = value;
+        if (!isFinite(value)) return;
+        if (value > maxValue) maxValue = value;
+        if (value < minValue) minValue = value;
       });
     });
+    var niceMaxValue = niceMax(maxValue * 1.08 || 1);
+    var niceMinValue = minValue < 0 ? -niceMax(-minValue * 1.08) : 0;
     var scaleSpec = {
-      maxValue: niceMax(maxValue * 1.08 || 1),
+      minValue: niceMinValue,
+      maxValue: niceMaxValue,
+      range: (niceMaxValue - niceMinValue) || 1,
       formatAxis: spec.formatAxis || fmtCompact,
       formatXAxis: spec.formatXAxis
     };
@@ -269,7 +279,7 @@
 
     function yAt(value) {
       return geometry.top + geometry.height -
-        (geometry.height * Number(value) / scaleSpec.maxValue);
+        (geometry.height * (Number(value) - scaleSpec.minValue) / scaleSpec.range);
     }
 
     var order = points.map(function (point, index) {

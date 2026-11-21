@@ -1017,7 +1017,7 @@
     if (dom.compileInput) {
       var compileTask = model && model.dataset_task;
       dom.compileInput.placeholder = compileTask === 'regression'
-        ? '{"optimizer": "adam", "loss": "mse", "metrics": ["mae", "mean_absolute_percentage_error"]}'
+        ? '{"optimizer": "adam", "loss": "mse", "metrics": ["mae", "mse", "root_mean_squared_error", "r2_score"]}'
         : (compileTask === 'classification'
           ? '{"optimizer": "adam", "loss": "sparse_categorical_crossentropy", "metrics": ["accuracy", "precision", "recall", "f1_score", "auc"]}'
           : '{"optimizer": "adam", "loss": "mse", "metrics": ["mae"]}');

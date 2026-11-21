@@ -77,6 +77,12 @@ TARGET_METRICS = (
     "val_mae",
     "mse",
     "val_mse",
+    "root_mean_squared_error",
+    "val_root_mean_squared_error",
+    "r2",
+    "val_r2",
+    "r2_score",
+    "val_r2_score",
     "mape",
     "val_mape",
     "mean_absolute_percentage_error",
@@ -95,6 +101,9 @@ TARGET_METRICS = (
 
 #: Metrics compiled into a Keras classifier by default.
 CLASSIFICATION_METRICS = ("accuracy", "precision", "recall", "f1_score", "auc")
+
+#: Metrics compiled into a Keras regressor by default (MAPE stays opt-in).
+REGRESSION_METRICS = ("mae", "mse", "root_mean_squared_error", "r2_score")
 
 #: Actions available for a target metric control.
 TARGET_ACTIONS = ("stop", "reduce_lr", "both")
@@ -534,9 +543,10 @@ def resolve_fit_method_name(model: Dict[str, Any], requested: str = "") -> str:
 def default_compile_options(model: Dict[str, Any], parameters: Dict[str, Any]) -> Dict[str, Any]:
     """Conservative Keras compile options for a framework ``fit``.
 
-    Regression stays on ``mse`` by default.  ``mean_absolute_percentage_error``
-    (alias ``mape``) is available as an explicit ``compile.loss`` and/or
-    ``compile.metrics`` entry, and the target-metric control offers both names.
+    Regression uses ``mse`` as the loss and logs ``mae``, ``mse``,
+    ``root_mean_squared_error`` and ``r2_score`` by default.  MAPE
+    (``mean_absolute_percentage_error``) remains an explicit opt-in because it
+    needs strictly positive targets.
     """
     activation = str(parameters.get("classifier_activation") or "").strip().lower()
     classes = parameters.get("num_classes")
@@ -552,7 +562,7 @@ def default_compile_options(model: Dict[str, Any], parameters: Dict[str, Any]) -
             "loss": "sparse_categorical_crossentropy",
             "metrics": list(CLASSIFICATION_METRICS),
         }
-    return {"optimizer": "adam", "loss": "mse"}
+    return {"optimizer": "adam", "loss": "mse", "metrics": list(REGRESSION_METRICS)}
 
 
 def resolve_compile_options(
@@ -740,7 +750,7 @@ EXAMPLE_JOBS: Dict[str, Dict[str, Any]] = {
             "epochs": 2,
             "batch_size": 4,
         },
-        "compile": {"optimizer": "adam", "loss": "mse", "metrics": ["mae"]},
+        "compile": {"optimizer": "adam", "loss": "mse", "metrics": list(REGRESSION_METRICS)},
     },
 }
 
