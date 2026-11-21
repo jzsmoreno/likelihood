@@ -478,6 +478,69 @@ def test_classification_defaults_include_popular_metrics():
     assert binary["metrics"] == expected
 
 
+def test_supported_optimizer_names_are_forwarded():
+    """Every optimizer offered by the wizard is accepted by the compile merge."""
+    for name in (
+        "adam",
+        "adamw",
+        "sgd",
+        "rmsprop",
+        "nadam",
+        "adagrad",
+        "adadelta",
+        "adamax",
+        "ftrl",
+    ):
+        options = training_core.resolve_compile_options({}, {}, {"optimizer": name})
+        assert options["optimizer"] == name
+
+
+def test_keras_compile_options_accept_optimizer_and_learning_rate(store, captured):
+    """The optimizer selector and learning rate reach the sandbox."""
+    job = store.start(
+        {
+            "model_id": "AutoClassifier",
+            "parameters": {
+                "input_shape_parm": 4,
+                "num_classes": 3,
+                "units": 8,
+                "activation": "relu",
+            },
+            "arguments": {"x": [[0.1, 0.2, 0.3, 0.4]] * 4, "y": [0, 1, 2, 0], "epochs": 1},
+            "compile": {"optimizer": "sgd", "learning_rate": 0.01},
+        }
+    )
+
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    assert finished["compile"]["optimizer"] == "sgd"
+    assert finished["compile"]["learning_rate"] == 0.01
+    assert captured[0]["compile"]["optimizer"] == "sgd"
+    assert captured[0]["compile"]["learning_rate"] == 0.01
+
+
+def test_compile_rejects_invalid_learning_rate(store):
+    """A non-positive or non-numeric learning rate fails before the job starts."""
+    for invalid in (-0.1, 0, "fast", True):
+        with pytest.raises(training_core.core.ValidationError):
+            store.start(
+                {
+                    "model_id": "AutoClassifier",
+                    "parameters": {
+                        "input_shape_parm": 4,
+                        "num_classes": 3,
+                        "units": 8,
+                        "activation": "relu",
+                    },
+                    "arguments": {
+                        "x": [[0.1, 0.2, 0.3, 0.4]] * 4,
+                        "y": [0, 1, 2, 0],
+                    },
+                    "compile": {"learning_rate": invalid},
+                }
+            )
+
+
 def test_regression_compile_accepts_mape_loss_and_metric(store, captured):
     """MAPE can be selected as the regression loss and/or metric."""
     job = store.start(

@@ -354,7 +354,8 @@ override the defaults:
   },
   "arguments": {"x": [[0.1, 0.2, 0.3, 0.4]], "y": [0], "epochs": 1},
   "compile": {
-    "optimizer": "adam",
+    "optimizer": "adamw",
+    "learning_rate": 0.001,
     "loss": "sparse_categorical_crossentropy",
     "metrics": ["accuracy", "precision", "recall", "f1_score", "auc"]
   }
@@ -366,6 +367,12 @@ that is already compiled. The Keras training history is stored in the job result
 and shown in the training detail page with a compact metrics monitor, a
 loss-per-epoch chart, a metrics-per-epoch chart and a summary table (latest
 value, best value and best epoch for every metric).
+
+The wizard's **Optimizador** selector offers Adam (default), AdamW, SGD, RMSprop,
+Nadam, Adagrad, Adadelta, Adamax and Ftrl, plus *Personalizado* to keep the
+`compile` JSON in control. The optional **Learning rate** field becomes
+`compile.learning_rate`; the sandbox builds the optimizer instance because
+Keras' `compile` does not accept a `learning_rate` keyword.
 
 Classification jobs log accuracy, precision, recall, F1 and AUC by default. The
 sandbox maps those names to sparse-aware wrappers, so the same metric names work

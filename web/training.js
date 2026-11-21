@@ -1120,6 +1120,8 @@
       if (dom.parametersInput) dom.parametersInput.value = '{}';
       if (dom.argumentsInput) dom.argumentsInput.value = '{}';
       if (dom.compileInput) dom.compileInput.value = '';
+      if (dom.optimizerSelect) dom.optimizerSelect.value = 'auto';
+      if (dom.learningRateInput) dom.learningRateInput.value = '';
       if (dom.compileField) dom.compileField.hidden = true;
       if (dom.normalizationSelect) dom.normalizationSelect.value = 'none';
       if (dom.targetNormalizationSelect) dom.targetNormalizationSelect.value = 'auto';
@@ -1403,6 +1405,21 @@
         ? JSON.stringify(example.compile, null, 2)
         : '';
     }
+    var exampleCompile = example.compile || {};
+    var optimizerNames = ['adam', 'adamw', 'sgd', 'rmsprop', 'nadam', 'adagrad',
+      'adadelta', 'adamax', 'ftrl'];
+    var exampleOptimizer = String(exampleCompile.optimizer || '').toLowerCase();
+    if (dom.optimizerSelect) {
+      dom.optimizerSelect.value = optimizerNames.indexOf(exampleOptimizer) >= 0
+        ? exampleOptimizer
+        : 'auto';
+    }
+    if (dom.learningRateInput) {
+      dom.learningRateInput.value =
+        exampleCompile.learning_rate !== undefined && exampleCompile.learning_rate !== null
+          ? exampleCompile.learning_rate
+          : '';
+    }
     if (dom.compileField) {
       dom.compileField.hidden = !(state.wKind === 'fit' && model.adapter === 'keras');
     }
@@ -1432,12 +1449,31 @@
     var args = {};
     try { args = JSON.parse(argsText || '{}'); } catch (error) { toast('Argumentos no es JSON válido', true); return; }
     body.arguments = args;
-    if (dom.compileField && !dom.compileField.hidden && dom.compileInput) {
-      var compileText = dom.compileInput.value.trim();
+    if (dom.compileField && !dom.compileField.hidden) {
+      var compile = {};
+      var compileText = dom.compileInput ? dom.compileInput.value.trim() : '';
       if (compileText) {
-        try { body.compile = JSON.parse(compileText); }
+        try { compile = JSON.parse(compileText); }
         catch (error) { toast('Compilación no es JSON válido', true); return; }
+        if (!compile || typeof compile !== 'object' || Array.isArray(compile)) {
+          toast('La compilación debe ser un objeto JSON', true);
+          return;
+        }
       }
+      var optimizerValue = dom.optimizerSelect ? dom.optimizerSelect.value : 'auto';
+      if (optimizerValue && optimizerValue !== 'auto' && optimizerValue !== 'custom') {
+        compile.optimizer = optimizerValue;
+      }
+      var learningRateText = dom.learningRateInput ? dom.learningRateInput.value.trim() : '';
+      if (learningRateText !== '') {
+        var learningRate = Number(learningRateText);
+        if (!isFinite(learningRate) || learningRate <= 0) {
+          toast('El learning rate debe ser mayor que 0', true);
+          return;
+        }
+        compile.learning_rate = learningRate;
+      }
+      if (Object.keys(compile).length) body.compile = compile;
     }
     try {
       var control = readTrainingControl();
@@ -1637,6 +1673,8 @@
     dom.argumentsInput = byId('job-arguments');
     dom.compileInput = byId('job-compile');
     dom.compileField = byId('compile-field');
+    dom.optimizerSelect = byId('job-optimizer');
+    dom.learningRateInput = byId('job-learning-rate');
     dom.normalizationSelect = byId('job-normalization');
     dom.normalizationField = byId('normalization-field');
     dom.targetNormalizationSelect = byId('job-target-normalization');

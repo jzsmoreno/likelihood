@@ -1896,6 +1896,24 @@ def _compile_metric_objects(instance, metrics):
     return resolved
 
 
+def _optimizer_with_learning_rate(name, learning_rate):
+    # ``compile`` accepts an optimizer instance or a name, not a learning-rate
+    # keyword; build the instance when the wizard sends both.
+    try:
+        import keras
+    except BaseException:
+        return name
+    try:
+        optimizer = keras.optimizers.get(name)
+    except BaseException:
+        return name
+    try:
+        optimizer.learning_rate = float(learning_rate)
+    except BaseException:
+        pass
+    return optimizer
+
+
 def _apply_compile(instance, options):
     # Keras-style models need ``compile`` before ``fit``.  The options come from
     # the training layer (server defaults or a user override), never from the
@@ -1918,6 +1936,15 @@ def _apply_compile(instance, options):
     except BaseException:
         pass
     kwargs = {key: value for key, value in options.items() if key != "force"}
+    if "learning_rate" in kwargs:
+        learning_rate = kwargs.pop("learning_rate")
+        optimizer = kwargs.get("optimizer")
+        if optimizer is None or (
+            isinstance(optimizer, str) and optimizer.strip().lower() in ("", "auto", "custom")
+        ):
+            optimizer = "adam"
+        if isinstance(optimizer, (str, dict)):
+            kwargs["optimizer"] = _optimizer_with_learning_rate(optimizer, learning_rate)
     if "metrics" in kwargs:
         kwargs["metrics"] = _compile_metric_objects(instance, kwargs["metrics"])
     if kwargs:

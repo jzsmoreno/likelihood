@@ -558,13 +558,36 @@ def default_compile_options(model: Dict[str, Any], parameters: Dict[str, Any]) -
 def resolve_compile_options(
     model: Dict[str, Any], parameters: Dict[str, Any], raw: Any
 ) -> Dict[str, Any]:
-    """Merge the request's ``compile`` object with the server defaults."""
+    """Merge the request's ``compile`` object with the server defaults.
+
+    ``learning_rate`` is accepted as a convenience and validated here; the
+    sandbox turns it into an optimizer instance because Keras' ``compile`` does
+    not take a ``learning_rate`` keyword.
+    """
     if raw is None:
         raw = {}
     if not isinstance(raw, dict):
         raise core.ValidationError("El campo 'compile' debe ser un objeto")
     options = default_compile_options(model, parameters)
     options.update(raw)
+    optimizer = options.get("optimizer")
+    if optimizer is not None and not isinstance(optimizer, (str, dict)):
+        raise core.ValidationError("El campo 'compile.optimizer' debe ser un nombre o un objeto")
+    if isinstance(optimizer, str) and not optimizer.strip():
+        options.pop("optimizer", None)
+    learning_rate = options.get("learning_rate")
+    if learning_rate is not None:
+        if isinstance(learning_rate, bool):
+            raise core.ValidationError("El campo 'compile.learning_rate' debe ser un número")
+        try:
+            learning_rate = float(learning_rate)
+        except (TypeError, ValueError) as exc:
+            raise core.ValidationError(
+                "El campo 'compile.learning_rate' debe ser un número"
+            ) from exc
+        if not math.isfinite(learning_rate) or learning_rate <= 0:
+            raise core.ValidationError("El campo 'compile.learning_rate' debe ser mayor que 0")
+        options["learning_rate"] = learning_rate
     return options
 
 

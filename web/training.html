@@ -755,8 +755,30 @@
         </div>
         <div class="wizard-field" id="compile-field" hidden>
           <label for="job-compile">Compilación Keras (opcional)</label>
+          <div class="training-control-grid">
+            <div class="wizard-field">
+              <label for="job-optimizer">Optimizador</label>
+              <select class="select" id="job-optimizer">
+                <option value="auto">Auto · Adam (por defecto)</option>
+                <option value="adam">Adam</option>
+                <option value="adamw">AdamW</option>
+                <option value="sgd">SGD</option>
+                <option value="rmsprop">RMSprop</option>
+                <option value="nadam">Nadam</option>
+                <option value="adagrad">Adagrad</option>
+                <option value="adadelta">Adadelta</option>
+                <option value="adamax">Adamax</option>
+                <option value="ftrl">Ftrl</option>
+                <option value="custom">Personalizado (JSON)</option>
+              </select>
+            </div>
+            <div class="wizard-field">
+              <label for="job-learning-rate">Learning rate</label>
+              <input type="number" class="input" id="job-learning-rate" min="0" step="any" placeholder="Por defecto del optimizador">
+            </div>
+          </div>
           <textarea class="wizard-json" id="job-compile" rows="5" placeholder='{"optimizer": "adam", "loss": "sparse_categorical_crossentropy", "metrics": ["accuracy"]}'></textarea>
-          <p class="hint">Solo para modelos Keras con <code>fit</code> heredado. Se combina con la compilación por defecto del servidor; <code>force: true</code> recompila un modelo ya compilado. En regresión puedes usar <code>mean_absolute_percentage_error</code> (o <code>mape</code>) como <code>loss</code> y/o en <code>metrics</code>; requiere objetivos positivos.</p>
+          <p class="hint">Solo para modelos Keras con <code>fit</code> heredado. Se combina con la compilación por defecto del servidor; <code>force: true</code> recompila un modelo ya compilado. El selector de optimizador sobrescribe <code>optimizer</code> del JSON (elige «Personalizado» para usar solo el JSON) y el learning rate se aplica al optimizador seleccionado. En regresión puedes usar <code>mean_absolute_percentage_error</code> (o <code>mape</code>) como <code>loss</code> y/o en <code>metrics</code>; requiere objetivos positivos.</p>
         </div>
         <div class="wizard-field" id="control-field" hidden>
           <label>Control por métrica objetivo (Keras)</label>
