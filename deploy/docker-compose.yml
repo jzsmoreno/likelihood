@@ -3,6 +3,7 @@
 #   docker compose -f deploy/docker-compose.yml up --build            # http://localhost:8000
 #   LM_API_TOKEN=secret docker compose -f deploy/docker-compose.yml up --build
 #   LM_PORT=9000 docker compose -f deploy/docker-compose.yml up       # container and published port
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml up --build   # NVIDIA GPU
 #
 # Every value can also be exported in the shell or written to a `.env` file next
 # to this compose file (Compose reads it automatically).
@@ -17,6 +18,11 @@ services:
       args:
         # "true" adds tensorflow, torch, keras-tuner, scikit-learn, pyvis.
         INSTALL_FULL_EXTRAS: "${INSTALL_FULL_EXTRAS:-true}"
+        # "true" installs `tensorflow[and-cuda]`; combine it with the GPU overlay
+        # (deploy/docker-compose.gpu.yml) or `--gpus all` so the container sees
+        # the NVIDIA driver. On a GPU host without it TensorFlow logs
+        # "Could not find cuda drivers on your machine, GPU will not be used".
+        INSTALL_CUDA: "${INSTALL_CUDA:-false}"
     image: likelihood-catalog:latest
     # Reap the child processes used by the playground and the live sessions.
     init: true
@@ -35,9 +41,17 @@ services:
       LM_INVOKE: "${LM_INVOKE:-1}"
       LM_SESSIONS: "${LM_SESSIONS:-1}"
       LM_CATALOG_TTL: "${LM_CATALOG_TTL:-2}"
-      # Address space of each sandboxed model process, in MiB. TensorFlow maps
-      # ~2.5 GiB just to import: raise it for heavy models, or set 0 to disable.
-      LM_PLAYGROUND_MEMORY: "${LM_PLAYGROUND_MEMORY:-8192}"
+      # Open file descriptors of each sandboxed model process. The old 128
+      # default made TensorFlow/abseil abort ("Unable to get high fd ... limit=128");
+      # 4096 is ample and 0 disables the cap.
+      LM_PLAYGROUND_FILES: "${LM_PLAYGROUND_FILES:-4096}"
+      # Address space of each sandboxed model process, in MiB. Keep it at 0 (the
+      # default) on GPU hosts: a CUDA context reserves a large virtual range and
+      # RLIMIT_AS makes pthread_create fail
+      # ("Thread tf_data_private_threadpool creation via pthread_create() failed").
+      # To bound a runaway model, cap the whole container with
+      # deploy.resources.limits.memory instead (see below).
+      LM_PLAYGROUND_MEMORY: "${LM_PLAYGROUND_MEMORY:-0}"
       # Long calls: a background invocation may take 15 min and retry a timeout.
       LM_INVOKE_JOB_TIMEOUT: "${LM_INVOKE_JOB_TIMEOUT:-900}"
       LM_INVOKE_MAX_TIMEOUT: "${LM_INVOKE_MAX_TIMEOUT:-3600}"
@@ -57,9 +71,11 @@ services:
       # - ./saved-models:/models:ro
     security_opt:
       - no-new-privileges:true
-    # Pin resources when the playground spawns heavy models:
+    # Cap the whole container (server plus every sandboxed child) here, now that
+    # the per-child address-space limit is disabled by default. TensorFlow +
+    # CUDA need several GiB, so raise the value for heavy models:
     # deploy:
     #   resources:
     #     limits:
-    #       cpus: "2"
-    #       memory: 2g
+    #       cpus: "4"
+    #       memory: 16g

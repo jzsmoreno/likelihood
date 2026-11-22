@@ -411,15 +411,46 @@ LM_API_TOKEN=change-me docker compose -f deploy/docker-compose.yml up --build   
 LM_PORT=9000 docker compose -f deploy/docker-compose.yml up                       # container + published port
 ```
 
+On a host with an NVIDIA GPU the image must also ship the CUDA libraries and the
+container must be granted access to the device:
+
+```bash
+# CUDA-enabled TensorFlow (tensorflow[and-cuda]) + `--gpus all`
+docker build -f deploy/Dockerfile --build-arg INSTALL_FULL_EXTRAS=true \
+  --build-arg INSTALL_CUDA=true -t likelihood-catalog:gpu .
+docker run --rm --gpus all -p 8000:8000 likelihood-catalog:gpu
+
+# Compose overlay: builds the CUDA variant and reserves every GPU of the host
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml up --build
+
+# Check that TensorFlow sees the card
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml \
+  exec catalog python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+```
+
+The host needs a recent NVIDIA driver and the [NVIDIA Container
+Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+registered with Docker (`sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker`).
+Without `--gpus all`/the overlay — or with the CPU image — TensorFlow logs
+`Could not find cuda drivers on your machine, GPU will not be used` and trains on
+the CPU. `deploy/docker-compose.gpu.yml` also documents `TF_NUM_INTRAOP_THREADS`
+/ `TF_NUM_INTEROP_THREADS` for many-core hosts.
+
 Notes:
 
 * The image runs as the unprivileged user `likelihood` (uid 1001), so mounted
   model files must be readable by that user.
 * Runs started from the UI (`/api/playground`, `/invoke` and the sessions) cap
-  the address space of the child process with `LM_PLAYGROUND_MEMORY`
-  (8 GiB by default, `0` disables it). Importing TensorFlow maps ~2.5 GiB on its
-  own: a lower value fails with `libtensorflow_cc.so.2: failed to map segment
-  from shared object`.
+  the number of open descriptors of the child process with
+  `LM_PLAYGROUND_FILES` (4096 by default, `0` disables the cap). The
+  address-space cap (`LM_PLAYGROUND_MEMORY`) is **disabled by default**:
+  importing TensorFlow maps ~2.5 GiB on its own and a CUDA context reserves a
+  much larger virtual range, so an `RLIMIT_AS` ceiling makes `pthread_create`
+  fail (`Thread tf_data_private_threadpool creation via pthread_create()
+  failed`), which killed training jobs on GPU hosts. Set it only for constrained
+  deployments (`LM_PLAYGROUND_MEMORY=8192`) and use
+  `deploy.resources.limits.memory` in Compose to bound the whole container
+  instead.
 * The model page submits every invocation as a background job
   (`LM_INVOKE_JOB_TIMEOUT`, 15 min) and polls it, so a cold TensorFlow import
   no longer hits the 60 s limit of the synchronous route. The compose file also
@@ -458,7 +489,8 @@ the equivalent `--` CLI flag). They let you secure the API or tune its behaviour
 | `LM_SERVING_WORKERS` | Background workers that validate/load deployments. | 2 |
 | `LM_SERVING_MAX_EVENTS` | Inference events kept in memory and reloaded from the log. | 20000 |
 | `LM_SERVING_LOG_INPUTS` | Store a short input/output preview in each monitoring event (`0` disables it). | true |
-| `LM_PLAYGROUND_MEMORY` | Address space (MiB) each sandboxed model process may map; raise it for heavy models or set `0` to disable the cap. | 8192 |
+| `LM_PLAYGROUND_MEMORY` | Address space (MiB) each sandboxed model process may map; `0` disables the cap (recommended on GPU hosts, where CUDA reserves a large virtual range). | 0 |
+| `LM_PLAYGROUND_FILES` | Open file descriptors each sandboxed model process may hold; `0` disables the cap. | 4096 |
 | `LM_INVOKE_TIMEOUT` | Seconds a synchronous `/invoke` or session call may take. | 60 |
 | `LM_INVOKE_JOB_TIMEOUT` | Seconds a background invocation (`/invoke/jobs`) may take. | 900 |
 | `LM_INVOKE_MAX_TIMEOUT` | Upper bound of the `timeout` a client may request in the body. | 3600 |

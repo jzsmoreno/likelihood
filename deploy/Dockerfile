@@ -12,12 +12,30 @@
 #
 # Models that need TensorFlow, PyTorch, Keras Tuner or scikit-learn are optional:
 #   docker build -f deploy/Dockerfile --build-arg INSTALL_FULL_EXTRAS=true -t likelihood-catalog:full .
+#
+# GPU host (NVIDIA driver + Container Toolkit): build with the CUDA wheels and
+# start the container with `--gpus all` (or use deploy/docker-compose.gpu.yml):
+#   docker build -f deploy/Dockerfile --build-arg INSTALL_FULL_EXTRAS=true \
+#     --build-arg INSTALL_CUDA=true -t likelihood-catalog:gpu .
+#   docker run --rm --gpus all -p 8000:8000 likelihood-catalog:gpu
 
 FROM python:3.12-slim AS runtime
 
 # Install the optional `[full]` extras (tensorflow, torch, keras-tuner, ...).
 ARG INSTALL_FULL_EXTRAS=true
 
+# Install TensorFlow together with its CUDA wheels (`tensorflow[and-cuda]`)
+# instead of the CPU build.  The host still needs a recent NVIDIA driver and the
+# NVIDIA Container Toolkit, and the container must be started with access to the
+# GPUs: `docker run --gpus all ...` or
+# `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml up`.
+# Without this flag TensorFlow logs "Could not find cuda drivers on your machine,
+# GPU will not be used" and trains on the CPU.
+ARG INSTALL_CUDA=false
+
+# NVIDIA_VISIBLE_DEVICES / NVIDIA_DRIVER_CAPABILITIES are read by the NVIDIA
+# container runtime to mount the host driver libraries (libcuda.so,
+# libnvidia-ml.so, ...) inside the container.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -25,7 +43,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HOME=/home/likelihood \
     PYTHONPATH=/app/server \
     LM_HOST=0.0.0.0 \
-    LM_PORT=8000
+    LM_PORT=8000 \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # graphviz: renders the pydot/graphviz diagrams some models produce.
 # libgomp1: OpenMP runtime used by the numpy/scipy/torch wheels.
@@ -44,10 +64,14 @@ RUN python -m pip install --upgrade pip \
     && python -m pip install -r requirements.txt \
     && python -m pip install "fastapi>=0.110" "uvicorn[standard]>=0.27" \
     && if [ "${INSTALL_FULL_EXTRAS}" = "true" ]; then \
-        python -m pip install \
+        if [ "${INSTALL_CUDA}" = "true" ]; then \
+            python -m pip install "tensorflow[and-cuda]>=2.16"; \
+        else \
+            python -m pip install "tensorflow>=2.15.0"; \
+        fi \
+        && python -m pip install \
             "networkx" \
             "pyvis" \
-            "tensorflow>=2.15.0" \
             "keras-tuner" \
             "scikit-learn" \
             "torch"; \

@@ -1,0 +1,37 @@
+# GPU overlay for the Likelihood model catalog.
+#
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.gpu.yml up --build
+#
+# It builds the image with `tensorflow[and-cuda]` and reserves every GPU of the
+# host. Requirements:
+#
+#   * A recent NVIDIA driver on the host (`nvidia-smi` must work).
+#   * The NVIDIA Container Toolkit installed and registered as a Docker runtime:
+#       sudo nvidia-ctk runtime configure --runtime=docker
+#       sudo systemctl restart docker
+#
+# To pin specific cards, replace `count: all` with `device_ids: ["0"]` (the IDs
+# are the ones reported by `nvidia-smi`). Everything else (ports, token,
+# volumes, LM_* settings) is inherited from deploy/docker-compose.yml.
+
+services:
+  catalog:
+    build:
+      args:
+        INSTALL_CUDA: "true"
+    environment:
+      # The NVIDIA runtime mounts the host driver libraries exposed by these.
+      NVIDIA_VISIBLE_DEVICES: "all"
+      NVIDIA_DRIVER_CAPABILITIES: "compute,utility"
+      # TensorFlow sizes its thread pools from the CPUs it sees, and the
+      # container sees every core of the host. On a many-core machine cap them
+      # so a training job does not reserve a stack per core:
+      # TF_NUM_INTRAOP_THREADS: "8"
+      # TF_NUM_INTEROP_THREADS: "4"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

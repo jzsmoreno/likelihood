@@ -470,12 +470,40 @@ def test_memory_mapping_errors_point_at_the_playground_limit():
     assert core.friendly_invocation_error("KeyError: 'missing'") == "KeyError: 'missing'"
 
 
+def test_thread_creation_errors_point_at_the_sandbox_limits():
+    # A CUDA context plus one thread per core exhausts RLIMIT_AS and
+    # pthread_create returns EAGAIN; the abseil "high fd" line is the tail of the
+    # abort when RLIMIT_NOFILE is 128 (the old sandbox default).
+    thread = core.friendly_invocation_error(
+        "Check failed: ret == 0 (11 vs. 0) Thread tf_data_private_threadpool "
+        "creation via pthread_create() failed."
+    )
+    assert "LM_PLAYGROUND_FILES" in thread
+    assert "LM_PLAYGROUND_MEMORY" in thread
+    assert thread.startswith("Check failed: ret == 0")
+
+    high_fd = core.friendly_invocation_error(
+        "[symbolize_elf.inc : 379] RAW: Unable to get high fd: rc=0, limit=128"
+    )
+    assert "LM_PLAYGROUND_FILES" in high_fd
+    assert high_fd.startswith("[symbolize_elf.inc : 379]")
+
+
 def test_sandbox_memory_leaves_room_for_tensorflow():
     # Importing TensorFlow maps ~2.5 GiB of address space before any model is
-    # built, so the default must stay above the 2 GiB ceiling that used to break
-    # every TensorFlow invocation. ``0`` means "no limit" and is also valid.
+    # built, so a configured default must stay above the 2 GiB ceiling that used
+    # to break every TensorFlow invocation. ``0`` means "no limit" and is also
+    # valid: a CUDA context reserves a much larger virtual range (and
+    # RLIMIT_AS makes pthread_create fail on GPU hosts).
     assert core.PLAYGROUND_MEMORY_MB == 0 or core.PLAYGROUND_MEMORY_MB >= 4096
     assert core.playground_limits()["memory"] == core.PLAYGROUND_MEMORY_MB * 1024 * 1024
+
+
+def test_sandbox_file_limit_leaves_room_for_tensorflow():
+    # TensorFlow/abseil need more than the old 128 ceiling, which made abseil
+    # report "Unable to get high fd ... limit=128" while symbolizing the abort.
+    assert core.PLAYGROUND_MAX_FILES == 0 or core.PLAYGROUND_MAX_FILES >= 1024
+    assert core.playground_limits()["files"] == core.PLAYGROUND_MAX_FILES
 
 
 def test_requested_timeout_accepts_and_bounds_the_budget():

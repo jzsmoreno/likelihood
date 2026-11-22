@@ -83,13 +83,23 @@ TRUST_PROXY = _env_flag("LM_TRUST_PROXY", False)
 PLAYGROUND_TIMEOUT = float(os.environ.get("LM_PLAYGROUND_TIMEOUT") or 60)
 #: CPU seconds the playground child may consume before the kernel kills it.
 PLAYGROUND_CPU_SECONDS = int(os.environ.get("LM_PLAYGROUND_CPU") or 30)
-#: Address space of the playground child, in MiB (``0`` disables the limit).
-#: TensorFlow maps ~2.5 GiB *just to import* (``libtensorflow_cc.so.2``), so a
-#: 2 GiB ceiling made every TensorFlow model die in the child with ``failed to
-#: map segment from shared object``; 8 GiB still bounds a runaway model.
-PLAYGROUND_MEMORY_MB = int(os.environ.get("LM_PLAYGROUND_MEMORY") or 8192)
+#: Address space of the playground child, in MiB (``0``, the default, disables it).
+#: TensorFlow maps ~2.5 GiB *just to import* (``libtensorflow_cc.so.2``), so a low
+#: ceiling makes every TensorFlow model die with ``failed to map segment from
+#: shared object``.  A CUDA context reserves a much larger virtual range on top of
+#: that, and once ``RLIMIT_AS``/``RLIMIT_DATA`` run out ``pthread_create`` fails
+#: with ``EAGAIN`` (``Thread tf_data_private_threadpool creation via
+#: pthread_create() failed``, seen in training jobs on GPU hosts).  The cap is
+#: therefore opt-in: bound the container instead (Compose
+#: ``deploy.resources.limits.memory``) and set a value here only for constrained
+#: deployments.
+PLAYGROUND_MEMORY_MB = int(os.environ.get("LM_PLAYGROUND_MEMORY") or 0)
 #: Open file descriptors the playground child may hold (``0`` disables the limit).
-PLAYGROUND_MAX_FILES = int(os.environ.get("LM_PLAYGROUND_FILES") or 128)
+#: The old 128 ceiling was below what TensorFlow needs: while symbolizing the
+#: abort, abseil reports ``Unable to get high fd: ... limit=128``, and the runtime
+#: can fail earlier while creating its thread pools.  4096 keeps the sandbox
+#: bounded and still leaves room for TensorFlow, PyTorch and the CUDA libraries.
+PLAYGROUND_MAX_FILES = int(os.environ.get("LM_PLAYGROUND_FILES") or 4096)
 #: Largest file the playground child may write, in MiB (``0`` disables the limit).
 PLAYGROUND_MAX_FILE_MB = int(os.environ.get("LM_PLAYGROUND_FILE_SIZE") or 32)
 #: Modules the catalog code may not import.  ``LM_PLAYGROUND_BLOCKED_MODULES``
@@ -2953,6 +2963,15 @@ _ADDRESS_SPACE_ERRORS = (
     "Memory allocation still failed",
 )
 
+#: Abseil/TensorFlow abort when the sandbox cannot create a thread (``EAGAIN``).
+#: Each thread stack and arena counts against ``RLIMIT_AS``/``RLIMIT_DATA``, which
+#: is what a CUDA context exhausts first; the trailing abseil line about the "high
+#: fd" is the symptom reported when ``RLIMIT_NOFILE`` is too small to symbolize it.
+_THREAD_CREATION_ERRORS = (
+    "pthread_create",
+    "Unable to get high fd",
+)
+
 
 def friendly_invocation_error(
     message: str,
@@ -2979,6 +2998,14 @@ def friendly_invocation_error(
             "cargar las librerías del modelo (TensorFlow necesita ~2,5 GiB solo para "
             "importarse): sube LM_PLAYGROUND_MEMORY (por ejemplo, 8192) o ponlo a 0 "
             "para desactivar el límite."
+        )
+    if any(fragment in text for fragment in _THREAD_CREATION_ERRORS):
+        return (
+            f"{text} · El proceso hijo no pudo crear un hilo: los límites del sandbox "
+            "(descriptores con LM_PLAYGROUND_FILES y espacio de direcciones con "
+            "LM_PLAYGROUND_MEMORY) son demasiado bajos para TensorFlow o CUDA. Deja "
+            "LM_PLAYGROUND_MEMORY a 0 y sube LM_PLAYGROUND_FILES (4096 por defecto; "
+            "65536 para datasets con muchos ficheros)."
         )
     if method == "call" and "NoneType' object is not callable" in text:
         return (
