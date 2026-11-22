@@ -84,6 +84,14 @@ RUN groupadd --system --gid 1001 likelihood \
 
 COPY --chown=likelihood:likelihood . .
 
+# Training jobs, their artifacts and the serving store are written under
+# /app/data.  The build context excludes data/ (see .dockerignore) and /app is
+# owned by root, so create the tree with the ownership of the runtime user;
+# otherwise the first job fails with
+# "PermissionError: [Errno 13] Permission denied: '/app/data'".
+RUN mkdir -p /app/data/output/training /app/data/output/serving /app/data/notebooks \
+    && chown -R likelihood:likelihood /app/data
+
 # Fail the build early when the server or the introspection layer is broken.
 RUN python -c "import server_core, server_fastapi; print('catalog models:', len(server_core.CATALOG))"
 

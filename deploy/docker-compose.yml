@@ -66,6 +66,12 @@ services:
       # rebuilding the image (LM_CATALOG_TTL controls how often it is checked).
       # Read-only because the server only introspects the sources.
       - ../likelihood/models:/app/likelihood/models:ro
+      # Training jobs (jobs.json + artifacts/) and the serving store are written
+      # under /app/data by the unprivileged user (uid 1001). The image creates
+      # that folder with the right owner, so Docker seeds a fresh named volume
+      # with it; a bind mount instead needs `sudo chown -R 1001:1001 <host-dir>`
+      # or the first write fails with PermissionError: '/app/data'.
+      - likelihood-data:/app/data
       # Saved models for POST /api/models/<id>/load and the "Cargar y usar"
       # panel. Pair it with LM_LOAD_ROOT=/models and LM_LOAD_RESTRICT=1.
       # - ./saved-models:/models:ro
@@ -79,3 +85,8 @@ services:
     #     limits:
     #       cpus: "4"
     #       memory: 16g
+
+volumes:
+  # jobs.json, the trained artifacts and the serving store. Remove it to start
+  # from an empty catalogue of jobs (`docker compose down -v`).
+  likelihood-data:

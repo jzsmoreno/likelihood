@@ -440,6 +440,14 @@ Notes:
 
 * The image runs as the unprivileged user `likelihood` (uid 1001), so mounted
   model files must be readable by that user.
+* Training jobs and their artifacts (`data/output/training`) plus the serving
+  store (`data/output/serving`) are written to `/app/data`. The image creates
+  that folder owned by uid 1001 and Compose persists it in the `likelihood-data`
+  volume. A bind mount there must be writable by uid 1001
+  (`sudo chown -R 1001:1001 <host-dir>`), otherwise the first job fails with
+  `PermissionError: [Errno 13] Permission denied: '/app/data'`. Point
+  `LM_TRAINING_STORE` / `LM_SERVING_STORE` to another writable directory if you
+  prefer.
 * Runs started from the UI (`/api/playground`, `/invoke` and the sessions) cap
   the number of open descriptors of the child process with
   `LM_PLAYGROUND_FILES` (4096 by default, `0` disables the cap). The
@@ -489,6 +497,7 @@ the equivalent `--` CLI flag). They let you secure the API or tune its behaviour
 | `LM_SERVING_WORKERS` | Background workers that validate/load deployments. | 2 |
 | `LM_SERVING_MAX_EVENTS` | Inference events kept in memory and reloaded from the log. | 20000 |
 | `LM_SERVING_LOG_INPUTS` | Store a short input/output preview in each monitoring event (`0` disables it). | true |
+| `LM_TRAINING_STORE` | Directory that keeps `jobs.json` and the `artifacts/` folder of the training jobs. | `data/output/training` |
 | `LM_PLAYGROUND_MEMORY` | Address space (MiB) each sandboxed model process may map; `0` disables the cap (recommended on GPU hosts, where CUDA reserves a large virtual range). | 0 |
 | `LM_PLAYGROUND_FILES` | Open file descriptors each sandboxed model process may hold; `0` disables the cap. | 4096 |
 | `LM_INVOKE_TIMEOUT` | Seconds a synchronous `/invoke` or session call may take. | 60 |
