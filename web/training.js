@@ -1801,6 +1801,10 @@
     if (dom.datasetY) dom.datasetY.innerHTML = '';
     if (dom.datasetApplyNote) dom.datasetApplyNote.textContent = '';
     if (dom.datasetFile) dom.datasetFile.value = '';
+    if (dom.datasetRows) {
+      dom.datasetRows.value = '';
+      dom.datasetRows.placeholder = 'Todas';
+    }
     setDatasetStatus('');
     syncCrossValidationVisibility();
   }
@@ -1899,6 +1903,10 @@
     }
     state.dataset = dataset;
     state.datasetSelection = null;
+    if (dom.datasetRows) {
+      dom.datasetRows.value = '';
+      dom.datasetRows.placeholder = dataset.rows ? 'Todas (' + dataset.rows + ')' : 'Todas';
+    }
     if (dom.datasetConfig) dom.datasetConfig.hidden = false;
     if (dom.datasetSummary) {
       dom.datasetSummary.textContent = dataset.name + ' · ' + dataset.rows + ' filas · ' +
@@ -1945,17 +1953,28 @@
     });
   }
 
+  function datasetSampleRows() {
+    if (!dom.datasetRows) return null;
+    var text = String(dom.datasetRows.value || '').trim();
+    if (!text) return null;
+    var value = Number(text);
+    return isFinite(value) ? value : NaN;
+  }
+
   function datasetSelection() {
     var model = modelById(state.wModel);
     if (!state.dataset || !model) return null;
     var mode = model.dataset_mode || 'xy';
-    return {
+    var selection = {
       dataset_id: state.dataset.dataset_id,
       mode: mode,
       task: model.dataset_task || 'auto',
       features: mode === 'datapoints' ? [] : selectedValues(dom.datasetX),
       target: dom.datasetY ? dom.datasetY.value : '',
     };
+    var sampleRows = datasetSampleRows();
+    if (sampleRows !== null) selection.sample_rows = sampleRows;
+    return selection;
   }
 
   function validateDatasetSelection() {
@@ -1976,6 +1995,17 @@
       toast('La columna objetivo no puede formar parte de X.', true);
       return null;
     }
+    var sampleRows = datasetSampleRows();
+    if (sampleRows !== null) {
+      if (!isFinite(sampleRows) || sampleRows < 1 || Math.floor(sampleRows) !== sampleRows) {
+        toast('Las filas a usar deben ser un entero mayor o igual que 1.', true);
+        return null;
+      }
+      if (state.dataset && state.dataset.rows && sampleRows > state.dataset.rows) {
+        toast('El dataset solo tiene ' + state.dataset.rows + ' filas.', true);
+        return null;
+      }
+    }
     return selection;
   }
 
@@ -1983,11 +2013,14 @@
     var selection = validateDatasetSelection();
     if (!selection) return;
     state.datasetSelection = selection;
+    var sampleText = selection.sample_rows
+      ? ' · muestra aleatoria de ' + selection.sample_rows + ' filas'
+      : '';
     if (dom.datasetApplyNote) {
       dom.datasetApplyNote.textContent = (selection.mode === 'datapoints'
         ? 'Selección lista: datapoints ← ' + selection.target
         : 'Selección lista: ' + selection.features.length + ' columnas X → ' + selection.target) +
-        '. Se usará al lanzar el job.';
+        sampleText + '. Se usará al lanzar el job.';
     }
     setDatasetStatus('Selección lista. Revisa los argumentos y lanza el job.');
     fillDataSettings(selection);
@@ -2010,7 +2043,13 @@
       dom.parametersInput.value = JSON.stringify(example.parameters || {}, null, 2);
     }
     if (dom.argumentsInput) {
-      dom.argumentsInput.value = JSON.stringify(example.arguments || {}, null, 2);
+      var exampleArgs = example.arguments || {};
+      if (state.dataset) {
+        // The dataset supplies X/Y; keep only the training options (epochs...).
+        exampleArgs = Object.assign({}, exampleArgs);
+        DATA_JSON_KEYS.forEach(function (key) { delete exampleArgs[key]; });
+      }
+      dom.argumentsInput.value = JSON.stringify(exampleArgs, null, 2);
     }
     if (dom.compileInput) {
       dom.compileInput.value = example.compile && Object.keys(example.compile).length
@@ -2040,7 +2079,9 @@
       dom.exampleNote.textContent = example.note || '';
     }
     if (dom.wizardExample) dom.wizardExample.textContent = 'Ejemplo cargado';
-    toast('Ejemplo cargado: ' + (example.label || model.name));
+    if (state.dataset) fillDataSettings(datasetSelection());
+    toast('Ejemplo cargado' + (state.dataset ? ' (X/Y salen del dataset)' : '') +
+      ': ' + (example.label || model.name));
   }
 
   function createJob() {
@@ -2199,6 +2240,9 @@
       if (dom.datasetApplyNote) dom.datasetApplyNote.textContent = '';
       fillDataSettings(datasetSelection());
     });
+    if (dom.datasetRows) dom.datasetRows.addEventListener('input', function () {
+      if (dom.datasetApplyNote) dom.datasetApplyNote.textContent = '';
+    });
     if (dom.datasetApply) dom.datasetApply.addEventListener('click', applyDataset);
   }
 
@@ -2352,6 +2396,7 @@
     dom.datasetModeBadge = byId('dataset-mode-badge');
     dom.datasetUrl = byId('dataset-url');
     dom.datasetLoadUrl = byId('dataset-load-url');
+    dom.datasetRows = byId('dataset-rows');
     dom.datasetFile = byId('dataset-file');
     dom.datasetLoadFile = byId('dataset-load-file');
     dom.datasetExamples = document.querySelector('.dataset-examples');

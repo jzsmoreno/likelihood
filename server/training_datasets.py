@@ -35,6 +35,8 @@ MAX_COLUMNS = int(os.environ.get("LM_TRAINING_DATASET_COLUMNS") or 200)
 MAX_DATASETS = int(os.environ.get("LM_TRAINING_DATASETS") or 20)
 #: Rows shown in the preview table.
 PREVIEW_ROWS = 8
+#: Seed of the reproducible random sample used by ``sample_rows`` options.
+SAMPLE_SEED = 42
 #: Extensions the loader understands.
 SUPPORTED_FORMATS = frozenset({"csv", "tsv", "xlsx", "parquet"})
 
@@ -226,6 +228,17 @@ def _preview(frame: pd.DataFrame) -> List[Dict[str, Any]]:
     return [{str(key): _json_value(value) for key, value in row.items()} for row in rows]
 
 
+def _sample_rows(data: Any, rows: Optional[int]) -> Any:
+    """Keep every row, or a reproducible random sample of ``rows``.
+
+    A random sample (instead of ``head``) keeps every class/region represented
+    even when the file is sorted (the Iris CSV is grouped by species).
+    """
+    if rows is None or rows <= 0 or rows >= len(data):
+        return data
+    return data.sample(n=int(rows), random_state=SAMPLE_SEED)
+
+
 class DatasetStore:
     """Small in-memory registry of parsed datasets."""
 
@@ -290,8 +303,13 @@ def build_xy(
     features: Sequence[str],
     target: str,
     task: str = "auto",
+    rows: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Build ``x``/``y`` arrays for a classification or regression target."""
+    """Build ``x``/``y`` arrays for a classification or regression target.
+
+    ``rows`` keeps a reproducible random sample of that size instead of every
+    valid row; ``None`` uses the whole dataset.
+    """
     feature_names = _require_columns(frame, features)
     target_name = str(target or "").strip()
     if not feature_names:
@@ -324,6 +342,7 @@ def build_xy(
 
     classes: Optional[Dict[str, int]] = None
     if task_name == "classification":
+        data = _sample_rows(data, rows)
         codes, uniques = pd.factorize(data["__target__"], sort=True)
         y = [int(code) for code in codes]
         classes = {str(value): index for index, value in enumerate(uniques)}
@@ -335,6 +354,8 @@ def build_xy(
         valid = ~y_series.isna()
         data = data.loc[valid]
         y_series = y_series.loc[valid]
+        data = _sample_rows(data, rows)
+        y_series = y_series.loc[data.index]
         y = [float(value) for value in y_series]
 
     x = data[feature_names].astype(float).values.tolist()
@@ -350,17 +371,25 @@ def build_xy(
     }
 
 
-def build_datapoints(frame: pd.DataFrame, target: str) -> Dict[str, Any]:
-    """Build a flat numeric ``datapoints`` sequence from one column."""
+def build_datapoints(
+    frame: pd.DataFrame, target: str, rows: Optional[int] = None
+) -> Dict[str, Any]:
+    """Build a flat numeric ``datapoints`` sequence from one column.
+
+    ``rows`` keeps a reproducible random sample of that size instead of every
+    value; ``None`` uses the whole column.
+    """
     target_name = str(target or "").strip()
     if not target_name or target_name not in frame.columns:
         raise core.ValidationError("Selecciona una columna de datapoints válida")
     series = pd.to_numeric(frame[target_name], errors="coerce")
     if (frame[target_name].notna() & series.isna()).any():
         raise core.ValidationError("La columna de datapoints debe ser numérica")
-    values = [float(value) for value in series.dropna()]
-    if not values:
+    series = series.dropna()
+    if not len(series):
         raise core.ValidationError("La columna de datapoints no contiene valores")
+    series = _sample_rows(series, rows)
+    values = [float(value) for value in series]
     return {
         "mode": "datapoints",
         "task": "",

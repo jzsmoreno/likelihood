@@ -708,7 +708,10 @@ EXAMPLE_JOBS: Dict[str, Dict[str, Any]] = {
         "method": "fit",
         "name": "AutoClassifier · clasificación",
         "label": "Clasificación",
-        "note": "x: 12 filas × 4 variables; y: 3 clases (0, 1, 2).",
+        "note": (
+            "x: 12 filas × 4 variables; y: 3 clases (0, 1, 2). "
+            "Con un dataset cargado, X/Y salen del dataset."
+        ),
         "parameters": {
             "input_shape_parm": 4,
             "num_classes": 3,
@@ -746,7 +749,10 @@ EXAMPLE_JOBS: Dict[str, Dict[str, Any]] = {
         "method": "fit",
         "name": "EnsembleClassifier · clasificación",
         "label": "Clasificación",
-        "note": "X: 12 filas × 4 variables; y: 3 clases (0, 1, 2); 2 modelos × 2 épocas.",
+        "note": (
+            "X: 12 filas × 4 variables; y: 3 clases (0, 1, 2); 2 modelos × 2 épocas. "
+            "Con un dataset cargado, X/Y salen del dataset."
+        ),
         "parameters": {
             "n_models": 2,
             "param_ranges": {"units": [8], "num_layers": [1]},
@@ -1186,7 +1192,8 @@ class TrainingStore:
 
         ``method_name`` selects the argument spelling: the Keras adapter uses
         ``x``/``y`` while classic estimators such as ``EnsembleClassifier.fit``
-        declare ``X``/``y``.
+        declare ``X``/``y``.  ``sample_rows`` keeps a reproducible random sample
+        of the requested size instead of every valid row.
         """
         if not isinstance(dataset_spec, dict):
             raise core.ValidationError("El campo 'dataset' debe ser un objeto")
@@ -1200,18 +1207,34 @@ class TrainingStore:
         features = dataset_spec.get("features") or []
         if not isinstance(features, list):
             raise core.ValidationError("El campo 'features' del dataset debe ser una lista")
+        sample_rows = dataset_spec.get("sample_rows")
+        if sample_rows in (None, ""):
+            sample_rows = None
+        else:
+            if isinstance(sample_rows, bool):
+                raise core.ValidationError("El campo 'sample_rows' del dataset debe ser un entero")
+            try:
+                sample_rows = int(sample_rows)
+            except (TypeError, ValueError) as exc:
+                raise core.ValidationError(
+                    "El campo 'sample_rows' del dataset debe ser un entero"
+                ) from exc
+            if sample_rows < 1:
+                raise core.ValidationError("El campo 'sample_rows' del dataset debe ser >= 1")
         frame = record["frame"]
         args: Dict[str, Any] = {}
         params: Dict[str, Any] = {}
         if mode == "datapoints":
-            built = training_datasets.build_datapoints(frame, target)
+            built = training_datasets.build_datapoints(frame, target, sample_rows)
             params = {"datapoints": built["datapoints"]}
             summary = (
                 f"{record['name']} · {built['rows']} valores → "
                 f"datapoints desde '{built['target']}'"
             )
+            if sample_rows is not None:
+                summary += f" · muestra de {built['rows']} filas"
         elif mode == "xy":
-            built = training_datasets.build_xy(frame, features, target, task)
+            built = training_datasets.build_xy(frame, features, target, task, sample_rows)
             x_name, y_name = "x", "y"
             try:
                 method = self._training_method(model, method_name or fit_method_name(model))
@@ -1227,6 +1250,8 @@ class TrainingStore:
                 f"{record['name']} · {built['rows']} filas · "
                 f"X: {len(built['features'])} columnas → {built['target']}"
             )
+            if sample_rows is not None:
+                summary += f" · muestra de {built['rows']} filas"
         else:
             raise core.ValidationError("El modo del dataset debe ser 'xy' o 'datapoints'")
         meta = {
@@ -1239,6 +1264,8 @@ class TrainingStore:
             "features": built.get("features") or [],
             "target": built.get("target") or target,
             "rows": built.get("rows") or 0,
+            "available_rows": len(frame),
+            "sample_rows": sample_rows,
             "classes": built.get("classes"),
             "summary": summary,
         }

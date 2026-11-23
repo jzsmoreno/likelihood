@@ -85,6 +85,36 @@ def test_regression_and_datapoints_modes():
     assert datapoints["target"] == "value"
 
 
+def test_build_xy_can_sample_a_reproducible_portion():
+    """``rows`` keeps a random, reproducible subset (not the first rows)."""
+    frame = pd.DataFrame(
+        {
+            "x1": [float(index) for index in range(60)],
+            "x2": [float(index % 7) for index in range(60)],
+            "target": ["a", "b", "c"] * 20,
+        }
+    )
+    full = training_datasets.build_xy(frame, ["x1", "x2"], "target", "classification")
+    sample = training_datasets.build_xy(frame, ["x1", "x2"], "target", "classification", rows=10)
+    repeat = training_datasets.build_xy(frame, ["x1", "x2"], "target", "classification", rows=10)
+
+    assert sample["rows"] == 10
+    assert len(sample["x"]) == 10 and len(sample["y"]) == 10
+    assert sample["x"] == repeat["x"] and sample["y"] == repeat["y"]
+    assert sample["x"] != full["x"][:10]
+
+
+def test_build_datapoints_can_sample_a_portion():
+    """The datapoints sequence follows the same reproducible sample."""
+    frame = pd.DataFrame({"value": [float(index) for index in range(40)]})
+    sample = training_datasets.build_datapoints(frame, "value", rows=8)
+    repeat = training_datasets.build_datapoints(frame, "value", rows=8)
+
+    assert sample["rows"] == 8
+    assert sample["datapoints"] == repeat["datapoints"]
+    assert sample["datapoints"] != [float(index) for index in range(8)]
+
+
 def test_parameter_overrides_follow_the_selected_dataset():
     """Keras shape and class parameters are derived from the selection."""
     model = {

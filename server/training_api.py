@@ -112,7 +112,8 @@ class TrainingRequest(BaseModel):
         default=None,
         description=(
             "Referencia de dataset: dataset_id, mode ('xy'/'datapoints'), "
-            "features, target y task."
+            "features, target, task y sample_rows (muestra aleatoria "
+            "reproducible; vacío = todas las filas)."
         ),
     )
     timeout: Optional[float] = Field(

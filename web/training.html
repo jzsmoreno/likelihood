@@ -875,6 +875,11 @@
                 <p class="hint" id="dataset-target-hint"></p>
               </div>
             </div>
+            <div class="wizard-field" id="dataset-rows-field">
+              <label for="dataset-rows">Filas a usar</label>
+              <input class="input" id="dataset-rows" type="number" min="1" step="1" placeholder="Todas">
+              <p class="hint">Vacío = todas las filas. Un número usa una muestra aleatoria reproducible (semilla 42).</p>
+            </div>
             <div class="dataset-apply-row">
               <span class="hint" id="dataset-apply-note"></span>
               <button class="btn btn-primary btn-sm" type="button" id="dataset-apply">Aplicar selección</button>

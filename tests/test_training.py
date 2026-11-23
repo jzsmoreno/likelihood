@@ -699,6 +699,61 @@ def test_target_normalization_accepts_the_declared_target_name():
     assert arguments["X"] == [[1.0], [2.0]]
 
 
+def test_dataset_sample_rows_limits_the_training_data(store, captured):
+    """``sample_rows`` sends a reproducible random portion to the fit call."""
+    frame = pd.DataFrame(
+        {
+            "x1": [float(index) for index in range(20)],
+            "x2": [float(index % 5) for index in range(20)],
+            "target": ["a", "b"] * 10,
+        }
+    )
+    dataset = store.datasets.put("sample.csv", frame, "sample.csv", "csv")
+    job = store.start(
+        {
+            "model_id": "AutoClassifier",
+            "parameters": {"input_shape_parm": 2, "num_classes": 2},
+            "arguments": {"epochs": 1},
+            "dataset": {
+                "dataset_id": dataset["dataset_id"],
+                "mode": "xy",
+                "task": "classification",
+                "features": ["x1", "x2"],
+                "target": "target",
+                "sample_rows": 6,
+            },
+        }
+    )
+
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    assert finished["dataset"]["rows"] == 6
+    assert finished["dataset"]["sample_rows"] == 6
+    call = captured[0]
+    assert len(call["arguments"]["x"]) == 6
+    assert len(call["arguments"]["y"]) == 6
+
+
+def test_dataset_sample_rows_must_be_positive(store):
+    """A zero/negative sample size is rejected before queueing the job."""
+    frame = pd.DataFrame({"x1": [1.0, 2.0], "target": ["a", "b"]})
+    dataset = store.datasets.put("sample.csv", frame, "sample.csv", "csv")
+    with pytest.raises(training_core.core.ValidationError):
+        store.start(
+            {
+                "model_id": "AutoClassifier",
+                "dataset": {
+                    "dataset_id": dataset["dataset_id"],
+                    "mode": "xy",
+                    "task": "classification",
+                    "features": ["x1"],
+                    "target": "target",
+                    "sample_rows": 0,
+                },
+            }
+        )
+
+
 def test_dataset_datapoints_mode_rebuilds_the_sequence(store, captured):
     """A datapoints selection is removed from the stored parameters and rebuilt."""
     frame = pd.DataFrame({"value": [1.0, 2.0, 3.0, 4.0]})
