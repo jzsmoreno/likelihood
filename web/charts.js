@@ -152,6 +152,14 @@
     return Math.max(172, Math.min(352, Math.round(width * ratio)));
   }
 
+  /* The right gutter grows when end labels are requested and the bottom gutter
+   * grows when the chart gets an explicit X axis caption. */
+  function chartGeometry(width, height, spec) {
+    var right = spec && spec.endLabels ? 62 : 14;
+    var bottom = spec && spec.xAxisTitle ? 60 : 52;
+    return { left: 48, top: 16, width: width - 48 - right, height: height - bottom };
+  }
+
   function linearPathD(segment) {
     return segment.map(function (point, index) {
       return (index === 0 ? 'M' : 'L') + fmtCoord(point.x) + ' ' + fmtCoord(point.y);
@@ -306,14 +314,15 @@
       var label = svg('text', {
         x: geometry.left - 8,
         y: y + 4,
+        'class': 'lm-axis-tick',
         'text-anchor': 'end',
         fill: colors.faint,
-        'font-size': 10
+        'font-size': 10.5
       });
       label.textContent = (spec.formatAxis || fmtCompact)(value);
       group.appendChild(label);
     }
-    var count = Math.min(6, geometry.points.length);
+    var count = Math.min(spec.maxXTicks || 6, geometry.points.length);
     for (var tick = 0; tick < count; tick += 1) {
       var indexPoint = count === 1
         ? 0
@@ -324,12 +333,26 @@
       var text = svg('text', {
         x: x,
         y: geometry.top + geometry.height + 17,
+        'class': 'lm-axis-tick',
         'text-anchor': tick === count - 1 ? 'end' : tick === 0 ? 'start' : 'middle',
         fill: colors.faint,
-        'font-size': 10
+        'font-size': 10.5
       });
       text.textContent = spec.formatXAxis ? spec.formatXAxis(point) : fmtAxisDate(point.t, geometry.span);
       group.appendChild(text);
+    }
+    if (spec.xAxisTitle) {
+      var caption = svg('text', {
+        x: geometry.left + geometry.width / 2,
+        y: geometry.top + geometry.height + 36,
+        'class': 'lm-axis-title',
+        'text-anchor': 'middle',
+        fill: colors.faint,
+        'font-size': 9.5,
+        'letter-spacing': '0.09em'
+      });
+      caption.textContent = String(spec.xAxisTitle).toUpperCase();
+      group.appendChild(caption);
     }
   }
 
@@ -352,7 +375,7 @@
     var context = shell(container, spec);
     var width = Math.max(320, container.clientWidth || 640);
     var height = chartHeight(width, spec);
-    var geometry = { left: 48, top: 16, width: width - 62, height: height - 52 };
+    var geometry = chartGeometry(width, height, spec);
     var node = svg('svg', {
       viewBox: '0 0 ' + width + ' ' + height,
       width: '100%',
@@ -388,7 +411,9 @@
       maxValue: niceMaxValue,
       range: (niceMaxValue - niceMinValue) || 1,
       formatAxis: spec.formatAxis || fmtCompact,
-      formatXAxis: spec.formatXAxis
+      formatXAxis: spec.formatXAxis,
+      xAxisTitle: spec.xAxisTitle,
+      maxXTicks: spec.maxXTicks
     };
     var background = svg('g', {});
     axes(background, scaleSpec, geometry);
@@ -408,6 +433,7 @@
     });
     var markerGroup = svg('g', { 'class': 'lm-chart-markers' });
     var markerList = [];
+    var endLabelList = [];
     series.forEach(function (entry) {
       var stroke = color(entry.color, 'blue');
       var segments = [];
@@ -419,7 +445,7 @@
           current = [];
           return;
         }
-        current.push({ x: xAt(item.index), y: yAt(value) });
+        current.push({ x: xAt(item.index), y: yAt(value), value: Number(value) });
       });
       if (current.length) segments.push(current);
       var gradientId = entry.area
@@ -462,6 +488,15 @@
           markerList.push({ point: segment[segment.length - 1], stroke: stroke, small: false });
         }
       });
+      if (spec.endLabels) {
+        for (var tailIndex = segments.length - 1; tailIndex >= 0; tailIndex -= 1) {
+          var tail = segments[tailIndex];
+          if (tail.length) {
+            endLabelList.push({ point: tail[tail.length - 1], stroke: stroke });
+            break;
+          }
+        }
+      }
     });
     markerList.forEach(function (marker) {
       var attrs = {
@@ -476,6 +511,23 @@
       markerGroup.appendChild(svg('circle', attrs));
     });
     node.appendChild(markerGroup);
+    endLabelList.forEach(function (entry) {
+      var label = svg('text', {
+        x: fmtCoord(entry.point.x + 7),
+        y: fmtCoord(entry.point.y + 3.5),
+        'class': 'lm-end-label',
+        'text-anchor': 'start',
+        fill: entry.stroke,
+        stroke: colors.surface,
+        'stroke-width': 3,
+        'paint-order': 'stroke',
+        'stroke-linejoin': 'round',
+        'font-size': 10,
+        'font-weight': 700
+      });
+      label.textContent = (spec.formatValue || fmtNumber)(entry.point.value);
+      node.appendChild(label);
+    });
 
 
     var guide = svg('line', {
@@ -582,7 +634,7 @@
     var context = shell(container, spec);
     var width = Math.max(320, container.clientWidth || 640);
     var height = chartHeight(width, spec);
-    var geometry = { left: 48, top: 16, width: width - 62, height: height - 52 };
+    var geometry = chartGeometry(width, height, spec);
     geometry.points = points;
     geometry.span = points.length > 1
       ? Number(points[points.length - 1].t) - Number(points[0].t)
@@ -597,7 +649,9 @@
     });
     var scaleSpec = {
       maxValue: niceMax(maxValue * 1.08 || 1),
-      formatAxis: spec.formatAxis || fmtCompact
+      formatAxis: spec.formatAxis || fmtCompact,
+      xAxisTitle: spec.xAxisTitle,
+      maxXTicks: spec.maxXTicks
     };
     var node = svg('svg', {
       viewBox: '0 0 ' + width + ' ' + height,

@@ -465,8 +465,39 @@
     return null;
   }
 
+  /* Friendly names for the Keras history keys that show up in training runs.
+   * Unknown keys fall back to "snake case → Sentence case". */
+  var METRIC_LABELS = {
+    loss: 'Pérdida',
+    val_loss: 'Pérdida (val)',
+    accuracy: 'Exactitud',
+    val_accuracy: 'Exactitud (val)',
+    acc: 'Exactitud',
+    val_acc: 'Exactitud (val)',
+    precision: 'Precisión',
+    val_precision: 'Precisión (val)',
+    recall: 'Sensibilidad',
+    val_recall: 'Sensibilidad (val)',
+    mae: 'MAE',
+    val_mae: 'MAE (val)',
+    mse: 'MSE',
+    val_mse: 'MSE (val)',
+    rmse: 'RMSE',
+    val_rmse: 'RMSE (val)',
+    mape: 'MAPE',
+    val_mape: 'MAPE (val)',
+    auc: 'AUC',
+    val_auc: 'AUC (val)',
+    f1: 'F1',
+    val_f1: 'F1 (val)'
+  };
+
   function metricLabel(key) {
-    return String(key).replace(/_/g, ' ');
+    var name = String(key);
+    var known = METRIC_LABELS[name.toLowerCase()];
+    if (known) return known;
+    var label = name.replace(/_/g, ' ');
+    return label.charAt(0).toUpperCase() + label.slice(1);
   }
 
   var METRIC_COLORS = ['lava', 'blue', 'green', 'amber', 'navy', 'muted', 'faint'];
@@ -515,9 +546,14 @@
     return { value: best, epoch: epoch };
   }
 
-  function metricTile(label, value, sub) {
+  function metricTile(label, value, sub, color) {
     return '<div class="training-metric">' +
-      '<span class="training-metric-label">' + esc(label) + '</span>' +
+      '<span class="training-metric-label">' +
+        (color
+          ? '<span class="training-metric-dot" style="background: var(--db-' + esc(color) + ')"></span>'
+          : '') +
+        esc(label) +
+      '</span>' +
       '<span class="training-metric-value">' + esc(value) + '</span>' +
       (sub ? '<span class="training-metric-sub">' + esc(sub) + '</span>' : '') +
       '</div>';
@@ -535,17 +571,70 @@
       return Math.max(maximum, history[key].length);
     }, 0);
     var colorMap = metricColorMap(keys);
+    var lossColor = colorMap[lossKey] || 'lava';
     var tiles = [
       metricTile('Épocas', fmt(epochs), 'total'),
       metricTile(metricLabel(lossKey), formatMetric(lossKey, latestValue(history[lossKey])),
-        'último valor'),
+        'último valor', lossColor),
       metricTile('Mejor ' + metricLabel(lossKey), formatMetric(lossKey, lossSummary.value),
-        lossSummary.epoch ? 'época ' + lossSummary.epoch : ''),
+        lossSummary.epoch ? 'época ' + lossSummary.epoch : '', lossColor),
     ];
     metricKeys.forEach(function (key) {
       tiles.push(metricTile(metricLabel(key), formatMetric(key, latestValue(history[key])),
-        'último valor'));
+        'último valor', colorMap[key]));
     });
+
+    /* Captions sit above each plot, in the same visual language as the catalog
+     * cards: a colour swatch, a short title and monospaced micro-stats. */
+    var lossFigure = lossKeys.length
+      ? '<figure class="training-chart">' +
+          '<figcaption class="training-chart-head">' +
+            '<span class="training-chart-title">' +
+              '<span class="training-chart-swatch" style="background: var(--db-' +
+                esc(lossColor) + ')"></span>' +
+              esc(metricLabel(lossKey)) +
+            '</span>' +
+            '<span class="training-chart-meta">' +
+              (lossSummary.value !== null
+                ? '<span class="training-chart-stat">mín. <b>' +
+                    esc(formatMetric(lossKey, lossSummary.value)) + '</b></span>' +
+                  (lossSummary.epoch
+                    ? '<span class="training-chart-sep">·</span>' +
+                      '<span class="training-chart-stat">época <b>' +
+                      esc(lossSummary.epoch) + '</b></span>'
+                    : '')
+                : '<span class="training-chart-stat"><b>' + esc(epochs) +
+                  '</b> épocas</span>') +
+            '</span>' +
+          '</figcaption>' +
+          '<div class="training-loss-chart" id="training-loss-chart"></div>' +
+        '</figure>'
+      : '';
+    var metricSwatches = metricKeys.slice(0, 4).map(function (key) {
+      return '<span class="training-chart-swatch" style="background: var(--db-' +
+        esc(colorMap[key] || 'blue') + ')"></span>';
+    }).join('');
+    var metricFigure = metricKeys.length
+      ? '<figure class="training-chart">' +
+          '<figcaption class="training-chart-head">' +
+            '<span class="training-chart-title">' +
+              (metricKeys.length > 1
+                ? '<span class="training-chart-swatches" aria-hidden="true">' +
+                  metricSwatches + '</span>'
+                : '') +
+              esc(metricKeys.length === 1 ? metricLabel(metricKeys[0]) : 'Métricas') +
+            '</span>' +
+            '<span class="training-chart-meta">' +
+              '<span class="training-chart-stat"><b>' + esc(metricKeys.length) + '</b> ' +
+                (metricKeys.length === 1 ? 'serie' : 'series') + '</span>' +
+              '<span class="training-chart-sep">·</span>' +
+              '<span class="training-chart-stat">última época <b>' +
+                esc(epochs) + '</b></span>' +
+            '</span>' +
+          '</figcaption>' +
+          '<div class="training-metrics-chart" id="training-metrics-chart"></div>' +
+        '</figure>'
+      : '';
     var control = job.control || {};
     var actionLabel = {
       stop: 'detener al alcanzar el objetivo',
@@ -553,7 +642,7 @@
       both: 'detener y reducir learning rate',
     }[control.action] || control.action;
     var controlHint = control.metric
-      ? '<p class="hint">Control: <code>' + esc(control.metric) + '</code>' +
+      ? '<p class="training-note">Control: <code>' + esc(control.metric) + '</code>' +
         (control.value !== null && control.value !== undefined ? ' · objetivo ' + esc(control.value) : '') +
         (actionLabel ? ' · ' + esc(actionLabel) : '') + '</p>'
       : '';
@@ -568,19 +657,14 @@
         '</tr>';
     }).join('');
     return '<section class="panel training-metrics-panel" aria-label="Monitor de entrenamiento">' +
-      '<div class="panel-header"><span class="panel-icon" aria-hidden="true">◔</span>' +
-        '<h2 class="panel-title">Monitor de entrenamiento</h2>' +
+      '<div class="panel-header">' +
+        '<h2 class="panel-title"><span class="panel-icon" aria-hidden="true">◔</span>' +
+        'Monitor de entrenamiento</h2>' +
         '<span class="training-metrics-badge">' + esc(epochs) + ' épocas</span></div>' +
       '<div class="panel-body">' +
         '<div class="training-metric-grid">' + tiles.join('') + '</div>' +
-        (lossKeys.length
-          ? '<div class="training-loss-chart" id="training-loss-chart"></div>' +
-            '<p class="hint">Pérdida por época.</p>'
-          : '') +
-        (metricKeys.length
-          ? '<div class="training-metrics-chart" id="training-metrics-chart"></div>' +
-            '<p class="hint">Métricas por época.</p>'
-          : '') +
+        lossFigure +
+        metricFigure +
         '<div class="training-metric-table-wrap">' +
           '<table class="training-metric-table">' +
             '<thead><tr><th>Métrica</th><th>Último</th><th>Mejor</th><th>Época</th></tr></thead>' +
@@ -640,8 +724,11 @@
         title: title,
         smooth: true,
         legend: seriesKeys.length > 1,
+        /* The final value is printed next to the head of a single curve. */
+        endLabels: seriesKeys.length === 1,
+        xAxisTitle: 'Época',
         tooltipTitle: function (point) { return 'Época ' + point.epoch; },
-        formatXAxis: function (point) { return 'Época ' + point.epoch; },
+        formatXAxis: function (point) { return String(point.epoch); },
         formatAxis: function (value) { return window.LMCharts.fmtCompact(value); },
         formatValue: function (value) { return window.LMCharts.fmtNumber(value, 4); },
         ariaLabel: ariaLabel,
@@ -649,9 +736,9 @@
     }
 
     draw('training-loss-chart', keys.filter(isLossMetric), 'Pérdida por época',
-      'Evolución de la pérdida por época', 200);
+      'Evolución de la pérdida por época', 210);
     draw('training-metrics-chart', keys.filter(function (key) { return !isLossMetric(key); }),
-      'Métricas por época', 'Evolución de las métricas por época', 220);
+      'Métricas por época', 'Evolución de las métricas por época', 240);
   }
 
   function renderJobDetail(job) {
@@ -710,8 +797,8 @@
     if (job.error) {
       errorBox =
         '<section class="panel panel-error" aria-label="Error del job">' +
-          '<div class="panel-header"><span class="panel-icon" aria-hidden="true">⚠</span>' +
-          '<h2 class="panel-title">El job falló</h2></div>' +
+          '<div class="panel-header"><h2 class="panel-title">' +
+          '<span class="panel-icon" aria-hidden="true">⚠</span>El job falló</h2></div>' +
           '<div class="panel-body"><pre class="error-pre">' + esc(cleanLog(job.error)) + '</pre>' +
           (job.error_detail
             ? '<details class="details-block"><summary>Detalle técnico</summary>' +
@@ -725,8 +812,8 @@
     if (job.status === 'succeeded') {
       resultPanel =
         '<section class="panel" aria-label="Resultado">' +
-          '<div class="panel-header"><span class="panel-icon" aria-hidden="true">✓</span>' +
-          '<h2 class="panel-title">Resultado</h2></div>' +
+          '<div class="panel-header"><h2 class="panel-title">' +
+          '<span class="panel-icon" aria-hidden="true">✓</span>Resultado</h2></div>' +
           '<div class="panel-body">' +
             '<div class="meta-grid">' +
               '<div class="meta-item"><span class="meta-label">Tipo de resultado</span><code>' + esc(job.result_type || '—') + '</code></div>' +
@@ -762,7 +849,7 @@
       artifactPanel =
         '<section class="panel artifact-panel" aria-label="Artefacto">' +
           '<div class="panel-header">' +
-            '<h2 class="panel-title"><span class="panel-icon" aria-hidden="true">{ }</span> Artefacto</h2>' +
+            '<h2 class="panel-title"><span class="panel-icon" aria-hidden="true">{ }</span>Artefacto</h2>' +
             (exists
               ? '<div class="panel-actions"><button class="btn btn-secondary btn-sm" type="button" data-action="delete-artifact">Borrar artefacto</button></div>'
               : '') +
@@ -789,15 +876,15 @@
                 esc(artifact.files.length) + ')</summary><pre class="code-block">' +
                 esc(artifact.files.join('\n')) + '</pre></details>'
               : '') +
-            (exists ? '' : '<p class="hint">La carpeta del artefacto ya no existe (puede haberse borrado al eliminar el job).</p>') +
+            (exists ? '' : '<p class="training-note">La carpeta del artefacto ya no existe (puede haberse borrado al eliminar el job).</p>') +
           '</div>' +
         '</section>';
     }
 
     var logPanel =
       '<section class="panel" aria-label="Registro del job">' +
-        '<div class="panel-header"><span class="panel-icon" aria-hidden="true">≡</span>' +
-        '<h2 class="panel-title">Registro</h2></div>' +
+        '<div class="panel-header"><h2 class="panel-title">' +
+        '<span class="panel-icon" aria-hidden="true">≡</span>Registro</h2></div>' +
         '<div class="panel-body"><ul class="log-list">' +
           (job.log || []).slice().reverse().map(function (entry) {
             return '<li class="log-item log-' + esc(entry.level) + '">' +

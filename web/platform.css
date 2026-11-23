@@ -761,6 +761,19 @@ button.side-link {
   overflow: visible;
 }
 
+/* Axis captions and value callouts share the interface typography. */
+.lm-chart svg text {
+  font-variant-numeric: tabular-nums;
+}
+
+.lm-chart svg .lm-axis-title {
+  font-weight: 700;
+}
+
+.lm-chart svg .lm-end-label {
+  pointer-events: none;
+}
+
 .lm-chart-tooltip {
   position: absolute;
   z-index: 20;

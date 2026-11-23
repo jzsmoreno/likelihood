@@ -199,6 +199,9 @@
     color: var(--db-muted);
     font-size: 10px;
     font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .02em;
+    white-space: nowrap;
   }
   .training-metric-grid {
     display: grid;
@@ -214,8 +217,15 @@
     border: 1px solid var(--db-line-soft);
     border-radius: var(--db-r-sm);
     background: var(--db-surface-alt);
+    transition: border-color .14s ease, box-shadow .14s ease;
+  }
+  .training-metric:hover {
+    border-color: var(--db-line);
+    box-shadow: var(--db-shadow-sm);
   }
   .training-metric-label {
+    display: inline-flex;
+    align-items: center;
     color: var(--db-faint);
     font-size: 9.5px;
     font-weight: 700;
@@ -227,10 +237,72 @@
     font-family: var(--db-mono);
     font-size: 15px;
     font-weight: 700;
+    font-variant-numeric: tabular-nums;
   }
   .training-metric-sub { color: var(--db-muted); font-size: 10px; }
-  .training-loss-chart { min-height: 220px; }
-  .training-metrics-chart { min-height: 220px; margin-top: 8px; }
+  .training-metric-label .training-metric-dot {
+    width: 6px;
+    height: 6px;
+    margin-right: 5px;
+  }
+
+  /* Chart figures: caption above the plot, catalog-card visual language. */
+  .training-chart {
+    margin: 0 0 12px;
+    padding: 12px 14px 8px;
+    border: 1px solid var(--db-line-soft);
+    border-radius: var(--db-r-md);
+    background: linear-gradient(180deg, var(--db-surface) 0%, var(--db-surface-alt) 100%);
+    box-shadow: var(--db-shadow-xs);
+  }
+  .training-chart-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 14px;
+    margin-bottom: 2px;
+  }
+  .training-chart-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--db-ink);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: .01em;
+  }
+  .training-chart-swatch {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px var(--db-surface);
+  }
+  .training-chart-swatches { display: inline-flex; gap: 3px; }
+  .training-chart-meta {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 5px;
+    color: var(--db-faint);
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .training-chart-stat b {
+    color: var(--db-text);
+    font-family: var(--db-mono);
+    font-size: 10.5px;
+    font-weight: 700;
+  }
+  .training-chart-sep { color: var(--db-line-strong); }
+  .training-chart .lm-chart-legend {
+    margin-top: 0;
+    padding-top: 6px;
+  }
+  .training-chart .lm-chart-empty { min-height: 150px; }
+  .training-loss-chart { min-height: 210px; }
+  .training-metrics-chart { min-height: 240px; }
   .training-metric-table-wrap { margin-top: 14px; overflow-x: auto; }
   .training-metric-table { width: 100%; border-collapse: collapse; font-size: 12px; }
   .training-metric-table th,
@@ -249,7 +321,13 @@
     letter-spacing: .05em;
     text-transform: uppercase;
   }
-  .training-metric-table td { color: var(--db-text); font-family: var(--db-mono); }
+  .training-metric-table tbody tr { transition: background .12s ease; }
+  .training-metric-table tbody tr:hover { background: var(--db-surface-alt); }
+  .training-metric-table td {
+    color: var(--db-text);
+    font-family: var(--db-mono);
+    font-variant-numeric: tabular-nums;
+  }
   .training-metric-dot {
     display: inline-block;
     width: 8px;
@@ -257,6 +335,22 @@
     margin-right: 6px;
     border-radius: 50%;
     vertical-align: middle;
+  }
+  .training-note {
+    margin-top: 14px;
+    padding: 8px 11px;
+    border: 1px dashed var(--db-line);
+    border-radius: var(--db-r-sm);
+    background: var(--db-surface-alt);
+    color: var(--db-muted);
+    font-size: 11.5px;
+  }
+  .training-note code {
+    padding: 1px 5px;
+    border-radius: var(--db-r-xs);
+    background: var(--db-surface);
+    color: var(--db-text);
+    font-size: 11px;
   }
 
   /* Dataset loader inside the training wizard. */
