@@ -198,6 +198,7 @@
     toggle.addEventListener('click', function () {
       var next = currentTheme() === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', next);
+      if (window.LMCharts) LMCharts.redrawAll();
       try { window.localStorage.setItem('lm-theme', next); } catch (error) { /* optional */ }
       toast(next === 'dark' ? 'Tema oscuro activado' : 'Tema claro activado');
     });
@@ -618,7 +619,14 @@
 
     function seriesFor(seriesKeys) {
       return seriesKeys.map(function (key) {
-        return { key: key, label: metricLabel(key), color: colorMap[key] || 'blue' };
+        return {
+          key: key,
+          label: metricLabel(key),
+          color: colorMap[key] || 'blue',
+          /* A single curve gets the soft gradient wash; stacking several washes
+           * would muddy the plot. */
+          area: seriesKeys.length === 1
+        };
       });
     }
 
@@ -630,6 +638,8 @@
         series: seriesFor(seriesKeys),
         height: height || 220,
         title: title,
+        smooth: true,
+        legend: seriesKeys.length > 1,
         tooltipTitle: function (point) { return 'Época ' + point.epoch; },
         formatXAxis: function (point) { return 'Época ' + point.epoch; },
         formatAxis: function (value) { return window.LMCharts.fmtCompact(value); },

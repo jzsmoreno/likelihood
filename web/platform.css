@@ -771,7 +771,14 @@ button.side-link {
   border-radius: var(--db-r-sm);
   background: var(--db-surface);
   box-shadow: var(--db-shadow-md);
+  font-family: var(--db-font);
   pointer-events: none;
+  animation: lm-tooltip-in .12s ease-out;
+}
+
+@keyframes lm-tooltip-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .lm-chart-tooltip-title {
@@ -835,7 +842,9 @@ button.side-link {
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
-  margin-top: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--db-line-soft);
   color: var(--db-muted);
   font-size: 10.5px;
   font-weight: 600;
@@ -853,6 +862,17 @@ button.side-link {
   height: 7px;
   border-radius: 2px;
   background: var(--db-blue);
+}
+
+.lm-legend-dot.is-dashed {
+  width: 13px;
+  height: 3px;
+  border-radius: 1px;
+  opacity: .85;
+}
+
+.lm-chart-markers {
+  pointer-events: none;
 }
 
 .latency-percentiles {
@@ -910,6 +930,10 @@ button.side-link {
 
 .lm-hbar-row:not(:disabled):hover .lm-hbar-label {
   color: var(--db-blue);
+}
+
+.lm-hbar-row:not(:disabled):hover .lm-hbar-track {
+  background: var(--db-line);
 }
 
 .lm-hbar-head {

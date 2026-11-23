@@ -6,11 +6,14 @@
  * The application has no build step and no npm dependencies, so the charts are
  * rendered as SVG/HTML with the browser primitives.  Every chart reads its colours
  * from the shared design tokens (app.css) and re-renders on resize or theme change.
+ * Line charts support opt-in monotone smoothing (`smooth`), gradient area fills
+ * (`area`), automatic data markers and an optional generated legend (`legend`).
  */
 (function (global) {
   var NS = 'http://www.w3.org/2000/svg';
   var charts = [];
   var resizeTimer = 0;
+  var gradSeq = 0;
 
   function cssVar(name, fallback) {
     var value = getComputedStyle(document.documentElement).getPropertyValue(name);
@@ -96,6 +99,12 @@
     return fmtNumber(value, digits === undefined ? 1 : digits) + '%';
   }
 
+  /* Number('') and Number(null) both collapse to 0, so charts need an explicit
+   * guard before trusting a value pulled out of an API payload. */
+  function hasValue(value) {
+    return value !== null && value !== undefined && value !== '' && isFinite(Number(value));
+  }
+
   function dateValue(point) {
     if (point && point.t !== undefined && point.t !== null) return Number(point.t) * 1000;
     if (point && point.timestamp) return Number(point.timestamp) * 1000;
@@ -128,6 +137,114 @@
     var fraction = value / Math.pow(10, exponent);
     var nice = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 2.5 ? 2.5 : fraction <= 5 ? 5 : 10;
     return nice * Math.pow(10, exponent);
+  }
+
+  function fmtCoord(value) {
+    return isFinite(value) ? Number(value).toFixed(1) : '0';
+  }
+
+  /* The charts grow with the container unless the caller pins an explicit
+   * height.  The aspect ratio stays bounded so a wide dashboard card does not
+   * turn a sparkline into a wall of empty space. */
+  function chartHeight(width, spec) {
+    if (spec && spec.height) return spec.height;
+    var ratio = spec && spec.aspectRatio ? spec.aspectRatio : 0.52;
+    return Math.max(172, Math.min(352, Math.round(width * ratio)));
+  }
+
+  function linearPathD(segment) {
+    return segment.map(function (point, index) {
+      return (index === 0 ? 'M' : 'L') + fmtCoord(point.x) + ' ' + fmtCoord(point.y);
+    }).join(' ');
+  }
+
+  /* Fritsch–Carlson monotone cubic interpolation.  The tangents are limited so
+   * the curve never overshoots the sampled data, which keeps loss/metric curves
+   * honest while still looking smoother than a polyline. */
+  function smoothPathD(segment) {
+    var count = segment.length;
+    if (count < 3) return linearPathD(segment);
+    var slopes = [];
+    var tangents = [];
+    var index;
+    for (index = 0; index < count - 1; index += 1) {
+      var dx = segment[index + 1].x - segment[index].x;
+      var dy = segment[index + 1].y - segment[index].y;
+      slopes.push(dx === 0 ? 0 : dy / dx);
+    }
+    tangents[0] = slopes[0];
+    tangents[count - 1] = slopes[count - 2];
+    for (index = 1; index < count - 1; index += 1) {
+      var previous = slopes[index - 1];
+      var next = slopes[index];
+      if (previous * next <= 0) {
+        tangents[index] = 0;
+      } else {
+        var average = (previous + next) / 2;
+        tangents[index] = Math.abs(average) < Math.abs(previous) && Math.abs(average) < Math.abs(next)
+          ? average
+          : (Math.abs(previous) < Math.abs(next) ? previous : next);
+      }
+    }
+    for (index = 0; index < count - 1; index += 1) {
+      var delta = slopes[index];
+      if (delta === 0) {
+        tangents[index] = 0;
+        tangents[index + 1] = 0;
+        continue;
+      }
+      var alpha = tangents[index] / delta;
+      var beta = tangents[index + 1] / delta;
+      var magnitude = alpha * alpha + beta * beta;
+      if (magnitude > 9) {
+        var scale = 3 / Math.sqrt(magnitude);
+        tangents[index] = scale * alpha * delta;
+        tangents[index + 1] = scale * beta * delta;
+      }
+    }
+    var path = 'M' + fmtCoord(segment[0].x) + ' ' + fmtCoord(segment[0].y);
+    for (index = 0; index < count - 1; index += 1) {
+      var start = segment[index];
+      var end = segment[index + 1];
+      var third = (end.x - start.x) / 3;
+      path += ' C' + fmtCoord(start.x + third) + ' ' + fmtCoord(start.y + tangents[index] * third) +
+        ' ' + fmtCoord(end.x - third) + ' ' + fmtCoord(end.y - tangents[index + 1] * third) +
+        ' ' + fmtCoord(end.x) + ' ' + fmtCoord(end.y);
+    }
+    return path;
+  }
+
+  /* A vertical fade under the line reads as depth without adding visual noise. */
+  function areaGradient(defs, stroke, opacity) {
+    var id = 'lm-area-' + (gradSeq += 1);
+    var gradient = svg('linearGradient', { id: id, x1: '0', y1: '0', x2: '0', y2: '1' });
+    gradient.appendChild(svg('stop', {
+      offset: '0%',
+      'stop-color': stroke,
+      'stop-opacity': opacity
+    }));
+    gradient.appendChild(svg('stop', {
+      offset: '100%',
+      'stop-color': stroke,
+      'stop-opacity': 0
+    }));
+    defs.appendChild(gradient);
+    return id;
+  }
+
+  function seriesLegend(container, series, spec) {
+    if (spec.legend !== true || !series.length) return;
+    var legend = html('div', 'lm-chart-legend');
+    series.forEach(function (entry) {
+      var item = html('span', 'lm-legend-item');
+      var dot = html('span', 'lm-legend-dot');
+      dot.style.background = color(entry.color, 'blue');
+      if (entry.dashed) dot.classList.add('is-dashed');
+      item.appendChild(dot);
+      item.appendChild(document.createTextNode(entry.label || entry.key));
+      legend.appendChild(item);
+    });
+    container.appendChild(legend);
   }
 
   function shell(container, spec) {
@@ -222,7 +339,7 @@
     var series = spec.series || [];
     var hasData = points.some(function (point) {
       return series.some(function (entry) {
-        return point[entry.key] !== null && point[entry.key] !== undefined;
+        return hasValue(point[entry.key]);
       });
     });
     if (!points.length || !hasData) {
@@ -234,7 +351,7 @@
     }
     var context = shell(container, spec);
     var width = Math.max(320, container.clientWidth || 640);
-    var height = spec.height || 250;
+    var height = chartHeight(width, spec);
     var geometry = { left: 48, top: 16, width: width - 62, height: height - 52 };
     var node = svg('svg', {
       viewBox: '0 0 ' + width + ' ' + height,
@@ -246,6 +363,10 @@
     var title = svg('title', {});
     title.textContent = spec.title || 'Serie temporal';
     node.appendChild(title);
+    var defs = svg('defs', {});
+    node.appendChild(defs);
+    var smooth = spec.smooth === true;
+    var colors = palette();
     geometry.points = points;
     geometry.span = points.length > 1
       ? Number(points[points.length - 1].t) - Number(points[0].t)
@@ -254,8 +375,8 @@
     var minValue = 0;
     points.forEach(function (point) {
       series.forEach(function (entry) {
+        if (!hasValue(point[entry.key])) return;
         var value = Number(point[entry.key]);
-        if (!isFinite(value)) return;
         if (value > maxValue) maxValue = value;
         if (value < minValue) minValue = value;
       });
@@ -285,13 +406,15 @@
     var order = points.map(function (point, index) {
       return { point: point, index: index };
     });
+    var markerGroup = svg('g', { 'class': 'lm-chart-markers' });
+    var markerList = [];
     series.forEach(function (entry) {
       var stroke = color(entry.color, 'blue');
       var segments = [];
       var current = [];
       order.forEach(function (item) {
         var value = item.point[entry.key];
-        if (value === null || value === undefined || !isFinite(Number(value))) {
+        if (!hasValue(value)) {
           if (current.length > 1) segments.push(current);
           current = [];
           return;
@@ -299,27 +422,29 @@
         current.push({ x: xAt(item.index), y: yAt(value) });
       });
       if (current.length) segments.push(current);
+      var gradientId = entry.area
+        ? areaGradient(defs, stroke, entry.areaOpacity === undefined ? 0.18 : entry.areaOpacity)
+        : null;
       segments.forEach(function (segment) {
-        var path = segment.map(function (point, index) {
-          return (index === 0 ? 'M' : 'L') + point.x.toFixed(1) + ' ' + point.y.toFixed(1);
-        }).join(' ');
+        var path = smooth ? smoothPathD(segment) : linearPathD(segment);
         if (entry.area) {
           var baseline = geometry.top + geometry.height;
           var area = path +
-            ' L' + segment[segment.length - 1].x.toFixed(1) + ' ' + baseline +
-            ' L' + segment[0].x.toFixed(1) + ' ' + baseline + ' Z';
+            ' L' + fmtCoord(segment[segment.length - 1].x) + ' ' + fmtCoord(baseline) +
+            ' L' + fmtCoord(segment[0].x) + ' ' + fmtCoord(baseline) + ' Z';
           node.appendChild(
             svg('path', {
               d: area,
-              fill: stroke,
-              opacity: entry.areaOpacity === undefined ? 0.12 : entry.areaOpacity,
-              stroke: 'none'
+              fill: 'url(#' + gradientId + ')',
+              stroke: 'none',
+              'class': 'lm-area'
             })
           );
         }
         node.appendChild(
           svg('path', {
             d: path,
+            'class': 'lm-line',
             fill: 'none',
             stroke: stroke,
             'stroke-width': entry.width || 2,
@@ -328,14 +453,35 @@
             'stroke-dasharray': entry.dashed ? '5 4' : null
           })
         );
+        /* Dashed percentile lines stay uncluttered: only the head is marked. */
+        if (segment.length <= 16 && !entry.dashed) {
+          segment.forEach(function (point) {
+            markerList.push({ point: point, stroke: stroke, small: true });
+          });
+        } else {
+          markerList.push({ point: segment[segment.length - 1], stroke: stroke, small: false });
+        }
       });
     });
+    markerList.forEach(function (marker) {
+      var attrs = {
+        cx: fmtCoord(marker.point.x),
+        cy: fmtCoord(marker.point.y),
+        r: marker.small ? 2.3 : 3.2,
+        fill: marker.small ? colors.surface : marker.stroke,
+        stroke: marker.small ? marker.stroke : colors.surface,
+        'stroke-width': 1.5
+      };
+      if (!marker.small) attrs['class'] = 'lm-marker-end';
+      markerGroup.appendChild(svg('circle', attrs));
+    });
+    node.appendChild(markerGroup);
 
 
     var guide = svg('line', {
       y1: geometry.top,
       y2: geometry.top + geometry.height,
-      stroke: palette().faint,
+      stroke: colors.faint,
       'stroke-width': 1,
       'stroke-dasharray': '3 3',
       visibility: 'hidden'
@@ -375,14 +521,14 @@
       clear(highlight);
       series.forEach(function (entry) {
         var value = point[entry.key];
-        if (value === null || value === undefined || !isFinite(Number(value))) return;
+        if (!hasValue(value)) return;
         highlight.appendChild(
           svg('circle', {
             cx: x,
             cy: yAt(value),
             r: 3.5,
             fill: color(entry.color, 'blue'),
-            stroke: palette().surface,
+            stroke: colors.surface,
             'stroke-width': 1.5
           })
         );
@@ -411,6 +557,7 @@
       if (spec.onSelect) spec.onSelect(points[indexAt(event)]);
     });
     context.root.insertBefore(node, context.tooltip);
+    seriesLegend(container, series, spec);
     container._lmRender = function () { lineChart(container, spec); };
   }
 
@@ -420,7 +567,10 @@
     var points = spec.points || [];
     var series = spec.series || [];
     var hasData = points.some(function (point) {
-      return series.some(function (entry) { return Number(point[entry.key]) > 0; });
+      return series.some(function (entry) {
+        var value = Number(point[entry.key]);
+        return isFinite(value) && value > 0;
+      });
     });
     if (!points.length || !hasData) {
       container.classList.add('lm-chart');
@@ -431,7 +581,7 @@
     }
     var context = shell(container, spec);
     var width = Math.max(320, container.clientWidth || 640);
-    var height = spec.height || 250;
+    var height = chartHeight(width, spec);
     var geometry = { left: 48, top: 16, width: width - 62, height: height - 52 };
     geometry.points = points;
     geometry.span = points.length > 1
@@ -440,7 +590,8 @@
     var maxValue = 0;
     points.forEach(function (point) {
       var total = series.reduce(function (sum, entry) {
-        return sum + (Number(point[entry.key]) || 0);
+        var value = Number(point[entry.key]);
+        return sum + (isFinite(value) && value > 0 ? value : 0);
       }, 0);
       if (total > maxValue) maxValue = total;
     });
@@ -469,8 +620,8 @@
       var x = geometry.left + slot * index + (slot - barWidth) / 2;
       var y = geometry.top + geometry.height;
       series.forEach(function (entry) {
-        var value = Number(point[entry.key]) || 0;
-        if (!value) return;
+        var value = Number(point[entry.key]);
+        if (!isFinite(value) || value <= 0) return;
         var barHeight = geometry.height * value / scaleSpec.maxValue;
         y -= barHeight;
         bars.appendChild(
@@ -522,18 +673,25 @@
       guide.setAttribute('x1', x);
       guide.setAttribute('x2', x);
       guide.setAttribute('visibility', 'visible');
-      showTooltip(
-        context,
-        event,
-        (spec.tooltipTitle || fmtDate)(point),
-        series.map(function (entry) {
-          return {
-            color: color(entry.color, 'blue'),
-            label: entry.label,
-            value: (spec.formatValue || fmtNumber)(point[entry.key])
-          };
-        })
-      );
+      var rows = series.map(function (entry) {
+        return {
+          color: color(entry.color, 'blue'),
+          label: entry.label,
+          value: (spec.formatValue || fmtNumber)(point[entry.key])
+        };
+      });
+      if (series.length > 1) {
+        var total = series.reduce(function (sum, entry) {
+          var value = Number(point[entry.key]);
+          return sum + (isFinite(value) ? value : 0);
+        }, 0);
+        rows.push({
+          color: 'transparent',
+          label: 'Total',
+          value: (spec.formatValue || fmtNumber)(total)
+        });
+      }
+      showTooltip(context, event, (spec.tooltipTitle || fmtDate)(point), rows);
     }
 
     overlay.addEventListener('mousemove', inspect);
@@ -545,6 +703,7 @@
       if (spec.onSelect) spec.onSelect(points[indexAt(event)]);
     });
     context.root.insertBefore(node, context.tooltip);
+    seriesLegend(container, series, spec);
     container._lmRender = function () { stackedBars(container, spec); };
   }
 
@@ -560,7 +719,8 @@
       return;
     }
     var max = items.reduce(function (top, item) {
-      return Math.max(top, Number(item.value) || 0);
+      var value = Number(item.value);
+      return isFinite(value) ? Math.max(top, value) : top;
     }, 0) || 1;
     var wrap = html('div', 'lm-hbar');
     items.forEach(function (item) {
@@ -579,7 +739,9 @@
       row.appendChild(head);
       var track = html('div', 'lm-hbar-track');
       var fill = html('div', 'lm-hbar-fill');
-      fill.style.width = Math.max(1.5, (Number(item.value) / max) * 100) + '%';
+      var numeric = Number(item.value);
+      var ratio = isFinite(numeric) ? numeric / max : 0;
+      fill.style.width = Math.max(1.5, ratio * 100) + '%';
       if (item.color) fill.style.background = color(item.color);
       track.appendChild(fill);
       row.appendChild(track);
@@ -605,7 +767,7 @@
   function donut(container, spec) {
     spec = spec || {};
     var items = (spec.items || []).filter(function (item) {
-      return Number(item.value) > 0;
+      return hasValue(item.value) && Number(item.value) > 0;
     });
     clear(container);
     container.classList.add('lm-chart');
