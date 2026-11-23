@@ -258,6 +258,9 @@
   function seriesLegend(container, series, spec) {
     if (spec.legend !== true || !series.length) return;
     var legend = html('div', 'lm-chart-legend');
+    /* Many series (train + validation) read better as a tidy grid than as a
+     * long wrapped paragraph of chips. */
+    if (series.length > 6) legend.classList.add('is-dense');
     series.forEach(function (entry) {
       var item = html('span', 'lm-legend-item');
       var dot = html('span', 'lm-legend-dot');
@@ -431,6 +434,12 @@
       });
     });
     var niceMaxValue = niceMax(maxValue * 1.08 || 1);
+    /* Callers may pin a sensible ceiling (for example 1 for rates) when the
+     * data fits inside it, which avoids a 0..2 axis for 0..1 metrics. */
+    var requestedMax = Number(spec.axisMax);
+    if (isFinite(requestedMax) && requestedMax > 0 && maxValue <= requestedMax) {
+      niceMaxValue = requestedMax;
+    }
     var niceMinValue = minValue < 0 ? -niceMax(-minValue * 1.08) : 0;
     var scaleSpec = {
       minValue: niceMinValue,
@@ -505,8 +514,9 @@
             'stroke-dasharray': entry.dashed ? '5 4' : null
           })
         );
-        /* Dashed percentile lines stay uncluttered: only the head is marked. */
-        if (segment.length <= 16 && !entry.dashed) {
+        /* Dashed percentile lines stay uncluttered: only the head is marked.
+         * Busy multi-series plots also drop the per-point dots. */
+        if (segment.length <= 16 && !entry.dashed && series.length <= 3) {
           segment.forEach(function (point) {
             markerList.push({ point: point, stroke: stroke, small: true });
           });

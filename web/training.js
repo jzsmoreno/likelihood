@@ -31,6 +31,8 @@
     wArtifact: '',
     dataset: null,
     datasetSelection: null,
+    // training monitor: which metric family is visible
+    metricView: '',
   };
 
   var dom = {};
@@ -490,12 +492,22 @@
     val_auc: 'AUC (val)',
     f1: 'F1',
     val_f1: 'F1 (val)',
-    kappa: 'Kappa de Cohen',
-    val_kappa: 'Kappa de Cohen (val)',
-    cohen_kappa: 'Kappa de Cohen',
-    val_cohen_kappa: 'Kappa de Cohen (val)',
-    cohen_kappa_score: 'Kappa de Cohen',
-    val_cohen_kappa_score: 'Kappa de Cohen (val)'
+    f1_score: 'F1',
+    val_f1_score: 'F1 (val)',
+    root_mean_squared_error: 'RMSE',
+    val_root_mean_squared_error: 'RMSE (val)',
+    r2: 'R²',
+    val_r2: 'R² (val)',
+    r2_score: 'R²',
+    val_r2_score: 'R² (val)',
+    mean_absolute_percentage_error: 'MAPE',
+    val_mean_absolute_percentage_error: 'MAPE (val)',
+    kappa: 'Kappa',
+    val_kappa: 'Kappa (val)',
+    cohen_kappa: 'Kappa',
+    val_cohen_kappa: 'Kappa (val)',
+    cohen_kappa_score: 'Kappa',
+    val_cohen_kappa_score: 'Kappa (val)'
   };
 
   function metricLabel(key) {
@@ -514,6 +526,33 @@
       map[key] = METRIC_COLORS[index % METRIC_COLORS.length];
     });
     return map;
+  }
+
+  function isValidationMetric(key) {
+    return /^val_/.test(String(key));
+  }
+
+  function metricBaseName(key) {
+    return String(key).replace(/^val_/, '');
+  }
+
+  /* Resolve the metric family shown by the monitor.  Jobs with validation
+   * metrics default to them because they drive model selection; jobs without
+   * one fall back to the training curves. */
+  function resolveMetricView(keys) {
+    var hasValidation = (keys || []).some(isValidationMetric);
+    if (state.metricView === 'both') return 'both';
+    if (state.metricView === 'val' && hasValidation) return 'val';
+    if (state.metricView === 'train') return 'train';
+    return hasValidation ? 'val' : 'train';
+  }
+
+  function metricsForView(keys, view) {
+    return (keys || []).filter(function (key) {
+      if (view === 'train') return !isValidationMetric(key);
+      if (view === 'val') return isValidationMetric(key);
+      return true;
+    });
   }
 
   function isLossMetric(key) {
@@ -578,41 +617,63 @@
     var history = job.result && job.result.history;
     var keys = historyKeys(history);
     if (!keys.length) return '';
+    var view = resolveMetricView(keys);
+    var hasValidation = keys.some(isValidationMetric);
+    var visible = metricsForView(keys, view);
+    if (!visible.length) visible = keys.slice();
     var lossKeys = keys.filter(isLossMetric);
-    var metricKeys = keys.filter(function (key) { return !isLossMetric(key); });
     var lossKey = lossKeys.indexOf('loss') >= 0 ? 'loss' : (lossKeys.length ? lossKeys[0] : keys[0]);
-    var lossSummary = metricBest(history[lossKey], 'min');
+    var visibleLoss = visible.filter(isLossMetric);
+    var summaryKey = visibleLoss.indexOf('val_loss') >= 0
+      ? 'val_loss'
+      : (visibleLoss.indexOf(lossKey) >= 0
+        ? lossKey
+        : (visibleLoss.length ? visibleLoss[0] : lossKey));
+    var lossSummary = metricBest(history[summaryKey], 'min');
+    var visibleMetrics = visible.filter(function (key) { return !isLossMetric(key); });
     var epochs = keys.reduce(function (maximum, key) {
       return Math.max(maximum, history[key].length);
     }, 0);
-    var colorMap = metricColorMap(keys);
-    var lossColor = colorMap[lossKey] || 'lava';
+    var colorMap = metricColorMap(visible.length ? visible : keys);
+    var lossColor = colorMap[summaryKey] || 'lava';
     var tiles = [
       metricTile('Épocas', fmt(epochs), 'total'),
-      metricTile(metricLabel(lossKey), formatMetric(lossKey, latestValue(history[lossKey])),
+      metricTile(metricLabel(summaryKey), formatMetric(summaryKey, latestValue(history[summaryKey])),
         'último valor', lossColor),
-      metricTile('Mejor ' + metricLabel(lossKey), formatMetric(lossKey, lossSummary.value),
+      metricTile('Mejor ' + metricLabel(summaryKey), formatMetric(summaryKey, lossSummary.value),
         lossSummary.epoch ? 'época ' + lossSummary.epoch : '', lossColor),
     ];
-    metricKeys.forEach(function (key) {
+    visibleMetrics.forEach(function (key) {
       tiles.push(metricTile(metricLabel(key), formatMetric(key, latestValue(history[key])),
         'último valor', colorMap[key]));
     });
 
     /* Captions sit above each plot, in the same visual language as the catalog
      * cards: a colour swatch, a short title and monospaced micro-stats. */
-    var lossFigure = lossKeys.length
+    var lossTitle = metricLabel(summaryKey);
+    if (view === 'both' && visibleLoss.length > 1 && isValidationMetric(summaryKey)) {
+      lossTitle = metricLabel(metricBaseName(summaryKey)) + ' · train / val';
+    }
+    var lossSwatches = visibleLoss.slice(0, 4).map(function (key) {
+      return '<span class="training-chart-swatch" style="background: var(--db-' +
+        esc(colorMap[key] || 'blue') + ')"></span>';
+    }).join('');
+    var lossFigure = visibleLoss.length
       ? '<figure class="training-chart">' +
           '<figcaption class="training-chart-head">' +
             '<span class="training-chart-title">' +
-              '<span class="training-chart-swatch" style="background: var(--db-' +
-                esc(lossColor) + ')"></span>' +
-              esc(metricLabel(lossKey)) +
+              (view === 'both' && visibleLoss.length > 1
+                ? '<span class="training-chart-swatches" aria-hidden="true">' +
+                  lossSwatches + '</span>'
+                : '<span class="training-chart-swatch" style="background: var(--db-' +
+                  esc(lossColor) + ')"></span>') +
+              esc(lossTitle) +
             '</span>' +
             '<span class="training-chart-meta">' +
               (lossSummary.value !== null
-                ? '<span class="training-chart-stat">mín. <b>' +
-                    esc(formatMetric(lossKey, lossSummary.value)) + '</b></span>' +
+                ? '<span class="training-chart-stat">' +
+                    (view === 'both' && isValidationMetric(summaryKey) ? 'val ' : '') +
+                    'mín. <b>' + esc(formatMetric(summaryKey, lossSummary.value)) + '</b></span>' +
                   (lossSummary.epoch
                     ? '<span class="training-chart-sep">·</span>' +
                       '<span class="training-chart-stat">época <b>' +
@@ -625,23 +686,23 @@
           '<div class="training-loss-chart" id="training-loss-chart"></div>' +
         '</figure>'
       : '';
-    var metricSwatches = metricKeys.slice(0, 4).map(function (key) {
+    var metricSwatches = visibleMetrics.slice(0, 4).map(function (key) {
       return '<span class="training-chart-swatch" style="background: var(--db-' +
         esc(colorMap[key] || 'blue') + ')"></span>';
     }).join('');
-    var metricFigure = metricKeys.length
+    var metricFigure = visibleMetrics.length
       ? '<figure class="training-chart">' +
           '<figcaption class="training-chart-head">' +
             '<span class="training-chart-title">' +
-              (metricKeys.length > 1
+              (visibleMetrics.length > 1 && visibleMetrics.length <= 4
                 ? '<span class="training-chart-swatches" aria-hidden="true">' +
                   metricSwatches + '</span>'
                 : '') +
-              esc(metricKeys.length === 1 ? metricLabel(metricKeys[0]) : 'Métricas') +
+              esc(visibleMetrics.length === 1 ? metricLabel(visibleMetrics[0]) : 'Métricas') +
             '</span>' +
             '<span class="training-chart-meta">' +
-              '<span class="training-chart-stat"><b>' + esc(metricKeys.length) + '</b> ' +
-                (metricKeys.length === 1 ? 'serie' : 'series') + '</span>' +
+              '<span class="training-chart-stat"><b>' + esc(visibleMetrics.length) + '</b> ' +
+                (visibleMetrics.length === 1 ? 'serie' : 'series') + '</span>' +
               '<span class="training-chart-sep">·</span>' +
               '<span class="training-chart-stat">última época <b>' +
                 esc(epochs) + '</b></span>' +
@@ -650,7 +711,7 @@
           '<div class="training-metrics-chart" id="training-metrics-chart"></div>' +
         '</figure>'
       : '';
-    var kappaNote = keys.some(isKappaMetric)
+    var kappaNote = visible.some(isKappaMetric)
       ? '<p class="training-note"><b>Kappa de Cohen</b>: corrige el acuerdo por azar ' +
         '(1 = acuerdo perfecto, 0 = azar). Con clases desbalanceadas la exactitud puede ' +
         'ser alta y kappa seguir en 0 si el modelo solo acierta la clase mayoritaria; ' +
@@ -667,7 +728,7 @@
         (control.value !== null && control.value !== undefined ? ' · objetivo ' + esc(control.value) : '') +
         (actionLabel ? ' · ' + esc(actionLabel) : '') + '</p>'
       : '';
-    var tableRows = keys.map(function (key) {
+    var tableRows = visible.map(function (key) {
       var summary = metricBest(history[key], metricDirection(key));
       return '<tr>' +
         '<td><span class="training-metric-dot" style="background: var(--db-' +
@@ -677,11 +738,25 @@
         '<td>' + (summary.epoch ? esc(summary.epoch) : '—') + '</td>' +
         '</tr>';
     }).join('');
-    return '<section class="panel training-metrics-panel" aria-label="Monitor de entrenamiento">' +
+    var viewSwitch = hasValidation
+      ? '<div class="metric-view-switch" role="group" aria-label="Ver métricas de train o de validación">' +
+          [['train', 'Train'], ['val', 'Val'], ['both', 'Ambas']].map(function (option) {
+            var active = view === option[0];
+            return '<button type="button" class="metric-view-btn' + (active ? ' is-active' : '') +
+              '" data-metric-view="' + option[0] + '" aria-pressed="' +
+              (active ? 'true' : 'false') + '">' + option[1] + '</button>';
+          }).join('') +
+        '</div>'
+      : '';
+    return '<section class="panel training-metrics-panel" id="training-metrics-panel" ' +
+      'aria-label="Monitor de entrenamiento">' +
       '<div class="panel-header">' +
         '<h2 class="panel-title"><span class="panel-icon" aria-hidden="true">◔</span>' +
         'Monitor de entrenamiento</h2>' +
-        '<span class="training-metrics-badge">' + esc(epochs) + ' épocas</span></div>' +
+        '<div class="panel-actions">' + viewSwitch +
+          '<span class="training-metrics-badge">' + esc(epochs) + ' épocas</span>' +
+        '</div>' +
+      '</div>' +
       '<div class="panel-body">' +
         '<div class="training-metric-grid">' + tiles.join('') + '</div>' +
         lossFigure +
@@ -751,10 +826,16 @@
           esc(item.ok ? formatMetric(metric, item.value) : '—') + '</span>' +
         '</div>';
     }).join('');
+    var hasValAccuracy = data.folds.some(function (fold) {
+      return fold.metrics && fold.metrics.val_accuracy !== undefined;
+    });
+    var hasValKappa = data.folds.some(function (fold) {
+      return fold.metrics && fold.metrics.val_kappa !== undefined;
+    });
     var rows = data.folds.map(function (fold) {
       var metrics = fold.metrics || {};
-      var accuracy = metrics.accuracy !== undefined ? metrics.accuracy : metrics.val_accuracy;
-      var kappaValue = metrics.kappa !== undefined ? metrics.kappa : metrics.val_kappa;
+      var accuracy = hasValAccuracy ? metrics.val_accuracy : metrics.accuracy;
+      var kappaValue = hasValKappa ? metrics.val_kappa : metrics.kappa;
       return '<tr' + (fold.fold === best ? ' class="is-best"' : '') + '>' +
         '<td>#' + esc(fold.fold) + '</td>' +
         '<td>' + esc(formatMetric(metric, fold.score)) + '</td>' +
@@ -796,7 +877,9 @@
         '</div>' +
         '<div class="training-metric-table-wrap"><table class="training-metric-table">' +
           '<thead><tr><th>Fold</th><th>' + esc(metricLabel(metric)) +
-          '</th><th>Train</th><th>Val</th><th>Exactitud</th><th>Kappa</th></tr></thead>' +
+          '</th><th>Train</th><th>Val</th><th>' +
+          (hasValAccuracy ? 'Exactitud (val)' : 'Exactitud') + '</th><th>' +
+          (hasValKappa ? 'Kappa (val)' : 'Kappa') + '</th></tr></thead>' +
           '<tbody>' + rows + '</tbody></table></div>' +
         '<p class="training-note">El artefacto guardado corresponde al fold #' + esc(best) +
         '. Las curvas del monitor muestran el historial de ese fold; el resto de folds ' +
@@ -809,10 +892,15 @@
     if (!dom.detail || !history || !window.LMCharts) return;
     var keys = historyKeys(history);
     if (!keys.length) return;
+    var view = resolveMetricView(keys);
+    var visible = metricsForView(keys, view);
+    if (!visible.length) visible = keys.slice();
+    var lossKeys = visible.filter(isLossMetric);
+    var metricKeys = visible.filter(function (key) { return !isLossMetric(key); });
     var epochs = keys.reduce(function (maximum, key) {
       return Math.max(maximum, history[key].length);
     }, 0);
-    var colorMap = metricColorMap(keys);
+    var colorMap = metricColorMap(visible);
 
     function pointsFor(seriesKeys) {
       var points = [];
@@ -859,6 +947,9 @@
           /* A single curve gets the soft gradient wash; stacking several washes
            * would muddy the plot. */
           area: seriesKeys.length === 1,
+          /* In the combined view the validation curves are dashed so the
+           * train/validation pair stays readable. */
+          dashed: view === 'both' && isValidationMetric(key),
           /* Tooltips and end labels follow the units of each series. */
           formatValue: seriesValueFormatter(key)
         };
@@ -872,12 +963,22 @@
       var container = dom.detail.querySelector('#' + containerId);
       if (!container || !seriesKeys.length) return;
       var allPercent = seriesKeys.every(percentSeries);
+      var peak = 0;
+      seriesKeys.forEach(function (key) {
+        (history[key] || []).forEach(function (value) {
+          if (value === null || value === undefined) return;
+          var numeric = Number(value);
+          if (isFinite(numeric)) peak = Math.max(peak, numeric);
+        });
+      });
       window.LMCharts.line(container, {
         points: pointsFor(seriesKeys),
         series: seriesFor(seriesKeys),
         aspectRatio: options.aspectRatio || 0.5,
         minHeight: options.minHeight || 168,
         maxHeight: options.maxHeight || 300,
+        /* Normalised metrics read better on a 0..1 axis than on 0..2. */
+        axisMax: peak > 0 && peak <= 1 ? 1 : undefined,
         title: title,
         smooth: true,
         legend: seriesKeys.length > 1,
@@ -895,11 +996,40 @@
       });
     }
 
-    draw('training-loss-chart', keys.filter(isLossMetric), 'Pérdida por época',
+    draw('training-loss-chart', lossKeys, 'Pérdida por época',
       'Evolución de la pérdida por época', { aspectRatio: 0.48, maxHeight: 300 });
-    draw('training-metrics-chart', keys.filter(function (key) { return !isLossMetric(key); }),
-      'Métricas por época', 'Evolución de las métricas por época',
-      { aspectRatio: 0.52, maxHeight: 300 });
+    draw('training-metrics-chart', metricKeys, 'Métricas por época',
+      'Evolución de las métricas por época', { aspectRatio: 0.52, maxHeight: 300 });
+  }
+
+  /* Rebuild only the monitor when the Train/Validation switch changes, so the
+   * scroll position and the rest of the detail stay untouched. */
+  function refreshMetricsPanel() {
+    var job = state.job;
+    if (!job || !dom.detail) return;
+    var panel = dom.detail.querySelector('#training-metrics-panel');
+    if (!panel) return;
+    var holder = document.createElement('div');
+    holder.innerHTML = trainingMetricsPanel(job);
+    var replacement = holder.firstElementChild;
+    if (!replacement) return;
+    panel.parentNode.replaceChild(replacement, panel);
+    renderTrainingChart(job);
+  }
+
+  function bindMetricView() {
+    if (!dom.detail) return;
+    dom.detail.addEventListener('click', function (event) {
+      var target = event.target;
+      var button = target && target.closest ? target.closest('[data-metric-view]') : null;
+      if (!button || !dom.detail.contains(button)) return;
+      var view = button.getAttribute('data-metric-view');
+      if (view !== 'train' && view !== 'val' && view !== 'both') return;
+      if (state.metricView === view) return;
+      state.metricView = view;
+      try { window.localStorage.setItem('lm-training-metric-view', view); } catch (error) { /* optional */ }
+      refreshMetricsPanel();
+    });
   }
 
   function renderJobDetail(job) {
@@ -1972,6 +2102,12 @@
     dom.listView = byId('training-list-view');
     dom.detailView = byId('training-detail-view');
     dom.detail = byId('job-detail');
+    try {
+      var savedView = window.localStorage.getItem('lm-training-metric-view');
+      if (savedView === 'train' || savedView === 'val' || savedView === 'both') {
+        state.metricView = savedView;
+      }
+    } catch (error) { /* optional */ }
     dom.kpis = byId('training-kpis');
     dom.results = byId('job-results');
     dom.search = byId('job-search');
@@ -2062,6 +2198,7 @@
     bindSidebar();
     bindTheme();
     bindDataset();
+    bindMetricView();
     bindWizard();
     bindDialogs();
     bindFilters();

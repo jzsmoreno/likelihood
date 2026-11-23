@@ -864,6 +864,15 @@ button.side-link {
   font-weight: 600;
 }
 
+/* Train/validation charts can carry a dozen series; a grid keeps the legend
+ * readable instead of letting it wrap into a wall of chips. */
+.lm-chart-legend.is-dense {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 5px 14px;
+  align-items: center;
+}
+
 .lm-legend-item {
   display: inline-flex;
   align-items: center;

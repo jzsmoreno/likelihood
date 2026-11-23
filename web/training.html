@@ -203,6 +203,31 @@
     letter-spacing: .02em;
     white-space: nowrap;
   }
+  .metric-view-switch {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--db-line);
+    border-radius: 999px;
+    background: var(--db-surface-alt);
+  }
+  .metric-view-btn {
+    padding: 3px 9px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--db-muted);
+    font-size: 10.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .12s ease, color .12s ease;
+  }
+  .metric-view-btn:hover { color: var(--db-ink); }
+  .metric-view-btn.is-active {
+    background: var(--db-surface);
+    color: var(--db-ink);
+    box-shadow: var(--db-shadow-xs);
+  }
   .training-metric-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
