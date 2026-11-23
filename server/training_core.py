@@ -97,10 +97,13 @@ TARGET_METRICS = (
     "val_f1_score",
     "auc",
     "val_auc",
+    "kappa",
+    "val_kappa",
 )
 
-#: Metrics compiled into a Keras classifier by default.
-CLASSIFICATION_METRICS = ("accuracy", "precision", "recall", "f1_score", "auc")
+#: Metrics compiled into a Keras classifier by default.  ``kappa`` is Cohen's
+#: kappa, which is more informative than raw accuracy on imbalanced targets.
+CLASSIFICATION_METRICS = ("accuracy", "precision", "recall", "f1_score", "auc", "kappa")
 
 #: Metrics compiled into a Keras regressor by default (MAPE stays opt-in).
 REGRESSION_METRICS = ("mae", "mse", "root_mean_squared_error", "r2_score")
@@ -543,6 +546,7 @@ def resolve_fit_method_name(model: Dict[str, Any], requested: str = "") -> str:
 def default_compile_options(model: Dict[str, Any], parameters: Dict[str, Any]) -> Dict[str, Any]:
     """Conservative Keras compile options for a framework ``fit``.
 
+    Classification logs accuracy, precision, recall, F1, AUC and Cohen's kappa.
     Regression uses ``mse`` as the loss and logs ``mae``, ``mse``,
     ``root_mean_squared_error`` and ``r2_score`` by default.  MAPE
     (``mean_absolute_percentage_error``) remains an explicit opt-in because it

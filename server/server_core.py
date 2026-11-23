@@ -1794,7 +1794,8 @@ def _compile_metric_objects(instance, metrics):
     # Keras' built-in precision/recall/F1/AUC expect binary or one-hot targets,
     # while the catalog trains classifiers with sparse integer labels.  Map the
     # familiar metric names to sparse-aware wrappers so the history and the
-    # training dashboard expose precision, recall, F1 and AUC for every task.
+    # training dashboard expose precision, recall, F1, AUC and Cohen's kappa for
+    # every task.
     if not isinstance(metrics, (list, tuple)):
         return metrics
     try:
@@ -1872,6 +1873,55 @@ def _compile_metric_objects(instance, metrics):
             for auc in self.aucs:
                 auc.reset_state()
 
+    class _CohenKappa(keras.metrics.Metric):
+        # Cohen's kappa for sparse integer labels, binary or multiclass.  The
+        # metric keeps a confusion matrix built from the running counts of every
+        # (true, predicted) pair, so ``result`` returns the unweighted kappa
+        # ``(p_o - p_e) / (1 - p_e)`` in ``[-1, 1]`` regardless of the number of
+        # classes.  Softmax outputs are reduced with ``argmax`` and a single
+        # sigmoid output is thresholded at ``0.5``.
+
+        def __init__(self, num_classes, name="kappa", **kwargs):
+            super().__init__(name=name, **kwargs)
+            self.num_classes = max(2, int(num_classes))
+            self.confusion = self.add_weight(
+                name="confusion",
+                shape=(self.num_classes, self.num_classes),
+                initializer="zeros",
+            )
+
+        def update_state(self, y_true, y_pred, sample_weight=None):
+            y_true = tf.reshape(tf.cast(y_true, tf.int32), [-1])
+            y_pred = tf.convert_to_tensor(y_pred)
+            if len(y_pred.shape) > 1 and y_pred.shape[-1] is not None and y_pred.shape[-1] > 1:
+                classes = tf.argmax(y_pred, axis=-1, output_type=tf.int32)
+            else:
+                classes = tf.cast(tf.reshape(y_pred, [-1]) >= 0.5, tf.int32)
+            weights = None
+            if sample_weight is not None:
+                weights = tf.reshape(tf.cast(sample_weight, self.dtype), [-1])
+            matrix = tf.math.confusion_matrix(
+                y_true,
+                classes,
+                num_classes=self.num_classes,
+                weights=weights,
+                dtype=self.dtype,
+            )
+            self.confusion.assign_add(matrix)
+
+        def result(self):
+            total = tf.reduce_sum(self.confusion)
+            safe_total = tf.maximum(total, 1.0)
+            observed = tf.linalg.trace(self.confusion) / safe_total
+            row = tf.reduce_sum(self.confusion, axis=1)
+            column = tf.reduce_sum(self.confusion, axis=0)
+            expected = tf.reduce_sum(row * column) / tf.square(safe_total)
+            denominator = 1.0 - expected
+            return tf.where(denominator > 0.0, (observed - expected) / denominator, 0.0)
+
+        def reset_state(self):
+            self.confusion.assign(tf.zeros_like(self.confusion))
+
     output_dim = 0
     try:
         shape = getattr(instance, "output_shape", None)
@@ -1912,6 +1962,8 @@ def _compile_metric_objects(instance, metrics):
             resolved.append(
                 _MacroAUC(output_dim) if multi else keras.metrics.AUC(name="auc")
             )
+        elif key in ("kappa", "cohen_kappa", "cohen_kappa_score"):
+            resolved.append(_CohenKappa(output_dim if multi else 2, name=key))
         elif key in ("r2", "r2_score"):
             resolved.append(_FlatR2(name=key))
         else:

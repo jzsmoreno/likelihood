@@ -489,7 +489,13 @@
     auc: 'AUC',
     val_auc: 'AUC (val)',
     f1: 'F1',
-    val_f1: 'F1 (val)'
+    val_f1: 'F1 (val)',
+    kappa: 'Kappa de Cohen',
+    val_kappa: 'Kappa de Cohen (val)',
+    cohen_kappa: 'Kappa de Cohen',
+    val_cohen_kappa: 'Kappa de Cohen (val)',
+    cohen_kappa_score: 'Kappa de Cohen',
+    val_cohen_kappa_score: 'Kappa de Cohen (val)'
   };
 
   function metricLabel(key) {
@@ -526,9 +532,18 @@
       name.indexOf('auc') >= 0;
   }
 
+  function isKappaMetric(key) {
+    return String(key).toLowerCase().indexOf('kappa') >= 0;
+  }
+
   function formatMetric(key, value) {
     if (value === null || value === undefined || !isFinite(Number(value))) return '—';
     if (isRateMetric(key)) return (Number(value) * 100).toFixed(2) + '%';
+    /* Cohen's kappa lives in [-1, 1]; four decimals keep the small changes
+     * between epochs readable in the tiles and the summary table. */
+    if (isKappaMetric(key)) {
+      return window.LMCharts ? window.LMCharts.fmtNumber(value, 4) : String(value);
+    }
     return fmt(value);
   }
 
@@ -635,6 +650,12 @@
           '<div class="training-metrics-chart" id="training-metrics-chart"></div>' +
         '</figure>'
       : '';
+    var kappaNote = keys.some(isKappaMetric)
+      ? '<p class="training-note"><b>Kappa de Cohen</b>: corrige el acuerdo por azar ' +
+        '(1 = acuerdo perfecto, 0 = azar). Con clases desbalanceadas la exactitud puede ' +
+        'ser alta y kappa seguir en 0 si el modelo solo acierta la clase mayoritaria; ' +
+        'mientras predice una única clase el valor es 0 por definición.</p>'
+      : '';
     var control = job.control || {};
     var actionLabel = {
       stop: 'detener al alcanzar el objetivo',
@@ -665,6 +686,7 @@
         '<div class="training-metric-grid">' + tiles.join('') + '</div>' +
         lossFigure +
         metricFigure +
+        kappaNote +
         '<div class="training-metric-table-wrap">' +
           '<table class="training-metric-table">' +
             '<thead><tr><th>Métrica</th><th>Último</th><th>Mejor</th><th>Época</th></tr></thead>' +
@@ -1149,7 +1171,7 @@
       dom.compileInput.placeholder = compileTask === 'regression'
         ? '{"optimizer": "adam", "loss": "mse", "metrics": ["mae", "mse", "root_mean_squared_error", "r2_score"]}'
         : (compileTask === 'classification'
-          ? '{"optimizer": "adam", "loss": "sparse_categorical_crossentropy", "metrics": ["accuracy", "precision", "recall", "f1_score", "auc"]}'
+          ? '{"optimizer": "adam", "loss": "sparse_categorical_crossentropy", "metrics": ["accuracy", "precision", "recall", "f1_score", "auc", "kappa"]}'
           : '{"optimizer": "adam", "loss": "mse", "metrics": ["mae"]}');
     }
     if (dom.targetNormalizationField) {

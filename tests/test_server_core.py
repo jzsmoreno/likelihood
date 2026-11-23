@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import sys
+import textwrap
 import threading
 import time
 from pathlib import Path
@@ -24,6 +26,7 @@ sys.path.insert(0, str(SERVER_DIR))
 
 import model_catalog  # noqa: E402
 import server_core as core  # noqa: E402
+import training_metrics  # noqa: E402
 
 
 @pytest.mark.parametrize(
@@ -640,3 +643,41 @@ def test_session_build_uses_the_requested_timeout(monkeypatch):
     assert session.id
     assert created == [600]
     assert waited == [600]  # the old code capped the build at 60 s
+
+
+def test_invoke_bootstrap_defines_a_working_cohens_kappa_metric():
+    """The sandbox compiles ``kappa`` into a sparse-aware Keras metric.
+
+    The metric classes live inside the ``_INVOKE_BOOTSTRAP`` script, so the
+    test extracts the real source block instead of duplicating the formula.
+    """
+    pytest.importorskip("tensorflow")
+    import numpy as np
+
+    block = re.search(
+        r"^    class _CohenKappa.*?(?=^    output_dim = 0)",
+        core._INVOKE_BOOTSTRAP,
+        re.S | re.M,
+    )
+    assert block is not None, "the Keras Cohen's kappa metric is missing"
+    assert 'elif key in ("kappa", "cohen_kappa", "cohen_kappa_score"):' in core._INVOKE_BOOTSTRAP
+
+    namespace = {}
+    exec(
+        "import keras\nimport tensorflow as tf\n" + textwrap.dedent(block.group(0)),
+        namespace,
+    )
+    kappa = namespace["_CohenKappa"]
+
+    def score(y_true, y_pred):
+        metric = kappa(2)
+        metric.update_state(np.asarray(y_true), np.asarray(y_pred, dtype="float32"))
+        return float(metric.result())
+
+    assert score([0, 1, 0, 1], [[0.1], [0.9], [0.2], [0.8]]) == pytest.approx(1.0)
+    assert score([0, 0, 1, 1], [[0.9], [0.1], [0.1], [0.9]]) == pytest.approx(0.0)
+    assert score([0, 0, 0, 1], [[0.1], [0.2], [0.9], [0.9]]) == pytest.approx(0.5)
+    # The sandbox implementation agrees with the server-side reference helper.
+    assert score([0, 0, 0, 1], [[0.1], [0.2], [0.9], [0.9]]) == pytest.approx(
+        training_metrics.cohens_kappa([0, 0, 0, 1], [0, 0, 1, 1])
+    )

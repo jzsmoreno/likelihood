@@ -469,8 +469,8 @@ def test_regression_default_compile_includes_popular_metrics():
 
 
 def test_classification_defaults_include_popular_metrics():
-    """Binary and multiclass classifiers log accuracy, precision, recall, F1 and AUC."""
-    expected = ["accuracy", "precision", "recall", "f1_score", "auc"]
+    """Classifiers log accuracy, precision, recall, F1, AUC and Cohen's kappa."""
+    expected = ["accuracy", "precision", "recall", "f1_score", "auc", "kappa"]
     multiclass = training_core.default_compile_options(
         {}, {"classifier_activation": "softmax", "num_classes": 3}
     )
@@ -482,6 +482,17 @@ def test_classification_defaults_include_popular_metrics():
     assert multiclass["metrics"] == expected
     assert binary["loss"] == "binary_crossentropy"
     assert binary["metrics"] == expected
+
+
+def test_target_metric_control_offers_cohens_kappa():
+    """The control accepts Cohen's kappa for early stopping / LR scheduling."""
+    assert "kappa" in training_core.TARGET_METRICS
+    assert "val_kappa" in training_core.TARGET_METRICS
+    control = training_core.normalize_training_control(
+        {"metric": "val_kappa", "action": "stop", "value": 0.8}
+    )
+    assert control["metric"] == "val_kappa"
+    assert control["value"] == 0.8
 
 
 def test_supported_optimizer_names_are_forwarded():
