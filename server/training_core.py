@@ -1480,8 +1480,7 @@ class TrainingStore:
             "filename": "model",
             "pickle_name": "model.pkl",
         }
-        records: List[Dict[str, Any]] = []
-        best: Optional[Dict[str, Any]] = None
+        fold_results: List[Dict[str, Any]] = []
         total_compute = 0.0
         for index, (train_indices, validation_indices) in enumerate(splits, start=1):
             fold_arguments = dict(base_arguments)
@@ -1508,22 +1507,6 @@ class TrainingStore:
             total_compute += fold_compute
             history = (result.get("result") or {}).get("history")
             history = history if isinstance(history, dict) else {}
-            score = cross_validation.fold_score(history, options["metric"])
-            if score is None and options["metric"] != "val_loss":
-                score = cross_validation.fold_score(history, "val_loss")
-                if score is not None:
-                    job["log"].append(
-                        {
-                            "at": iso(),
-                            "level": "warning",
-                            "message": (
-                                "La métrica %s no aparece en el historial; se usa val_loss"
-                                % options["metric"]
-                            ),
-                        }
-                    )
-            if score is None:
-                score = cross_validation.fold_score(history, "loss")
             metrics: Dict[str, float] = {}
             for key, values in history.items():
                 if not isinstance(values, list) or not values:
@@ -1537,45 +1520,121 @@ class TrainingStore:
                     continue
                 if math.isfinite(number):
                     metrics[key] = number
-            records.append(
+            fold_results.append(
                 {
                     "fold": index,
                     "train_rows": len(train_indices),
                     "validation_rows": len(validation_indices),
-                    "score": score,
+                    "score": None,
                     "compute_seconds": round(fold_compute, 3),
                     "metrics": metrics,
+                    "history": history,
+                    "result": result,
+                    "dir": fold_dir,
                 }
             )
+
+        requested_metric = str(options.get("metric") or "val_loss")
+        metric = requested_metric
+        mode = str(options.get("mode") or "min")
+        components: List[Dict[str, Any]] = []
+        if metric == "balanced":
+            scores, components = cross_validation.composite_scores(
+                [record["metrics"] for record in fold_results],
+                options.get("weights") or {},
+            )
+            if components:
+                for record, score in zip(fold_results, scores):
+                    record["score"] = score
+                mode = "max"
+            else:
+                job["log"].append(
+                    {
+                        "at": iso(),
+                        "level": "warning",
+                        "message": (
+                            "No hay métricas comunes para la selección balanceada; "
+                            "se usa val_loss"
+                        ),
+                    }
+                )
+                metric = "val_loss"
+                mode = "min"
+        if metric != "balanced":
+            feedback = False
+            for record in fold_results:
+                score = cross_validation.fold_score(record["history"], metric)
+                if score is None and metric != "val_loss":
+                    score = cross_validation.fold_score(record["history"], "val_loss")
+                    if score is not None:
+                        feedback = True
+                if score is None:
+                    score = cross_validation.fold_score(record["history"], "loss")
+                record["score"] = score
+            if feedback:
+                job["log"].append(
+                    {
+                        "at": iso(),
+                        "level": "warning",
+                        "message": (
+                            "La métrica %s no aparece en el historial; se usa val_loss"
+                            % requested_metric
+                        ),
+                    }
+                )
+        if metric == "balanced":
+            used = {component["metric"] for component in components}
+            skipped = sorted(set((options.get("weights") or {}).keys()) - used)
+            if skipped:
+                job["log"].append(
+                    {
+                        "at": iso(),
+                        "level": "warning",
+                        "message": (
+                            "Métricas sin valores en todos los folds: %s" % ", ".join(skipped)
+                        ),
+                    }
+                )
+        for record in fold_results:
             job["log"].append(
                 {
                     "at": iso(),
                     "level": "info",
                     "message": "Fold %d/%d: %s=%s"
                     % (
-                        index,
+                        record["fold"],
                         len(splits),
-                        options["metric"],
-                        "—" if score is None else round(score, 6),
+                        metric,
+                        "—" if record["score"] is None else round(record["score"], 6),
                     ),
                 }
             )
-            if best is None or (
-                score is not None
-                and (
-                    best["score"] is None
-                    or cross_validation.is_better(score, best["score"], options["mode"])
-                )
+        best_record = fold_results[0]
+        for record in fold_results[1:]:
+            score = record["score"]
+            if score is not None and (
+                best_record["score"] is None
+                or cross_validation.is_better(score, best_record["score"], mode)
             ):
-                best = {
-                    "fold": index,
-                    "score": score,
-                    "dir": fold_dir,
-                    "result": result,
-                    "history": history,
-                }
-        if best is None:  # pragma: no cover - make_folds always yields samples
-            raise core.ValidationError("La validación cruzada no pudo entrenar ningún fold")
+                best_record = record
+        records = [
+            {
+                "fold": record["fold"],
+                "train_rows": record["train_rows"],
+                "validation_rows": record["validation_rows"],
+                "score": record["score"],
+                "compute_seconds": record["compute_seconds"],
+                "metrics": record["metrics"],
+            }
+            for record in fold_results
+        ]
+        best = {
+            "fold": best_record["fold"],
+            "score": best_record["score"],
+            "dir": best_record["dir"],
+            "result": best_record["result"],
+            "history": best_record["history"],
+        }
         self._promote_artifact(Path(best["dir"]), Path(save_path))
         shutil.rmtree(fold_root, ignore_errors=True)
         summary = cross_validation.summarise([record["score"] for record in records])
@@ -1588,8 +1647,11 @@ class TrainingStore:
             "folds": records,
             "cross_validation": {
                 "folds": len(records),
-                "metric": options["metric"],
-                "mode": options["mode"],
+                "metric": metric,
+                "requested_metric": requested_metric,
+                "mode": mode,
+                "weights": dict(options.get("weights") or {}),
+                "components": components,
                 "shuffle": options["shuffle"],
                 "seed": options["seed"],
                 "mean": summary["mean"],

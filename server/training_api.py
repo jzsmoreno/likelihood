@@ -86,8 +86,10 @@ class TrainingRequest(BaseModel):
         default=None,
         description=(
             "Validación cruzada k-fold para fit Keras con dataset 'xy': folds "
-            "(2-10), metric (por defecto val_loss), mode (auto/min/max), shuffle "
-            "y seed. El artefacto guardado corresponde al mejor fold."
+            "(2-10), metric (val_loss por defecto, o 'balanced' para combinar "
+            "métricas), weights ({nombre: peso} para 'balanced'), mode "
+            "(auto/min/max), shuffle y seed. El artefacto guardado corresponde "
+            "al mejor fold."
         ),
     )
     normalization: Optional[str] = Field(

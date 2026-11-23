@@ -175,3 +175,62 @@ def test_cross_validation_rejects_an_explicit_validation_data_argument(store):
     spec["arguments"]["validation_data"] = [[[0.0, 0.0]], [0]]
     with pytest.raises(core.ValidationError):
         store.start(spec)
+
+
+def test_cross_validation_balanced_selection(store, monkeypatch):
+    dataset = make_dataset(store)
+    histories = {
+        1: {"val_loss": [0.2], "val_accuracy": [0.9]},
+        2: {"val_loss": [0.1], "val_accuracy": [0.7]},
+        3: {"val_loss": [0.3], "val_accuracy": [0.8]},
+    }
+    calls = []
+
+    def fake_run_invoke(model, method, parameters, arguments, **kwargs):
+        index = len(calls) + 1
+        calls.append(index)
+        target = Path(kwargs["save_path"])
+        target.mkdir(parents=True, exist_ok=True)
+        (target / "model.pkl").write_bytes(("fold-%d" % index).encode())
+        return {
+            "type": model["id"],
+            "module": model["module"],
+            "repr": "<%s>" % model["id"],
+            "compute_seconds": 0.5,
+            "result": {"history": histories[index]},
+            "save_path": str(target),
+            "load_path": str(target),
+            "save_method": "pickle",
+            "save_bytes": 6,
+        }
+
+    monkeypatch.setattr(training_core.core, "run_invoke", fake_run_invoke)
+
+    job = store.start(job_spec(dataset, metric="balanced"))
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    cv = finished["result"]["cross_validation"]
+    assert cv["metric"] == "balanced"
+    assert cv["requested_metric"] == "balanced"
+    assert cv["mode"] == "max"
+    assert cv["scores"] == pytest.approx([0.75, 0.5, 0.25])
+    assert cv["best_fold"] == 1
+    assert [component["metric"] for component in cv["components"]] == [
+        "val_accuracy",
+        "val_loss",
+    ]
+    artifact = Path(finished["artifact"]["path"])
+    assert (artifact / "model.pkl").read_bytes() == b"fold-1"
+
+    calls.clear()
+    weighted = store.start(
+        job_spec(dataset, metric="balanced", weights={"val_loss": 3, "val_accuracy": 1})
+    )
+    finished_weighted = wait_for(store, weighted["job_id"])
+    assert finished_weighted["status"] == "succeeded", finished_weighted["error"]
+    cv_weighted = finished_weighted["result"]["cross_validation"]
+    assert cv_weighted["scores"] == pytest.approx([0.625, 0.75, 0.125])
+    assert cv_weighted["best_fold"] == 2
+    assert cv_weighted["weights"] == {"val_loss": 3.0, "val_accuracy": 1.0}
+    weighted_artifact = Path(finished_weighted["artifact"]["path"])
+    assert (weighted_artifact / "model.pkl").read_bytes() == b"fold-2"

@@ -1030,7 +1030,7 @@
         </div>
         <div class="wizard-field" id="cv-field" hidden>
           <label>Validación cruzada k-fold (Keras)</label>
-          <p class="hint" style="margin-top:2px">Entrena k modelos con particiones distintas y guarda como artefacto el fold con la mejor métrica. Requiere un dataset X + Y; el job tarda aproximadamente k veces más y las curvas del monitor corresponden al mejor fold.</p>
+          <p class="hint" style="margin-top:2px">Entrena k modelos con particiones distintas y guarda como artefacto el fold con la mejor métrica. Requiere un dataset X + Y; el job tarda aproximadamente k veces más y las curvas del monitor corresponden al mejor fold. Con la métrica <code>balanced</code> se combinan varias métricas normalizadas (0–1); puedes dar pesos por métrica y las pérdidas se invierten automáticamente.</p>
           <label class="check-row" for="job-cv-enabled"><input type="checkbox" id="job-cv-enabled"><span>Activar validación cruzada</span></label>
           <div class="training-control-grid" id="cv-options" hidden>
             <div class="wizard-field">
@@ -1050,15 +1050,21 @@
                 <option value="loss">loss</option>
                 <option value="accuracy">accuracy</option>
                 <option value="kappa">kappa</option>
+                <option value="balanced">Balance (todas)</option>
               </select>
             </div>
-            <div class="wizard-field">
+            <div class="wizard-field" id="cv-mode-field">
               <label for="job-cv-mode">Dirección</label>
               <select class="select" id="job-cv-mode">
                 <option value="auto">Automática</option>
                 <option value="min">Minimizar</option>
                 <option value="max">Maximizar</option>
               </select>
+            </div>
+            <div class="wizard-field" id="cv-weights-field" hidden>
+              <label for="job-cv-weights">Pesos por métrica (JSON)</label>
+              <input type="text" class="input mono" id="job-cv-weights" placeholder='{"val_accuracy": 2, "val_loss": 1}'>
+              <p class="hint">Opcional. Solo se combinan las métricas indicadas; vacío = todas las <code>val_*</code> con peso 1.</p>
             </div>
             <div class="wizard-field">
               <label for="job-cv-seed">Semilla (barajado)</label>

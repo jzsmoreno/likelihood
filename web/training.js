@@ -507,7 +507,8 @@
     cohen_kappa: 'Kappa',
     val_cohen_kappa: 'Kappa (val)',
     cohen_kappa_score: 'Kappa',
-    val_cohen_kappa_score: 'Kappa (val)'
+    val_cohen_kappa_score: 'Kappa (val)',
+    balanced: 'Balance'
   };
 
   function metricLabel(key) {
@@ -575,12 +576,20 @@
     return String(key).toLowerCase().indexOf('kappa') >= 0;
   }
 
+  function isCompositeMetric(key) {
+    return String(key).toLowerCase() === 'balanced';
+  }
+
   function formatMetric(key, value) {
     if (value === null || value === undefined || !isFinite(Number(value))) return '—';
     if (isRateMetric(key)) return (Number(value) * 100).toFixed(2) + '%';
     /* Cohen's kappa lives in [-1, 1]; four decimals keep the small changes
      * between epochs readable in the tiles and the summary table. */
     if (isKappaMetric(key)) {
+      return window.LMCharts ? window.LMCharts.fmtNumber(value, 4) : String(value);
+    }
+    /* The balanced CV score is a 0..1 quality index. */
+    if (isCompositeMetric(key)) {
       return window.LMCharts ? window.LMCharts.fmtNumber(value, 4) : String(value);
     }
     return fmt(value);
@@ -845,6 +854,20 @@
         '<td>' + esc(kappaValue === undefined ? '—' : formatMetric('kappa', kappaValue)) + '</td>' +
         '</tr>';
     }).join('');
+    var components = cv.components || [];
+    var balanceNote = '';
+    if (cv.metric === 'balanced' && components.length) {
+      balanceNote = '<p class="training-note"><b>Balance</b> = media ponderada 0–1 de ' +
+        components.map(function (component) {
+          return '<code>' + esc(component.metric) + '</code> ×' + esc(component.weight) +
+            ' (' + (component.direction === 'min' ? 'minimizar' : 'maximizar') + ')';
+        }).join(' · ') +
+        '. Las métricas de pérdida se invierten antes de combinar.</p>';
+    } else if (cv.requested_metric === 'balanced') {
+      balanceNote = '<p class="training-note">No se pudo calcular el balance ' +
+        '(sin métricas comunes en todos los folds); se seleccionó por ' +
+        esc(metricLabel(metric)) + '.</p>';
+    }
     var tiles = [
       metricTile('Folds', fmt(cv.folds),
         cv.shuffle ? 'barajado · seed ' + seedText : 'secuencial'),
@@ -881,6 +904,7 @@
           (hasValAccuracy ? 'Exactitud (val)' : 'Exactitud') + '</th><th>' +
           (hasValKappa ? 'Kappa (val)' : 'Kappa') + '</th></tr></thead>' +
           '<tbody>' + rows + '</tbody></table></div>' +
+        balanceNote +
         '<p class="training-note">El artefacto guardado corresponde al fold #' + esc(best) +
         '. Las curvas del monitor muestran el historial de ese fold; el resto de folds ' +
         'solo aporta su puntuación.</p>' +
@@ -1381,6 +1405,9 @@
   function syncCrossValidationFields() {
     var enabled = dom.cvEnabled && dom.cvEnabled.checked;
     if (dom.cvOptions) dom.cvOptions.hidden = !enabled;
+    var balanced = dom.cvMetric && dom.cvMetric.value === 'balanced';
+    if (dom.cvWeightsField) dom.cvWeightsField.hidden = !enabled || !balanced;
+    if (dom.cvModeField) dom.cvModeField.hidden = !enabled || balanced;
   }
 
   function syncCrossValidationVisibility() {
@@ -1400,6 +1427,7 @@
     if (dom.cvMode) dom.cvMode.value = 'auto';
     if (dom.cvSeed) dom.cvSeed.value = '42';
     if (dom.cvShuffle) dom.cvShuffle.checked = true;
+    if (dom.cvWeights) dom.cvWeights.value = '';
     syncCrossValidationFields();
   }
 
@@ -1415,13 +1443,40 @@
     if (seed !== null && (!isFinite(seed) || Math.floor(seed) !== seed || seed < 0)) {
       throw new Error('La semilla debe ser un entero no negativo.');
     }
-    return {
+    var metric = dom.cvMetric ? dom.cvMetric.value : 'val_loss';
+    var balanced = metric === 'balanced';
+    var weights = null;
+    if (balanced) {
+      var weightsText = dom.cvWeights ? String(dom.cvWeights.value).trim() : '';
+      if (weightsText) {
+        var parsed;
+        try {
+          parsed = JSON.parse(weightsText);
+        } catch (error) {
+          throw new Error('Los pesos de la validación cruzada no son JSON válido.');
+        }
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('Los pesos deben ser un objeto JSON {métrica: peso}.');
+        }
+        weights = {};
+        Object.keys(parsed).forEach(function (key) {
+          var weight = Number(parsed[key]);
+          if (!isFinite(weight) || weight <= 0) {
+            throw new Error('El peso de "' + key + '" debe ser un número mayor que 0.');
+          }
+          weights[key] = weight;
+        });
+      }
+    }
+    var payload = {
       folds: folds,
-      metric: dom.cvMetric ? dom.cvMetric.value : 'val_loss',
-      mode: dom.cvMode ? dom.cvMode.value : 'auto',
+      metric: metric,
+      mode: balanced ? 'max' : (dom.cvMode ? dom.cvMode.value : 'auto'),
       shuffle: dom.cvShuffle ? dom.cvShuffle.checked : true,
       seed: seed,
     };
+    if (weights && Object.keys(weights).length) payload.weights = weights;
+    return payload;
   }
 
   function onKindChange() {
@@ -2057,6 +2112,7 @@
     if (dom.controlEnabled) dom.controlEnabled.addEventListener('change', syncControlFields);
     if (dom.targetAction) dom.targetAction.addEventListener('change', syncControlFields);
     if (dom.cvEnabled) dom.cvEnabled.addEventListener('change', syncCrossValidationFields);
+    if (dom.cvMetric) dom.cvMetric.addEventListener('change', syncCrossValidationFields);
     if (dom.wizardExample) dom.wizardExample.addEventListener('click', loadExample);
     if (dom.createDialog) {
       dom.createDialog.addEventListener('click', function (event) {
@@ -2162,6 +2218,9 @@
     dom.cvFolds = byId('job-cv-folds');
     dom.cvMetric = byId('job-cv-metric');
     dom.cvMode = byId('job-cv-mode');
+    dom.cvModeField = byId('cv-mode-field');
+    dom.cvWeights = byId('job-cv-weights');
+    dom.cvWeightsField = byId('cv-weights-field');
     dom.cvSeed = byId('job-cv-seed');
     dom.cvShuffle = byId('job-cv-shuffle');
     dom.artifactInput = byId('job-artifact-id');

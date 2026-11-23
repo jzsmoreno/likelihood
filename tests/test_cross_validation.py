@@ -26,6 +26,7 @@ def test_normalise_options_defaults():
     assert options == {
         "folds": 5,
         "metric": "val_loss",
+        "weights": {},
         "mode": "min",
         "shuffle": True,
         "seed": 42,
@@ -94,3 +95,65 @@ def test_summarise_returns_mean_and_population_std():
     assert summary["mean"] == pytest.approx(0.3)
     assert summary["std"] == pytest.approx(0.08165, abs=1e-6)
     assert cross_validation.summarise([None]) == {"mean": None, "std": None}
+
+
+def test_normalise_options_accepts_balanced_and_weights():
+    options = cross_validation.normalise_options(
+        {"metric": "balanced", "weights": {"val_accuracy": 2, "val_loss": 1}, "mode": "min"}
+    )
+    assert options["metric"] == "balanced"
+    assert options["mode"] == "max"  # composite scores are always maximised
+    assert options["weights"] == {"val_accuracy": 2.0, "val_loss": 1.0}
+
+
+@pytest.mark.parametrize(
+    "weights",
+    [{"val_loss": 0}, {"val_loss": -1}, {"val_loss": "x"}, [], {"": 1}],
+)
+def test_normalise_options_rejects_invalid_weights(weights):
+    with pytest.raises(core.ValidationError):
+        cross_validation.normalise_options({"metric": "balanced", "weights": weights})
+
+
+def test_composite_scores_normalise_directions_with_equal_weights():
+    scores, components = cross_validation.composite_scores(
+        [
+            {"val_loss": 0.2, "val_accuracy": 0.9},
+            {"val_loss": 0.1, "val_accuracy": 0.7},
+            {"val_loss": 0.3, "val_accuracy": 0.8},
+        ]
+    )
+    assert scores == pytest.approx([0.75, 0.5, 0.25])
+    assert [component["metric"] for component in components] == ["val_accuracy", "val_loss"]
+    assert components[1]["direction"] == "min"
+
+
+def test_composite_scores_honour_explicit_weights():
+    scores, _ = cross_validation.composite_scores(
+        [
+            {"val_loss": 0.2, "val_accuracy": 0.9},
+            {"val_loss": 0.1, "val_accuracy": 0.7},
+            {"val_loss": 0.3, "val_accuracy": 0.8},
+        ],
+        {"val_loss": 3, "val_accuracy": 1},
+    )
+    assert scores == pytest.approx([0.625, 0.75, 0.125])
+
+
+def test_composite_scores_skip_metrics_missing_from_some_folds():
+    scores, components = cross_validation.composite_scores(
+        [
+            {"val_accuracy": 0.9, "val_loss": 0.2},
+            {"val_accuracy": 0.7},
+        ]
+    )
+    assert scores == pytest.approx([1.0, 0.0])
+    assert [component["metric"] for component in components] == ["val_accuracy"]
+
+
+def test_composite_scores_handle_empty_and_constant_metrics():
+    empty_scores, empty_components = cross_validation.composite_scores([{}, {}])
+    assert empty_scores == [None, None]
+    assert empty_components == []
+    constant, _ = cross_validation.composite_scores([{"val_accuracy": 0.8}, {"val_accuracy": 0.8}])
+    assert constant == pytest.approx([0.5, 0.5])
