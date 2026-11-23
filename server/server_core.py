@@ -1559,7 +1559,18 @@ def _convert(name, value, hints):
 
 def _convert_all(values, hints=None):
     hints = types if hints is None else hints
-    return {key: _convert(key, value, hints) for key, value in (values or {}).items()}
+    converted = {}
+    for key, value in (values or {}).items():
+        if key == "validation_data" and isinstance(value, (list, tuple)) and len(value) == 2:
+            # Keras' ``fit`` needs arrays, but JSON only carries lists and the
+            # catalog has no type hint for this training-layer argument.
+            converted[key] = (
+                _convert(key, value[0], {key: "array"}),
+                _convert(key, value[1], {key: "array"}),
+            )
+        else:
+            converted[key] = _convert(key, value, hints)
+    return converted
 
 
 def _safe(value, depth=0):

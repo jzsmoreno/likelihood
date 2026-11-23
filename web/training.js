@@ -698,6 +698,112 @@
     '</section>';
   }
 
+  function crossValidationData(job) {
+    var result = job.result || {};
+    var cv = result.cross_validation;
+    if (!cv || !cv.folds) return null;
+    var folds = result.folds || [];
+    var metric = cv.metric || 'val_loss';
+    var finite = [];
+    var scores = folds.map(function (fold) {
+      var value = fold.score;
+      var ok = value !== null && value !== undefined && isFinite(Number(value));
+      if (ok) finite.push(Number(value));
+      return { fold: fold.fold, value: ok ? Number(value) : null, ok: ok };
+    });
+    var min = finite.length ? Math.min.apply(null, finite) : 0;
+    var max = finite.length ? Math.max.apply(null, finite) : 0;
+    var span = max - min;
+    /* Longer bar = better fold, whichever direction the metric uses. */
+    var invert = cv.mode !== 'max';
+    scores.forEach(function (item) {
+      var ratio = 0.06;
+      if (item.ok && span > 0) {
+        var relative = invert ? (max - item.value) / span : (item.value - min) / span;
+        ratio = 0.08 + 0.92 * relative;
+      }
+      item.width = Math.max(3, Math.round(ratio * 100));
+    });
+    return {
+      cv: cv,
+      folds: folds,
+      metric: metric,
+      scores: scores,
+      best: Number(cv.best_fold)
+    };
+  }
+
+  function crossValidationPanel(job) {
+    var data = crossValidationData(job);
+    if (!data) return '';
+    var cv = data.cv;
+    var metric = data.metric;
+    var best = data.best;
+    var mean = cv.mean;
+    var std = cv.std;
+    var seedText = cv.seed === null || cv.seed === undefined ? '—' : cv.seed;
+    var bars = data.scores.map(function (item) {
+      return '<div class="cv-score-row' + (item.fold === best ? ' is-best' : '') + '">' +
+        '<span class="cv-score-label">Fold #' + esc(item.fold) + '</span>' +
+        '<div class="cv-score-track"><div class="cv-score-fill" style="width:' +
+          (item.ok ? item.width : 0) + '%"></div></div>' +
+        '<span class="cv-score-value">' +
+          esc(item.ok ? formatMetric(metric, item.value) : '—') + '</span>' +
+        '</div>';
+    }).join('');
+    var rows = data.folds.map(function (fold) {
+      var metrics = fold.metrics || {};
+      var accuracy = metrics.accuracy !== undefined ? metrics.accuracy : metrics.val_accuracy;
+      var kappaValue = metrics.kappa !== undefined ? metrics.kappa : metrics.val_kappa;
+      return '<tr' + (fold.fold === best ? ' class="is-best"' : '') + '>' +
+        '<td>#' + esc(fold.fold) + '</td>' +
+        '<td>' + esc(formatMetric(metric, fold.score)) + '</td>' +
+        '<td>' + esc(fold.train_rows) + '</td>' +
+        '<td>' + esc(fold.validation_rows) + '</td>' +
+        '<td>' + esc(accuracy === undefined ? '—' : formatMetric('accuracy', accuracy)) + '</td>' +
+        '<td>' + esc(kappaValue === undefined ? '—' : formatMetric('kappa', kappaValue)) + '</td>' +
+        '</tr>';
+    }).join('');
+    var tiles = [
+      metricTile('Folds', fmt(cv.folds),
+        cv.shuffle ? 'barajado · seed ' + seedText : 'secuencial'),
+      metricTile('Mejor fold', '#' + best, 'por ' + metricLabel(metric), 'green'),
+      metricTile(metricLabel(metric),
+        mean === null || mean === undefined ? '—' : formatMetric(metric, mean),
+        std === null || std === undefined ? '' : 'σ ' + formatMetric(metric, std), 'blue'),
+      metricTile('Mejor valor', formatMetric(metric, cv.best_score), 'fold #' + best),
+    ].join('');
+    return '<section class="panel" aria-label="Validación cruzada">' +
+      '<div class="panel-header">' +
+        '<h2 class="panel-title"><span class="panel-icon" aria-hidden="true">⧉</span>' +
+        'Validación cruzada</h2>' +
+        '<span class="training-metrics-badge">' + esc(cv.folds) + ' folds</span></div>' +
+      '<div class="panel-body">' +
+        '<div class="training-metric-grid">' + tiles + '</div>' +
+        '<div class="training-chart">' +
+          '<div class="training-chart-head">' +
+            '<span class="training-chart-title">' + esc(metricLabel(metric)) + ' por fold</span>' +
+            '<span class="training-chart-meta">' +
+              '<span class="training-chart-stat">' +
+                (cv.mode === 'max' ? 'maximizar' : 'minimizar') + '</span>' +
+              '<span class="training-chart-sep">·</span>' +
+              '<span class="training-chart-stat">media <b>' +
+                esc(mean === null || mean === undefined ? '—' : formatMetric(metric, mean)) +
+              '</b></span>' +
+            '</span>' +
+          '</div>' +
+          '<div class="cv-score-list">' + bars + '</div>' +
+        '</div>' +
+        '<div class="training-metric-table-wrap"><table class="training-metric-table">' +
+          '<thead><tr><th>Fold</th><th>' + esc(metricLabel(metric)) +
+          '</th><th>Train</th><th>Val</th><th>Exactitud</th><th>Kappa</th></tr></thead>' +
+          '<tbody>' + rows + '</tbody></table></div>' +
+        '<p class="training-note">El artefacto guardado corresponde al fold #' + esc(best) +
+        '. Las curvas del monitor muestran el historial de ese fold; el resto de folds ' +
+        'solo aporta su puntuación.</p>' +
+      '</div></section>';
+  }
+
   function renderTrainingChart(job) {
     var history = job.result && job.result.history;
     if (!dom.detail || !history || !window.LMCharts) return;
@@ -839,6 +945,15 @@
         ? '<div class="meta-item"><span class="meta-label">Normalización Y</span><code>' +
           esc(job.target_normalization.method) + '</code></div>'
         : '') +
+      (job.cross_validation && job.cross_validation.folds
+        ? '<div class="meta-item"><span class="meta-label">Validación cruzada</span>' +
+          '<span class="meta-value">' + esc(job.cross_validation.folds) + ' folds · ' +
+          esc(job.cross_validation.metric || 'val_loss') + '</span>' +
+          '<span class="meta-sub mono">' + esc(job.cross_validation.mode || 'auto') +
+          (job.cross_validation.seed === null || job.cross_validation.seed === undefined
+            ? ''
+            : ' · seed ' + esc(job.cross_validation.seed)) + '</span></div>'
+        : '') +
       '<div class="meta-item"><span class="meta-label">Creado</span><span class="meta-value">' + esc(isoDate(job.created_at)) + '</span></div>' +
       '<div class="meta-item"><span class="meta-label">Iniciado</span><span class="meta-value">' + esc(isoDate(job.started_at)) + '</span></div>' +
       '<div class="meta-item"><span class="meta-label">Finalizado</span><span class="meta-value">' + esc(isoDate(job.finished_at)) + '</span></div>' +
@@ -897,6 +1012,7 @@
     }
 
     var metricsPanel = job.status === 'succeeded' ? trainingMetricsPanel(job) : '';
+    var cvPanel = job.status === 'succeeded' ? crossValidationPanel(job) : '';
 
     var artifactPanel = '';
     if (artifact) {
@@ -953,7 +1069,7 @@
       '<a class="link-back" href="/training">← Todos los jobs</a>';
 
     dom.detail.innerHTML = backLink + header + metaGrid + errorBox + resultPanel +
-      metricsPanel + artifactPanel + logPanel;
+      cvPanel + metricsPanel + artifactPanel + logPanel;
     wireDetailActions(job);
     renderTrainingChart(job);
     if (job.status === 'pending' || job.status === 'running') pollJob(job.job_id);
@@ -1076,6 +1192,7 @@
       );
     }
     syncControlFields();
+    syncCrossValidationVisibility();
   }
 
   function readTrainingControl() {
@@ -1129,6 +1246,52 @@
     if (dom.targetFactor) dom.targetFactor.value = '0.5';
     if (dom.targetMinLr) dom.targetMinLr.value = '0.000001';
     syncControlFields();
+  }
+
+  function syncCrossValidationFields() {
+    var enabled = dom.cvEnabled && dom.cvEnabled.checked;
+    if (dom.cvOptions) dom.cvOptions.hidden = !enabled;
+  }
+
+  function syncCrossValidationVisibility() {
+    var model = modelById(state.wModel);
+    var supported = state.wKind === 'fit' &&
+      model && model.adapter === 'keras' &&
+      model.dataset_mode === 'xy' && !!state.dataset;
+    if (dom.cvField) dom.cvField.hidden = !supported;
+    if (!supported && dom.cvEnabled) dom.cvEnabled.checked = false;
+    syncCrossValidationFields();
+  }
+
+  function resetCrossValidation() {
+    if (dom.cvEnabled) dom.cvEnabled.checked = false;
+    if (dom.cvFolds) dom.cvFolds.value = '5';
+    if (dom.cvMetric) dom.cvMetric.value = 'val_loss';
+    if (dom.cvMode) dom.cvMode.value = 'auto';
+    if (dom.cvSeed) dom.cvSeed.value = '42';
+    if (dom.cvShuffle) dom.cvShuffle.checked = true;
+    syncCrossValidationFields();
+  }
+
+  function readCrossValidation() {
+    if (!dom.cvField || dom.cvField.hidden) return null;
+    if (!dom.cvEnabled || !dom.cvEnabled.checked) return null;
+    var folds = Number(dom.cvFolds ? dom.cvFolds.value : 5);
+    if (!isFinite(folds) || Math.floor(folds) !== folds || folds < 2 || folds > 10) {
+      throw new Error('Los folds deben ser un entero entre 2 y 10.');
+    }
+    var seedText = dom.cvSeed ? String(dom.cvSeed.value).trim() : '';
+    var seed = seedText === '' ? null : Number(seedText);
+    if (seed !== null && (!isFinite(seed) || Math.floor(seed) !== seed || seed < 0)) {
+      throw new Error('La semilla debe ser un entero no negativo.');
+    }
+    return {
+      folds: folds,
+      metric: dom.cvMetric ? dom.cvMetric.value : 'val_loss',
+      mode: dom.cvMode ? dom.cvMode.value : 'auto',
+      shuffle: dom.cvShuffle ? dom.cvShuffle.checked : true,
+      seed: seed,
+    };
   }
 
   function onKindChange() {
@@ -1278,6 +1441,7 @@
       if (dom.normalizationSelect) dom.normalizationSelect.value = 'none';
       if (dom.targetNormalizationSelect) dom.targetNormalizationSelect.value = 'auto';
       resetTrainingControl();
+      resetCrossValidation();
       if (dom.artifactInput) dom.artifactInput.value = '';
       if (dom.modelCard) dom.modelCard.hidden = true;
       if (dom.wizardExample) { dom.wizardExample.hidden = true; dom.wizardExample.textContent = 'Cargar ejemplo'; }
@@ -1348,6 +1512,7 @@
     if (dom.datasetApplyNote) dom.datasetApplyNote.textContent = '';
     if (dom.datasetFile) dom.datasetFile.value = '';
     setDatasetStatus('');
+    syncCrossValidationVisibility();
   }
 
   function renderDatasetPreview(dataset) {
@@ -1452,6 +1617,7 @@
     renderDatasetPreview(dataset);
     renderDatasetColumns(dataset);
     setDatasetStatus('Dataset cargado. Selecciona las columnas y pulsa «Aplicar selección».');
+    syncCrossValidationVisibility();
   }
 
   function loadDatasetUrl(url) {
@@ -1634,6 +1800,13 @@
       toast(error.message, true);
       return;
     }
+    try {
+      var crossValidation = readCrossValidation();
+      if (crossValidation) body.cross_validation = crossValidation;
+    } catch (error) {
+      toast(error.message, true);
+      return;
+    }
     if (state.wKind === 'fit' && dom.normalizationSelect) {
       body.normalization = dom.normalizationSelect.value;
     }
@@ -1753,6 +1926,7 @@
     if (dom.modelSelect) dom.modelSelect.addEventListener('change', onModelChange);
     if (dom.controlEnabled) dom.controlEnabled.addEventListener('change', syncControlFields);
     if (dom.targetAction) dom.targetAction.addEventListener('change', syncControlFields);
+    if (dom.cvEnabled) dom.cvEnabled.addEventListener('change', syncCrossValidationFields);
     if (dom.wizardExample) dom.wizardExample.addEventListener('click', loadExample);
     if (dom.createDialog) {
       dom.createDialog.addEventListener('click', function (event) {
@@ -1846,6 +2020,14 @@
     dom.targetFactorField = byId('target-factor-field');
     dom.targetMinLr = byId('job-target-min-lr');
     dom.targetMinLrField = byId('target-min-lr-field');
+    dom.cvField = byId('cv-field');
+    dom.cvEnabled = byId('job-cv-enabled');
+    dom.cvOptions = byId('cv-options');
+    dom.cvFolds = byId('job-cv-folds');
+    dom.cvMetric = byId('job-cv-metric');
+    dom.cvMode = byId('job-cv-mode');
+    dom.cvSeed = byId('job-cv-seed');
+    dom.cvShuffle = byId('job-cv-shuffle');
     dom.artifactInput = byId('job-artifact-id');
     dom.artifactField = byId('artifact-field');
     dom.constructorHint = byId('constructor-hint');

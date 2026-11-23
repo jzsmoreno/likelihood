@@ -39,6 +39,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import cross_validation
 import server_core as core
 import training_datasets
 from serving_core import iso
@@ -892,6 +893,7 @@ class TrainingStore:
             "parameters": dict(record.get("parameters") or {}),
             "compile": dict(record.get("compile") or {}),
             "control": dict(record.get("control") or {}),
+            "cross_validation": dict(record.get("cross_validation") or {}),
             "normalization": str(record.get("normalization") or "none"),
             "target_normalization": dict(record.get("target_normalization") or {}),
             "adapter": str(record.get("adapter") or ""),
@@ -942,12 +944,17 @@ class TrainingStore:
         kind = str(spec.get("kind") or "fit").strip().lower()
         if kind not in ("fit", "evaluate"):
             raise core.ValidationError("El campo 'kind' debe ser 'fit' o 'evaluate'")
+        if kind != "fit" and (spec.get("cross_validation") or spec.get("cv")):
+            raise core.ValidationError(
+                "La validación cruzada solo está disponible para jobs de tipo 'fit'"
+            )
         model_id = str(spec.get("model_id") or "").strip()
         if not model_id:
             raise core.ValidationError("El campo 'model_id' es obligatorio")
         model = self._find_model(model_id)
         compile_options: Dict[str, Any] = {}
         control: Dict[str, Any] = {}
+        cv_options: Dict[str, Any] = {}
         normalization = "none"
         target_normalization: Dict[str, Any] = {}
         dataset_meta: Optional[Dict[str, Any]] = None
@@ -1000,10 +1007,32 @@ class TrainingStore:
                     spec.get("compile", spec.get("compile_options")),
                 )
                 control = normalize_training_control(spec.get("control"))
-            elif spec.get("control"):
+                raw_cv = spec.get("cross_validation", spec.get("cv"))
+                if raw_cv:
+                    if not dataset_meta or dataset_meta.get("mode") != "xy":
+                        raise core.ValidationError(
+                            "La validación cruzada requiere un dataset en modo 'xy' (X + Y)"
+                        )
+                    cv_options = cross_validation.normalise_options(raw_cv)
+                    rows = int(dataset_meta.get("rows") or len(arguments.get("y") or []))
+                    if rows < cv_options["folds"]:
+                        raise core.ValidationError(
+                            "El dataset tiene %d filas y se piden %d folds; reduce los folds"
+                            % (rows, cv_options["folds"])
+                        )
+                    raw_input_arguments = spec.get("arguments", spec.get("args")) or {}
+                    if (
+                        isinstance(raw_input_arguments, dict)
+                        and "validation_data" in raw_input_arguments
+                    ):
+                        raise core.ValidationError(
+                            "No se puede combinar 'cross_validation' con "
+                            "'arguments.validation_data'"
+                        )
+            elif spec.get("control") or spec.get("cross_validation") or spec.get("cv"):
                 raise core.ValidationError(
-                    "El control por métrica objetivo solo está disponible para "
-                    "entrenamientos Keras con fit"
+                    "El control por métrica objetivo y la validación cruzada solo están "
+                    "disponibles para entrenamientos Keras con fit"
                 )
         else:
             artifact_id = str(spec.get("artifact_id") or "").strip()
@@ -1044,6 +1073,7 @@ class TrainingStore:
                     "parameters": stored_parameters,
                     "compile": compile_options,
                     "control": control,
+                    "cross_validation": cv_options,
                     "normalization": normalization,
                     "target_normalization": target_normalization,
                     "adapter": method.get("framework") or "",
@@ -1207,8 +1237,15 @@ class TrainingStore:
                 job["result_type"] = outcome.get("result_type")
                 job["result_repr"] = outcome.get("result_repr")
                 result_value = outcome.get("result")
-                if isinstance(result_value, dict) and isinstance(result_value.get("history"), dict):
-                    job["result"] = {"history": result_value["history"]}
+                if isinstance(result_value, dict):
+                    kept: Dict[str, Any] = {}
+                    if isinstance(result_value.get("history"), dict):
+                        kept["history"] = result_value["history"]
+                    for key in ("folds", "cross_validation"):
+                        if key in result_value:
+                            kept[key] = result_value[key]
+                    if kept:
+                        job["result"] = kept
                 job["instance"] = {
                     "type": outcome.get("type"),
                     "module": outcome.get("module"),
@@ -1264,6 +1301,12 @@ class TrainingStore:
                                 "parameters": artifact_parameters(job.get("parameters") or {}),
                                 "normalization": job.get("normalization") or "none",
                                 "target_normalization": dict(job.get("target_normalization") or {}),
+                                "cross_validation": dict(job.get("cross_validation") or {}),
+                                "selection": (
+                                    (result_value or {}).get("cross_validation")
+                                    if isinstance(result_value, dict)
+                                    else None
+                                ),
                                 "created_at": iso(),
                                 "load_path": load_path,
                                 "loader": loader_name,
@@ -1357,6 +1400,19 @@ class TrainingStore:
                 if target_stats:
                     job["target_normalization"] = {"method": target_method, **target_stats}
         save_method, save_parameter = save_method_for(model)
+        cv_options = dict(job.get("cross_validation") or {})
+        if cv_options:
+            return self._run_cross_validation(
+                job,
+                model,
+                method,
+                parameters,
+                arguments,
+                save_path,
+                save_method,
+                save_parameter,
+                cv_options,
+            )
         result = core.run_invoke(
             model,
             method,
@@ -1380,6 +1436,185 @@ class TrainingStore:
                 {"at": iso(), "level": "info", "message": f"Instancia: {result['module']}"}
             )
         return result
+
+    def _run_cross_validation(
+        self,
+        job: Dict[str, Any],
+        model: Dict[str, Any],
+        method: Dict[str, Any],
+        parameters: Dict[str, Any],
+        arguments: Dict[str, Any],
+        save_path: str,
+        save_method: str,
+        save_parameter: str,
+        options: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Fit one model per fold and promote the artifact of the best one.
+
+        Every fold runs in its own sandbox child with a ``validation_data``
+        pair, so the returned history carries the ``val_*`` metrics used to rank
+        the folds.  The fold folders live under ``save_path/folds`` and are
+        removed once the winner is copied to the job artifact root.
+        """
+        x_values = arguments.get("x")
+        y_values = arguments.get("y")
+        if (
+            not isinstance(x_values, list)
+            or not isinstance(y_values, list)
+            or not x_values
+            or len(x_values) != len(y_values)
+        ):
+            raise core.ValidationError(
+                "La validación cruzada requiere argumentos 'x' e 'y' del mismo tamaño"
+            )
+        splits = cross_validation.make_folds(
+            len(y_values), options["folds"], options["shuffle"], options["seed"]
+        )
+        base_arguments = dict(arguments)
+        base_arguments.pop("validation_split", None)
+        fold_root = Path(save_path) / "folds"
+        save_options = {
+            "method": save_method,
+            "path_parameter": save_parameter,
+            "layout": save_layout_for(model),
+            "filename": "model",
+            "pickle_name": "model.pkl",
+        }
+        records: List[Dict[str, Any]] = []
+        best: Optional[Dict[str, Any]] = None
+        total_compute = 0.0
+        for index, (train_indices, validation_indices) in enumerate(splits, start=1):
+            fold_arguments = dict(base_arguments)
+            fold_arguments["x"] = cross_validation.select_rows(x_values, train_indices)
+            fold_arguments["y"] = cross_validation.select_rows(y_values, train_indices)
+            fold_arguments["validation_data"] = [
+                cross_validation.select_rows(x_values, validation_indices),
+                cross_validation.select_rows(y_values, validation_indices),
+            ]
+            fold_dir = fold_root / ("fold-%d" % index)
+            result = core.run_invoke(
+                model,
+                method,
+                parameters,
+                fold_arguments,
+                timeout=float(job["timeout_seconds"]),
+                save_path=str(fold_dir),
+                save_options=save_options,
+                compile_options=dict(job.get("compile") or {}) or None,
+                training_controls=dict(job.get("control") or {}) or None,
+                limits={"cpu": TRAIN_CPU_SECONDS},
+            )
+            fold_compute = float(result.get("compute_seconds") or 0.0)
+            total_compute += fold_compute
+            history = (result.get("result") or {}).get("history")
+            history = history if isinstance(history, dict) else {}
+            score = cross_validation.fold_score(history, options["metric"])
+            if score is None and options["metric"] != "val_loss":
+                score = cross_validation.fold_score(history, "val_loss")
+                if score is not None:
+                    job["log"].append(
+                        {
+                            "at": iso(),
+                            "level": "warning",
+                            "message": (
+                                "La métrica %s no aparece en el historial; se usa val_loss"
+                                % options["metric"]
+                            ),
+                        }
+                    )
+            if score is None:
+                score = cross_validation.fold_score(history, "loss")
+            metrics: Dict[str, float] = {}
+            for key, values in history.items():
+                if not isinstance(values, list) or not values:
+                    continue
+                last = values[-1]
+                if isinstance(last, bool):
+                    continue
+                try:
+                    number = float(last)
+                except (TypeError, ValueError):
+                    continue
+                if math.isfinite(number):
+                    metrics[key] = number
+            records.append(
+                {
+                    "fold": index,
+                    "train_rows": len(train_indices),
+                    "validation_rows": len(validation_indices),
+                    "score": score,
+                    "compute_seconds": round(fold_compute, 3),
+                    "metrics": metrics,
+                }
+            )
+            job["log"].append(
+                {
+                    "at": iso(),
+                    "level": "info",
+                    "message": "Fold %d/%d: %s=%s"
+                    % (
+                        index,
+                        len(splits),
+                        options["metric"],
+                        "—" if score is None else round(score, 6),
+                    ),
+                }
+            )
+            if best is None or (
+                score is not None
+                and (
+                    best["score"] is None
+                    or cross_validation.is_better(score, best["score"], options["mode"])
+                )
+            ):
+                best = {
+                    "fold": index,
+                    "score": score,
+                    "dir": fold_dir,
+                    "result": result,
+                    "history": history,
+                }
+        if best is None:  # pragma: no cover - make_folds always yields samples
+            raise core.ValidationError("La validación cruzada no pudo entrenar ningún fold")
+        self._promote_artifact(Path(best["dir"]), Path(save_path))
+        shutil.rmtree(fold_root, ignore_errors=True)
+        summary = cross_validation.summarise([record["score"] for record in records])
+        best_result = dict(best["result"])
+        best_result["save_path"] = save_path
+        best_result["load_path"] = save_path
+        best_result["compute_seconds"] = round(total_compute, 3)
+        best_result["result"] = {
+            "history": best["history"],
+            "folds": records,
+            "cross_validation": {
+                "folds": len(records),
+                "metric": options["metric"],
+                "mode": options["mode"],
+                "shuffle": options["shuffle"],
+                "seed": options["seed"],
+                "mean": summary["mean"],
+                "std": summary["std"],
+                "scores": [record["score"] for record in records],
+                "best_fold": best["fold"],
+                "best_score": best["score"],
+                "train_rows": records[0]["train_rows"],
+                "validation_rows": records[0]["validation_rows"],
+            },
+        }
+        return best_result
+
+    @staticmethod
+    def _promote_artifact(source: Path, target: Path) -> None:
+        """Copy the winning fold's files into the job artifact folder."""
+        target.mkdir(parents=True, exist_ok=True)
+        if not source.exists():
+            return
+        for entry in source.iterdir():
+            destination = target / entry.name
+            if entry.is_dir():
+                shutil.copytree(entry, destination, dirs_exist_ok=True)
+            else:
+                shutil.copy2(entry, destination)
 
     def _run_evaluate(self, job: Dict[str, Any]) -> Dict[str, Any]:
         """Load an artifact (when given) and run a scoring method on the model."""

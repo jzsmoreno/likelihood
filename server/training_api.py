@@ -82,6 +82,14 @@ class TrainingRequest(BaseModel):
             "('stop'/'reduce_lr'/'both'), value, patience, min_delta, factor, min_lr."
         ),
     )
+    cross_validation: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description=(
+            "Validación cruzada k-fold para fit Keras con dataset 'xy': folds "
+            "(2-10), metric (por defecto val_loss), mode (auto/min/max), shuffle "
+            "y seed. El artefacto guardado corresponde al mejor fold."
+        ),
+    )
     normalization: Optional[str] = Field(
         default=None,
         description=(
@@ -171,6 +179,7 @@ def _job_payload(settings: Any, job: Dict[str, Any]) -> Dict[str, Any]:
         "parameters": dict(job.get("parameters") or {}),
         "compile": dict(job.get("compile") or {}),
         "control": dict(job.get("control") or {}),
+        "cross_validation": dict(job.get("cross_validation") or {}),
         "normalization": str(job.get("normalization") or "none"),
         "target_normalization": dict(job.get("target_normalization") or {}),
         "timeout_seconds": job.get("timeout_seconds"),

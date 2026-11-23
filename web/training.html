@@ -313,6 +313,42 @@
     border: 0;
     background: transparent;
   }
+  /* K-fold score bars: relative heights keep negative metrics (kappa) readable. */
+  .cv-score-list { display: grid; gap: 8px; margin-top: 8px; }
+  .cv-score-row {
+    display: grid;
+    grid-template-columns: 64px 1fr 76px;
+    align-items: center;
+    gap: 10px;
+  }
+  .cv-score-label { color: var(--db-muted); font-size: 11px; font-weight: 600; }
+  .cv-score-row.is-best .cv-score-label { color: var(--db-ink); }
+  .cv-score-track {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--db-line-soft);
+  }
+  .cv-score-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--db-blue), #5f9fd4);
+    transition: width .3s ease;
+  }
+  .cv-score-row.is-best .cv-score-fill {
+    background: linear-gradient(90deg, var(--db-green), #4ec99a);
+  }
+  .cv-score-value {
+    color: var(--db-ink);
+    font-family: var(--db-mono);
+    font-size: 11.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .training-metric-table tbody tr.is-best { background: var(--db-green-soft); }
+  .training-metric-table tbody tr.is-best td:first-child { font-weight: 700; }
+  .training-metric-table tbody tr.is-best:hover { background: var(--db-green-soft); }
   @media (max-width: 760px) {
     .training-chart { padding: 10px 10px 6px; }
     .training-chart-head { gap: 2px 10px; }
@@ -964,6 +1000,47 @@
             <div class="wizard-field" id="target-min-lr-field">
               <label for="job-target-min-lr">Learning rate mínimo</label>
               <input type="number" class="input" id="job-target-min-lr" min="0" step="any" value="0.000001">
+            </div>
+          </div>
+        </div>
+        <div class="wizard-field" id="cv-field" hidden>
+          <label>Validación cruzada k-fold (Keras)</label>
+          <p class="hint" style="margin-top:2px">Entrena k modelos con particiones distintas y guarda como artefacto el fold con la mejor métrica. Requiere un dataset X + Y; el job tarda aproximadamente k veces más y las curvas del monitor corresponden al mejor fold.</p>
+          <label class="check-row" for="job-cv-enabled"><input type="checkbox" id="job-cv-enabled"><span>Activar validación cruzada</span></label>
+          <div class="training-control-grid" id="cv-options" hidden>
+            <div class="wizard-field">
+              <label for="job-cv-folds">Folds</label>
+              <input type="number" class="input" id="job-cv-folds" min="2" max="10" step="1" value="5">
+            </div>
+            <div class="wizard-field">
+              <label for="job-cv-metric">Métrica de selección</label>
+              <select class="select" id="job-cv-metric">
+                <option value="val_loss">val_loss</option>
+                <option value="val_accuracy">val_accuracy</option>
+                <option value="val_kappa">val_kappa</option>
+                <option value="val_f1_score">val_f1_score</option>
+                <option value="val_auc">val_auc</option>
+                <option value="val_precision">val_precision</option>
+                <option value="val_recall">val_recall</option>
+                <option value="loss">loss</option>
+                <option value="accuracy">accuracy</option>
+                <option value="kappa">kappa</option>
+              </select>
+            </div>
+            <div class="wizard-field">
+              <label for="job-cv-mode">Dirección</label>
+              <select class="select" id="job-cv-mode">
+                <option value="auto">Automática</option>
+                <option value="min">Minimizar</option>
+                <option value="max">Maximizar</option>
+              </select>
+            </div>
+            <div class="wizard-field">
+              <label for="job-cv-seed">Semilla (barajado)</label>
+              <input type="number" class="input" id="job-cv-seed" min="0" step="1" value="42">
+            </div>
+            <div class="wizard-field">
+              <label class="check-row" for="job-cv-shuffle"><input type="checkbox" id="job-cv-shuffle" checked><span>Barajar filas antes de dividir</span></label>
             </div>
           </div>
         </div>
