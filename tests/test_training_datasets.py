@@ -109,6 +109,9 @@ def test_dataset_store_exposes_preview_and_columns():
     assert metadata["dataset_id"].startswith("ds-")
     assert metadata["rows"] == 4
     assert [column["name"] for column in metadata["columns"]] == ["x1", "x2", "target"]
+    target = next(column for column in metadata["columns"] if column["name"] == "target")
+    assert target["unique"] == 2
+    assert target["numeric"] is False
     assert metadata["preview"][0]["x1"] == 1.0
     assert "frame" not in metadata
     assert store.get(metadata["dataset_id"]) is not None

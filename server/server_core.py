@@ -1573,6 +1573,33 @@ def _convert_all(values, hints=None):
     return converted
 
 
+def _mean_history(histories):
+    # Mean of the member histories of an ensemble (one list of floats per metric).
+    entries = []
+    for item in histories:
+        history = getattr(item, "history", None)
+        if isinstance(history, dict):
+            entries.append(history)
+    if not entries:
+        return {}
+    merged = {}
+    for key in entries[0]:
+        series = [
+            values[key] for values in entries if isinstance(values.get(key), (list, tuple))
+        ]
+        if not series:
+            continue
+        length = min(len(values) for values in series)
+        try:
+            merged[key] = [
+                float(sum(float(values[index]) for values in series) / len(series))
+                for index in range(length)
+            ]
+        except (TypeError, ValueError):
+            continue
+    return merged
+
+
 def _safe(value, depth=0):
     # JSON friendly projection of a Python value returned by a model method.
     if depth > 6:
@@ -1598,6 +1625,13 @@ def _safe(value, depth=0):
     if isinstance(history, dict):
         # ``keras.callbacks.History`` is the result of ``Model.fit``.
         return {"history": _safe(history, depth + 1)}
+    histories = getattr(value, "all_history", None)
+    if isinstance(histories, (list, tuple)) and histories:
+        # ``EnsembleClassifier`` keeps one ``History`` per member; the training
+        # dashboard expects a single curve, so average the members epoch by epoch.
+        merged = _mean_history(histories)
+        if merged:
+            return {"history": merged}
     return None
 
 
@@ -1772,7 +1806,50 @@ def _default_input_shape():
     return (None, 1)
 
 
+def _is_ensemble(instance):
+    # ``EnsembleClassifier`` is shipped by the library; the server adapts it
+    # here instead of changing the package.
+    kind = type(instance)
+    return (
+        kind.__name__ == "EnsembleClassifier"
+        and kind.__module__ == "likelihood.models.ensemble"
+    )
+
+
+def _prepare_ensemble(instance, method_name, arguments):
+    # ``EnsembleClassifier.fit`` predates the catalog's JSON payload: it samples
+    # ``np.int64`` hyperparameters (Keras rejects them as ``units``) and compiles
+    # ``CategoricalCrossentropy``.  Sample native Python configurations and
+    # expand integer labels to one-hot targets here, leaving the package intact.
+    if str(method_name or "").lower() not in ("fit", "train") or not _is_ensemble(instance):
+        return
+    try:
+        configs = getattr(instance, "configs", None)
+        if not configs and callable(getattr(instance, "_generate_model_configs", None)):
+            generated = instance._generate_model_configs()
+            instance.configs = [
+                {
+                    key: value.item() if hasattr(value, "item") else value
+                    for key, value in dict(config).items()
+                }
+                for config in generated
+            ]
+        if isinstance(arguments, dict) and arguments.get("y") is not None:
+            import numpy as np
+
+            labels = np.asarray(arguments["y"])
+            if labels.ndim == 1 and labels.size:
+                classes = int(np.max(labels)) + 1
+                arguments["y"] = np.eye(classes, dtype="float32")[
+                    labels.astype("int32")
+                ]
+    except BaseException:
+        # The real call reports the original error with a clearer message.
+        return
+
+
 def _prepare(instance, method_name, arguments):
+    _prepare_ensemble(instance, method_name, arguments)
     # Keras models may not set ``built`` from their own ``build`` override, so a
     # private marker keeps the instance prepared across session calls (rebuilding
     # it would throw away the trained weights of the classifier).

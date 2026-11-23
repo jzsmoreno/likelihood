@@ -637,6 +637,68 @@ def test_dataset_backed_job_keeps_only_a_compact_reference(store, captured):
     assert call["arguments"]["y"] == [0, 1, 0, 2]
 
 
+def test_ensemble_dataset_uses_the_fit_argument_spelling(store, captured):
+    """``EnsembleClassifier.fit(X, y)`` receives the dataset as ``X``/``y``.
+
+    Regression test: the dataset builder always sent lowercase ``x``, so the
+    training form rejected the job with ``Argumentos desconocidos: x``.
+    """
+    model = training_core.core.MODELS_BY_ID["EnsembleClassifier"]
+    assert training_core.training_dataset_mode(model) == "xy"
+    assert training_core.xy_argument_names(training_core.training_fit_method(model)) == ("X", "y")
+
+    frame = pd.DataFrame(
+        {
+            "a": [float(index) for index in range(12)],
+            "b": [float(index % 3) for index in range(12)],
+            "target": [index % 3 for index in range(12)],
+        }
+    )
+    dataset = store.datasets.put("ensemble.csv", frame, "ensemble.csv", "csv")
+    job = store.start(
+        {
+            "model_id": "EnsembleClassifier",
+            "parameters": {"n_models": 1},
+            "arguments": {"epochs": 2},
+            "dataset": {
+                "dataset_id": dataset["dataset_id"],
+                "mode": "xy",
+                "task": "classification",
+                "features": ["a", "b"],
+                "target": "target",
+            },
+        }
+    )
+
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    call = captured[0]
+    assert set(call["arguments"]) == {"X", "y", "epochs"}
+    assert call["arguments"]["X"][0] == [0.0, 0.0]
+    assert call["arguments"]["y"] == [index % 3 for index in range(12)]
+    assert call["arguments"]["epochs"] == 2
+
+
+def test_ensemble_training_example_uses_capital_x():
+    """The wizard example matches ``EnsembleClassifier.fit(X, y)``."""
+    model = training_core.core.MODELS_BY_ID["EnsembleClassifier"]
+    example = training_core.training_example(model)
+    assert example["method"] == "fit"
+    assert set(example["arguments"]) >= {"X", "y", "epochs"}
+    assert len(example["arguments"]["X"]) == 12
+    assert example["parameters"]["n_models"] == 2
+
+
+def test_target_normalization_accepts_the_declared_target_name():
+    """The scaler edits ``Y`` when the fit method capitalises the target."""
+    arguments, stats = training_core.apply_target_normalization(
+        {"X": [[1.0], [2.0]], "Y": [1.0, 3.0]}, "standard", "Y"
+    )
+    assert stats["mean"] == 2.0
+    assert arguments["Y"] == [-1.0, 1.0]
+    assert arguments["X"] == [[1.0], [2.0]]
+
+
 def test_dataset_datapoints_mode_rebuilds_the_sequence(store, captured):
     """A datapoints selection is removed from the stored parameters and rebuilt."""
     frame = pd.DataFrame({"value": [1.0, 2.0, 3.0, 4.0]})

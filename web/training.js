@@ -31,6 +31,8 @@
     wArtifact: '',
     dataset: null,
     datasetSelection: null,
+    autoParams: null,
+    autoArgs: null,
     // training monitor: which metric family is visible
     metricView: '',
   };
@@ -1506,7 +1508,21 @@
     var previous = state.wModel;
     var id = dom.modelSelect ? dom.modelSelect.value : '';
     state.wModel = id;
-    if (previous !== id) resetDataset();
+    if (previous !== id) {
+      // Values produced by ``fillDataSettings`` belong to the previous model;
+      // reset them instead of sending unknown constructor fields.
+      if (state.autoParams !== null && dom.parametersInput &&
+          dom.parametersInput.value.trim() === state.autoParams) {
+        dom.parametersInput.value = '{}';
+      }
+      if (state.autoArgs !== null && dom.argumentsInput &&
+          dom.argumentsInput.value.trim() === state.autoArgs) {
+        dom.argumentsInput.value = '{}';
+      }
+      state.autoParams = null;
+      state.autoArgs = null;
+      resetDataset();
+    }
     var model = modelById(id);
     if (dom.methodInput) {
       dom.methodInput.value = model ? (state.wKind === 'evaluate' ? 'score' : model.fit_method) : '';
@@ -1611,6 +1627,8 @@
       state.wTimeout = '';
       state.wParams = '{}';
       state.wArgs = '{}';
+      state.autoParams = null;
+      state.autoArgs = null;
       state.wArtifact = '';
       if (dom.kindSelect) dom.kindSelect.value = state.wKind;
       if (dom.modelSelect) dom.modelSelect.value = state.wModel;
@@ -1683,6 +1701,93 @@
     if (!dom.datasetStatus) return;
     dom.datasetStatus.textContent = message || '';
     dom.datasetStatus.classList.toggle('is-error', Boolean(isError));
+  }
+
+  var DATA_JSON_KEYS = ['x', 'X', 'y', 'Y', 'datapoints'];
+  var FEATURE_COUNT_FIELDS = [
+    'input_shape_parm', 'n_features', 'n_inputs', 'input_dim', 'n_columns', 'state_dim',
+  ];
+  var OUTPUT_COUNT_FIELDS = ['output_shape_parm', 'output_dim'];
+
+  function readJsonObject(input) {
+    if (!input) return null;
+    var text = String(input.value || '').trim();
+    if (!text) return {};
+    try {
+      var parsed = JSON.parse(text);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function isAutoFilledValue(input, previous) {
+    if (!input) return false;
+    var text = String(input.value || '').trim();
+    return text === '' || text === '{}' || (previous !== null && text === previous);
+  }
+
+  function datasetTaskFor(model, target) {
+    var declared = model && model.dataset_task;
+    if (declared === 'classification' || declared === 'regression') return declared;
+    return target && target.numeric ? 'regression' : 'classification';
+  }
+
+  /**
+   * Fill the constructor/arguments JSON from the model example and the dataset.
+   * Missing hyperparameters come from the catalog example; the shape of X and
+   * the number of classes always follow the current column selection.
+   * Manually edited JSON is preserved (only missing keys are added).
+   */
+  function fillDataSettings(selection) {
+    var model = modelById(state.wModel);
+    if (!model || !selection || !state.dataset) return;
+    if (!dom.parametersInput || !dom.argumentsInput) return;
+    var fields = model.constructor_fields || [];
+    var example = model.example || {};
+
+    var params = readJsonObject(dom.parametersInput);
+    if (params !== null) {
+      var paramsAuto = isAutoFilledValue(dom.parametersInput, state.autoParams);
+      var nextParams = paramsAuto ? {} : params;
+      Object.keys(example.parameters || {}).forEach(function (key) {
+        if (DATA_JSON_KEYS.indexOf(key) >= 0) return;
+        if (fields.indexOf(key) >= 0 && !(key in nextParams)) {
+          nextParams[key] = example.parameters[key];
+        }
+      });
+      if (selection.mode === 'xy') {
+        var featureCount = (selection.features || []).length;
+        FEATURE_COUNT_FIELDS.forEach(function (key) {
+          if (fields.indexOf(key) >= 0) nextParams[key] = featureCount;
+        });
+        var target = (state.dataset.columns || []).find(function (column) {
+          return column.name === selection.target;
+        });
+        var task = datasetTaskFor(model, target);
+        if (task === 'classification' && target && target.unique > 0) {
+          if (fields.indexOf('num_classes') >= 0) nextParams.num_classes = target.unique;
+        } else if (task === 'regression') {
+          OUTPUT_COUNT_FIELDS.forEach(function (key) {
+            if (fields.indexOf(key) >= 0) nextParams[key] = 1;
+          });
+        }
+      }
+      dom.parametersInput.value = JSON.stringify(nextParams, null, 2);
+      state.autoParams = paramsAuto ? dom.parametersInput.value.trim() : null;
+    }
+
+    var args = readJsonObject(dom.argumentsInput);
+    if (args !== null) {
+      var argsAuto = isAutoFilledValue(dom.argumentsInput, state.autoArgs);
+      var nextArgs = argsAuto ? {} : args;
+      Object.keys(example.arguments || {}).forEach(function (key) {
+        if (DATA_JSON_KEYS.indexOf(key) >= 0) return;
+        if (!(key in nextArgs)) nextArgs[key] = example.arguments[key];
+      });
+      dom.argumentsInput.value = JSON.stringify(nextArgs, null, 2);
+      state.autoArgs = argsAuto ? dom.argumentsInput.value.trim() : null;
+    }
   }
 
   function resetDataset() {
@@ -1801,6 +1906,7 @@
     }
     renderDatasetPreview(dataset);
     renderDatasetColumns(dataset);
+    fillDataSettings(datasetSelection());
     setDatasetStatus('Dataset cargado. Selecciona las columnas y pulsa «Aplicar selección».');
     syncCrossValidationVisibility();
   }
@@ -1884,6 +1990,7 @@
         '. Se usará al lanzar el job.';
     }
     setDatasetStatus('Selección lista. Revisa los argumentos y lanza el job.');
+    fillDataSettings(selection);
     toast('Selección de dataset aplicada.');
   }
 
@@ -1894,6 +2001,8 @@
       return;
     }
     var example = model.example;
+    state.autoParams = null;
+    state.autoArgs = null;
     if (example.method) state.wMethod = example.method;
     if (dom.methodInput && example.method) dom.methodInput.value = example.method;
     if (dom.nameInput && example.name) dom.nameInput.value = example.name;
@@ -2082,9 +2191,13 @@
       if (dom.datasetUrl) dom.datasetUrl.value = chip.getAttribute('data-dataset-url') || '';
       loadDatasetUrl(chip.getAttribute('data-dataset-url') || '');
     });
-    if (dom.datasetY) dom.datasetY.addEventListener('change', syncDatasetTarget);
+    if (dom.datasetY) dom.datasetY.addEventListener('change', function () {
+      syncDatasetTarget();
+      fillDataSettings(datasetSelection());
+    });
     if (dom.datasetX) dom.datasetX.addEventListener('change', function () {
       if (dom.datasetApplyNote) dom.datasetApplyNote.textContent = '';
+      fillDataSettings(datasetSelection());
     });
     if (dom.datasetApply) dom.datasetApply.addEventListener('click', applyDataset);
   }

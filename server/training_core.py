@@ -241,6 +241,19 @@ def save_method_for(model: Dict[str, Any]) -> Tuple[str, str]:
     return "", ""
 
 
+def save_filename_for(model: Dict[str, Any]) -> str:
+    """Filename handed to the native save method.
+
+    ``EnsembleClassifier.save`` removes a ``.pkl`` suffix with ``str.rstrip``,
+    which also strips a trailing ``l``/``k``/``p``/``.`` (``model`` becomes
+    ``mode``).  A neutral name keeps the saved directory predictable without
+    modifying the package.
+    """
+    if str(model.get("module") or "") == "likelihood.models.ensemble":
+        return "bundle"
+    return "model"
+
+
 def save_layout_for(model: Dict[str, Any]) -> str:
     """Return a special folder layout required by the model's Serving loader."""
     if save_method_for(model)[0]:
@@ -472,19 +485,20 @@ def target_normalization_method(raw: Any, task: str, feature_method: str) -> str
 
 
 def apply_target_normalization(
-    arguments: Dict[str, Any], method: str
+    arguments: Dict[str, Any], method: str, name: str = "y"
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """Scale the regression target ``y`` and return the scaler metadata.
+    """Scale the regression target (``name``) and return the scaler metadata.
 
     Classification labels are integer codes, so callers must resolve ``method``
     to ``none`` for a classification task before calling this helper.  The
     metadata is persisted in ``artifact.json`` so predictions can be mapped back
-    to the original target units.
+    to the original target units.  ``name`` matches the spelling of the fit
+    method (``y`` for the Keras adapter, ``Y`` for a capitalised estimator).
     """
-    if method == "none" or "y" not in arguments:
+    if method == "none" or name not in arguments:
         return dict(arguments), {}
     normalized = dict(arguments)
-    normalized["y"], stats = _scale_value(normalized["y"], method)
+    normalized[name], stats = _scale_value(normalized[name], method)
     return normalized, stats
 
 
@@ -728,6 +742,37 @@ EXAMPLE_JOBS: Dict[str, Dict[str, Any]] = {
             "metrics": list(CLASSIFICATION_METRICS),
         },
     },
+    "EnsembleClassifier": {
+        "method": "fit",
+        "name": "EnsembleClassifier · clasificación",
+        "label": "Clasificación",
+        "note": "X: 12 filas × 4 variables; y: 3 clases (0, 1, 2); 2 modelos × 2 épocas.",
+        "parameters": {
+            "n_models": 2,
+            "param_ranges": {"units": [8], "num_layers": [1]},
+            "voting_method": "soft",
+        },
+        "arguments": {
+            "X": [
+                [0.1, 0.2, 0.3, 0.4],
+                [0.2, 0.1, 0.4, 0.3],
+                [0.3, 0.4, 0.1, 0.2],
+                [0.4, 0.3, 0.2, 0.1],
+                [0.5, 0.2, 0.1, 0.3],
+                [0.2, 0.5, 0.3, 0.1],
+                [0.1, 0.3, 0.5, 0.2],
+                [0.3, 0.1, 0.2, 0.5],
+                [0.4, 0.2, 0.5, 0.1],
+                [0.2, 0.4, 0.1, 0.5],
+                [0.5, 0.1, 0.4, 0.2],
+                [0.1, 0.5, 0.2, 0.4],
+            ],
+            "y": [0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2],
+            "epochs": 2,
+            "batch_size": 4,
+        },
+        "compile": {},
+    },
     "GANRegressor": {
         "method": "fit",
         "name": "GANRegressor · regresión",
@@ -788,13 +833,32 @@ def training_example(model: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     }
 
 
+def xy_argument_names(method: Dict[str, Any]) -> Tuple[str, str]:
+    """Names ``method`` uses for the feature matrix and the targets.
+
+    The Keras adapter follows the lowercase ``x``/``y`` convention, but classic
+    estimators such as ``EnsembleClassifier.fit(X, y)`` keep the scikit-learn
+    capitalisation.  The dataset builder and the cross-validation splitter use
+    this helper so the generated arguments always match the declared method.
+    """
+    names = {
+        parameter["name"]
+        for parameter in method.get("parameters") or []
+        if not parameter.get("variadic")
+    }
+    features = "X" if "X" in names and "x" not in names else "x"
+    targets = "Y" if "Y" in names and "y" not in names else "y"
+    return features, targets
+
+
 def training_dataset_mode(model: Dict[str, Any]) -> str:
     """How a dataset maps onto ``model``: ``xy``, ``datapoints`` or ``generic``."""
     fit = training_fit_method(model)
     if fit is None:
         return "generic"
+    x_name, y_name = xy_argument_names(fit)
     names = {parameter["name"] for parameter in fit.get("parameters") or []}
-    if {"x", "y"} <= names or {"X", "y"} <= names:
+    if x_name in names and y_name in names:
         return "xy"
     if any(parameter.get("name") == "datapoints" for parameter in model.get("parameters") or []):
         return "datapoints"
@@ -965,7 +1029,7 @@ class TrainingStore:
             dataset_spec = spec.get("dataset")
             if dataset_spec:
                 dataset_args, dataset_params, dataset_meta = self._dataset_values(
-                    model, dataset_spec
+                    model, dataset_spec, method_name
                 )
                 raw_arguments = spec.get("arguments", spec.get("args")) or {}
                 raw_parameters = spec.get("parameters", spec.get("params")) or {}
@@ -991,8 +1055,11 @@ class TrainingStore:
             target_method = target_normalization_method(
                 spec.get("target_normalization"), task, normalization
             )
+            _, target_name = xy_argument_names(method)
             if target_method != "none":
-                arguments, target_stats = apply_target_normalization(arguments, target_method)
+                arguments, target_stats = apply_target_normalization(
+                    arguments, target_method, target_name
+                )
                 if target_stats:
                     target_normalization = {"method": target_method, **target_stats}
             if method["name"].lower() in ("save", "load", "load_model", "save_model"):
@@ -1014,7 +1081,7 @@ class TrainingStore:
                             "La validación cruzada requiere un dataset en modo 'xy' (X + Y)"
                         )
                     cv_options = cross_validation.normalise_options(raw_cv)
-                    rows = int(dataset_meta.get("rows") or len(arguments.get("y") or []))
+                    rows = int(dataset_meta.get("rows") or len(arguments.get(target_name) or []))
                     if rows < cv_options["folds"]:
                         raise core.ValidationError(
                             "El dataset tiene %d filas y se piden %d folds; reduce los folds"
@@ -1110,9 +1177,17 @@ class TrainingStore:
             raise
 
     def _dataset_values(
-        self, model: Dict[str, Any], dataset_spec: Dict[str, Any]
+        self,
+        model: Dict[str, Any],
+        dataset_spec: Dict[str, Any],
+        method_name: str = "",
     ) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[Dict[str, Any]]]:
-        """Expand a dataset reference into method arguments and constructor overrides."""
+        """Expand a dataset reference into method arguments and constructor overrides.
+
+        ``method_name`` selects the argument spelling: the Keras adapter uses
+        ``x``/``y`` while classic estimators such as ``EnsembleClassifier.fit``
+        declare ``X``/``y``.
+        """
         if not isinstance(dataset_spec, dict):
             raise core.ValidationError("El campo 'dataset' debe ser un objeto")
         dataset_id = str(dataset_spec.get("dataset_id") or "").strip()
@@ -1137,7 +1212,14 @@ class TrainingStore:
             )
         elif mode == "xy":
             built = training_datasets.build_xy(frame, features, target, task)
-            args = {"x": built["x"], "y": built["y"]}
+            x_name, y_name = "x", "y"
+            try:
+                method = self._training_method(model, method_name or fit_method_name(model))
+            except core.ModelNotFound:
+                method = None
+            if method is not None:
+                x_name, y_name = xy_argument_names(method)
+            args = {x_name: built["x"], y_name: built["y"]}
             params = training_datasets.parameter_overrides(
                 model, built["features"], built["task"], built.get("classes")
             )
@@ -1176,6 +1258,9 @@ class TrainingStore:
         Training data is often posted inside ``arguments``; a key that names a
         constructor parameter and not a method argument (``datapoints`` for
         ``Arima.train``) is moved to ``parameters`` instead of being rejected.
+        Methods that declare ``**kwargs`` (such as ``EnsembleClassifier.fit``)
+        accept extra training options (``epochs``, ``batch_size``...) and forward
+        them untouched.
         """
         method = self._training_method(model, method_name)
         raw_arguments = spec.get("arguments", spec.get("args"))
@@ -1200,12 +1285,21 @@ class TrainingStore:
             for parameter in method.get("parameters") or []
             if not parameter.get("variadic")
         }
+        accepts_extra = any(
+            parameter.get("kind") == "var_keyword" for parameter in method.get("parameters") or []
+        )
         for name in list(arguments):
             if name in constructor_names and name not in method_names:
                 parameters.setdefault(name, arguments.pop(name))
+        extras: Dict[str, Any] = {}
+        if accepts_extra:
+            extras = {name: value for name, value in arguments.items() if name not in method_names}
+            for name in extras:
+                arguments.pop(name)
+        coerced = core.coerce_arguments(core.method_fields(method), arguments)
         return (
             method,
-            core.coerce_arguments(core.method_fields(method), arguments),
+            {**coerced, **extras},
             core.resolved_parameters(model, parameters),
         )
 
@@ -1389,14 +1483,17 @@ class TrainingStore:
             arguments["epochs"] = int(control["max_epochs"])
         normalization = str(job.get("normalization") or "none")
         if job.get("dataset"):
-            data_args, data_params, _ = self._dataset_values(model, job["dataset"])
+            data_args, data_params, _ = self._dataset_values(model, job["dataset"], job["method"])
             arguments.update(data_args)
             parameters.update(data_params)
             if normalization != "none":
                 arguments, parameters = apply_normalization(arguments, parameters, normalization)
             target_method = str((job.get("target_normalization") or {}).get("method") or "none")
             if target_method != "none":
-                arguments, target_stats = apply_target_normalization(arguments, target_method)
+                _, target_name = xy_argument_names(method)
+                arguments, target_stats = apply_target_normalization(
+                    arguments, target_method, target_name
+                )
                 if target_stats:
                     job["target_normalization"] = {"method": target_method, **target_stats}
         save_method, save_parameter = save_method_for(model)
@@ -1424,7 +1521,7 @@ class TrainingStore:
                 "method": save_method,
                 "path_parameter": save_parameter,
                 "layout": save_layout_for(model),
-                "filename": "model",
+                "filename": save_filename_for(model),
                 "pickle_name": "model.pkl",
             },
             compile_options=dict(job.get("compile") or {}) or None,
@@ -1456,8 +1553,9 @@ class TrainingStore:
         the folds.  The fold folders live under ``save_path/folds`` and are
         removed once the winner is copied to the job artifact root.
         """
-        x_values = arguments.get("x")
-        y_values = arguments.get("y")
+        x_name, y_name = xy_argument_names(method)
+        x_values = arguments.get(x_name)
+        y_values = arguments.get(y_name)
         if (
             not isinstance(x_values, list)
             or not isinstance(y_values, list)
@@ -1465,7 +1563,8 @@ class TrainingStore:
             or len(x_values) != len(y_values)
         ):
             raise core.ValidationError(
-                "La validación cruzada requiere argumentos 'x' e 'y' del mismo tamaño"
+                "La validación cruzada requiere argumentos '%s' e '%s' del mismo tamaño"
+                % (x_name, y_name)
             )
         splits = cross_validation.make_folds(
             len(y_values), options["folds"], options["shuffle"], options["seed"]
@@ -1477,15 +1576,15 @@ class TrainingStore:
             "method": save_method,
             "path_parameter": save_parameter,
             "layout": save_layout_for(model),
-            "filename": "model",
+            "filename": save_filename_for(model),
             "pickle_name": "model.pkl",
         }
         fold_results: List[Dict[str, Any]] = []
         total_compute = 0.0
         for index, (train_indices, validation_indices) in enumerate(splits, start=1):
             fold_arguments = dict(base_arguments)
-            fold_arguments["x"] = cross_validation.select_rows(x_values, train_indices)
-            fold_arguments["y"] = cross_validation.select_rows(y_values, train_indices)
+            fold_arguments[x_name] = cross_validation.select_rows(x_values, train_indices)
+            fold_arguments[y_name] = cross_validation.select_rows(y_values, train_indices)
             fold_arguments["validation_data"] = [
                 cross_validation.select_rows(x_values, validation_indices),
                 cross_validation.select_rows(y_values, validation_indices),

@@ -212,6 +212,7 @@ def _column_meta(frame: pd.DataFrame) -> List[Dict[str, Any]]:
                 "name": str(name),
                 "dtype": str(series.dtype),
                 "non_null": non_null,
+                "unique": int(series.nunique(dropna=True)),
                 "numeric": numeric,
                 "sample": sample,
             }
