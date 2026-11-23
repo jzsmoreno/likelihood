@@ -27,6 +27,7 @@ Design notes
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import logging
 import math
@@ -46,6 +47,8 @@ from serving_core import iso
 
 LOGGER = logging.getLogger("likelihood.training")
 
+#: Maximum number of series-analysis results / forecasts kept in memory.
+MAX_SERIES_CACHE = max(4, int(os.environ.get("LM_TRAINING_SERIES_CACHE") or 24))
 #: Directory that keeps ``jobs.json`` and the ``artifacts/`` folder.  Tests inject a
 #: temporary directory; production can point ``LM_TRAINING_STORE`` to a volume.
 STORE_DIR = Path(
@@ -64,6 +67,10 @@ MAX_PERSISTED = max(1, int(os.environ.get("LM_TRAINING_MAX_PERSISTED") or 500))
 #: cap (30 s by default) kills multi-threaded TensorFlow long before its
 #: wall-clock budget because the kernel counts CPU time across every thread.
 TRAIN_CPU_SECONDS = max(0, int(os.environ.get("LM_TRAINING_CPU") or 0))
+
+#: Wall-clock limit of one hold-out + forecast analysis request
+#: (``LM_TRAINING_SERIES_TIMEOUT``).
+SERIES_ANALYSIS_TIMEOUT = float(os.environ.get("LM_TRAINING_SERIES_TIMEOUT") or 180.0)
 
 #: Method names that fit a model, in the order the catalogue prefers them.
 FIT_METHODS = ("fit", "train", "fit_transform", "fit_predict", "fit_predict_transform")
@@ -113,7 +120,7 @@ REGRESSION_METRICS = ("mae", "mse", "root_mean_squared_error", "r2_score")
 TARGET_ACTIONS = ("stop", "reduce_lr", "both")
 
 #: Supported input-data normalizations.  Targets (``y``) are never changed.
-NORMALIZATIONS = ("none", "standard", "minmax", "minmax_symmetric")
+NORMALIZATIONS = ("none", "standard", "minmax", "minmax_symmetric", "detrend_minmax")
 
 #: Method arguments that contain training features (not targets).
 NORMALIZABLE_ARGUMENTS = ("x", "X", "datapoints")
@@ -227,6 +234,10 @@ def artifact_path(artifact_id: str, directory: Optional[Path] = None) -> Path:
 
 def save_method_for(model: Dict[str, Any]) -> Tuple[str, str]:
     """Return ``(method_name, path_parameter)`` of the model's native save method."""
+    if str(model.get("id") or "") == "FourierRegression":
+        # ``FourierRegression.save_model`` pickles ``theta_trained``, a field the
+        # denoising ``fit`` never sets; pickle the live instance instead.
+        return "", ""
     for name in ("save", "save_model"):
         method = core.find_method(model, name)
         if method is None or method.get("kind") not in ("method", "static"):
@@ -331,11 +342,15 @@ def normalization_method(raw: Any) -> str:
         "-1-1": "minmax_symmetric",
         "minus-one-one": "minmax_symmetric",
         "symmetric": "minmax_symmetric",
+        "detrend": "detrend_minmax",
+        "data_scaler": "detrend_minmax",
+        "datascaler": "detrend_minmax",
     }
     value = aliases.get(value, value)
     if value not in NORMALIZATIONS:
         raise core.ValidationError(
-            "El campo 'normalization' debe ser none, standard, minmax o minmax_symmetric"
+            "El campo 'normalization' debe ser none, standard, minmax, "
+            "minmax_symmetric o detrend_minmax"
         )
     return value
 
@@ -374,9 +389,29 @@ def _numeric_column(values: List[Any]) -> List[float]:
     return numbers
 
 
+def _detrend_values(values: List[float]) -> List[float]:
+    """Subtract the least-squares line from one sequence."""
+    count = len(values)
+    if count < 2:
+        return list(values)
+    mean_x = (count - 1) / 2.0
+    mean_y = sum(values) / count
+    denominator = sum((index - mean_x) ** 2 for index in range(count))
+    if denominator == 0:
+        return list(values)
+    slope = (
+        sum((index - mean_x) * (value - mean_y) for index, value in enumerate(values)) / denominator
+    )
+    intercept = mean_y - slope * mean_x
+    return [value - (slope * index + intercept) for index, value in enumerate(values)]
+
+
 def _scale_column(values: List[Any], method: str) -> Tuple[List[float], Dict[str, Any]]:
     """Scale one numeric column and return the metadata needed to invert it."""
     numbers = _numeric_column(values)
+    if method == "detrend_minmax":
+        numbers = _detrend_values(numbers)
+        method = "minmax_symmetric"
     if method == "none" or not numbers:
         return numbers, {"method": "none"}
     minimum = min(numbers)
@@ -439,6 +474,27 @@ def _normalise_value(value: Any, method: str) -> Any:
     return _scale_value(value, method)[0]
 
 
+def _normalise_datapoints(value: Any, method: str) -> Any:
+    """Normalize a flat sequence or every series row of a ``datapoints`` matrix.
+
+    ``FourierRegression`` receives ``(series, points)``; scaling each column
+    would mix different series at the same time step and turns a single series
+    into zeros.  Rows are the series, so each one is scaled independently.
+    """
+    if not isinstance(value, list) or not value:
+        return value
+    if all(not isinstance(item, (list, tuple)) for item in value):
+        return _normalise_column(value, method)
+    rows: List[List[float]] = []
+    for row in value:
+        if not isinstance(row, (list, tuple)):
+            raise core.ValidationError(
+                "La normalización espera una matriz rectangular en datapoints"
+            )
+        rows.append(_normalise_column(list(row), method))
+    return rows
+
+
 def apply_normalization(
     arguments: Dict[str, Any], parameters: Dict[str, Any], method: str
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
@@ -446,17 +502,20 @@ def apply_normalization(
 
     ``y`` is deliberately excluded here: :func:`apply_target_normalization`
     scales a regression target only after the caller has resolved the task, so
-    classification labels stay as integer codes.
+    classification labels stay as integer codes.  A ``datapoints`` matrix is
+    scaled per series row (``FourierRegression``), while ``x``/``X`` matrices
+    are scaled per feature column.
     """
     if method == "none":
         return dict(arguments), dict(parameters)
     normalized_args = dict(arguments)
     normalized_params = dict(parameters)
     for name in NORMALIZABLE_ARGUMENTS:
+        normalise = _normalise_datapoints if name == "datapoints" else _normalise_value
         if name in normalized_args:
-            normalized_args[name] = _normalise_value(normalized_args[name], method)
+            normalized_args[name] = normalise(normalized_args[name], method)
         if name in normalized_params:
-            normalized_params[name] = _normalise_value(normalized_params[name], method)
+            normalized_params[name] = normalise(normalized_params[name], method)
     return normalized_args, normalized_params
 
 
@@ -474,9 +533,18 @@ def target_normalization_method(raw: Any, task: str, feature_method: str) -> str
     task_name = str(task or "").strip().lower()
     value = str(raw or "").strip().lower()
     if value in TARGET_NORMALIZATION_AUTO:
-        method = feature_method if task_name == "regression" else "none"
+        if task_name == "regression" and feature_method == "detrend_minmax":
+            # A detrended target cannot be inverted with the stored min/max.
+            method = "none"
+        else:
+            method = feature_method if task_name == "regression" else "none"
     else:
         method = normalization_method(value)
+        if method == "detrend_minmax":
+            raise core.ValidationError(
+                "La normalización de y no admite detrend_minmax; usa "
+                "standard, minmax, minmax_symmetric o none"
+            )
     if task_name == "classification" and method != "none":
         raise core.ValidationError(
             "La normalización de y solo está disponible para problemas de regresión"
@@ -871,6 +939,21 @@ def training_dataset_mode(model: Dict[str, Any]) -> str:
     return "generic"
 
 
+#: Models whose ``datapoints`` constructor accepts a ``(series, points)`` matrix.
+SERIES_MATRIX_MODELS = frozenset({"FourierRegression"})
+
+
+def training_series_mode(model: Dict[str, Any]) -> str:
+    """``matrix`` for multi-series forecasting models, ``sequence`` otherwise.
+
+    ``FourierRegression`` denoises/forecasts every row of its ``datapoints``
+    matrix; ``Arima`` keeps the original flat sequence.
+    """
+    if training_dataset_mode(model) != "datapoints":
+        return ""
+    return "matrix" if str(model.get("id") or "") in SERIES_MATRIX_MODELS else "sequence"
+
+
 def training_dataset_task(model: Dict[str, Any]) -> str:
     """The task implied by a curated example, if the model has one."""
     example = training_example(model) or {}
@@ -901,6 +984,34 @@ def method_name_hint(model: Dict[str, Any]) -> bool:
     return False
 
 
+def _series_metrics(actual: Sequence[Any], predicted: Sequence[Any]) -> Dict[str, Any]:
+    """Error metrics of a hold-out window (ignores non-finite pairs)."""
+    pairs = []
+    for truth, forecast in zip(actual, predicted):
+        try:
+            truth = float(truth)
+            forecast = float(forecast)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(truth) and math.isfinite(forecast):
+            pairs.append((truth, forecast))
+    if not pairs:
+        return {"points": 0, "rmse": None, "mae": None, "mape": None}
+    errors = [truth - forecast for truth, forecast in pairs]
+    rmse = math.sqrt(sum(error * error for error in errors) / len(errors))
+    mae = sum(abs(error) for error in errors) / len(errors)
+    percentages = [
+        abs(error / truth) * 100.0 for (truth, _), error in zip(pairs, errors) if truth != 0
+    ]
+    mape = sum(percentages) / len(percentages) if percentages else None
+    return {
+        "points": len(pairs),
+        "rmse": round(rmse, 6),
+        "mae": round(mae, 6),
+        "mape": None if mape is None else round(mape, 4),
+    }
+
+
 class TrainingStore:
     """Training job registry, artifact store and job executor."""
 
@@ -911,6 +1022,14 @@ class TrainingStore:
         self._lock = threading.RLock()
         self._jobs: Dict[str, Dict[str, Any]] = {}
         self.datasets = training_datasets.DatasetStore()
+        # ``analyse_series`` refits in a throw-away child and never writes the
+        # fit artifact.  Cache both complete results and the split-independent
+        # full-history forecast so moving the validation slider does not redo
+        # that work.
+        self._series_results: Dict[str, Dict[str, Any]] = {}
+        self._series_result_order: List[str] = []
+        self._series_forecasts: Dict[str, Dict[str, Any]] = {}
+        self._series_forecast_order: List[str] = []
         self._executor = ThreadPoolExecutor(
             max_workers=TRAIN_WORKERS, thread_name_prefix="lm-training"
         )
@@ -1224,15 +1343,44 @@ class TrainingStore:
         frame = record["frame"]
         args: Dict[str, Any] = {}
         params: Dict[str, Any] = {}
+        series_mode = training_series_mode(model)
+        series_names: List[str] = []
         if mode == "datapoints":
-            built = training_datasets.build_datapoints(frame, target, sample_rows)
-            params = {"datapoints": built["datapoints"]}
-            summary = (
-                f"{record['name']} · {built['rows']} valores → "
-                f"datapoints desde '{built['target']}'"
-            )
+            columns = dataset_spec.get("series") or []
+            if not isinstance(columns, list):
+                raise core.ValidationError("El campo 'series' del dataset debe ser una lista")
+            columns = [str(column).strip() for column in columns if str(column).strip()]
+            if not columns and target:
+                columns = [target]
+            if series_mode == "matrix":
+                built = training_datasets.build_series(frame, columns, sample_rows)
+                params = {"datapoints": built["datapoints"]}
+                series_names = list(built["series"])
+                summary = (
+                    f"{record['name']} · {len(built['series'])} series × "
+                    f"{built['rows']} puntos → {', '.join(built['series'])}"
+                )
+            else:
+                if not columns:
+                    raise core.ValidationError("Selecciona al menos una serie temporal")
+                if len(columns) == 1:
+                    built = training_datasets.build_datapoints(frame, columns[0], sample_rows)
+                    params = {"datapoints": built["datapoints"]}
+                    series_names = list(built.get("series") or columns)
+                    summary = (
+                        f"{record['name']} · {built['rows']} valores → "
+                        f"datapoints desde '{built['target']}'"
+                    )
+                else:
+                    built = training_datasets.build_series(frame, columns, sample_rows)
+                    params = {"datapoints": built["datapoints"]}
+                    series_names = list(built["series"])
+                    summary = (
+                        f"{record['name']} · {len(built['series'])} series × "
+                        f"{built['rows']} puntos · un modelo por serie"
+                    )
             if sample_rows is not None:
-                summary += f" · muestra de {built['rows']} filas"
+                summary += f" · últimos {built['rows']} puntos"
         elif mode == "xy":
             built = training_datasets.build_xy(frame, features, target, task, sample_rows)
             x_name, y_name = "x", "y"
@@ -1266,6 +1414,11 @@ class TrainingStore:
             "rows": built.get("rows") or 0,
             "available_rows": len(frame),
             "sample_rows": sample_rows,
+            "series": series_names,
+            "series_mode": series_mode,
+            "label_column": (
+                training_datasets.series_label_column(frame, series_names) if series_names else ""
+            ),
             "classes": built.get("classes"),
             "summary": summary,
         }
@@ -1523,6 +1676,9 @@ class TrainingStore:
                 )
                 if target_stats:
                     job["target_normalization"] = {"method": target_method, **target_stats}
+        series = (job.get("dataset") or {}).get("series") or []
+        if training_series_mode(model) == "sequence" and len(series) > 1:
+            return self._run_series_fit(job, model, method, parameters, arguments, save_path)
         save_method, save_parameter = save_method_for(model)
         cv_options = dict(job.get("cross_validation") or {})
         if cv_options:
@@ -1560,6 +1716,56 @@ class TrainingStore:
                 {"at": iso(), "level": "info", "message": f"Instancia: {result['module']}"}
             )
         return result
+
+    def _run_series_fit(
+        self,
+        job: Dict[str, Any],
+        model: Dict[str, Any],
+        method: Dict[str, Any],
+        parameters: Dict[str, Any],
+        arguments: Dict[str, Any],
+        save_path: str,
+    ) -> Dict[str, Any]:
+        """Train one model per series (Arima is univariate) into the artifact."""
+        matrix = parameters.get("datapoints")
+        if not isinstance(matrix, list) or not matrix:
+            raise core.ValidationError("La matriz de series está vacía")
+        fit_names = {parameter["name"] for parameter in method.get("parameters") or []}
+        fit_arguments = {key: value for key, value in arguments.items() if key in fit_names}
+        outcome = core.run_series_fit(
+            model,
+            {
+                **{key: value for key, value in parameters.items() if key != "datapoints"},
+                "datapoints": matrix,
+            },
+            fit_arguments,
+            save_path,
+            fit_method=method["name"],
+            series_mode="sequence",
+            seed=42,
+            timeout=float(job["timeout_seconds"]),
+            limits={"cpu": TRAIN_CPU_SECONDS},
+        )
+        files = [str(path) for path in outcome.get("files") or []]
+        job["log"].append(
+            {
+                "at": iso(),
+                "level": "info",
+                "message": f"{len(files)} modelos entrenados (uno por serie)",
+            }
+        )
+        return {
+            "type": model["name"],
+            "module": model["module"],
+            "repr": f"<{model['name']} · {len(files)} modelos>",
+            "compute_seconds": outcome.get("compute_seconds"),
+            "result": {"series": len(files), "models": len(files)},
+            "result_type": "list",
+            "result_repr": f"{len(files)} modelos (uno por serie)",
+            "save_path": save_path,
+            "load_path": "",
+            "save_method": "pickle-batch",
+        }
 
     def _run_cross_validation(
         self,
@@ -1808,6 +2014,11 @@ class TrainingStore:
         """Load an artifact (when given) and run a scoring method on the model."""
         model = self._find_model(job["model_id"])
         artifact = job["artifact"] or {}
+        if str(artifact.get("save_method") or "") == "pickle-batch":
+            raise core.ValidationError(
+                "El artefacto contiene varios modelos (uno por serie); "
+                "usa «Analizar series» para ver validación y predicción."
+            )
         path = str(artifact.get("load_path") or artifact.get("path") or "")
         load = None
         if path:
@@ -1894,6 +2105,12 @@ class TrainingStore:
                             }
                         )
             del self._jobs[job["job_id"]]
+            # Analysis results and forecasts are keyed by job; drop them when
+            # the job (and its dataset reference) disappears.
+            self._series_results.clear()
+            self._series_result_order.clear()
+            self._series_forecasts.clear()
+            self._series_forecast_order.clear()
             self._persist_locked()
         return {"id": job["job_id"], "deleted": True, "artifact_deleted": deleted_artifact}
 
@@ -1959,7 +2176,386 @@ class TrainingStore:
                 break
         return {"id": wanted, "deleted": deleted}
 
+    @staticmethod
+    def _series_cache_store(
+        cache: Dict[str, Dict[str, Any]], order: List[str], key: str, value: Dict[str, Any]
+    ) -> None:
+        """Insert one entry in a bounded in-memory cache (caller holds the lock)."""
+        cache[key] = value
+        if key in order:
+            order.remove(key)
+        order.append(key)
+        while len(order) > MAX_SERIES_CACHE:
+            cache.pop(order.pop(0), None)
+
+    @staticmethod
+    def _series_cache_key(
+        job: Dict[str, Any],
+        series_names: List[str],
+        series_mode: str,
+        total: int,
+        scaling: str,
+        validation_mode: str,
+        split: int,
+        steps: int,
+        seed: int,
+        fit_arguments: Dict[str, Any],
+        predict_arguments: Dict[str, Any],
+        *,
+        include_split: bool,
+    ) -> str:
+        """Stable key for the result cache / split-independent forecast cache."""
+        dataset = job.get("dataset") or {}
+        payload = {
+            "job_id": job.get("job_id"),
+            "dataset_id": dataset.get("dataset_id"),
+            "sample_rows": dataset.get("sample_rows"),
+            "series": list(series_names),
+            "series_mode": series_mode,
+            "total": total,
+            "model_id": job.get("model_id"),
+            "parameters": job.get("parameters") or {},
+            "fit_arguments": fit_arguments,
+            "predict_arguments": predict_arguments,
+            "scaling": scaling,
+            "validation_mode": validation_mode,
+            "steps": steps,
+            "seed": seed,
+            "split": split if include_split else None,
+        }
+        raw = json.dumps(payload, sort_keys=True, default=str, ensure_ascii=False)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
     # -- helpers ---------------------------------------------------------------
+
+    def analyse_series(self, job_id: str, options: Dict[str, Any]) -> Dict[str, Any]:
+        """Hold-out validation and future forecast for a ``datapoints`` job.
+
+        The model runs inside a throw-away sandbox child: in ``holdout`` mode it
+        is fitted on the first ``1 - validation_ratio`` points to predict the
+        held-out tail and fitted again on the whole series to forecast
+        ``n_steps`` values.  In ``full`` mode one full-history fit supplies both
+        charts.  This method is read-only with respect to the fit artifact: no
+        model is saved or rewritten by ``Analizar series``, and results are
+        cached by request/forecast signature.
+        """
+        job = self.job(job_id)
+        if job is None:
+            raise core.ModelNotFound(f'Trabajo no encontrado: "{job_id}"')
+        if job.get("kind") != "fit" or job.get("status") != "succeeded":
+            raise core.ValidationError("El análisis de series requiere un job de fit completado")
+        dataset = job.get("dataset") or {}
+        series_mode = str(dataset.get("series_mode") or "").strip()
+        if series_mode not in ("matrix", "sequence"):
+            # Jobs created before ``series_mode`` was persisted still know
+            # their pipeline from the model catalogue.
+            try:
+                series_mode = training_series_mode(self._find_model(job["model_id"]))
+            except core.APIError:
+                series_mode = ""
+        if dataset.get("mode") != "datapoints" or series_mode not in ("matrix", "sequence"):
+            raise core.ValidationError("El job no usa un dataset de series temporales")
+        series_names = dataset.get("series")
+        if isinstance(series_names, str):
+            series_names = [series_names]
+        elif not isinstance(series_names, list):
+            series_names = []
+        series_names = [str(name).strip() for name in series_names if str(name).strip()]
+        if not series_names and dataset.get("target"):
+            series_names = [str(dataset["target"]).strip()]
+        if not series_names:
+            raise core.ValidationError("El job no tiene series temporales seleccionadas")
+        record = self.datasets.get(dataset.get("dataset_id"))
+        if record is None:
+            raise core.ModelNotFound(
+                "El dataset del job ya no está en memoria; vuelve a lanzar el job"
+            )
+        built = training_datasets.build_series(
+            record["frame"],
+            series_names,
+            dataset.get("sample_rows"),
+        )
+        total = int(built["rows"])
+        if total < 8:
+            raise core.ValidationError(
+                "La serie necesita al menos 8 puntos para validar y predecir"
+            )
+
+        def number(
+            name: str,
+            default: Any,
+            minimum: Optional[float] = None,
+            maximum: Optional[float] = None,
+            cast: type = float,
+        ) -> Any:
+            value = options.get(name, default)
+            if isinstance(value, bool):
+                raise core.ValidationError(f"El campo '{name}' debe ser numérico")
+            try:
+                value = cast(value)
+            except (TypeError, ValueError) as exc:
+                raise core.ValidationError(f"El campo '{name}' debe ser numérico") from exc
+            if minimum is not None and value < minimum:
+                raise core.ValidationError(f"El campo '{name}' debe ser >= {minimum:g}")
+            if maximum is not None and value > maximum:
+                raise core.ValidationError(f"El campo '{name}' debe ser <= {maximum:g}")
+            return value
+
+        ratio = number("validation_ratio", 0.2, 0.05, 0.9)
+        steps = number("n_steps", 12, 1, 365, int)
+        sigma = number("sigma", 0.0, 0.0, 1.0)
+        mov = number("mov", 200, 2, None, int)
+        walkers = number("n_walkers", 1, 1, mov, int)
+        seed = number("seed", 42, 0, None, int)
+        scaling = options.get("scaling")
+        if scaling in (None, ""):
+            raw_scale = options.get("scale", True)
+            if isinstance(raw_scale, str):
+                raw_scale = raw_scale.strip().lower() not in ("0", "false", "no", "off")
+            scaling = "detrend_minmax" if raw_scale else "none"
+        scaling = training_datasets.scaling_method(scaling)
+        validation_mode = str(options.get("validation_mode") or "holdout").strip().lower()
+        validation_mode = {
+            "in_sample": "full",
+            "insample": "full",
+            "same": "full",
+            "all": "full",
+            "out_of_sample": "holdout",
+            "oos": "holdout",
+            "validation": "holdout",
+        }.get(validation_mode, validation_mode)
+        if validation_mode not in ("holdout", "full"):
+            raise core.ValidationError("El modo de validación debe ser 'holdout' o 'full'")
+        split = max(3, min(total - 1, int(round(total * (1.0 - ratio)))))
+
+        actual = built["datapoints"]
+        scaled_full = actual
+        series_stats: List[Dict[str, Any]] = []
+        if scaling != "none":
+            # One DataScaler-compatible transform over the **whole** series, as
+            # in examples/Regression_Models.ipynb (``scaler = DataScaler(a)``).
+            # The validation model trains on the first ``split`` points of this
+            # scaled series, so both charts share the notebook's scale.
+            scaled_full, series_stats = training_datasets.fit_series_scaler(actual, scaling)
+        validation_input = [row[:split] for row in scaled_full]
+        forecast_input = scaled_full
+
+        model = self._find_model(job["model_id"])
+        fit_method = training_fit_method(model)
+        if fit_method is None:
+            raise core.ValidationError("El modelo no declara un método de entrenamiento")
+        fit_names = {parameter["name"] for parameter in fit_method.get("parameters") or []}
+        fit_arguments: Dict[str, Any] = {}
+        if "sigma" in fit_names:
+            fit_arguments["sigma"] = sigma
+        if "mov" in fit_names:
+            fit_arguments["mov"] = mov
+        if "mode" in fit_names:
+            fit_arguments["mode"] = False
+        if "nwalkers" in fit_names:
+            fit_arguments["nwalkers"] = walkers
+        if "weights" in fit_names:
+            fit_arguments["weights"] = False
+        predict_method = core.find_method(model, "predict")
+        if predict_method is None:
+            raise core.ValidationError("El modelo no declara un método predict")
+        predict_names = {parameter["name"] for parameter in predict_method.get("parameters") or []}
+        predict_arguments: Dict[str, Any] = {}
+        if "n_walkers" in predict_names:
+            predict_arguments["n_walkers"] = walkers
+        if "name" in predict_names:
+            predict_arguments["name"] = "series_analysis"
+        if "save" in predict_names:
+            predict_arguments["save"] = False
+        constructor_parameters = {
+            key: value
+            for key, value in (job.get("parameters") or {}).items()
+            if key != "datapoints"
+        }
+        result_key = self._series_cache_key(
+            job,
+            built["series"],
+            series_mode,
+            total,
+            scaling,
+            validation_mode,
+            split,
+            steps,
+            seed,
+            fit_arguments,
+            predict_arguments,
+            include_split=True,
+        )
+        forecast_key = self._series_cache_key(
+            job,
+            built["series"],
+            series_mode,
+            total,
+            scaling,
+            validation_mode,
+            split,
+            steps,
+            seed,
+            fit_arguments,
+            predict_arguments,
+            include_split=False,
+        )
+        with self._lock:
+            cached_result = self._series_results.get(result_key)
+            cached_forecast = self._series_forecasts.get(forecast_key)
+        if cached_result is not None:
+            return {**cached_result, "cached": True}
+
+        def run_child(*, validation_only: bool = False) -> Dict[str, Any]:
+            return core.run_series_analysis(
+                model,
+                {**constructor_parameters, "datapoints": forecast_input},
+                fit_arguments,
+                predict_arguments,
+                split,
+                steps,
+                validation_datapoints=validation_input,
+                fit_method=fit_method["name"],
+                predict_method=predict_method["name"],
+                series_mode=series_mode,
+                validation_mode=validation_mode,
+                validation_only=validation_only,
+                seed=seed,
+                timeout=SERIES_ANALYSIS_TIMEOUT,
+                limits={"cpu": TRAIN_CPU_SECONDS},
+            )
+
+        full_cache_hit = False
+        cached_forecast_used = False
+        result: Optional[Dict[str, Any]] = None
+        if validation_mode == "full" and cached_forecast is not None:
+            # One full-history fit already contains the in-sample tail; changing
+            # the validation slider only changes how that fit is sliced.
+            result = {
+                "validation_full": cached_forecast["validation_full"],
+                "forecast_full": cached_forecast["forecast_full"],
+                "forecast": cached_forecast["forecast"],
+                "split": split,
+                "holdout": total - split,
+                "validation_mode": "full",
+                "validation_training_rows": total,
+                "forecast_training_rows": total,
+                "compute_seconds": cached_forecast.get("compute_seconds"),
+            }
+            full_cache_hit = True
+            cached_forecast_used = True
+        elif validation_mode == "holdout" and cached_forecast is not None:
+            # The full-history forecast does not depend on the split.  Retrain
+            # only the hold-out model, then merge the cached forecast.
+            result = run_child(validation_only=True)
+            result["forecast_full"] = cached_forecast["forecast_full"]
+            result["forecast"] = cached_forecast["forecast"]
+            result["forecast_training_rows"] = total
+            result["validation_mode"] = "holdout"
+            cached_forecast_used = True
+        if result is None:
+            result = run_child()
+            # Cache the raw (scaled) forecast; scaling is inverted below.
+            if validation_mode == "full":
+                forecast_payload = {
+                    "validation_full": result.get("validation_full"),
+                    "forecast_full": result.get("forecast_full"),
+                    "forecast": result.get("forecast"),
+                    "compute_seconds": result.get("compute_seconds"),
+                }
+            else:
+                forecast_payload = {
+                    "forecast_full": result.get("forecast_full"),
+                    "forecast": result.get("forecast"),
+                    "compute_seconds": result.get("compute_seconds"),
+                }
+            if forecast_payload.get("forecast_full") and forecast_payload.get("forecast"):
+                with self._lock:
+                    self._series_cache_store(
+                        self._series_forecasts,
+                        self._series_forecast_order,
+                        forecast_key,
+                        forecast_payload,
+                    )
+        validation_full = result.get("validation_full") or []
+        if not validation_full:
+            fallback = result.get("validation") or []
+            validation_full = [
+                [0.0] * split + list(fallback[index] if index < len(fallback) else [])
+                for index in range(len(actual))
+            ]
+        forecast_full = result.get("forecast_full") or []
+        if forecast_full:
+            if scaling != "none":
+                forecast_full = training_datasets.apply_series_scaler(
+                    forecast_full, series_stats, 0
+                )
+            forecast_fitted = [row[:total] for row in forecast_full]
+            forecast_values = [row[total:] for row in forecast_full]
+        else:
+            forecast_fitted = []
+            forecast_values = result.get("forecast") or []
+            if scaling != "none":
+                forecast_values = training_datasets.apply_series_scaler(
+                    forecast_values, series_stats, total
+                )
+        if scaling != "none" and validation_full:
+            validation_full = training_datasets.apply_series_scaler(
+                validation_full, series_stats, 0
+            )
+        fitted = [row[:split] for row in validation_full]
+        validation = [row[split:] for row in validation_full]
+        metrics = []
+        for index, name in enumerate(built["series"]):
+            predicted = validation[index] if index < len(validation) else []
+            metrics.append({"series": name, **_series_metrics(actual[index][split:], predicted)})
+        label_column = str(dataset.get("label_column") or "") or (
+            training_datasets.series_label_column(record["frame"], built["series"])
+        )
+        response = {
+            "job_id": job["job_id"],
+            "series": built["series"],
+            "rows": total,
+            "split": int(result.get("split") or split),
+            "holdout": int(result.get("holdout") or (total - split)),
+            "validation_ratio": ratio,
+            "n_steps": steps,
+            "sigma": sigma,
+            "mov": mov,
+            "n_walkers": walkers,
+            "seed": seed,
+            "scale": scaling != "none",
+            "scaling": scaling,
+            "validation_mode": validation_mode,
+            "validation_training_rows": int(
+                result.get("validation_training_rows")
+                or (total if validation_mode == "full" else split)
+            ),
+            "forecast_training_rows": int(result.get("forecast_training_rows") or total),
+            "series_mode": series_mode,
+            "labels": training_datasets.series_labels(
+                record["frame"], label_column, built["indices"]
+            ),
+            "future_labels": training_datasets.future_series_labels(
+                record["frame"], label_column, built["indices"], steps
+            ),
+            "actual": actual,
+            "fitted": fitted,
+            "validation": validation,
+            "forecast": forecast_values,
+            "forecast_fitted": forecast_fitted,
+            "metrics": metrics,
+            "compute_seconds": result.get("compute_seconds"),
+            "elapsed": result.get("elapsed"),
+        }
+        with self._lock:
+            self._series_cache_store(
+                self._series_results, self._series_result_order, result_key, response
+            )
+        response = dict(response)
+        response["cached"] = bool(full_cache_hit)
+        response["cached_forecast"] = bool(cached_forecast_used)
+        return response
 
     def _find_model(self, model_id: str) -> Dict[str, Any]:
         """Resolve ``model_id`` against the catalog (the single source of truth)."""

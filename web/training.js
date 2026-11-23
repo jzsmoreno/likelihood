@@ -35,6 +35,9 @@
     autoArgs: null,
     // training monitor: which metric family is visible
     metricView: '',
+    // series analysis of the current job (validation + forecast)
+    seriesAnalysis: null,
+    seriesIndex: 0,
   };
 
   var dom = {};
@@ -1058,8 +1061,488 @@
     });
   }
 
+  function seriesFmt(value, digits) {
+    if (value === null || value === undefined || !isFinite(Number(value))) return '—';
+    if (window.LMCharts) return window.LMCharts.fmtNumber(Number(value), digits);
+    return Number(value).toFixed(digits === undefined ? 2 : digits);
+  }
+
+  function seriesInput(id, label, value, min, max, step) {
+    return '<div class="wizard-field"><label for="' + id + '">' + esc(label) + '</label>' +
+      '<input class="input" id="' + id + '" type="number" min="' + min + '" max="' + max +
+      '" step="' + step + '" value="' + value + '"></div>';
+  }
+
+  function seriesAnalysisPanel(job) {
+    var dataset = job.dataset || {};
+    var series = dataset.series;
+    if (!Array.isArray(series)) {
+      series = series ? [series] : (dataset.target ? [dataset.target] : []);
+    }
+    var seriesMode = dataset.series_mode;
+    var supported = seriesMode === 'matrix' || seriesMode === 'sequence' ||
+      ((String(job.model_id) === 'FourierRegression' || String(job.model_id) === 'Arima') &&
+        series.length > 0);
+    if (job.kind !== 'fit' || !supported || !series.length) return '';
+    var fourier = String(job.model_id || '') === 'FourierRegression';
+    var count = series.length === 1 ? '1 serie' : series.length + ' series';
+    var points = dataset.rows || 0;
+    var available = Number(dataset.available_rows) || 0;
+    var pointsText = available && available !== points ? points + ' de ' + available : points;
+    return '<section class="panel" id="series-panel" aria-label="Series temporales">' +
+      '<div class="panel-header"><h2 class="panel-title">' +
+        '<span class="panel-icon" aria-hidden="true">∿</span>Series temporales</h2>' +
+        '<span class="training-metrics-badge">' + esc(count) + '</span></div>' +
+      '<div class="panel-body">' +
+        '<div class="meta-grid">' +
+          '<div class="meta-item"><span class="meta-label">Series</span>' +
+            '<span class="meta-value">' + esc(series.join(', ')) + '</span></div>' +
+          '<div class="meta-item"><span class="meta-label">Puntos</span>' +
+            '<span class="meta-value">' + esc(pointsText) + '</span>' +
+            '<span class="meta-sub mono">' + esc(dataset.label_column || 'índice') + '</span></div>' +
+          (job.normalization && job.normalization !== 'none'
+            ? '<div class="meta-item"><span class="meta-label">Normalización del job</span>' +
+              '<span class="meta-value">' + esc(job.normalization) + '</span>' +
+              '<span class="meta-sub mono">no usada por este análisis</span></div>'
+            : '') +
+        '</div>' +
+        '<div class="training-control-grid">' +
+          seriesInput('series-ratio', 'Validación (%)', 20, 5, 50, 5) +
+          seriesInput('series-steps', 'Pasos futuros', 12, 1, 365, 1) +
+          (fourier ? seriesInput('series-sigma', 'Sigma FFT', 1, 0, 1, 0.05) : '') +
+          seriesInput('series-mov', 'Iteraciones (mov)', 300, 2, 2000, 10) +
+          seriesInput('series-walkers', 'Walkers', 5, 1, 50, 1) +
+          seriesInput('series-seed', 'Semilla', 42, 0, 999999, 1) +
+        '</div>' +
+        '<div class="wizard-field">' +
+          '<label for="series-validation-mode">Modelo de validación</label>' +
+          '<select class="select" id="series-validation-mode">' +
+            '<option value="holdout">Fuera de muestra (el tramo final no se usa al entrenar)</option>' +
+            '<option value="full">Un solo modelo con toda la serie (en muestra)</option>' +
+          '</select>' +
+          '<p class="hint">Fuera de muestra: la validación entrena sin el tramo final y la predicción se reentrena con toda la serie (la predicción se reutiliza desde caché si no cambian sus parámetros). ' +
+          'Un solo modelo: el mismo ajuste con todos los puntos se usa para el tramo final y para predecir; cambiar Validación (%) no reentrena, solo recorta el tramo comparado.</p>' +
+        '</div>' +
+        '<div class="wizard-field">' +
+          '<label for="series-scaling">Escalado</label>' +
+          '<select class="select" id="series-scaling">' +
+            '<option value="detrend_minmax">Tendencia + [-1,1] (DataScaler)</option>' +
+            '<option value="minmax_symmetric">Solo [-1,1] (sin detrend)</option>' +
+            '<option value="minmax">Solo [0,1] (sin detrend)</option>' +
+            '<option value="standard">Z-score (sin detrend)</option>' +
+            '<option value="none">Sin escalado (datos originales)</option>' +
+          '</select>' +
+          '<p class="hint">Un único escalado sobre la serie completa, como el notebook; ' +
+          'se usa en validación y predicción y se invierte a las unidades originales.</p>' +
+        '</div>' +
+        '<div class="dataset-apply-row">' +
+          '<span class="hint" id="series-status">Valida el tramo final y predice los próximos pasos.</span>' +
+          '<div class="panel-actions">' +
+            '<button class="btn btn-secondary btn-sm" type="button" id="series-download" disabled>Descargar CSV</button>' +
+            '<button class="btn btn-primary btn-sm" type="button" id="series-run">Analizar series</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="wizard-field" id="series-select-field" hidden>' +
+          '<label for="series-select">Serie a graficar</label>' +
+          '<select class="select" id="series-select"></select>' +
+          '<p class="hint">Elige qué serie se muestra en las dos gráficas.</p>' +
+        '</div>' +
+        '<div class="training-chart"><div class="training-chart-head">' +
+          '<span class="training-chart-title" id="series-validation-title">Validación · tramo final</span>' +
+          '<span class="training-chart-meta" id="series-validation-meta"></span></div>' +
+          '<div id="series-validation-chart"></div></div>' +
+        '<div class="training-chart"><div class="training-chart-head">' +
+          '<span class="training-chart-title" id="series-forecast-title">Predicción futura</span>' +
+          '<span class="training-chart-meta" id="series-forecast-meta"></span></div>' +
+          '<div id="series-forecast-chart"></div></div>' +
+        '<p class="hint" id="series-fit-note"></p>' +
+        '<div class="training-metric-table-wrap" id="series-metrics"></div>' +
+      '</div></section>';
+  }
+
+  function syncSeriesSelect(series) {
+    var select = byId('series-select');
+    var selectField = byId('series-select-field');
+    if (!select || !selectField) return;
+    if (!Array.isArray(series) || !series.length) {
+      selectField.hidden = true;
+      return;
+    }
+    if (select.options.length !== series.length) {
+      select.innerHTML = series.map(function (name, index) {
+        return '<option value="' + index + '">' + esc(name) + '</option>';
+      }).join('');
+    }
+    var wanted = Number(state.seriesIndex) || 0;
+    if (wanted < 0 || wanted >= series.length) wanted = 0;
+    if (!select.value && select.options.length) select.value = String(wanted);
+    selectField.hidden = false;
+  }
+
+  function renderSeriesCharts(job) {
+    var container = byId('series-validation-chart');
+    if (!container || !window.LMCharts) return;
+    var analysis = state.seriesAnalysis;
+    var result = analysis && analysis.jobId === job.job_id ? analysis.result : null;
+    var validationMeta = byId('series-validation-meta');
+    var forecastMeta = byId('series-forecast-meta');
+    var validationTitle = byId('series-validation-title');
+    var fitNote = byId('series-fit-note');
+    var modeSelect = byId('series-validation-mode');
+    var mode = result && result.validation_mode
+      ? result.validation_mode
+      : (modeSelect ? modeSelect.value : 'holdout');
+    var fullMode = mode === 'full';
+    var jobSeries = job && job.dataset ? job.dataset.series : [];
+    if (!Array.isArray(jobSeries)) {
+      jobSeries = jobSeries ? [jobSeries] : (job.dataset && job.dataset.target ? [job.dataset.target] : []);
+    }
+    if (validationTitle) {
+      validationTitle.textContent = fullMode
+        ? 'Ajuste en muestra · tramo final'
+        : 'Validación · tramo final';
+    }
+    if (!result) {
+      syncSeriesSelect(jobSeries);
+      if (fitNote) {
+        fitNote.textContent = fullMode
+          ? 'Un único modelo entrenado con toda la serie se usará para el tramo final y para predecir.'
+          : 'La validación entrenará sin el tramo final; la predicción futura se reentrenará con toda la serie real.';
+      }
+      window.LMCharts.line(container, {
+        points: [],
+        series: [],
+        emptyText: 'Pulsa «Analizar series» para validar el tramo final.',
+      });
+      window.LMCharts.line(byId('series-forecast-chart'), {
+        points: [],
+        series: [],
+        emptyText: 'La predicción futura aparecerá aquí.',
+      });
+      if (validationMeta) validationMeta.textContent = '';
+      if (forecastMeta) forecastMeta.textContent = '';
+      return;
+    }
+    var series = result.series || jobSeries;
+    syncSeriesSelect(series);
+    var select = byId('series-select');
+    var wanted = Number(state.seriesIndex) || 0;
+    if (wanted < 0 || wanted >= series.length) wanted = 0;
+    var index = select ? Number(select.value) || 0 : wanted;
+    if (!isFinite(index) || index < 0 || index >= series.length) index = 0;
+    state.seriesIndex = index;
+
+    var labels = result.labels || [];
+    var actual = (result.actual || [])[index] || [];
+    var fitted = (result.fitted || [])[index] || [];
+    var validation = (result.validation || [])[index] || [];
+    var split = Number(result.split) || 0;
+    var total = Number(result.rows) || actual.length;
+    var validationRows = Number(result.validation_training_rows) || split;
+    var forecastRows = Number(result.forecast_training_rows) || total;
+    if (fitNote) {
+      fitNote.textContent = fullMode
+        ? 'Un único modelo entrenado con ' + forecastRows +
+          ' puntos reales: el tramo final es ajuste en muestra y la predicción continúa ese mismo ajuste.'
+        : 'Validación fuera de muestra: modelo entrenado con ' + validationRows +
+          ' puntos (el tramo final no se usó). Predicción futura: modelo reentrenado con ' +
+          forecastRows + ' puntos reales; por eso el ajuste y el punto de partida pueden diferir.';
+    }
+    var points = actual.map(function (value, position) {
+      var predicted = validation[position - split];
+      var fittedValue = fitted[position];
+      if (position === split - 1 && fittedValue !== undefined && isFinite(Number(fittedValue))) {
+        predicted = fittedValue;
+      }
+      return {
+        t: position,
+        label: labels[position] !== undefined ? String(labels[position]) : String(position),
+        actual: isFinite(Number(value)) ? Number(value) : null,
+        fitted: position < split && fittedValue !== undefined && isFinite(Number(fittedValue))
+          ? Number(fittedValue)
+          : null,
+        prediction: predicted !== undefined && isFinite(Number(predicted))
+          ? Number(predicted)
+          : null,
+      };
+    });
+    window.LMCharts.line(container, {
+      points: points,
+      series: [
+        { key: 'actual', label: 'Real', color: 'blue', area: true },
+        { key: 'fitted', label: fullMode ? 'Ajuste (toda la serie)' : 'Ajuste (train)', color: 'amber', dashed: true },
+        { key: 'prediction', label: fullMode ? 'Ajuste en muestra (tramo final)' : 'Predicción validación', color: 'lava', dashed: true },
+      ],
+      aspectRatio: 0.42,
+      maxHeight: 280,
+      legend: true,
+      xAxisTitle: 'Tiempo',
+      formatXAxis: function (point) { return point.label; },
+      tooltipTitle: function (point) { return point.label; },
+      formatAxis: function (value) { return window.LMCharts.fmtCompact(value); },
+      formatValue: function (value) { return seriesFmt(value, 4); },
+      emptyText: 'Sin datos de validación.',
+      ariaLabel: 'Validación de la serie ' + (series[index] || ''),
+    });
+    var metric = (result.metrics || [])[index] || {};
+    if (validationMeta) {
+      validationMeta.textContent = (fullMode
+        ? 'mismo modelo (' + validationRows + ' pts)'
+        : 'modelo con ' + validationRows + ' pts') +
+        ' · RMSE ' + seriesFmt(metric.rmse, 4) +
+        ' · MAE ' + seriesFmt(metric.mae, 4) +
+        (metric.mape === null || metric.mape === undefined
+          ? ''
+          : ' · MAPE ' + seriesFmt(metric.mape, 2) + '%');
+    }
+
+    var forecast = (result.forecast || [])[index] || [];
+    var forecastFitted = (result.forecast_fitted || [])[index] || [];
+    var futureLabels = result.future_labels || [];
+    var lastFitted = forecastFitted[total - 1];
+    lastFitted = lastFitted !== undefined && isFinite(Number(lastFitted))
+      ? Number(lastFitted)
+      : null;
+    var future = actual.map(function (value, position) {
+      var fittedValue = forecastFitted[position];
+      return {
+        t: position,
+        label: labels[position] !== undefined ? String(labels[position]) : String(position),
+        actual: isFinite(Number(value)) ? Number(value) : null,
+        fitted: fittedValue !== undefined && isFinite(Number(fittedValue))
+          ? Number(fittedValue)
+          : null,
+        forecast: position === total - 1 ? lastFitted : null,
+      };
+    });
+    forecast.forEach(function (value, offset) {
+      future.push({
+        t: total + offset,
+        label: futureLabels[offset] !== undefined ? String(futureLabels[offset]) : 't+' + (offset + 1),
+        actual: null,
+        fitted: null,
+        forecast: isFinite(Number(value)) ? Number(value) : null,
+      });
+    });
+    window.LMCharts.line(byId('series-forecast-chart'), {
+      points: future,
+      series: [
+        { key: 'actual', label: 'Histórico', color: 'blue' },
+        { key: 'fitted', label: fullMode ? 'Ajuste (mismo modelo)' : 'Ajuste (toda la serie)', color: 'amber', dashed: true },
+        { key: 'forecast', label: 'Predicción futura', color: 'lava', dashed: true },
+      ],
+      aspectRatio: 0.42,
+      maxHeight: 280,
+      legend: true,
+      xAxisTitle: 'Tiempo',
+      formatXAxis: function (point) { return point.label; },
+      tooltipTitle: function (point) { return point.label; },
+      formatAxis: function (value) { return window.LMCharts.fmtCompact(value); },
+      formatValue: function (value) { return seriesFmt(value, 4); },
+      emptyText: 'Sin predicción futura.',
+      ariaLabel: 'Predicción futura de la serie ' + (series[index] || ''),
+    });
+    if (forecastMeta) {
+      var prefix = (result.scaling === 'none' || result.scale === false) ? 'sin escalar · ' : '';
+      var forecastLabel = fullMode
+        ? 'mismo modelo (' + forecastRows + ' pts)'
+        : 'modelo con ' + forecastRows + ' pts (toda la serie)';
+      forecastMeta.textContent = prefix + forecastLabel + ' · ' + forecast.length + ' pasos · ' +
+        seriesFmt(actual[actual.length - 1], 2) + ' → ' + seriesFmt(forecast[0], 2);
+      var low = Infinity;
+      var high = -Infinity;
+      actual.forEach(function (value) {
+        if (value === null || value === undefined || !isFinite(Number(value))) return;
+        low = Math.min(low, Number(value));
+        high = Math.max(high, Number(value));
+      });
+      var span = high - low;
+      var unstable = isFinite(span) && span > 0 && forecast.some(function (value) {
+        if (!isFinite(Number(value))) return false;
+        return Number(value) < low - span || Number(value) > high + span;
+      });
+      if (unstable) forecastMeta.textContent += ' · ⚠ fuera del rango observado';
+    }
+    renderSeriesMetrics(result);
+  }
+
+  function renderSeriesMetrics(result) {
+    var box = byId('series-metrics');
+    if (!box) return;
+    var rows = result.metrics || [];
+    box.innerHTML = '<table class="training-metric-table"><thead><tr>' +
+      '<th>Serie</th><th>Puntos</th><th>RMSE</th><th>MAE</th><th>MAPE</th></tr></thead><tbody>' +
+      rows.map(function (row) {
+        return '<tr><td>' + esc(row.series) + '</td><td>' + esc(row.points) + '</td>' +
+          '<td>' + seriesFmt(row.rmse, 4) + '</td>' +
+          '<td>' + seriesFmt(row.mae, 4) + '</td>' +
+          '<td>' + (row.mape === null || row.mape === undefined
+            ? '—'
+            : seriesFmt(row.mape, 2) + '%') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function seriesCsv(analysis) {
+    var result = analysis.result;
+    var labels = result.labels || [];
+    var futureLabels = result.future_labels || [];
+    var split = Number(result.split) || 0;
+    var lines = ['split,index,label,series,actual,prediction'];
+    function row(values) {
+      return values.map(function (value) {
+        var text = value === null || value === undefined ? '' : String(value);
+        return /[",\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+      }).join(',');
+    }
+    (result.series || []).forEach(function (name, index) {
+      var actual = (result.actual || [])[index] || [];
+      var fitted = (result.fitted || [])[index] || [];
+      var validation = (result.validation || [])[index] || [];
+      actual.forEach(function (value, position) {
+        var predicted = validation[position - split];
+        var modelValue = position < split ? fitted[position] : predicted;
+        lines.push(row([
+          position < split ? 'train' : 'validation',
+          position,
+          labels[position] !== undefined ? labels[position] : position,
+          name,
+          value,
+          modelValue !== undefined ? modelValue : '',
+        ]));
+      });
+      var forecast = (result.forecast || [])[index] || [];
+      forecast.forEach(function (value, offset) {
+        lines.push(row([
+          'forecast',
+          actual.length + offset,
+          futureLabels[offset] !== undefined ? futureLabels[offset] : 't+' + (offset + 1),
+          name,
+          '',
+          value,
+        ]));
+      });
+    });
+    return lines.join('\r\n');
+  }
+
+  function downloadSeriesCsv() {
+    var analysis = state.seriesAnalysis;
+    if (!analysis) return;
+    var blob = new Blob([seriesCsv(analysis)], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = 'series-' + analysis.jobId + '.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function runSeriesAnalysis(job) {
+    if (!job || !job.job_id) return;
+    var ratio = Number(byId('series-ratio') ? byId('series-ratio').value : 20) / 100;
+    var steps = Number(byId('series-steps') ? byId('series-steps').value : 12);
+    var sigma = Number(byId('series-sigma') ? byId('series-sigma').value : 1);
+    var mov = Number(byId('series-mov') ? byId('series-mov').value : 300);
+    var walkers = Number(byId('series-walkers') ? byId('series-walkers').value : 5);
+    var seed = Number(byId('series-seed') ? byId('series-seed').value : 42);
+    var scaling = byId('series-scaling') ? byId('series-scaling').value : 'detrend_minmax';
+    var validationMode = byId('series-validation-mode')
+      ? byId('series-validation-mode').value
+      : 'holdout';
+    if (['holdout', 'full'].indexOf(validationMode) < 0) validationMode = 'holdout';
+    var scalingMethods = ['detrend_minmax', 'minmax_symmetric', 'minmax', 'standard', 'none'];
+    if (scalingMethods.indexOf(scaling) < 0) scaling = 'detrend_minmax';
+    if (!isFinite(ratio) || ratio <= 0 || ratio >= 1) {
+      toast('La validación debe quedar entre 5% y 50%.', true);
+      return;
+    }
+    if (!isFinite(steps) || steps < 1 || Math.floor(steps) !== steps) {
+      toast('Los pasos futuros deben ser un entero mayor o igual que 1.', true);
+      return;
+    }
+    if (!isFinite(sigma) || sigma < 0 || sigma > 1) {
+      toast('Sigma debe estar entre 0 y 1.', true);
+      return;
+    }
+    if (!isFinite(mov) || mov < 2 || Math.floor(mov) !== mov) {
+      toast('Las iteraciones (mov) deben ser un entero mayor o igual que 2.', true);
+      return;
+    }
+    if (!isFinite(walkers) || walkers < 1 || walkers > mov || Math.floor(walkers) !== walkers) {
+      toast('Los walkers deben ser un entero entre 1 y mov.', true);
+      return;
+    }
+    if (!isFinite(seed) || seed < 0 || Math.floor(seed) !== seed) {
+      toast('La semilla debe ser un entero mayor o igual que 0.', true);
+      return;
+    }
+    var button = byId('series-run');
+    var status = byId('series-status');
+    if (button) button.disabled = true;
+    if (status) status.textContent = 'Ajustando el modelo y calculando la predicción…';
+    api('/api/training/jobs/' + encodeURIComponent(job.job_id) + '/series', {
+      method: 'POST',
+      body: {
+        validation_ratio: ratio,
+        n_steps: steps,
+        sigma: sigma,
+        mov: mov,
+        n_walkers: walkers,
+        seed: seed,
+        scaling: scaling,
+        validation_mode: validationMode,
+      },
+    }).then(function (data) {
+      state.seriesAnalysis = { jobId: job.job_id, result: data };
+      state.seriesIndex = 0;
+      if (button) button.disabled = false;
+      if (status) {
+        if (data.cached) {
+          status.textContent = 'Análisis listo (caché; sin reentrenar).';
+        } else if (data.cached_forecast) {
+          status.textContent = 'Validación recalculada; predicción futura reutilizada de caché.';
+        } else {
+          status.textContent = 'Análisis listo' +
+            (data.compute_seconds !== undefined
+              ? ' · ' + data.compute_seconds + ' s de cómputo'
+              : '') + '.';
+        }
+      }
+      var download = byId('series-download');
+      if (download) download.disabled = false;
+      renderSeriesCharts(job);
+      toast(data.cached
+        ? 'Análisis de series recuperado de caché'
+        : (data.cached_forecast
+          ? 'Análisis listo; predicción reutilizada'
+          : 'Análisis de series completado'));
+    }).catch(function (error) {
+      if (button) button.disabled = false;
+      if (status) status.textContent = error.message;
+      toast(error.message, true);
+    });
+  }
+
+  function bindSeriesActions(job) {
+    if (!dom.detail) return;
+    var run = byId('series-run');
+    if (run) run.addEventListener('click', function () { runSeriesAnalysis(job); });
+    var download = byId('series-download');
+    if (download) download.addEventListener('click', downloadSeriesCsv);
+    var select = byId('series-select');
+    if (select) select.addEventListener('change', function () {
+      state.seriesIndex = Number(select.value) || 0;
+      renderSeriesCharts(job);
+    });
+  }
+
   function renderJobDetail(job) {
     if (!dom.detail) return;
+    if (state.seriesAnalysis && state.seriesAnalysis.jobId !== job.job_id) {
+      state.seriesAnalysis = null;
+    }
     var isFit = job.kind === 'fit';
     var artifact = job.artifact || null;
     var model = job.model || null;
@@ -1169,6 +1652,7 @@
 
     var metricsPanel = job.status === 'succeeded' ? trainingMetricsPanel(job) : '';
     var cvPanel = job.status === 'succeeded' ? crossValidationPanel(job) : '';
+    var seriesPanel = job.status === 'succeeded' ? seriesAnalysisPanel(job) : '';
 
     var artifactPanel = '';
     if (artifact) {
@@ -1198,6 +1682,9 @@
                     esc(artifact.load_path) + '</code></div>'
                 : '') +
             '</div>' +
+            (artifact.save_method === 'pickle-batch'
+              ? '<p class="training-note">Lote de modelos: uno por serie. Usa «Analizar series» para validar y predecir; no hay una única ruta de carga para Serving.</p>'
+              : '') +
             (artifact.files && artifact.files.length
               ? '<details class="details-block"><summary>Archivos del artefacto (' +
                 esc(artifact.files.length) + ')</summary><pre class="code-block">' +
@@ -1225,9 +1712,11 @@
       '<a class="link-back" href="/training">← Todos los jobs</a>';
 
     dom.detail.innerHTML = backLink + header + metaGrid + errorBox + resultPanel +
-      cvPanel + metricsPanel + artifactPanel + logPanel;
+      cvPanel + metricsPanel + seriesPanel + artifactPanel + logPanel;
     wireDetailActions(job);
+    bindSeriesActions(job);
     renderTrainingChart(job);
+    renderSeriesCharts(job);
     if (job.status === 'pending' || job.status === 'running') pollJob(job.job_id);
   }
 
@@ -1321,6 +1810,13 @@
 
   function modelById(id) {
     return state.models.find(function (model) { return model.id === id; });
+  }
+
+  /** FourierRegression consumes a matrix; Arima fits one model per series. */
+  function isMultiSeriesModel(model) {
+    if (!model || model.dataset_mode !== 'datapoints') return false;
+    return model.series_mode === 'matrix' ||
+      ['FourierRegression', 'Arima'].indexOf(String(model.id)) >= 0;
   }
 
   function controlAction() {
@@ -1521,7 +2017,10 @@
       }
       state.autoParams = null;
       state.autoArgs = null;
-      resetDataset();
+      // Keep the loaded dataset: switching to FourierRegression must show the
+      // multi-series selector without forcing a second upload.
+      state.datasetSelection = null;
+      if (dom.datasetApplyNote) dom.datasetApplyNote.textContent = '';
     }
     var model = modelById(id);
     if (dom.methodInput) {
@@ -1544,22 +2043,39 @@
     }
     syncControlVisibility();
     var datasetMode = model && model.dataset_mode;
+    var seriesMatrix = model && isMultiSeriesModel(model);
     var datasetVisible = state.wKind === 'fit' && datasetMode && datasetMode !== 'generic';
     if (dom.datasetPanel) dom.datasetPanel.hidden = !datasetVisible;
     if (dom.datasetModeBadge) {
       dom.datasetModeBadge.textContent = datasetMode === 'xy'
         ? 'X + Y'
-        : (datasetMode === 'datapoints' ? 'datapoints' : '');
+        : (datasetMode === 'datapoints' ? (seriesMatrix ? 'series' : 'datapoints') : '');
     }
-    if (dom.datasetXField) dom.datasetXField.hidden = datasetMode === 'datapoints';
+    if (dom.datasetXField) dom.datasetXField.hidden = datasetMode === 'datapoints' && !seriesMatrix;
+    if (dom.datasetXLabel) {
+      dom.datasetXLabel.textContent = seriesMatrix ? 'Series (una o varias)' : 'Columnas X';
+    }
+    if (dom.datasetXHint) {
+      dom.datasetXHint.textContent = seriesMatrix
+        ? (model && String(model.id) === 'Arima'
+          ? 'Selecciona una o varias columnas; se entrenará un Arima independiente por serie.'
+          : 'Selecciona una o varias columnas numéricas; cada una es una serie temporal.')
+        : 'Variables numéricas de entrada (Ctrl/Cmd para seleccionar varias).';
+    }
+    if (dom.datasetYField) dom.datasetYField.hidden = seriesMatrix;
     if (dom.datasetYLabel) {
       dom.datasetYLabel.textContent = datasetMode === 'datapoints'
-        ? 'Columna de datapoints'
+        ? (model && String(model.id) === 'Arima'
+          ? 'Serie temporal (Arima)'
+          : 'Columna de datapoints')
         : 'Columna Y / objetivo';
     }
-    if (state.dataset) {
+    if (state.wKind === 'fit' && state.dataset && datasetMode && datasetMode !== 'generic') {
       renderDatasetColumns(state.dataset);
-    } else {
+      fillDataSettings(datasetSelection());
+    } else if (state.wKind === 'fit' && state.dataset) {
+      resetDataset();
+    } else if (state.wKind === 'fit') {
       syncDatasetTarget();
     }
     if (dom.modelCard) {
@@ -1849,6 +2365,7 @@
     var model = modelById(state.wModel);
     if (!model || !dataset || !dataset.columns) return;
     var mode = model.dataset_mode;
+    var matrix = isMultiSeriesModel(model);
     var numeric = dataset.columns.filter(function (column) { return column.numeric; });
     var target = preferredTarget(dataset, model);
     var targetCandidates = (mode === 'datapoints' || model.dataset_task === 'regression')
@@ -1861,8 +2378,22 @@
       }).join('');
       if (target) dom.datasetY.value = target.name;
     }
-    if (dom.datasetXField) dom.datasetXField.hidden = mode === 'datapoints';
-    if (mode !== 'datapoints' && dom.datasetX) {
+    if (dom.datasetXLabel) {
+      dom.datasetXLabel.textContent = matrix ? 'Series (una o varias)' : 'Columnas X';
+    }
+    if (dom.datasetXHint) {
+      dom.datasetXHint.textContent = matrix
+        ? 'Selecciona una o varias columnas numéricas; cada una es una serie temporal.'
+        : 'Variables numéricas de entrada (Ctrl/Cmd para seleccionar varias).';
+    }
+    if (dom.datasetYField) dom.datasetYField.hidden = matrix;
+    if (dom.datasetXField) dom.datasetXField.hidden = mode === 'datapoints' && !matrix;
+    if (matrix && dom.datasetX) {
+      dom.datasetX.innerHTML = numeric.map(function (column) {
+        return '<option value="' + esc(column.name) + '" selected>' +
+          esc(column.name) + ' · ' + esc(column.dtype) + '</option>';
+      }).join('');
+    } else if (mode !== 'datapoints' && dom.datasetX) {
       var targetName = target ? target.name : '';
       dom.datasetX.innerHTML = numeric.map(function (column) {
         var selected = column.name !== targetName;
@@ -1876,6 +2407,7 @@
   function syncDatasetTarget() {
     var model = modelById(state.wModel);
     var mode = model && model.dataset_mode;
+    var matrix = isMultiSeriesModel(model);
     var target = dom.datasetY ? dom.datasetY.value : '';
     if (mode === 'xy' && dom.datasetX) {
       Array.prototype.forEach.call(dom.datasetX.options, function (option) {
@@ -1883,7 +2415,11 @@
       });
     }
     if (dom.datasetTargetHint) {
-      if (mode === 'datapoints') {
+      if (matrix) {
+        dom.datasetTargetHint.textContent = (model && String(model.id) === 'Arima')
+          ? 'Cada columna seleccionada entrena un Arima independiente; se comparan todas en «Analizar series».'
+          : 'Cada columna seleccionada es una serie temporal independiente.';
+      } else if (mode === 'datapoints') {
         dom.datasetTargetHint.textContent = 'La columna se usará como secuencia de datapoints.';
       } else if (model && model.dataset_task === 'classification') {
         dom.datasetTargetHint.textContent = 'Las etiquetas de texto se codifican como enteros (0..n-1).';
@@ -1965,13 +2501,15 @@
     var model = modelById(state.wModel);
     if (!state.dataset || !model) return null;
     var mode = model.dataset_mode || 'xy';
+    var matrix = isMultiSeriesModel(model);
     var selection = {
       dataset_id: state.dataset.dataset_id,
       mode: mode,
       task: model.dataset_task || 'auto',
-      features: mode === 'datapoints' ? [] : selectedValues(dom.datasetX),
-      target: dom.datasetY ? dom.datasetY.value : '',
+      features: mode === 'xy' ? selectedValues(dom.datasetX) : [],
+      target: matrix ? '' : (dom.datasetY ? dom.datasetY.value : ''),
     };
+    if (matrix) selection.series = selectedValues(dom.datasetX);
     var sampleRows = datasetSampleRows();
     if (sampleRows !== null) selection.sample_rows = sampleRows;
     return selection;
@@ -1983,17 +2521,26 @@
       toast('Carga un dataset antes de lanzar el job.', true);
       return null;
     }
-    if (!selection.target) {
-      toast('Selecciona la columna Y u objetivo.', true);
-      return null;
-    }
-    if (selection.mode === 'xy' && !selection.features.length) {
-      toast('Selecciona al menos una columna X.', true);
-      return null;
-    }
-    if (selection.mode === 'xy' && selection.features.indexOf(selection.target) >= 0) {
-      toast('La columna objetivo no puede formar parte de X.', true);
-      return null;
+    var model = modelById(state.wModel);
+    var matrix = isMultiSeriesModel(model);
+    if (matrix) {
+      if (!selection.series || !selection.series.length) {
+        toast('Selecciona al menos una serie temporal.', true);
+        return null;
+      }
+    } else {
+      if (!selection.target) {
+        toast('Selecciona la columna Y u objetivo.', true);
+        return null;
+      }
+      if (selection.mode === 'xy' && !selection.features.length) {
+        toast('Selecciona al menos una columna X.', true);
+        return null;
+      }
+      if (selection.mode === 'xy' && selection.features.indexOf(selection.target) >= 0) {
+        toast('La columna objetivo no puede formar parte de X.', true);
+        return null;
+      }
     }
     var sampleRows = datasetSampleRows();
     if (sampleRows !== null) {
@@ -2018,7 +2565,9 @@
       : '';
     if (dom.datasetApplyNote) {
       dom.datasetApplyNote.textContent = (selection.mode === 'datapoints'
-        ? 'Selección lista: datapoints ← ' + selection.target
+        ? (selection.series
+          ? 'Selección lista: ' + selection.series.length + ' series'
+          : 'Selección lista: datapoints ← ' + selection.target)
         : 'Selección lista: ' + selection.features.length + ' columnas X → ' + selection.target) +
         sampleText + '. Se usará al lanzar el job.';
     }
@@ -2406,7 +2955,10 @@
     dom.datasetPreview = byId('dataset-preview');
     dom.datasetX = byId('dataset-x');
     dom.datasetXField = byId('dataset-x-field');
+    dom.datasetXLabel = byId('dataset-x-label');
+    dom.datasetXHint = byId('dataset-x-hint');
     dom.datasetY = byId('dataset-y');
+    dom.datasetYField = byId('dataset-y-field');
     dom.datasetYLabel = byId('dataset-y-label');
     dom.datasetTargetHint = byId('dataset-target-hint');
     dom.datasetApply = byId('dataset-apply');

@@ -856,6 +856,8 @@
             <span class="dataset-examples-label">Ejemplos</span>
             <button class="dataset-chip" type="button" data-dataset-url="https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" data-dataset-task="classification">Iris · clasificación</button>
             <button class="dataset-chip" type="button" data-dataset-url="https://raw.githubusercontent.com/ageron/handson-ml2/master/datasets/housing/housing.csv" data-dataset-task="regression">Housing · regresión</button>
+            <button class="dataset-chip" type="button" data-dataset-url="https://raw.githubusercontent.com/skforecast/skforecast-datasets/main/data/consumos-combustibles-mensual.csv" data-dataset-task="timeseries">Combustibles · 5 series</button>
+            <button class="dataset-chip" type="button" data-dataset-url="https://raw.githubusercontent.com/jbrownlee/Datasets/master/airline-passengers.csv" data-dataset-task="timeseries">Pasajeros aéreos · 1 serie</button>
           </div>
           <p class="hint dataset-status" id="dataset-status" role="status"></p>
           <div class="dataset-config" id="dataset-config" hidden>
@@ -865,11 +867,11 @@
             </div>
             <div class="dataset-columns">
               <div class="wizard-field" id="dataset-x-field">
-                <label for="dataset-x">Columnas X</label>
+                <label for="dataset-x" id="dataset-x-label">Columnas X</label>
                 <select class="select dataset-multi" id="dataset-x" multiple size="7"></select>
-                <p class="hint">Variables numéricas de entrada (Ctrl/Cmd para seleccionar varias).</p>
+                <p class="hint" id="dataset-x-hint">Variables numéricas de entrada (Ctrl/Cmd para seleccionar varias).</p>
               </div>
-              <div class="wizard-field">
+              <div class="wizard-field" id="dataset-y-field">
                 <label for="dataset-y" id="dataset-y-label">Columna Y / objetivo</label>
                 <select class="select" id="dataset-y"></select>
                 <p class="hint" id="dataset-target-hint"></p>
@@ -878,7 +880,7 @@
             <div class="wizard-field" id="dataset-rows-field">
               <label for="dataset-rows">Filas a usar</label>
               <input class="input" id="dataset-rows" type="number" min="1" step="1" placeholder="Todas">
-              <p class="hint">Vacío = todas las filas. Un número usa una muestra aleatoria reproducible (semilla 42).</p>
+              <p class="hint">Vacío = todas las filas. En tablas se usa una muestra aleatoria de N; en series temporales, los últimos N puntos.</p>
             </div>
             <div class="dataset-apply-row">
               <span class="hint" id="dataset-apply-note"></span>
@@ -893,8 +895,9 @@
             <option value="standard">Estandarizar · media 0, desviación 1</option>
             <option value="minmax">Min-Max · 0 a 1</option>
             <option value="minmax_symmetric">Min-Max · -1 a 1</option>
+            <option value="detrend_minmax">Quitar tendencia + Min-Max · -1 a 1 (series)</option>
           </select>
-          <p class="hint">Se aplica a <code>x</code>/<code>X</code> y <code>datapoints</code>. Las etiquetas de clasificación nunca se escalan.</p>
+          <p class="hint">Se aplica a <code>x</code>/<code>X</code> (por columna) y <code>datapoints</code> (por serie). La opción «Quitar tendencia» solo tiene sentido en series temporales. Las etiquetas de clasificación nunca se escalan.</p>
         </div>
         <div class="wizard-field" id="target-normalization-field">
           <label for="job-target-normalization">Normalización de Y (regresión)</label>

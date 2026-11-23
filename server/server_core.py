@@ -2404,6 +2404,235 @@ _emit(result)
 """
 
 
+#: Fit + forecast for one or more time series inside a throw-away child.
+#: The same child computes the hold-out validation and the future forecast so a
+#: model such as ``FourierRegression`` is only imported once per request.
+_SERIES_BOOTSTRAP = _SANDBOX_PRELUDE + r"""
+import random
+import time
+
+try:
+    import numpy as np
+
+    parameters = payload.get("parameters") or {}
+    fit_arguments = payload.get("fit_arguments") or {}
+    predict_arguments = payload.get("predict_arguments") or {}
+    fit_method = str(payload.get("fit_method") or "fit")
+    predict_method = str(payload.get("predict_method") or "predict")
+    matrix_mode = str(payload.get("series_mode") or "matrix") == "matrix"
+    validation_mode = str(payload.get("validation_mode") or "holdout")
+    validation_only = bool(payload.get("validation_only"))
+    seed = int(payload.get("seed") if payload.get("seed") is not None else 42)
+    matrix = np.asarray(parameters.get("datapoints"), dtype=float)
+    if matrix.ndim != 2 or matrix.shape[0] < 1 or matrix.shape[1] < 3:
+        raise ValueError("El análisis de series espera una matriz (series, puntos)")
+    total = int(matrix.shape[1])
+    split = int(payload.get("split") or 0)
+    if split <= 1 or split >= total:
+        split = min(max(2, int(total * 0.8)), total - 1)
+    holdout = total - split
+    steps = max(1, int(payload.get("n_steps") or 1))
+
+    def fit_and_predict(model_parameters, horizon, sequence):
+        def attempt(fit_args, predict_args):
+            np.random.seed(seed)
+            random.seed(seed)
+            payload["parameters"] = model_parameters
+            instance = _build()
+            getattr(instance, fit_method)(**fit_args)
+            call = dict(predict_args)
+            call["n_steps"] = int(horizon)
+            prediction = np.asarray(
+                getattr(instance, predict_method)(**call), dtype=float
+            )
+            if sequence:
+                if prediction.ndim == 2:
+                    prediction = prediction[0, :]
+            elif prediction.ndim == 1:
+                prediction = prediction.reshape(1, -1)
+            return prediction
+
+        try:
+            return attempt(fit_arguments, predict_arguments)
+        except IndexError as exc:
+            # ``likelihood.main.walkers`` reshapes the first walker's iteration
+            # list and indexes it with the walker number. If that walk converges
+            # before touching every walker, the library raises IndexError. The
+            # library is untouched, so fall back to a single walker for this
+            # series instead of failing the whole analysis.
+            if str(exc) != "list index out of range":
+                raise
+            retry_fit = dict(fit_arguments)
+            retry_predict = dict(predict_arguments)
+            if retry_fit.get("nwalkers", 0) > 1:
+                retry_fit["nwalkers"] = 1
+            if retry_predict.get("n_walkers", 0) > 1:
+                retry_predict["n_walkers"] = 1
+            if retry_fit == fit_arguments and retry_predict == predict_arguments:
+                raise
+            return attempt(retry_fit, retry_predict)
+
+    def run_model(values, horizon):
+        if matrix_mode:
+            # FourierRegression consumes the full (series, points) matrix.
+            return fit_and_predict(
+                {**parameters, "datapoints": values.tolist()}, horizon, False
+            )
+        # Arima is univariate: one model per selected series.
+        rows = []
+        for row in values:
+            rows.append(
+                fit_and_predict(
+                    {**parameters, "datapoints": row.tolist()}, horizon, True
+                )
+            )
+        return np.vstack(rows)
+
+    validation_values = payload.get("validation_datapoints")
+    if validation_values:
+        validation_matrix = np.asarray(validation_values, dtype=float)
+        if validation_matrix.ndim != 2 or validation_matrix.shape[1] != split:
+            validation_matrix = matrix[:, :split]
+    else:
+        validation_matrix = matrix[:, :split]
+
+    started = time.monotonic()
+    if validation_only:
+        # The full-history forecast is cached by the parent; only the hold-out
+        # fit depends on the requested split.
+        validation_full = run_model(validation_matrix, holdout)
+        _emit({
+            "ok": True,
+            "validation_full": validation_full.tolist(),
+            "validation": validation_full[:, -holdout:].tolist(),
+            "split": split,
+            "holdout": holdout,
+            "validation_mode": "holdout",
+            "validation_training_rows": int(validation_matrix.shape[1]),
+            "forecast_training_rows": 0,
+            "compute_seconds": round(time.monotonic() - started, 3),
+        })
+    elif validation_mode == "full":
+        # One fit on all real points: the last holdout is an in-sample fit and
+        # the forecast is the continuation of that same fitted model.
+        future_full = run_model(matrix, steps)
+        validation_full = future_full[:, :total].copy()
+        _emit({
+            "ok": True,
+            "validation_full": validation_full.tolist(),
+            "validation": validation_full[:, -holdout:].tolist(),
+            "forecast_full": future_full.tolist(),
+            "forecast": future_full[:, -steps:].tolist(),
+            "split": split,
+            "holdout": holdout,
+            "validation_mode": validation_mode,
+            "validation_training_rows": total,
+            "forecast_training_rows": total,
+            "compute_seconds": round(time.monotonic() - started, 3),
+        })
+    else:
+        validation_full = run_model(validation_matrix, holdout)
+        future_full = run_model(matrix, steps)
+        _emit({
+            "ok": True,
+            "validation_full": validation_full.tolist(),
+            "validation": validation_full[:, -holdout:].tolist(),
+            "forecast_full": future_full.tolist(),
+            "forecast": future_full[:, -steps:].tolist(),
+            "split": split,
+            "holdout": holdout,
+            "validation_mode": validation_mode,
+            "validation_training_rows": int(validation_matrix.shape[1]),
+            "forecast_training_rows": total,
+            "compute_seconds": round(time.monotonic() - started, 3),
+        })
+except BaseException as exc:
+    import traceback as _traceback
+
+    _emit({
+        "ok": False,
+        "error": "%s: %s" % (type(exc).__name__, exc),
+        "traceback": _traceback.format_exc()[-4000:],
+    })
+    sys.exit(3)
+"""
+
+
+#: Fit one model per series (Arima cannot consume a matrix) and pickle each
+#: instance inside the job artifact folder.
+_SERIES_FIT_BOOTSTRAP = _SANDBOX_PRELUDE + r"""
+import pickle
+import random
+import time
+
+try:
+    import numpy as np
+
+    parameters = payload.get("parameters") or {}
+    fit_arguments = payload.get("fit_arguments") or {}
+    fit_method = str(payload.get("fit_method") or "fit")
+    matrix_mode = str(payload.get("series_mode") or "sequence") == "matrix"
+    seed = int(payload.get("seed") if payload.get("seed") is not None else 42)
+    save_dir = str(payload.get("save_dir") or "")
+    if not save_dir:
+        raise ValueError("Falta la carpeta de artefactos para el lote")
+    os.makedirs(save_dir, exist_ok=True)
+
+    matrix = np.asarray(parameters.get("datapoints"), dtype=float)
+    if matrix.ndim != 2 or matrix.shape[0] < 1 or matrix.shape[1] < 2:
+        raise ValueError("El lote espera una matriz (series, puntos)")
+
+    def fit_instance(datapoints, args):
+        np.random.seed(seed)
+        random.seed(seed)
+        payload["parameters"] = {**parameters, "datapoints": datapoints}
+        instance = _build()
+        getattr(instance, fit_method)(**args)
+        return instance
+
+    def fit_one(datapoints, name):
+        try:
+            instance = fit_instance(datapoints, fit_arguments)
+        except IndexError as exc:
+            # Same early-convergence bug as the analysis bootstrap: retry with
+            # a single walker instead of failing the whole multi-series job.
+            if str(exc) != "list index out of range":
+                raise
+            retry_args = dict(fit_arguments)
+            if retry_args.get("nwalkers", 0) <= 1:
+                raise
+            retry_args["nwalkers"] = 1
+            instance = fit_instance(datapoints, retry_args)
+        path = os.path.join(save_dir, name)
+        with open(path, "wb") as handle:
+            pickle.dump(instance, handle)
+        return path
+
+    started = time.monotonic()
+    files = []
+    if matrix_mode:
+        files.append(fit_one(matrix.tolist(), "series_0.pkl"))
+    else:
+        for index, row in enumerate(matrix):
+            files.append(fit_one(row.tolist(), "series_%d.pkl" % index))
+    _emit({
+        "ok": True,
+        "files": files,
+        "series": len(files),
+        "compute_seconds": round(time.monotonic() - started, 3),
+    })
+except BaseException as exc:
+    import traceback as _traceback
+
+    _emit({
+        "ok": False,
+        "error": "%s: %s" % (type(exc).__name__, exc),
+        "traceback": _traceback.format_exc()[-4000:],
+    })
+    sys.exit(3)
+"""
+
+
 #: Long lived worker behind ``POST /api/models/<id>/sessions``: it builds the
 #: model once and then answers one JSON line per method call, so ``fit`` followed
 #: by ``predict`` keeps the state of the instance.
@@ -3284,6 +3513,187 @@ def run_invoke(
     result["method"] = method["name"]
     result["elapsed"] = round(elapsed, 3)
     result["stdout"] = stdout.split(_PLAYGROUND_MARKER)[0][-4000:].strip()
+    result["stderr"] = stderr[-4000:]
+    return result
+
+
+def run_series_analysis(
+    model: Dict[str, Any],
+    parameters: Dict[str, Any],
+    fit_arguments: Dict[str, Any],
+    predict_arguments: Dict[str, Any],
+    split: int,
+    n_steps: int,
+    validation_datapoints: Optional[List[List[float]]] = None,
+    fit_method: str = "fit",
+    predict_method: str = "predict",
+    series_mode: str = "matrix",
+    validation_mode: str = "holdout",
+    validation_only: bool = False,
+    seed: int = 42,
+    timeout: Optional[float] = None,
+    limits: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Fit a series model on a train window and forecast, inside the sandbox.
+
+    Returns ``validation`` (hold-out tail), ``validation_full`` (train fit +
+    hold-out), ``forecast_full`` (full fit + future) and ``forecast`` (future)
+    matrices (``series × points``).  In ``holdout`` mode the validation model is
+    fitted on ``validation_datapoints`` (or ``datapoints[:, :split]``) and asked
+    for ``total - split`` steps; the forecast model is fitted on the whole
+    matrix and asked for ``n_steps``.  In ``full`` mode one model is fitted on
+    the whole matrix and both the in-sample tail and the future forecast come
+    from that same fit.
+    """
+    timeout = INVOKE_TIMEOUT if timeout is None else timeout
+    payload_data: Dict[str, Any] = {
+        "module": model["module"],
+        "name": model["name"],
+        "parameters": parameters,
+        **sandbox_payload(model, constructor_types(model)),
+        "fit_arguments": dict(fit_arguments),
+        "predict_arguments": dict(predict_arguments),
+        "fit_method": str(fit_method),
+        "predict_method": str(predict_method),
+        "series_mode": str(series_mode),
+        "validation_mode": str(validation_mode),
+        "validation_only": bool(validation_only),
+        "seed": int(seed),
+        "split": int(split),
+        "n_steps": int(n_steps),
+    }
+    if validation_datapoints is not None:
+        payload_data["validation_datapoints"] = validation_datapoints
+    if limits:
+        payload_data["limits"] = {**payload_data.get("limits", {}), **limits}
+    payload = json.dumps(payload_data)
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-c", _SERIES_BOOTSTRAP],
+            input=payload,
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=child_environment(),
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise InvocationError(
+            f"El análisis de series superó el límite de {timeout:g} segundos", status=504
+        ) from exc
+    elapsed = time.monotonic() - started
+    stdout = completed.stdout or ""
+    stderr = (completed.stderr or "").strip()
+    result_line = ""
+    for line in stdout.splitlines():
+        candidate = _marker_payload(line)
+        if candidate is not None:
+            result_line = candidate
+    if not result_line:
+        tail = stderr or stdout
+        message = _last_error_line(tail) or (
+            "El análisis de series terminó sin respuesta "
+            f"(código de salida {completed.returncode})"
+        )
+        raise InvocationError(message, detail=tail[-4000:])
+    try:
+        result = json.loads(result_line)
+    except json.JSONDecodeError as exc:
+        raise InvocationError(
+            "El análisis de series devolvió una respuesta inválida",
+            detail=stdout[-2000:],
+        ) from exc
+    if not result.get("ok"):
+        raise InvocationError(
+            result.get("error") or "El análisis de series falló",
+            detail=(result.get("traceback") or stderr)[-4000:],
+        )
+    result.pop("ok", None)
+    result["elapsed"] = round(elapsed, 3)
+    result["stderr"] = stderr[-4000:]
+    return result
+
+
+def run_series_fit(
+    model: Dict[str, Any],
+    parameters: Dict[str, Any],
+    fit_arguments: Dict[str, Any],
+    save_dir: str,
+    fit_method: str = "fit",
+    series_mode: str = "sequence",
+    seed: int = 42,
+    timeout: Optional[float] = None,
+    limits: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Fit one model per series and pickle each instance in ``save_dir``.
+
+    ``Arima`` is univariate, so a multi-series job trains one model per row.
+    The returned ``files`` are absolute pickle paths inside the artifact
+    folder; the training store exposes the first one as ``load_path``.
+    """
+    timeout = INVOKE_TIMEOUT if timeout is None else timeout
+    payload_data: Dict[str, Any] = {
+        "module": model["module"],
+        "name": model["name"],
+        "parameters": parameters,
+        **sandbox_payload(model, constructor_types(model)),
+        "fit_arguments": dict(fit_arguments),
+        "fit_method": str(fit_method),
+        "series_mode": str(series_mode),
+        "seed": int(seed),
+        "save_dir": str(save_dir),
+    }
+    if limits:
+        payload_data["limits"] = {**payload_data.get("limits", {}), **limits}
+    payload = json.dumps(payload_data)
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-c", _SERIES_FIT_BOOTSTRAP],
+            input=payload,
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=child_environment(),
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise InvocationError(
+            f"El entrenamiento por series superó el límite de {timeout:g} segundos",
+            status=504,
+        ) from exc
+    elapsed = time.monotonic() - started
+    stdout = completed.stdout or ""
+    stderr = (completed.stderr or "").strip()
+    result_line = ""
+    for line in stdout.splitlines():
+        candidate = _marker_payload(line)
+        if candidate is not None:
+            result_line = candidate
+    if not result_line:
+        tail = stderr or stdout
+        message = _last_error_line(tail) or (
+            "El entrenamiento por series terminó sin respuesta "
+            f"(código de salida {completed.returncode})"
+        )
+        raise InvocationError(message, detail=tail[-4000:])
+    try:
+        result = json.loads(result_line)
+    except json.JSONDecodeError as exc:
+        raise InvocationError(
+            "El entrenamiento por series devolvió una respuesta inválida",
+            detail=stdout[-2000:],
+        ) from exc
+    if not result.get("ok"):
+        raise InvocationError(
+            result.get("error") or "El entrenamiento por series falló",
+            detail=(result.get("traceback") or stderr)[-4000:],
+        )
+    result.pop("ok", None)
+    result["elapsed"] = round(elapsed, 3)
     result["stderr"] = stderr[-4000:]
     return result
 

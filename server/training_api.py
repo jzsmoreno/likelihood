@@ -49,6 +49,56 @@ def require_training(settings: Any) -> None:
         )
 
 
+class SeriesAnalysisRequest(BaseModel):
+    """Body of ``POST /api/training/jobs/<id>/series``."""
+
+    validation_ratio: float = Field(
+        default=0.2,
+        gt=0,
+        lt=1,
+        description="Fracción final de la serie reservada para validación (0-1).",
+    )
+    n_steps: int = Field(default=12, ge=1, le=365, description="Pasos futuros a predecir.")
+    scaling: Optional[str] = Field(
+        default=None,
+        description=(
+            "detrend_minmax (DataScaler, por defecto), minmax_symmetric "
+            "(solo [-1,1]), minmax, standard o none. Se aplica a la serie "
+            "completa; si falta, scale=true equivale a detrend_minmax."
+        ),
+    )
+    scale: bool = Field(
+        default=True,
+        description="Alias booleano obsoleto de scaling: true=detrend_minmax, false=none.",
+    )
+    validation_mode: Optional[str] = Field(
+        default=None,
+        description=(
+            "holdout (por defecto): la validación entrena sin el tramo final y "
+            "la predicción se reentrena con toda la serie. full: un único modelo "
+            "entrenado con toda la serie (validación en muestra) usado también "
+            "para la predicción futura."
+        ),
+    )
+    sigma: float = Field(
+        default=0.0,
+        ge=0,
+        le=1,
+        description="Umbral de denoising FFT (solo FourierRegression).",
+    )
+    mov: int = Field(default=200, ge=2, description="Iteraciones de la caminata ARIMA.")
+    seed: int = Field(
+        default=42,
+        ge=0,
+        description="Semilla de NumPy/Python para que el análisis sea reproducible.",
+    )
+    n_walkers: int = Field(
+        default=1,
+        ge=1,
+        description=("Caminantes por ventana en FourierRegression o ``nwalkers`` en Arima.train."),
+    )
+
+
 class TrainingRequest(BaseModel):
     """Body of ``POST /api/training/jobs``."""
 
@@ -267,6 +317,7 @@ def build_router() -> APIRouter:
             example = training_core.training_example(model)
             dataset_mode = training_core.training_dataset_mode(model)
             dataset_task = training_core.training_dataset_task(model)
+            series_mode = training_core.training_series_mode(model)
             model_parameters = model.get("parameters") or []
             constructor_fields = [p.get("name") for p in model_parameters if not p.get("variadic")]
             method_fields = [
@@ -287,6 +338,7 @@ def build_router() -> APIRouter:
                     "example": example,
                     "dataset_mode": dataset_mode,
                     "dataset_task": dataset_task,
+                    "series_mode": series_mode,
                 }
             )
         rows.sort(key=lambda item: item["name"].lower())
@@ -348,6 +400,17 @@ def build_router() -> APIRouter:
             raise core.ModelNotFound(f'Trabajo no encontrado: "{job_id}"')
         payload = _job_payload(settings, job)
         return _no_store({"success": True, "job": payload, **payload})
+
+    @router.post("/api/training/jobs/{job_id}/series", tags=[TRAINING_TAG])
+    def analyse_series(
+        job_id: str,
+        body: SeriesAnalysisRequest,
+        settings: Any = Depends(get_settings),
+    ) -> JSONResponse:
+        """Hold-out validation and future forecast for a series fit job."""
+        require_training(settings)
+        result = settings.training.analyse_series(job_id, body.model_dump())
+        return _no_store({"success": True, **result})
 
     @router.post("/api/training/jobs", status_code=202, tags=[TRAINING_TAG])
     def create_job(

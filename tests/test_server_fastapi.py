@@ -328,6 +328,10 @@ def test_training_models_include_framework_fit_adapters(client):
     assert rows["GANRegressor"]["adapter"] == "keras"
     assert rows["Arima"]["fit_method"] == "train"
     assert rows["Arima"]["adapter"] == ""
+    assert rows["Arima"]["dataset_mode"] == "datapoints"
+    assert rows["Arima"]["series_mode"] == "sequence"
+    assert rows["FourierRegression"]["dataset_mode"] == "datapoints"
+    assert rows["FourierRegression"]["series_mode"] == "matrix"
     assert "AutoQL" not in rows
 
     assert rows["AutoClassifier"]["example"]["label"] == "Clasificación"
@@ -351,6 +355,95 @@ def test_training_page_loads_charts_and_dataset_controls(client):
     assert 'id="dataset-panel"' in response.text
     assert 'id="dataset-x"' in response.text
     assert 'id="dataset-y"' in response.text
+    assert 'id="dataset-rows"' in response.text
+    assert 'value="detrend_minmax"' in response.text
+    assert "consumos-combustibles-mensual.csv" in response.text
+    assert "airline-passengers.csv" in response.text
+
+
+def test_training_series_analysis_endpoint(client, settings):
+    """A FourierRegression job exposes hold-out validation and a forecast."""
+    import math
+
+    lines = ["Fecha,alpha,beta"]
+    for index in range(36):
+        month = index % 12 + 1
+        year = 2020 + index // 12
+        lines.append(
+            "%04d-%02d-01,%.4f,%.4f"
+            % (
+                year,
+                month,
+                10 + math.sin(index / 3.0),
+                20 + math.cos(index / 4.0),
+            )
+        )
+    payload = ("\n".join(lines)).encode("utf-8")
+    uploaded = client.post(
+        "/api/training/datasets/upload",
+        files={"file": ("series.csv", payload, "text/csv")},
+    )
+    assert uploaded.status_code == 200, uploaded.text
+    dataset = uploaded.json()["dataset"]
+
+    created = client.post(
+        "/api/training/jobs",
+        json={
+            "model_id": "FourierRegression",
+            "arguments": {"sigma": 0, "mov": 10, "mode": False},
+            "dataset": {
+                "dataset_id": dataset["dataset_id"],
+                "mode": "datapoints",
+                "task": "auto",
+                "series": ["alpha", "beta"],
+            },
+        },
+    )
+    assert created.status_code == 202, created.text
+    job_id = created.json()["job"]["job_id"]
+
+    deadline = time.monotonic() + 120
+    job = None
+    while time.monotonic() < deadline:
+        response = client.get("/api/training/jobs/%s" % job_id)
+        assert response.status_code == 200, response.text
+        job = response.json()["job"]
+        if job["status"] not in ("pending", "running"):
+            break
+        time.sleep(0.25)
+    assert job and job["status"] == "succeeded", job
+    assert job["dataset"]["series_mode"] == "matrix"
+    assert job["dataset"]["series"] == ["alpha", "beta"]
+
+    analysis = client.post(
+        "/api/training/jobs/%s/series" % job_id,
+        json={
+            "validation_ratio": 0.25,
+            "n_steps": 3,
+            "sigma": 0,
+            "mov": 10,
+            "n_walkers": 1,
+            "scaling": "minmax_symmetric",
+        },
+    )
+    assert analysis.status_code == 200, analysis.text
+    body = analysis.json()
+    assert body["series"] == ["alpha", "beta"]
+    assert body["rows"] == 36
+    assert body["split"] == 27
+    assert body["scale"] is True
+    assert body["scaling"] == "minmax_symmetric"
+    assert body["validation_mode"] == "holdout"
+    assert body["validation_training_rows"] == 27
+    assert body["forecast_training_rows"] == 36
+    assert len(body["fitted"]) == 2
+    assert len(body["fitted"][0]) == 27
+    assert len(body["validation"]) == 2
+    assert len(body["validation"][0]) == 9
+    assert len(body["forecast"][0]) == 3
+    assert len(body["forecast_fitted"][0]) == 36
+    assert body["future_labels"]
+    assert body["metrics"][0]["points"] == 9
 
 
 def test_training_dataset_upload_and_inspection(client):

@@ -174,6 +174,25 @@ def test_training_normalization_scales_features_without_touching_targets():
     assert symmetric_args["y"] == [1, 2]
 
 
+def test_training_normalization_detrends_series_rows():
+    """detrend_minmax removes the line per series and keeps the [-1,1] range."""
+    arguments = {"datapoints": [[1.0, 2.0, 3.0, 4.0], [0.0, 2.0, 0.0, 2.0]]}
+    scaled, _ = training_core.apply_normalization(arguments, {}, "detrend_minmax")
+
+    assert scaled["datapoints"][0] == [0.0, 0.0, 0.0, 0.0]
+    assert all(-1.0001 <= value <= 1.0001 for value in scaled["datapoints"][1])
+    assert scaled["datapoints"][1] != [0.0, 0.0, 0.0, 0.0]
+    assert training_core.normalization_method("detrend") == "detrend_minmax"
+
+
+def test_target_normalization_does_not_detrend_y():
+    """A detrended y could not be inverted, so auto falls back to none."""
+    method = training_core.target_normalization_method("auto", "regression", "detrend_minmax")
+    assert method == "none"
+    with pytest.raises(training_core.core.ValidationError):
+        training_core.target_normalization_method("detrend_minmax", "regression", "none")
+
+
 def test_training_normalization_rejects_unknown_methods():
     with pytest.raises(training_core.core.ValidationError):
         training_core.normalization_method("unknown")
@@ -389,6 +408,10 @@ def test_artifact_savers_are_detected_for_serving():
         "components"
     )
     assert training_core.save_layout_for(training_core.core.MODELS_BY_ID["Arima"]) == ""
+    assert training_core.save_method_for(training_core.core.MODELS_BY_ID["FourierRegression"]) == (
+        "",
+        "",
+    )
 
 
 def test_keras_models_expose_an_inherited_fit_adapter():
@@ -699,6 +722,105 @@ def test_target_normalization_accepts_the_declared_target_name():
     assert arguments["X"] == [[1.0], [2.0]]
 
 
+def test_fourier_dataset_builds_a_series_matrix(store, captured):
+    """A multi-column datapoints job sends a ``(series, points)`` matrix."""
+    frame = pd.DataFrame(
+        {
+            "date": pd.date_range("2020-01-01", periods=10, freq="MS"),
+            "a": [float(index) for index in range(10)],
+            "b": [float(index) * 2 for index in range(10)],
+        }
+    )
+    dataset = store.datasets.put("series.csv", frame, "series.csv", "csv")
+    job = store.start(
+        {
+            "model_id": "FourierRegression",
+            "dataset": {
+                "dataset_id": dataset["dataset_id"],
+                "mode": "datapoints",
+                "task": "auto",
+                "series": ["a", "b"],
+                "sample_rows": 8,
+            },
+        }
+    )
+
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    assert finished["method"] == "fit"
+    assert finished["dataset"]["series"] == ["a", "b"]
+    assert finished["dataset"]["series_mode"] == "matrix"
+    assert finished["dataset"]["rows"] == 8
+    assert finished["dataset"]["label_column"] == "date"
+
+    matrix = captured[0]["parameters"]["datapoints"]
+    assert len(matrix) == 2
+    assert len(matrix[0]) == 8
+    assert matrix[0] == [2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
+    assert matrix[1][0] == 4.0
+
+
+def test_datapoints_normalization_scales_each_series_row():
+    """``datapoints`` (series × points) is scaled per row, not per time step."""
+    _, parameters = training_core.apply_normalization(
+        {}, {"datapoints": [[1.0, 2.0, 3.0], [10.0, 20.0, 30.0]]}, "standard"
+    )
+    matrix = parameters["datapoints"]
+    expected = [-1.224744871391589, 0.0, 1.224744871391589]
+    assert matrix[0] == pytest.approx(expected)
+    assert matrix[1] == pytest.approx(expected)
+
+    single_row = training_core.apply_normalization(
+        {}, {"datapoints": [[1.0, 2.0, 3.0]]}, "standard"
+    )[1]["datapoints"][0]
+    assert single_row == pytest.approx(expected)
+
+    flat_arguments, _ = training_core.apply_normalization(
+        {"datapoints": [1.0, 2.0, 3.0]}, {}, "standard"
+    )
+    assert flat_arguments["datapoints"] == pytest.approx(expected)
+
+    x_arguments, _ = training_core.apply_normalization(
+        {"x": [[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]]}, {}, "standard"
+    )
+    assert x_arguments["x"][0] == pytest.approx([expected[0], expected[0]])
+    assert x_arguments["x"][2][0] == pytest.approx(expected[2])
+
+
+def test_fourier_datapoints_normalization_uses_series_rows(store, captured):
+    """The job normalization must not collapse a single series to zeros."""
+    frame = pd.DataFrame(
+        {
+            "a": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+            "b": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0],
+        }
+    )
+    dataset = store.datasets.put("series.csv", frame, "series.csv", "csv")
+    job = store.start(
+        {
+            "model_id": "FourierRegression",
+            "normalization": "standard",
+            "dataset": {
+                "dataset_id": dataset["dataset_id"],
+                "mode": "datapoints",
+                "task": "auto",
+                "series": ["a", "b"],
+                "sample_rows": 8,
+            },
+        }
+    )
+
+    finished = wait_for(store, job["job_id"])
+    assert finished["status"] == "succeeded", finished["error"]
+    matrix = captured[0]["parameters"]["datapoints"]
+    for row in matrix:
+        mean = sum(row) / len(row)
+        variance = sum((value - mean) ** 2 for value in row) / len(row)
+        assert abs(mean) < 1e-9
+        assert abs(variance - 1.0) < 1e-6
+    assert len(set(matrix[0])) > 1
+
+
 def test_dataset_sample_rows_limits_the_training_data(store, captured):
     """``sample_rows`` sends a reproducible random portion to the fit call."""
     frame = pd.DataFrame(
@@ -771,6 +893,8 @@ def test_dataset_datapoints_mode_rebuilds_the_sequence(store, captured):
 
     finished = wait_for(store, job["job_id"])
     assert finished["status"] == "succeeded", finished["error"]
+    assert finished["dataset"]["series_mode"] == "sequence"
+    assert finished["dataset"]["series"] == ["value"]
     assert "datapoints" not in finished["parameters"]
     assert captured[0]["parameters"]["datapoints"] == [1.0, 2.0, 3.0, 4.0]
 

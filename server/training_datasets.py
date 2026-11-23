@@ -15,12 +15,14 @@ import os
 import socket
 import threading
 import uuid
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+import numpy as np
 import pandas as pd
 
 import server_core as core
@@ -239,6 +241,13 @@ def _sample_rows(data: Any, rows: Optional[int]) -> Any:
     return data.sample(n=int(rows), random_state=SAMPLE_SEED)
 
 
+def _limit_series(data: Any, rows: Optional[int]) -> Any:
+    """Keep the most recent ``rows`` values (time order is never shuffled)."""
+    if rows is None or rows <= 0 or rows >= len(data):
+        return data
+    return data.tail(int(rows))
+
+
 class DatasetStore:
     """Small in-memory registry of parsed datasets."""
 
@@ -388,16 +397,225 @@ def build_datapoints(
     series = series.dropna()
     if not len(series):
         raise core.ValidationError("La columna de datapoints no contiene valores")
-    series = _sample_rows(series, rows)
+    series = _limit_series(series, rows)
     values = [float(value) for value in series]
     return {
         "mode": "datapoints",
         "task": "",
         "features": [],
         "target": target_name,
+        "series": [target_name],
         "rows": len(values),
         "datapoints": values,
     }
+
+
+def build_series(
+    frame: pd.DataFrame,
+    columns: Sequence[str],
+    rows: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Build a ``(series, points)`` matrix from one or more numeric columns.
+
+    ``FourierRegression`` denoises and forecasts every row of the matrix, so a
+    single selected column still becomes a ``1 × n`` matrix.  ``rows`` keeps the
+    most recent values without reordering the series.
+    """
+    names = _require_columns(frame, columns)
+    if not names:
+        raise core.ValidationError("Selecciona al menos una columna de la serie")
+    selected = frame[names].apply(pd.to_numeric, errors="coerce")
+    invalid = [name for name in names if (frame[name].notna() & selected[name].isna()).any()]
+    if invalid:
+        raise core.ValidationError(
+            f"Las columnas de la serie deben ser numéricas: {', '.join(invalid)}"
+        )
+    data = selected.dropna()
+    if data.empty:
+        raise core.ValidationError("No quedan puntos con valores válidos")
+    data = _limit_series(data, rows)
+    values = data.astype(float).values.T.tolist()
+    return {
+        "mode": "datapoints",
+        "task": "",
+        "features": [],
+        "target": names[0],
+        "series": names,
+        "rows": len(data),
+        "indices": data.index.tolist(),
+        "datapoints": values,
+    }
+
+
+#: Column names that usually hold the time axis of a series dataset.
+DATE_COLUMN_HINTS = ("date", "fecha", "month", "mes", "time", "timestamp", "period", "ds")
+
+#: Scaling methods accepted by the series analysis / DataScaler-compatible scaler.
+SCALING_METHODS = ("detrend_minmax", "minmax_symmetric", "minmax", "standard", "none")
+
+
+def scaling_method(raw: Any) -> str:
+    """Validate the scaling selector of a series analysis."""
+    value = str(raw or "detrend_minmax").strip().lower()
+    aliases = {
+        "detrend": "detrend_minmax",
+        "data_scaler": "detrend_minmax",
+        "datascaler": "detrend_minmax",
+        "[-1,1]": "minmax_symmetric",
+        "symmetric": "minmax_symmetric",
+        "0-1": "minmax",
+        "zscore": "standard",
+        "std": "standard",
+        "raw": "none",
+    }
+    value = aliases.get(value, value)
+    if value not in SCALING_METHODS:
+        raise core.ValidationError(
+            "El escalado debe ser detrend_minmax, minmax_symmetric, minmax, standard o none"
+        )
+    return value
+
+
+def fit_series_scaler(
+    matrix: Sequence[Sequence[float]], method: str = "detrend_minmax"
+) -> Tuple[List[List[float]], List[Dict[str, Any]]]:
+    """Scale every series with the selected method and return its statistics.
+
+    * ``detrend_minmax`` — DataScaler: linear detrend + min/max to [-1, 1].
+    * ``minmax_symmetric`` — min/max to [-1, 1] without detrending.
+    * ``minmax`` — min/max to [0, 1] without detrending.
+    * ``standard`` — z-score without detrending.
+    * ``none`` — original values.
+    """
+    method = scaling_method(method)
+    array = np.asarray(matrix, dtype=float)
+    if array.ndim != 2:
+        raise core.ValidationError("El escalado de series espera una matriz (series, puntos)")
+    if method == "none":
+        return array.tolist(), [{"mode": "none"} for _ in range(array.shape[0])]
+    scaled = np.zeros_like(array)
+    stats: List[Dict[str, Any]] = []
+    for index, row in enumerate(array):
+        x = np.arange(row.shape[0], dtype=float)
+        if method == "detrend_minmax" and row.shape[0] > 1:
+            coefficients = np.polyfit(x, row, 1)
+        else:
+            coefficients = np.array([0.0, 0.0])
+        detrended = row - np.polyval(coefficients, x)
+        if method == "standard":
+            mean = float(np.mean(detrended))
+            std = float(np.std(detrended)) or 1.0
+            scaled[index, :] = (detrended - mean) / std
+            stats.append({"mode": method, "mean": mean, "std": std})
+            continue
+        low = float(np.min(detrended))
+        high = float(np.max(detrended))
+        span = high - low or 1.0
+        if method == "minmax":
+            scaled[index, :] = (detrended - low) / span
+        else:
+            scaled[index, :] = 2.0 * (detrended - low) / span - 1.0
+        stats.append(
+            {
+                "mode": method,
+                "coef": [float(coefficients[0]), float(coefficients[1])],
+                "low": low,
+                "span": span,
+            }
+        )
+    return scaled.tolist(), stats
+
+
+def apply_series_scaler(
+    values: Sequence[Sequence[float]],
+    stats: Sequence[Dict[str, Any]],
+    start: int = 0,
+) -> List[List[float]]:
+    """Inverse of :func:`fit_series_scaler` for values starting at ``start``."""
+    array = np.asarray(values, dtype=float)
+    if array.ndim == 1:
+        array = array.reshape(1, -1)
+    restored = np.zeros_like(array)
+    for index, row in enumerate(array):
+        stat = (
+            stats[index]
+            if index < len(stats)
+            else {"mode": "detrend_minmax", "coef": [0.0, 0.0], "low": 0.0, "span": 1.0}
+        )
+        mode = str(stat.get("mode") or "detrend_minmax")
+        if mode == "none":
+            restored[index, :] = row
+            continue
+        if mode == "standard":
+            restored[index, :] = row * stat["std"] + stat["mean"]
+            continue
+        if mode == "minmax":
+            restored[index, :] = row * stat["span"] + stat["low"]
+            continue
+        x = np.arange(int(start), int(start) + row.shape[0], dtype=float)
+        coefficients = stat["coef"]
+        restored[index, :] = (row + 1.0) / 2.0 * stat["span"] + stat["low"]
+        if mode == "detrend_minmax":
+            restored[index, :] += coefficients[0] * x + coefficients[1]
+    return restored.tolist()
+
+
+def series_label_column(frame: pd.DataFrame, columns: Sequence[str]) -> str:
+    """Best column for x labels: a date-like column outside the series."""
+    selected = {str(column) for column in columns}
+    for name in frame.columns:
+        if str(name) in selected:
+            continue
+        series = frame[name]
+        if pd.api.types.is_numeric_dtype(series) and not pd.api.types.is_datetime64_any_dtype(
+            series
+        ):
+            continue
+        parsed = pd.to_datetime(series, errors="coerce")
+        if parsed.notna().mean() >= 0.9:
+            return str(name)
+    for name in frame.columns:
+        if str(name).lower() in DATE_COLUMN_HINTS and str(name) not in selected:
+            return str(name)
+    return ""
+
+
+def series_labels(frame: pd.DataFrame, column: str, indices: Sequence[Any]) -> List[str]:
+    """Labels for the rows of a built series (dates when available)."""
+    if not column or column not in frame.columns:
+        return [str(index) for index in range(len(indices))]
+    values = frame.loc[list(indices), column]
+    labels: List[str] = []
+    for value in values:
+        text = str(value)
+        # ``Timestamp`` strings carry a redundant midnight suffix.
+        if len(text) >= 10 and text[4:5] == "-" and text[7:8] == "-":
+            text = text[:10]
+        labels.append(text)
+    return labels
+
+
+def future_series_labels(
+    frame: pd.DataFrame, column: str, indices: Sequence[Any], steps: int
+) -> List[str]:
+    """Extrapolated labels for a forecast (dates when the axis is periodic)."""
+    sample = ""
+    if column and column in frame.columns and len(indices):
+        sample = str(frame.loc[list(indices), column].iloc[-1])
+    if column and column in frame.columns and len(indices) > 2:
+        dates = pd.to_datetime(frame.loc[list(indices), column], errors="coerce")
+        if dates.notna().all():
+            with warnings.catch_warnings():
+                # pandas 2.x announces a future ``infer_freq`` return type.
+                warnings.simplefilter("ignore")
+                frequency = pd.infer_freq(dates)
+            if frequency is not None and not isinstance(frequency, str):
+                frequency = getattr(frequency, "freqstr", str(frequency))
+            if frequency:
+                future = pd.date_range(dates.iloc[-1], periods=int(steps) + 1, freq=frequency)[1:]
+                fmt = "%Y-%m" if len(sample) == 7 else "%Y-%m-%d"
+                return [value.strftime(fmt) for value in future]
+    return ["t+" + str(offset) for offset in range(1, int(steps) + 1)]
 
 
 def parameter_overrides(
