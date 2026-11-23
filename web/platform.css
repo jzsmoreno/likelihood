@@ -779,6 +779,7 @@ button.side-link {
   z-index: 20;
   min-width: 140px;
   max-width: 250px;
+  max-width: min(250px, calc(100% - 12px));
   padding: 8px 10px;
   border: 1px solid var(--db-line);
   border-radius: var(--db-r-sm);

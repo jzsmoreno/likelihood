@@ -701,6 +701,27 @@
       return points;
     }
 
+    /* Keras reports rates as fractions in [0, 1].  Only convert when the series
+     * actually lives in that range, so a metric already expressed as a
+     * percentage keeps its own units. */
+    function percentSeries(key) {
+      var peak = 0;
+      (history[key] || []).forEach(function (value) {
+        if (value === null || value === undefined) return;
+        var numeric = Number(value);
+        if (isFinite(numeric)) peak = Math.max(peak, Math.abs(numeric));
+      });
+      return isRateMetric(key) && peak <= 1;
+    }
+
+    function seriesValueFormatter(key) {
+      var percent = percentSeries(key);
+      return function (value) {
+        if (percent) return window.LMCharts.fmtNumber(Number(value) * 100, 2) + '%';
+        return window.LMCharts.fmtNumber(value, 4);
+      };
+    }
+
     function seriesFor(seriesKeys) {
       return seriesKeys.map(function (key) {
         return {
@@ -709,18 +730,26 @@
           color: colorMap[key] || 'blue',
           /* A single curve gets the soft gradient wash; stacking several washes
            * would muddy the plot. */
-          area: seriesKeys.length === 1
+          area: seriesKeys.length === 1,
+          /* Tooltips and end labels follow the units of each series. */
+          formatValue: seriesValueFormatter(key)
         };
       });
     }
 
-    function draw(containerId, seriesKeys, title, ariaLabel, height) {
+    /* The plot follows the card width instead of a fixed pixel height, so the
+     * same figure reads well on a phone and on a wide desktop. */
+    function draw(containerId, seriesKeys, title, ariaLabel, options) {
+      options = options || {};
       var container = dom.detail.querySelector('#' + containerId);
       if (!container || !seriesKeys.length) return;
+      var allPercent = seriesKeys.every(percentSeries);
       window.LMCharts.line(container, {
         points: pointsFor(seriesKeys),
         series: seriesFor(seriesKeys),
-        height: height || 220,
+        aspectRatio: options.aspectRatio || 0.5,
+        minHeight: options.minHeight || 168,
+        maxHeight: options.maxHeight || 300,
         title: title,
         smooth: true,
         legend: seriesKeys.length > 1,
@@ -729,16 +758,20 @@
         xAxisTitle: 'Época',
         tooltipTitle: function (point) { return 'Época ' + point.epoch; },
         formatXAxis: function (point) { return String(point.epoch); },
-        formatAxis: function (value) { return window.LMCharts.fmtCompact(value); },
+        formatAxis: allPercent
+          ? function (value) { return window.LMCharts.fmtNumber(Number(value) * 100, 0) + '%'; }
+          : function (value) { return window.LMCharts.fmtCompact(value); },
         formatValue: function (value) { return window.LMCharts.fmtNumber(value, 4); },
-        ariaLabel: ariaLabel,
+        emptyText: 'La curva se mostrará cuando el job avance.',
+        ariaLabel: ariaLabel
       });
     }
 
     draw('training-loss-chart', keys.filter(isLossMetric), 'Pérdida por época',
-      'Evolución de la pérdida por época', 210);
+      'Evolución de la pérdida por época', { aspectRatio: 0.48, maxHeight: 300 });
     draw('training-metrics-chart', keys.filter(function (key) { return !isLossMetric(key); }),
-      'Métricas por época', 'Evolución de las métricas por época', 240);
+      'Métricas por época', 'Evolución de las métricas por época',
+      { aspectRatio: 0.52, maxHeight: 300 });
   }
 
   function renderJobDetail(job) {

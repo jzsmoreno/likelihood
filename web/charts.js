@@ -14,6 +14,7 @@
   var charts = [];
   var resizeTimer = 0;
   var gradSeq = 0;
+  var observer = null;
 
   function cssVar(name, fallback) {
     var value = getComputedStyle(document.documentElement).getPropertyValue(name);
@@ -145,19 +146,33 @@
 
   /* The charts grow with the container unless the caller pins an explicit
    * height.  The aspect ratio stays bounded so a wide dashboard card does not
-   * turn a sparkline into a wall of empty space. */
+   * turn a sparkline into a wall of empty space; callers can tighten the bounds
+   * with `minHeight` / `maxHeight` when a plot needs a different shape. */
   function chartHeight(width, spec) {
-    if (spec && spec.height) return spec.height;
-    var ratio = spec && spec.aspectRatio ? spec.aspectRatio : 0.52;
-    return Math.max(172, Math.min(352, Math.round(width * ratio)));
+    spec = spec || {};
+    if (spec.height) return spec.height;
+    var ratio = spec.aspectRatio || 0.52;
+    var min = spec.minHeight || 172;
+    var max = spec.maxHeight || 352;
+    if (max < min) max = min;
+    return Math.max(min, Math.min(max, Math.round(width * ratio)));
   }
 
   /* The right gutter grows when end labels are requested and the bottom gutter
-   * grows when the chart gets an explicit X axis caption. */
+   * grows when the chart gets an explicit X axis caption.  End labels are
+   * dropped on narrow cards: a 62px gutter would eat the plot on a phone. */
   function chartGeometry(width, height, spec) {
-    var right = spec && spec.endLabels ? 62 : 14;
-    var bottom = spec && spec.xAxisTitle ? 60 : 52;
-    return { left: 48, top: 16, width: width - 48 - right, height: height - bottom };
+    spec = spec || {};
+    var endLabels = spec.endLabels === true && width >= 460;
+    var right = endLabels ? 62 : 14;
+    var bottom = spec.xAxisTitle ? 60 : 52;
+    return {
+      left: 48,
+      top: 16,
+      width: width - 48 - right,
+      height: height - bottom,
+      endLabels: endLabels
+    };
   }
 
   function linearPathD(segment) {
@@ -282,10 +297,16 @@
     });
     tooltip.hidden = false;
     var bounds = root.getBoundingClientRect();
+    var tipWidth = tooltip.offsetWidth || 0;
+    var tipHeight = tooltip.offsetHeight || 0;
     var x = event.clientX - bounds.left + 12;
     var y = event.clientY - bounds.top + 12;
-    tooltip.style.left = Math.max(4, Math.min(x, bounds.width - tooltip.offsetWidth - 4)) + 'px';
-    tooltip.style.top = Math.max(4, Math.min(y, bounds.height - tooltip.offsetHeight - 4)) + 'px';
+    /* Flip to the other side of the cursor instead of letting the card clip the
+     * tooltip at the edge of a narrow plot. */
+    if (x + tipWidth > bounds.width - 4) x = event.clientX - bounds.left - tipWidth - 12;
+    if (y + tipHeight > bounds.height - 4) y = event.clientY - bounds.top - tipHeight - 12;
+    tooltip.style.left = Math.max(4, Math.min(x, bounds.width - tipWidth - 4)) + 'px';
+    tooltip.style.top = Math.max(4, Math.min(y, bounds.height - tipHeight - 4)) + 'px';
   }
 
   function hideTooltip(context) {
@@ -322,7 +343,12 @@
       label.textContent = (spec.formatAxis || fmtCompact)(value);
       group.appendChild(label);
     }
-    var count = Math.min(spec.maxXTicks || 6, geometry.points.length);
+    /* Tick density follows the available width so labels never collide. */
+    var count = Math.min(
+      spec.maxXTicks || 6,
+      Math.max(2, Math.floor(geometry.width / 78)),
+      geometry.points.length
+    );
     for (var tick = 0; tick < count; tick += 1) {
       var indexPoint = count === 1
         ? 0
@@ -333,7 +359,7 @@
       var text = svg('text', {
         x: x,
         y: geometry.top + geometry.height + 17,
-        'class': 'lm-axis-tick',
+        'class': 'lm-axis-tick lm-axis-tick-x',
         'text-anchor': tick === count - 1 ? 'end' : tick === 0 ? 'start' : 'middle',
         fill: colors.faint,
         'font-size': 10.5
@@ -488,11 +514,15 @@
           markerList.push({ point: segment[segment.length - 1], stroke: stroke, small: false });
         }
       });
-      if (spec.endLabels) {
+      if (geometry.endLabels) {
         for (var tailIndex = segments.length - 1; tailIndex >= 0; tailIndex -= 1) {
           var tail = segments[tailIndex];
           if (tail.length) {
-            endLabelList.push({ point: tail[tail.length - 1], stroke: stroke });
+            endLabelList.push({
+              point: tail[tail.length - 1],
+              stroke: stroke,
+              format: entry.formatValue
+            });
             break;
           }
         }
@@ -525,7 +555,7 @@
         'font-size': 10,
         'font-weight': 700
       });
-      label.textContent = (spec.formatValue || fmtNumber)(entry.point.value);
+      label.textContent = (entry.format || spec.formatValue || fmtNumber)(entry.point.value);
       node.appendChild(label);
     });
 
@@ -593,7 +623,9 @@
           return {
             color: color(entry.color, 'blue'),
             label: entry.label,
-            value: (spec.formatValue || fmtNumber)(point[entry.key])
+            /* A series may carry its own formatter (fractions shown as
+             * percentages, counts as integers, ...). */
+            value: (entry.formatValue || spec.formatValue || fmtNumber)(point[entry.key])
           };
         })
       );
@@ -911,28 +943,81 @@
   }
 
 
+  function isLive(container) {
+    return typeof container.isConnected === 'boolean'
+      ? container.isConnected
+      : document.documentElement.contains(container);
+  }
+
   function redrawAll() {
-    charts.forEach(function (container) {
-      if (container.isConnected && container._lmRender) container._lmRender();
+    /* Views are re-rendered by replacing their markup, so the registry has to
+     * drop detached containers instead of holding on to stale closures. */
+    charts = charts.filter(function (container) {
+      if (isLive(container)) return true;
+      if (observer && container._lmObserved) {
+        observer.unobserve(container);
+        container._lmObserved = false;
+      }
+      return false;
     });
+    charts.forEach(function (container) {
+      if (container._lmRender) container._lmRender();
+    });
+  }
+
+  /* The sidebar collapses and the dashboard cards reflow without a window
+   * resize event, so every chart watches its own box when the browser supports
+   * it.  Only width changes trigger a redraw: height changes are a consequence
+   * of the redraw and would otherwise loop. */
+  function watch(container) {
+    if (typeof window.ResizeObserver !== 'function') return;
+    if (!observer) {
+      observer = new window.ResizeObserver(function (entries) {
+        var changed = false;
+        entries.forEach(function (entry) {
+          var width = Math.round(entry.contentRect.width);
+          if (!width || width === entry.target._lmWidth) return;
+          entry.target._lmWidth = width;
+          changed = true;
+        });
+        if (changed) {
+          window.clearTimeout(resizeTimer);
+          resizeTimer = window.setTimeout(redrawAll, 80);
+        }
+      });
+    }
+    if (container._lmObserved) return;
+    container._lmObserved = true;
+    container._lmWidth = Math.round(container.clientWidth || 0);
+    observer.observe(container);
   }
 
   function register(container) {
     if (!container) return;
     container.setAttribute('data-lm-chart', '1');
     if (charts.indexOf(container) === -1) charts.push(container);
+    watch(container);
   }
 
-  window.addEventListener('resize', function () {
-    window.clearTimeout(resizeTimer);
-    resizeTimer = window.setTimeout(redrawAll, 160);
-  });
+  /* Fallback for browsers without ResizeObserver. */
+  if (typeof window.ResizeObserver !== 'function') {
+    window.addEventListener('resize', function () {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(redrawAll, 160);
+    });
+  }
+
+  /* Keep the observer's bookkeeping in sync with app-driven renders so the
+   * initial observation of an unchanged box does not trigger a second paint. */
+  function sync(container) {
+    container._lmWidth = Math.round(container.clientWidth || 0);
+  }
 
   global.LMCharts = {
-    line: function (container, spec) { register(container); lineChart(container, spec); },
-    stackedBars: function (container, spec) { register(container); stackedBars(container, spec); },
-    bars: function (container, spec) { register(container); hbar(container, spec); },
-    donut: function (container, spec) { register(container); donut(container, spec); },
+    line: function (container, spec) { register(container); lineChart(container, spec); sync(container); },
+    stackedBars: function (container, spec) { register(container); stackedBars(container, spec); sync(container); },
+    bars: function (container, spec) { register(container); hbar(container, spec); sync(container); },
+    donut: function (container, spec) { register(container); donut(container, spec); sync(container); },
     redrawAll: redrawAll,
     palette: palette,
     fmtNumber: fmtNumber,

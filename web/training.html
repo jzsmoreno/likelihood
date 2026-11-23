@@ -254,6 +254,11 @@
     border-radius: var(--db-r-md);
     background: linear-gradient(180deg, var(--db-surface) 0%, var(--db-surface-alt) 100%);
     box-shadow: var(--db-shadow-xs);
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .training-chart:hover {
+    border-color: var(--db-line-strong);
+    box-shadow: var(--db-shadow-sm);
   }
   .training-chart-head {
     display: flex;
@@ -300,9 +305,19 @@
     margin-top: 0;
     padding-top: 6px;
   }
-  .training-chart .lm-chart-empty { min-height: 150px; }
-  .training-loss-chart { min-height: 210px; }
-  .training-metrics-chart { min-height: 240px; }
+  /* The plot derives its height from the card width, so the containers only
+   * keep a floor for the empty state.  Inside the card the empty state drops
+   * its own frame instead of nesting a second dashed border. */
+  .training-chart .lm-chart-empty {
+    min-height: 140px;
+    border: 0;
+    background: transparent;
+  }
+  @media (max-width: 760px) {
+    .training-chart { padding: 10px 10px 6px; }
+    .training-chart-head { gap: 2px 10px; }
+    .training-metrics-panel .panel-body { padding: 12px; }
+  }
   .training-metric-table-wrap { margin-top: 14px; overflow-x: auto; }
   .training-metric-table { width: 100%; border-collapse: collapse; font-size: 12px; }
   .training-metric-table th,
