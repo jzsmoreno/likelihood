@@ -2109,6 +2109,12 @@
     if (fileClose) fileClose.addEventListener('click', closeFileBrowser);
     var fileUp = byId('file-up');
     if (fileUp) fileUp.addEventListener('click', function () { loadFiles(fileUp.dataset.parent || '', true); });
+    var fileRefresh = byId('file-refresh');
+    if (fileRefresh) {
+      fileRefresh.addEventListener('click', function () {
+        loadFiles(state.filePath || '', false);
+      });
+    }
     var fileAccept = byId('file-accept');
     if (fileAccept) {
       fileAccept.addEventListener('click', function () {

@@ -859,3 +859,27 @@ def test_legacy_store_is_migrated_to_unique_instances(tmp_path):
             reopened.shutdown()
     finally:
         store.shutdown()
+
+
+def test_loaded_model_sample_hints_use_trained_columns():
+    """SimulationEngine examples use a real trained column, not "example"."""
+    loaded = {
+        "attribute_keys": {
+            "proba_dict": ["col_1", "col_2"],
+            "columns": ["col_1", "col_2"],
+        }
+    }
+    fields = [
+        {
+            "name": "df",
+            "type": "DataFrame",
+            "sample": [{"col_1": 1.0, "col_2": 2.0}],
+        },
+        {"name": "column", "type": "str", "sample": "example"},
+    ]
+    hinted = serving_core.apply_sample_hints(fields, loaded)
+    assert hinted[1]["sample"] == "col_1"
+    assert set(hinted[0]["sample"][0]) == {"col_1", "col_2"}
+    payload = serving_core.method_example(hinted)
+    assert payload["inputs"]["column"] == "col_1"
+    assert payload["inputs"]["df"][0]["col_1"] == 1.0

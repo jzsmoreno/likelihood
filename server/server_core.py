@@ -1696,6 +1696,33 @@ def _describe(instance):
     except TypeError:
         attributes = []
     attribute_values = {}
+    attribute_keys = {}
+    # Model-specific state may live in slots or as computed properties instead of
+    # ``__dict__`` (SimulationEngine keeps ``w_dict`` outside ``vars``); expose a
+    # few small key lists so Serving can generate valid examples (e.g. the
+    # trained target column).
+    for name in list(attributes) + ["w_dict", "proba_dict", "target_columns", "classes"]:
+        if name in attribute_keys:
+            continue
+        try:
+            raw = getattr(instance, name, None)
+        except BaseException:
+            continue
+        if isinstance(raw, dict):
+            keys = [
+                str(key)
+                for key in list(raw.keys())[:30]
+                if isinstance(key, (str, int, float, bool))
+            ]
+            if keys:
+                attribute_keys[name] = keys
+        elif hasattr(raw, "columns"):
+            try:
+                keys = [str(key) for key in list(raw.columns)[:30]]
+            except BaseException:
+                keys = []
+            if keys:
+                attribute_keys["columns"] = keys
     for name in attributes:
         try:
             raw = getattr(instance, name, None)
@@ -1717,6 +1744,7 @@ def _describe(instance):
         "repr": repr(instance)[:2000],
         "attributes": attributes,
         "attribute_values": attribute_values,
+        "attribute_keys": attribute_keys,
     }
 
 

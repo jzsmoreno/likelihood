@@ -239,6 +239,8 @@ def deployment_payload(
         if method is not None
         else list(deployment.get("method_fields") or [])
     )
+    if fields:
+        fields = serving_core.apply_sample_hints(fields, deployment.get("loaded_artifact") or {})
     base = str(request.base_url).rstrip("/")
     path = f"/api/serving/endpoints/{deployment['id']}/predict"
     label, tone = serving_core.STATUS_LABELS.get(
@@ -444,6 +446,13 @@ def build_router() -> APIRouter:
         """Configuration, deployment log and counters of one endpoint."""
         require_serving(settings)
         deployment = settings.serving.get(endpoint_id)
+        model = find_model(
+            settings.catalog,
+            deployment.get("model_type_id") or deployment["model_id"],
+        )
+        if model is not None:
+            settings.serving.ensure_loaded_metadata(deployment["id"], model)
+            deployment = settings.serving.get(endpoint_id)
         stats = _stats_by_endpoint(settings.serving.events.events()).get(deployment["id"])
         payload = deployment_payload(settings, deployment, request, stats)
         return _no_store({"success": True, "endpoint": payload, **payload})
@@ -456,6 +465,8 @@ def build_router() -> APIRouter:
         require_serving(settings)
         deployment = settings.serving.get(endpoint_id)
         model = _model_or_404(settings, deployment.get("model_type_id") or deployment["model_id"])
+        settings.serving.ensure_loaded_metadata(deployment["id"], model)
+        deployment = settings.serving.get(endpoint_id)
         method = core.method_for_invocation(model, deployment["method"])
         docs = serving_core.build_docs(
             deployment,

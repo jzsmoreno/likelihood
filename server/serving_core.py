@@ -1165,6 +1165,7 @@ class ServingStore:
                     "repr": result.get("repr"),
                     "attributes": result.get("attributes") or [],
                     "attribute_values": result.get("attribute_values") or {},
+                    "attribute_keys": result.get("attribute_keys") or {},
                     "elapsed": result.get("elapsed"),
                     "loaded_at": iso(),
                 }
@@ -1177,6 +1178,10 @@ class ServingStore:
                 deployment["deployed_at"] = iso()
                 deployment["stopped_at"] = None
                 deployment["loaded_artifact"] = artifact
+                if artifact:
+                    deployment["method_fields"] = apply_sample_hints(
+                        deployment.get("method_fields") or [], artifact
+                    )
                 deployment["last_error"] = ""
                 if artifact:
                     self._log(
@@ -1237,6 +1242,73 @@ class ServingStore:
                 self._log(deployment, "Endpoint detenido por el usuario", level="warn")
                 self._persist_locked()
             return self._public(deployment)
+
+    def ensure_loaded_metadata(self, endpoint_id: str, model: Dict[str, Any]) -> None:
+        """Refresh loaded-artifact metadata for deployments saved by older code.
+
+        Older deployments only stored ``attributes``/``attribute_values``.  The
+        newer payload hints need ``attribute_keys`` (for example SimulationEngine
+        target columns) without forcing the user to redeploy.  This runs one
+        child load the first time the endpoint detail is opened and persists the
+        refreshed metadata; failures are intentionally non-fatal.
+        """
+        with self._lock:
+            deployment = self._deployments.get(str(endpoint_id or "").strip())
+            if deployment is None or deployment.get("status") != "running":
+                return
+            load = deployment.get("load") or {}
+            if not load.get("enabled"):
+                return
+            loaded = deployment.get("loaded_artifact")
+            if isinstance(loaded, dict) and "attribute_keys" in loaded:
+                return
+            request = {
+                "loader": load.get("loader"),
+                "path": load.get("path"),
+                "parameters": deployment.get("parameters") or {},
+            }
+        try:
+            prepared = core.prepare_load(model, request)
+            result = core.run_load(model, prepared, timeout=DEPLOY_TIMEOUT)
+        except BaseException:
+            return
+        artifact = {
+            "loader": prepared["name"],
+            "path": prepared["path"],
+            "type": result.get("type"),
+            "module": result.get("module"),
+            "repr": result.get("repr"),
+            "attributes": result.get("attributes") or [],
+            "attribute_values": result.get("attribute_values") or {},
+            "attribute_keys": result.get("attribute_keys") or {},
+            "elapsed": result.get("elapsed"),
+            "loaded_at": (loaded or {}).get("loaded_at") or iso(),
+        }
+        with self._lock:
+            deployment = self._deployments.get(str(endpoint_id or "").strip())
+            if deployment is None:
+                return
+            deployment.setdefault("load", {}).update(
+                {
+                    "path": prepared["path"],
+                    "loader": prepared["name"],
+                    "path_parameter": prepared.get("path_parameter"),
+                    "parameters": prepared.get("parameters") or {},
+                }
+            )
+            deployment["loaded_artifact"] = artifact
+            deployment["method_fields"] = apply_sample_hints(
+                deployment.get("method_fields") or [], artifact
+            )
+            self._persist_locked()
+            model_instance = self._models.get(deployment.get("model_id") or "")
+            if model_instance is not None:
+                model_instance["loaded_artifact"] = artifact
+                if isinstance(model_instance.get("load"), dict):
+                    model_instance["load"]["path"] = prepared["path"]
+                    model_instance["load"]["loader"] = prepared["name"]
+                model_instance["updated_at"] = iso()
+                self._persist_models_locked()
 
     def restart(self, endpoint_id: str, model: Dict[str, Any]) -> Dict[str, Any]:
         """Restart/start an endpoint, revalidating its configuration and artifact."""
@@ -1712,6 +1784,48 @@ def _arguments_from_body(body: Dict[str, Any], fields: Sequence[Dict[str, Any]])
     return raw
 
 
+def apply_sample_hints(
+    method_fields: Sequence[Dict[str, Any]], loaded_artifact: Optional[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """Use real trained keys for string arguments such as ``column``.
+
+    ``SimulationEngine.predict(df, column)`` stores its target names in
+    ``w_dict``/``proba_dict``.  The generic catalog sample for a string is
+    ``"example"``, which makes the Probar payload raise ``KeyError: 'example'``.
+    Loaded artifacts expose those key lists as ``attribute_keys``; reuse the
+    first one as the sample for target-like string fields.
+    """
+    if not isinstance(loaded_artifact, dict):
+        return list(method_fields)
+    keys = loaded_artifact.get("attribute_keys")
+    if not isinstance(keys, dict):
+        return list(method_fields)
+    hint = ""
+    for name in ("w_dict", "proba_dict", "target_columns", "columns", "classes"):
+        values = keys.get(name)
+        if isinstance(values, list) and values:
+            hint = str(values[0])
+            break
+    if not hint:
+        return list(method_fields)
+    hint_fields = {"column", "colname", "col_name", "target", "target_column"}
+    column_names = keys.get("columns") or keys.get("w_dict") or keys.get("proba_dict") or []
+    rows = []
+    if isinstance(column_names, list) and column_names:
+        rows = [{str(name): float(index + 1) for name in column_names} for index in range(3)]
+    fields = [dict(field) for field in method_fields]
+    for field in fields:
+        if field.get("name") in hint_fields:
+            field["sample"] = hint
+        if (
+            rows
+            and str(field.get("name") or "").lower() in {"df", "dataframe", "data"}
+            and "dataframe" in str(field.get("type") or "").lower()
+        ):
+            field["sample"] = [dict(row) for row in rows]
+    return fields
+
+
 def method_example(method_fields: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     """Example request body generated from the real method fields."""
     examples = {
@@ -1778,6 +1892,7 @@ def build_docs(
     constructor values of the deployment; there is no hardcoded example.
     """
     fields = core.method_fields(method, example_parameters(deployment, model))
+    fields = apply_sample_hints(fields, deployment.get("loaded_artifact") or {})
     payload = method_example(fields)
     path = f"/api/serving/endpoints/{deployment['id']}/predict"
     endpoint_url = (base_url.rstrip("/") + path) if base_url else path
