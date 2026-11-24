@@ -42,6 +42,7 @@
 
   var dom = {};
   var confirmCallback = null;
+  var seriesAutoTimer = null;
 
   function byId(id) { return document.getElementById(id); }
 
@@ -1139,6 +1140,9 @@
           '<span class="hint" id="series-status">Valida el tramo final y predice los próximos pasos.</span>' +
           '<div class="panel-actions">' +
             '<button class="btn btn-secondary btn-sm" type="button" id="series-download" disabled>Descargar CSV</button>' +
+            '<button class="btn btn-secondary btn-sm" type="button" id="series-overwrite" disabled ' +
+              'title="Reentrena el modelo guardado con los parámetros del último análisis (sigma/mov/walkers/escalado).">' +
+              'Sobrescribir modelo</button>' +
             '<button class="btn btn-primary btn-sm" type="button" id="series-run">Analizar series</button>' +
           '</div>' +
         '</div>' +
@@ -1189,10 +1193,12 @@
     var validationTitle = byId('series-validation-title');
     var fitNote = byId('series-fit-note');
     var modeSelect = byId('series-validation-mode');
+    var overwriteButton = byId('series-overwrite');
     var mode = result && result.validation_mode
       ? result.validation_mode
       : (modeSelect ? modeSelect.value : 'holdout');
     var fullMode = mode === 'full';
+    if (overwriteButton) overwriteButton.disabled = !result || !state.seriesAnalysis;
     var jobSeries = job && job.dataset ? job.dataset.series : [];
     if (!Array.isArray(jobSeries)) {
       jobSeries = jobSeries ? [jobSeries] : (job.dataset && job.dataset.target ? [job.dataset.target] : []);
@@ -1439,8 +1445,11 @@
     window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
 
-  function runSeriesAnalysis(job) {
+  function runSeriesAnalysis(job, opts) {
+    opts = opts || {};
     if (!job || !job.job_id) return;
+    var runningButton = byId('series-run');
+    if (!runningButton || runningButton.disabled) return;
     var ratio = Number(byId('series-ratio') ? byId('series-ratio').value : 20) / 100;
     var steps = Number(byId('series-steps') ? byId('series-steps').value : 12);
     var sigma = Number(byId('series-sigma') ? byId('series-sigma').value : 1);
@@ -1479,23 +1488,26 @@
       return;
     }
     var button = byId('series-run');
+    var overwriteButton = byId('series-overwrite');
     var status = byId('series-status');
     if (button) button.disabled = true;
+    if (overwriteButton) overwriteButton.disabled = true;
     if (status) status.textContent = 'Ajustando el modelo y calculando la predicción…';
+    var request = {
+      validation_ratio: ratio,
+      n_steps: steps,
+      sigma: sigma,
+      mov: mov,
+      n_walkers: walkers,
+      seed: seed,
+      scaling: scaling,
+      validation_mode: validationMode,
+    };
     api('/api/training/jobs/' + encodeURIComponent(job.job_id) + '/series', {
       method: 'POST',
-      body: {
-        validation_ratio: ratio,
-        n_steps: steps,
-        sigma: sigma,
-        mov: mov,
-        n_walkers: walkers,
-        seed: seed,
-        scaling: scaling,
-        validation_mode: validationMode,
-      },
+      body: request,
     }).then(function (data) {
-      state.seriesAnalysis = { jobId: job.job_id, result: data };
+      state.seriesAnalysis = { jobId: job.job_id, result: data, options: request };
       state.seriesIndex = 0;
       if (button) button.disabled = false;
       if (status) {
@@ -1513,11 +1525,55 @@
       var download = byId('series-download');
       if (download) download.disabled = false;
       renderSeriesCharts(job);
-      toast(data.cached
-        ? 'Análisis de series recuperado de caché'
-        : (data.cached_forecast
-          ? 'Análisis listo; predicción reutilizada'
-          : 'Análisis de series completado'));
+      if (!opts.silent) {
+        toast(data.cached
+          ? 'Análisis de series recuperado de caché'
+          : (data.cached_forecast
+            ? 'Análisis listo; predicción reutilizada'
+            : 'Análisis de series completado'));
+      }
+    }).catch(function (error) {
+      if (button) button.disabled = false;
+      if (overwriteButton) {
+        overwriteButton.disabled = !(state.seriesAnalysis &&
+          state.seriesAnalysis.jobId === job.job_id);
+      }
+      if (status) status.textContent = error.message;
+      if (!opts.silent) toast(error.message, true);
+    });
+  }
+
+  function scheduleSeriesAnalysis(job) {
+    if (!state.seriesAnalysis || state.seriesAnalysis.jobId !== job.job_id) return;
+    if (seriesAutoTimer) window.clearTimeout(seriesAutoTimer);
+    seriesAutoTimer = window.setTimeout(function () {
+      seriesAutoTimer = null;
+      runSeriesAnalysis(job, { silent: true });
+    }, 450);
+  }
+
+  function overwriteSeriesModel(job) {
+    var analysis = state.seriesAnalysis;
+    if (!analysis || analysis.jobId !== job.job_id || !analysis.options) {
+      toast('Primero ejecuta «Analizar series».', true);
+      return;
+    }
+    if (!window.confirm(
+      '¿Sobrescribir el modelo guardado del job con los parámetros del último análisis? ' +
+      'Se creará un artefacto nuevo y se reemplazará la referencia actual.'
+    )) {
+      return;
+    }
+    var button = byId('series-overwrite');
+    var status = byId('series-status');
+    if (button) button.disabled = true;
+    if (status) status.textContent = 'Reentrenando y sobrescribiendo el modelo guardado…';
+    api('/api/training/jobs/' + encodeURIComponent(job.job_id) + '/series/overwrite', {
+      method: 'POST',
+      body: analysis.options,
+    }).then(function (data) {
+      toast('Modelo sobrescrito: ' + (data.artifact_id || 'nuevo artefacto'));
+      loadJob(job.job_id);
     }).catch(function (error) {
       if (button) button.disabled = false;
       if (status) status.textContent = error.message;
@@ -1529,8 +1585,15 @@
     if (!dom.detail) return;
     var run = byId('series-run');
     if (run) run.addEventListener('click', function () { runSeriesAnalysis(job); });
+    var overwrite = byId('series-overwrite');
+    if (overwrite) overwrite.addEventListener('click', function () { overwriteSeriesModel(job); });
     var download = byId('series-download');
     if (download) download.addEventListener('click', downloadSeriesCsv);
+    var steps = byId('series-steps');
+    if (steps) {
+      steps.addEventListener('change', function () { scheduleSeriesAnalysis(job); });
+      steps.addEventListener('input', function () { scheduleSeriesAnalysis(job); });
+    }
     var select = byId('series-select');
     if (select) select.addEventListener('change', function () {
       state.seriesIndex = Number(select.value) || 0;
@@ -1540,6 +1603,10 @@
 
   function renderJobDetail(job) {
     if (!dom.detail) return;
+    if (seriesAutoTimer) {
+      window.clearTimeout(seriesAutoTimer);
+      seriesAutoTimer = null;
+    }
     if (state.seriesAnalysis && state.seriesAnalysis.jobId !== job.job_id) {
       state.seriesAnalysis = null;
     }
@@ -1673,6 +1740,10 @@
               '<div class="meta-item"><span class="meta-label">Estado</span>' +
                 (exists ? '<span class="status-badge status-succeeded"><span class="dot"></span>En disk</span>'
                         : '<span class="status-badge status-failed"><span class="dot"></span>Perdido</span>') + '</div>' +
+              (artifact.series_scaling
+                ? '<div class="meta-item"><span class="meta-label">Escalado de series</span>' +
+                  '<span class="meta-value">' + esc(artifact.series_scaling) + '</span></div>'
+                : '') +
               '<div class="meta-item artifact-path"><span class="meta-label">Carpeta</span>' +
                 '<code class="artifact-path-value" title="' + esc(artifact.path || '') + '">' +
                   esc(artifact.path || '') + '</code></div>' +

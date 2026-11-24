@@ -445,6 +445,23 @@ def test_training_series_analysis_endpoint(client, settings):
     assert body["future_labels"]
     assert body["metrics"][0]["points"] == 9
 
+    overwritten = client.post(
+        "/api/training/jobs/%s/series/overwrite" % job_id,
+        json={
+            "validation_ratio": 0.25,
+            "n_steps": 3,
+            "sigma": 0,
+            "mov": 10,
+            "n_walkers": 1,
+            "scaling": "none",
+        },
+    )
+    assert overwritten.status_code == 200, overwritten.text
+    replacement = overwritten.json()
+    assert replacement["message"]
+    assert replacement["artifact_id"] != job["artifact"]["artifact_id"]
+    assert replacement["files"]
+
 
 def test_training_dataset_upload_and_inspection(client):
     """CSV uploads are parsed and described for the column selectors."""

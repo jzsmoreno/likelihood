@@ -318,10 +318,71 @@ def test_series_analysis_can_use_one_full_model(fitted_arima):
     assert len(analysis["forecast"][0]) == 5
 
 
+def test_overwrite_series_replaces_artifact_with_analysis_config(fitted_arima):
+    """The explicit overwrite button writes a new artifact and updates the job."""
+    store, job = fitted_arima
+    old_id = job["artifact"]["artifact_id"]
+    result = store.overwrite_series(
+        job["job_id"],
+        {
+            "sigma": 0,
+            "mov": 10,
+            "n_walkers": 1,
+            "scaling": "none",
+        },
+    )
+    updated = store.job(job["job_id"])
+    assert result["artifact_id"] != old_id
+    assert updated["artifact"]["artifact_id"] == result["artifact_id"]
+    assert updated["artifact"]["files"]
+    assert Path(updated["artifact"]["path"], "artifact.json").is_file()
+    assert updated["arguments"] == {"nwalkers": 1, "mov": 10, "weights": False}
+    assert updated["normalization"] == "none"
+
+
+def test_overwrite_series_supports_fourier(fitted):
+    """The explicit overwrite also works for a matrix FourierRegression model."""
+    store, job = fitted
+    old_id = job["artifact"]["artifact_id"]
+    result = store.overwrite_series(
+        job["job_id"],
+        {
+            "sigma": 0,
+            "mov": 10,
+            "n_walkers": 1,
+            "scaling": "none",
+        },
+    )
+    updated = store.job(job["job_id"])
+    assert result["artifact_id"] != old_id
+    assert updated["artifact"]["files"]
+    assert updated["normalization"] == "none"
+
+
+def test_overwrite_series_supports_arima_multi_series(fitted_arima_multi):
+    """Overwriting a multi-series Arima job keeps one saved model per series."""
+    store, job = fitted_arima_multi
+    result = store.overwrite_series(
+        job["job_id"],
+        {
+            "sigma": 0,
+            "mov": 10,
+            "n_walkers": 1,
+            "scaling": "detrend_minmax",
+        },
+    )
+    updated = store.job(job["job_id"])
+    names = {Path(name).name for name in updated["artifact"]["files"]}
+    assert {"series_0.pkl", "series_1.pkl"} <= names
+    assert updated["artifact"]["save_method"] == "pickle-batch"
+    assert updated["normalization"] == "detrend_minmax"
+    assert result["artifact_id"] == updated["artifact"]["artifact_id"]
+
+
 def test_series_analysis_does_not_rewrite_fit_artifact(fitted_arima):
     """Analizar series is read-only: the fit artifact is not touched."""
     store, job = fitted_arima
-    before = dict(job["artifact"] or {})
+    before = dict((store.job(job["job_id"]) or {}).get("artifact") or {})
     store.analyse_series(
         job["job_id"],
         {

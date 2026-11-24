@@ -412,6 +412,17 @@ def build_router() -> APIRouter:
         result = settings.training.analyse_series(job_id, body.model_dump())
         return _no_store({"success": True, **result})
 
+    @router.post("/api/training/jobs/{job_id}/series/overwrite", tags=[TRAINING_TAG])
+    def overwrite_series_model(
+        job_id: str,
+        body: SeriesAnalysisRequest,
+        settings: Any = Depends(get_settings),
+    ) -> JSONResponse:
+        """Explicitly replace the fit artifact with the analysed configuration."""
+        require_training(settings)
+        result = settings.training.overwrite_series(job_id, body.model_dump())
+        return _no_store({"success": True, **result})
+
     @router.post("/api/training/jobs", status_code=202, tags=[TRAINING_TAG])
     def create_job(
         body: TrainingRequest,

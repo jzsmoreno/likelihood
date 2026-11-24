@@ -2557,6 +2557,177 @@ class TrainingStore:
         response["cached_forecast"] = bool(cached_forecast_used)
         return response
 
+    def overwrite_series(self, job_id: str, options: Dict[str, Any]) -> Dict[str, Any]:
+        """Retrain and replace the saved fit artifact with the analysis config.
+
+        This is the only analysis path that writes a model.  It fits the full
+        selected series (the same model used by ``Predicción futura``) with the
+        analysis fit arguments and scaling, writes a **new** artifact first, and
+        swaps the job reference only after the fit succeeds.  A failed overwrite
+        leaves the previous artifact intact.
+        """
+        job = self.job(job_id)
+        if job is None:
+            raise core.ModelNotFound(f'Trabajo no encontrado: "{job_id}"')
+        if job.get("kind") != "fit" or job.get("status") != "succeeded":
+            raise core.ValidationError(
+                "Solo se puede sobrescribir el modelo de un job de fit completado"
+            )
+        dataset = job.get("dataset") or {}
+        if dataset.get("mode") != "datapoints":
+            raise core.ValidationError("El job no usa un dataset de series temporales")
+        if self.datasets.get(dataset.get("dataset_id")) is None:
+            raise core.ModelNotFound(
+                "El dataset del job ya no está en memoria; vuelve a lanzar el job"
+            )
+        model = self._find_model(job["model_id"])
+        method = self._training_method(model, job["method"])
+        if method is None:
+            raise core.ValidationError("El job no declara un método de entrenamiento")
+
+        def number(
+            name: str,
+            default: Any,
+            cast: type,
+            minimum: Optional[float] = None,
+            maximum: Optional[float] = None,
+        ) -> Any:
+            value = options.get(name, default)
+            if isinstance(value, bool):
+                raise core.ValidationError(f"El campo '{name}' debe ser numérico")
+            try:
+                value = cast(value)
+            except (TypeError, ValueError) as exc:
+                raise core.ValidationError(f"El campo '{name}' debe ser numérico") from exc
+            if minimum is not None and value < minimum:
+                raise core.ValidationError(f"El campo '{name}' debe ser >= {minimum:g}")
+            if maximum is not None and value > maximum:
+                raise core.ValidationError(f"El campo '{name}' debe ser <= {maximum:g}")
+            return value
+
+        sigma = number("sigma", 0.0, float, 0.0, 1.0)
+        mov = number("mov", 200, int, 2)
+        walkers = number("n_walkers", 1, int, 1, mov)
+        scaling = training_datasets.scaling_method(options.get("scaling"))
+        fit_names = {parameter["name"] for parameter in method.get("parameters") or []}
+        fit_arguments: Dict[str, Any] = {}
+        if "sigma" in fit_names:
+            fit_arguments["sigma"] = sigma
+        if "mov" in fit_names:
+            fit_arguments["mov"] = mov
+        if "mode" in fit_names:
+            fit_arguments["mode"] = False
+        if "nwalkers" in fit_names:
+            fit_arguments["nwalkers"] = walkers
+        if "weights" in fit_names:
+            fit_arguments["weights"] = False
+
+        new_id = new_artifact_id()
+        new_path = artifact_path(new_id, self.directory)
+        new_path.mkdir(parents=True, exist_ok=True)
+        job_copy = copy.deepcopy(job)
+        job_copy["artifact"] = {"artifact_id": new_id, "path": str(new_path)}
+        job_copy["arguments"] = dict(fit_arguments)
+        job_copy["normalization"] = scaling
+        job_copy["cross_validation"] = {}
+        job_copy["log"] = []
+        job_copy["status"] = "succeeded"
+        job_copy["kind"] = "fit"
+        try:
+            outcome = self._run_fit(job_copy)
+        except BaseException:
+            shutil.rmtree(new_path, ignore_errors=True)
+            raise
+
+        try:
+            size, files = artifact_stats(new_path)
+            if not files:
+                raise core.ValidationError("El entrenamiento no generó archivos de artefacto")
+            load_path = str(outcome.get("load_path") or "")
+            if not load_path and files:
+                load_path = str(new_path)
+            loader_name = ""
+            try:
+                loader_name = core.resolve_loader(model).get("name") or ""
+            except core.APIError:
+                pass
+            metadata = {
+                "artifact_id": new_id,
+                "job_id": job_id,
+                "model_id": job["model_id"],
+                "model_name": job.get("model_name") or "",
+                "method": job["method"],
+                "parameters": artifact_parameters(job.get("parameters") or {}),
+                "arguments": artifact_parameters(fit_arguments),
+                "normalization": scaling,
+                "target_normalization": dict(job.get("target_normalization") or {}),
+                "cross_validation": {},
+                "created_at": iso(),
+                "load_path": load_path,
+                "loader": loader_name,
+                "files": files,
+                "size_bytes": size,
+                "series_scaling": scaling,
+                "series_overwrite": True,
+                "overwritten_from": (job.get("artifact") or {}).get("artifact_id"),
+            }
+            _atomic_write(
+                new_path / "artifact.json",
+                json.dumps(metadata, ensure_ascii=False, indent=2),
+            )
+            size, files = artifact_stats(new_path)
+        except BaseException:
+            shutil.rmtree(new_path, ignore_errors=True)
+            raise
+
+        old_artifact = dict(job.get("artifact") or {})
+        with self._lock:
+            current = self._jobs.get(str(job_id or "").strip())
+            if current is None:
+                shutil.rmtree(new_path, ignore_errors=True)
+                raise core.ModelNotFound(f'Trabajo no encontrado: "{job_id}"')
+            current["artifact"] = {
+                "artifact_id": new_id,
+                "path": str(new_path),
+                "load_path": load_path,
+                "loader": loader_name,
+                "files": files,
+                "size_bytes": size,
+                "metadata_path": str(new_path / "artifact.json"),
+                "save_method": outcome.get("save_method") or "",
+                "model_id": job["model_id"],
+                "model_name": job.get("model_name") or "",
+                "method": job["method"],
+                "created_at": iso(),
+                "series_scaling": scaling,
+                "overwritten_from": old_artifact.get("artifact_id"),
+            }
+            current["arguments"] = dict(fit_arguments)
+            current["normalization"] = scaling
+            current["updated_at"] = iso()
+            current["log"].append(
+                {
+                    "at": iso(),
+                    "level": "info",
+                    "message": (
+                        "Modelo sobrescrito con la configuración de Analizar series: "
+                        f"escalado {scaling}, argumentos {fit_arguments}"
+                    ),
+                }
+            )
+            self._persist_locked()
+        return {
+            "job_id": job_id,
+            "artifact_id": new_id,
+            "files": files,
+            "size_bytes": size,
+            "load_path": load_path,
+            "save_method": outcome.get("save_method") or "",
+            "normalization": scaling,
+            "arguments": fit_arguments,
+            "message": "Modelo sobrescrito con la configuración analizada",
+        }
+
     def _find_model(self, model_id: str) -> Dict[str, Any]:
         """Resolve ``model_id`` against the catalog (the single source of truth)."""
         model = core.MODELS_BY_ID.get(str(model_id or "").strip())
