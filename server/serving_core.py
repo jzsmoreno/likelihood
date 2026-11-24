@@ -743,21 +743,75 @@ class ServingStore:
             return self._public(self._find_model(model_id))
 
     def list_models(self) -> List[Dict[str, Any]]:
-        """Every registered model instance with its deployment references."""
+        """Every registered model instance that is still usable.
+
+        Historical deployments created a new instance on each deploy, so the
+        store can contain many records with the same effective configuration and
+        records whose training artifact was deleted later.  The picker should
+        only show current, available versions: stale paths are hidden and
+        duplicate inactive versions collapse to the most recent one.  Instances
+        with an active deployment are always kept.
+        """
+        groups: Dict[str, List[Dict[str, Any]]] = {}
         with self._lock:
-            records = []
             for model in self._models.values():
+                load = model.get("load") or {}
+                normalized_path = ""
+                available = True
+                if load.get("enabled"):
+                    raw_path = str(load.get("path") or "").strip()
+                    if not _load_path_available(raw_path):
+                        available = False
+                    else:
+                        try:
+                            normalized_path = core.normalize_load_path(raw_path)
+                        except core.APIError:
+                            available = False
+                if not available:
+                    continue
                 deployments = [
                     deployment["id"]
                     for deployment in self._deployments.values()
                     if deployment.get("model_id") == model["model_id"]
                 ]
-                records.append(
+                active_deployments = [
+                    deployment["id"]
+                    for deployment in self._deployments.values()
+                    if deployment.get("model_id") == model["model_id"]
+                    and str(deployment.get("status") or "") in ("running", "deploying")
+                ]
+                record = {
+                    **self._public(model),
+                    "available": True,
+                    "deployment_count": len(deployments),
+                    "active_deployment_count": len(active_deployments),
+                    "deployments": sorted(deployments),
+                }
+                signature = json.dumps(
                     {
-                        **self._public(model),
-                        "deployment_count": len(deployments),
-                        "deployments": sorted(deployments),
-                    }
+                        "model_type_id": model.get("model_type_id"),
+                        # One picker entry per named model instance: repeated
+                        # deployments with the same default name are historical
+                        # versions, not separate reusable instances.  Users who
+                        # need distinct configurations can give them distinct
+                        # names.
+                        "name": model.get("name"),
+                    },
+                    sort_keys=True,
+                    default=str,
+                )
+                groups.setdefault(signature, []).append(record)
+        records: List[Dict[str, Any]] = []
+        for group in groups.values():
+            active = [item for item in group if item.get("active_deployment_count")]
+            if active:
+                records.extend(active)
+            else:
+                records.append(
+                    max(
+                        group,
+                        key=lambda item: item.get("updated_at") or item.get("created_at") or "",
+                    )
                 )
         records.sort(key=lambda item: item.get("created_at") or "", reverse=True)
         return records
@@ -1674,6 +1728,48 @@ def _artifact_parameters(model: Dict[str, Any], path: str) -> Dict[str, Any]:
                 if name in known and (isinstance(value, (bool, int, float, str)) or value is None):
                     found[name] = value
     return found
+
+
+def _load_path_available(path: str) -> bool:
+    """Whether a model path points to something a loader can actually use."""
+    if not str(path or "").strip():
+        return False
+    try:
+        target = _artifact_path(path)
+    except (OSError, ValueError):
+        return False
+    if target.is_file():
+        return True
+    if not target.is_dir():
+        return False
+    metadata_path = target / "artifact.json"
+    if metadata_path.is_file():
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            metadata = None
+        if isinstance(metadata, dict):
+            raw = str(metadata.get("load_path") or "").strip()
+            if raw:
+                candidate = Path(raw).expanduser()
+                if not candidate.is_absolute():
+                    candidate = target / candidate
+                if any(spelling.exists() for spelling in core._load_candidates(candidate)):
+                    return True
+            files = metadata.get("files")
+            if isinstance(files, list) and any(
+                str(name).lower().endswith((".pkl", ".keras", ".h5")) for name in files
+            ):
+                return True
+        return any(
+            child.is_file() and child.suffix.lower() in (".pkl", ".keras", ".h5")
+            for child in target.iterdir()
+        )
+    # Keras component folders (for example examples/best_model) have no
+    # artifact.json but do contain config.json + component/archives.
+    return (target / "config.json").is_file() or any(
+        child.is_file() and child.suffix.lower() in (".keras", ".h5") for child in target.iterdir()
+    )
 
 
 def _normalise_config(raw: Any) -> Dict[str, Any]:

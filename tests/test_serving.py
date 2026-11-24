@@ -883,3 +883,40 @@ def test_loaded_model_sample_hints_use_trained_columns():
     payload = serving_core.method_example(hinted)
     assert payload["inputs"]["column"] == "col_1"
     assert payload["inputs"]["df"][0]["col_1"] == 1.0
+
+
+def test_list_models_hides_stale_and_historical_versions(tmp_path, monkeypatch):
+    """The instance picker only shows current, available versions."""
+    monkeypatch.setattr(core, "LOAD_RESTRICT", False)
+    store = serving_core.ServingStore(tmp_path / "store")
+    try:
+        valid = tmp_path / "model.pkl"
+        valid.write_bytes(pickle.dumps({"ok": True}))
+        missing = tmp_path / "missing.pkl"
+
+        def add(model_id, path, created, name="Calculator · predict"):
+            record = store._normalise_model_record(
+                {
+                    "model_id": model_id,
+                    "model_type_id": "Calculator",
+                    "model_name": "Calculator",
+                    "name": name,
+                    "parameters": {"value": 1},
+                    "load": {"enabled": True, "loader": "load", "path": str(path)},
+                    "created_at": created,
+                    "updated_at": created,
+                }
+            )
+            store._models[model_id] = record
+
+        add("mdl-old", valid, "2026-01-01T00:00:00Z")
+        add("mdl-new", valid, "2026-01-02T00:00:00Z")
+        add("mdl-missing", missing, "2026-01-03T00:00:00Z")
+        add("mdl-named", valid, "2026-01-04T00:00:00Z", name="Named instance")
+
+        models = store.list_models()
+        ids = {model["model_id"] for model in models}
+        assert ids == {"mdl-new", "mdl-named"}
+        assert all(model["available"] for model in models)
+    finally:
+        store.shutdown()
