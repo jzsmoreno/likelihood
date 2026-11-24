@@ -2562,9 +2562,10 @@ class TrainingStore:
 
         This is the only analysis path that writes a model.  It fits the full
         selected series (the same model used by ``Predicción futura``) with the
-        analysis fit arguments and scaling, writes a **new** artifact first, and
-        swaps the job reference only after the fit succeeds.  A failed overwrite
-        leaves the previous artifact intact.
+        analysis fit arguments and scaling, trains into a hidden staging folder,
+        and replaces the **existing artifact folder** only after the fit succeeds.
+        Serving paths therefore keep pointing at the updated model.  A failed
+        overwrite leaves the previous artifact intact.
         """
         job = self.job(job_id)
         if job is None:
@@ -2622,11 +2623,16 @@ class TrainingStore:
         if "weights" in fit_names:
             fit_arguments["weights"] = False
 
-        new_id = new_artifact_id()
-        new_path = artifact_path(new_id, self.directory)
-        new_path.mkdir(parents=True, exist_ok=True)
+        existing_artifact = dict(job.get("artifact") or {})
+        artifact_id = str(existing_artifact.get("artifact_id") or new_artifact_id())
+        artifact_dir = Path(
+            str(existing_artifact.get("path") or artifact_path(artifact_id, self.directory))
+        )
+        artifact_dir.parent.mkdir(parents=True, exist_ok=True)
+        staging = artifact_dir.parent / f".{artifact_id}-next-{uuid.uuid4().hex[:8]}"
+        staging.mkdir(parents=True, exist_ok=True)
         job_copy = copy.deepcopy(job)
-        job_copy["artifact"] = {"artifact_id": new_id, "path": str(new_path)}
+        job_copy["artifact"] = {"artifact_id": artifact_id, "path": str(staging)}
         job_copy["arguments"] = dict(fit_arguments)
         job_copy["normalization"] = scaling
         job_copy["cross_validation"] = {}
@@ -2636,23 +2642,34 @@ class TrainingStore:
         try:
             outcome = self._run_fit(job_copy)
         except BaseException:
-            shutil.rmtree(new_path, ignore_errors=True)
+            shutil.rmtree(staging, ignore_errors=True)
             raise
 
+        def final_artifact_path(value: Any) -> str:
+            text = str(value or "").strip()
+            if not text:
+                return ""
+            if text == str(staging):
+                return str(artifact_dir)
+            prefix = str(staging) + os.sep
+            if text.startswith(prefix):
+                return str(artifact_dir / text[len(prefix) :])
+            return text
+
         try:
-            size, files = artifact_stats(new_path)
+            size, files = artifact_stats(staging)
             if not files:
                 raise core.ValidationError("El entrenamiento no generó archivos de artefacto")
-            load_path = str(outcome.get("load_path") or "")
+            load_path = final_artifact_path(outcome.get("load_path"))
             if not load_path and files:
-                load_path = str(new_path)
+                load_path = str(artifact_dir)
             loader_name = ""
             try:
                 loader_name = core.resolve_loader(model).get("name") or ""
             except core.APIError:
                 pass
             metadata = {
-                "artifact_id": new_id,
+                "artifact_id": artifact_id,
                 "job_id": job_id,
                 "model_id": job["model_id"],
                 "model_name": job.get("model_name") or "",
@@ -2669,38 +2686,53 @@ class TrainingStore:
                 "size_bytes": size,
                 "series_scaling": scaling,
                 "series_overwrite": True,
-                "overwritten_from": (job.get("artifact") or {}).get("artifact_id"),
+                "overwritten_from": existing_artifact.get("artifact_id"),
             }
             _atomic_write(
-                new_path / "artifact.json",
+                staging / "artifact.json",
                 json.dumps(metadata, ensure_ascii=False, indent=2),
             )
-            size, files = artifact_stats(new_path)
         except BaseException:
-            shutil.rmtree(new_path, ignore_errors=True)
+            shutil.rmtree(staging, ignore_errors=True)
             raise
 
-        old_artifact = dict(job.get("artifact") or {})
+        # Replace the existing artifact folder atomically.  Serving/model paths
+        # use this folder (or a file inside it), so they keep working after the
+        # overwrite and see the new model on the next load/restart.
+        backup = artifact_dir.parent / f".{artifact_id}-old-{uuid.uuid4().hex[:8]}"
+        try:
+            if artifact_dir.exists():
+                os.replace(artifact_dir, backup)
+            os.replace(staging, artifact_dir)
+            if backup.exists():
+                shutil.rmtree(backup, ignore_errors=True)
+        except BaseException:
+            if backup.exists() and not artifact_dir.exists():
+                os.replace(backup, artifact_dir)
+            shutil.rmtree(staging, ignore_errors=True)
+            raise
+        size, files = artifact_stats(artifact_dir)
+
         with self._lock:
             current = self._jobs.get(str(job_id or "").strip())
             if current is None:
-                shutil.rmtree(new_path, ignore_errors=True)
+                shutil.rmtree(artifact_dir, ignore_errors=True)
                 raise core.ModelNotFound(f'Trabajo no encontrado: "{job_id}"')
             current["artifact"] = {
-                "artifact_id": new_id,
-                "path": str(new_path),
+                "artifact_id": artifact_id,
+                "path": str(artifact_dir),
                 "load_path": load_path,
                 "loader": loader_name,
                 "files": files,
                 "size_bytes": size,
-                "metadata_path": str(new_path / "artifact.json"),
+                "metadata_path": str(artifact_dir / "artifact.json"),
                 "save_method": outcome.get("save_method") or "",
                 "model_id": job["model_id"],
                 "model_name": job.get("model_name") or "",
                 "method": job["method"],
                 "created_at": iso(),
                 "series_scaling": scaling,
-                "overwritten_from": old_artifact.get("artifact_id"),
+                "overwritten_from": existing_artifact.get("artifact_id"),
             }
             current["arguments"] = dict(fit_arguments)
             current["normalization"] = scaling
@@ -2718,7 +2750,7 @@ class TrainingStore:
             self._persist_locked()
         return {
             "job_id": job_id,
-            "artifact_id": new_id,
+            "artifact_id": artifact_id,
             "files": files,
             "size_bytes": size,
             "load_path": load_path,

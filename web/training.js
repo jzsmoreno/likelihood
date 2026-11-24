@@ -1560,7 +1560,7 @@
     }
     if (!window.confirm(
       '¿Sobrescribir el modelo guardado del job con los parámetros del último análisis? ' +
-      'Se creará un artefacto nuevo y se reemplazará la referencia actual.'
+      'Se reemplazará el artefacto actual; las rutas de Serving se mantienen.'
     )) {
       return;
     }

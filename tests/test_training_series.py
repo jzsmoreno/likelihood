@@ -332,8 +332,9 @@ def test_overwrite_series_replaces_artifact_with_analysis_config(fitted_arima):
         },
     )
     updated = store.job(job["job_id"])
-    assert result["artifact_id"] != old_id
-    assert updated["artifact"]["artifact_id"] == result["artifact_id"]
+    assert result["artifact_id"] == old_id
+    assert updated["artifact"]["artifact_id"] == old_id
+    assert updated["artifact"]["path"] == job["artifact"]["path"]
     assert updated["artifact"]["files"]
     assert Path(updated["artifact"]["path"], "artifact.json").is_file()
     assert updated["arguments"] == {"nwalkers": 1, "mov": 10, "weights": False}
@@ -354,7 +355,7 @@ def test_overwrite_series_supports_fourier(fitted):
         },
     )
     updated = store.job(job["job_id"])
-    assert result["artifact_id"] != old_id
+    assert result["artifact_id"] == job["artifact"]["artifact_id"]
     assert updated["artifact"]["files"]
     assert updated["normalization"] == "none"
 
@@ -376,7 +377,7 @@ def test_overwrite_series_supports_arima_multi_series(fitted_arima_multi):
     assert {"series_0.pkl", "series_1.pkl"} <= names
     assert updated["artifact"]["save_method"] == "pickle-batch"
     assert updated["normalization"] == "detrend_minmax"
-    assert result["artifact_id"] == updated["artifact"]["artifact_id"]
+    assert result["artifact_id"] == job["artifact"]["artifact_id"]
 
 
 def test_series_analysis_does_not_rewrite_fit_artifact(fitted_arima):

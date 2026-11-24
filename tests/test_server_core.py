@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import json
+import pickle
 import re
 import sys
 import textwrap
@@ -681,3 +682,71 @@ def test_invoke_bootstrap_defines_a_working_cohens_kappa_metric():
     assert score([0, 0, 0, 1], [[0.1], [0.2], [0.9], [0.9]]) == pytest.approx(
         training_metrics.cohens_kappa([0, 0, 0, 1], [0, 0, 1, 1])
     )
+
+
+def test_normalize_load_path_resolves_training_artifact_directory(tmp_path, monkeypatch):
+    """A training artifact folder resolves to the basename loaders expect."""
+    monkeypatch.setattr(core, "LOAD_RESTRICT", False)
+    artifact = tmp_path / "art-test"
+    artifact.mkdir()
+    (artifact / "model.pkl").write_bytes(b"pickle")
+    (artifact / "artifact.json").write_text(
+        json.dumps({"load_path": str(artifact / "model"), "loader": "load"}),
+        encoding="utf-8",
+    )
+    assert core.normalize_load_path(str(artifact)) == str((artifact / "model").resolve())
+
+
+def test_normalize_load_path_strips_pkl_for_load_model_loaders(tmp_path, monkeypatch):
+    """``load_model`` appends .pkl itself; a fallback .pkl path is normalized."""
+    monkeypatch.setattr(core, "LOAD_RESTRICT", False)
+    artifact = tmp_path / "art-arima"
+    artifact.mkdir()
+    (artifact / "model.pkl").write_bytes(b"pickle")
+    (artifact / "artifact.json").write_text(
+        json.dumps({"load_path": str(artifact / "model.pkl"), "loader": "load_model"}),
+        encoding="utf-8",
+    )
+    assert core.normalize_load_path(str(artifact)) == str((artifact / "model").resolve())
+
+
+def test_normalize_load_path_keeps_component_directories(tmp_path, monkeypatch):
+    """Keras component folders without artifact.json keep being directories."""
+    monkeypatch.setattr(core, "LOAD_RESTRICT", False)
+    components = tmp_path / "components"
+    components.mkdir()
+    (components / "main_model.keras").write_bytes(b"keras")
+    assert core.normalize_load_path(str(components)) == str(components.resolve())
+
+
+def test_simulationengine_loads_from_training_artifact_folder(tmp_path, monkeypatch):
+    """A training artifact folder is resolved before SimulationEngine.load()."""
+    from likelihood.models.simulation import SimulationEngine
+
+    monkeypatch.setattr(core, "LOAD_RESTRICT", False)
+    artifact = tmp_path / "art-simulation"
+    artifact.mkdir()
+    with open(artifact / "model.pkl", "wb") as handle:
+        pickle.dump(SimulationEngine(use_scaler=False), handle)
+    (artifact / "artifact.json").write_text(
+        json.dumps(
+            {
+                "load_path": str(artifact / "model"),
+                "loader": "load",
+                "files": ["model.pkl"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    model = core.MODELS_BY_ID["SimulationEngine"]
+    prepared = core.prepare_load(
+        model,
+        {
+            "loader": "load",
+            "path": str(artifact),
+            "parameters": {"use_scaler": False},
+        },
+    )
+    assert prepared["path"] == str((artifact / "model").resolve())
+    result = core.run_load(model, prepared, timeout=60)
+    assert result["type"] == "SimulationEngine"

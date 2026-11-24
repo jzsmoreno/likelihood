@@ -459,7 +459,7 @@ def test_training_series_analysis_endpoint(client, settings):
     assert overwritten.status_code == 200, overwritten.text
     replacement = overwritten.json()
     assert replacement["message"]
-    assert replacement["artifact_id"] != job["artifact"]["artifact_id"]
+    assert replacement["artifact_id"] == job["artifact"]["artifact_id"]
     assert replacement["files"]
 
 

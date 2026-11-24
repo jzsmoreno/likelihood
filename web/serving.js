@@ -1977,11 +1977,12 @@
     fileCallback = null;
   }
 
-  function loadFiles(path) {
+  function loadFiles(path, selectDirectory) {
     var list = byId('file-list');
     if (list) list.innerHTML = '<div class="loader"><span class="spinner"></span> Leyendo…</div>';
     api('/api/files' + (path ? '?path=' + encodeURIComponent(path) : '')).then(function (data) {
       state.filePath = data.path;
+      if (selectDirectory) fileSelected = data.path;
       if (byId('file-path')) byId('file-path').textContent = data.path;
       if (byId('file-relative')) byId('file-relative').textContent = data.relative || '';
       var entries = data.entries || [];
@@ -2005,7 +2006,7 @@
           var kind = button.getAttribute('data-file-kind');
           fileSelected = button.getAttribute('data-file-path');
           if (kind === 'dir') {
-            loadFiles(fileSelected);
+            loadFiles(fileSelected, true);
             return;
           }
           each(list.querySelectorAll('.file-entry'), function (other) { other.classList.remove('is-selected'); });
@@ -2107,7 +2108,7 @@
     var fileClose = byId('file-close');
     if (fileClose) fileClose.addEventListener('click', closeFileBrowser);
     var fileUp = byId('file-up');
-    if (fileUp) fileUp.addEventListener('click', function () { loadFiles(fileUp.dataset.parent || ''); });
+    if (fileUp) fileUp.addEventListener('click', function () { loadFiles(fileUp.dataset.parent || '', true); });
     var fileAccept = byId('file-accept');
     if (fileAccept) {
       fileAccept.addEventListener('click', function () {

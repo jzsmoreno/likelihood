@@ -1127,13 +1127,66 @@ def _load_candidates(path: Path) -> List[Path]:
     return candidates
 
 
+def _artifact_load_target(directory: Path) -> Path:
+    """Resolve a training artifact folder to the path its loader expects.
+
+    A job artifact such as ``art-.../`` contains ``artifact.json`` and a native
+    file (``model.pkl``, ``model.keras``, …).  The metadata's ``load_path`` is
+    intentionally extension-less for loaders that append ``.pkl`` themselves
+    (for example ``SimulationEngine.load``).  Passing the folder directly would
+    make that loader look for ``art-....pkl``.
+    """
+    metadata_path = directory / "artifact.json"
+    if not metadata_path.is_file():
+        return directory
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        metadata = None
+    if isinstance(metadata, dict):
+        raw = str(metadata.get("load_path") or "").strip()
+        if raw:
+            target = Path(raw).expanduser()
+            if not target.is_absolute():
+                target = directory / target
+            if metadata.get("loader") == "load_model" and target.suffix.lower() == ".pkl":
+                # ``Arima``/``FourierRegression.load_model(name)`` append
+                # ``.pkl`` themselves.  An artifact.json written by the pickle
+                # fallback may already include it.
+                target = target.with_suffix("")
+            if any(candidate.exists() for candidate in _load_candidates(target)):
+                return target
+    # Older/incomplete metadata: prefer the native model file names the
+    # training worker uses.  ``artifact.json`` itself is never a model.
+    preferred = (
+        "model.pkl",
+        "model.keras",
+        "model.h5",
+        "model",
+        "bundle.pkl",
+        "bundle",
+        "simulation_model.pkl",
+    )
+    for name in preferred:
+        candidate = directory / name
+        if any(spelling.exists() for spelling in _load_candidates(candidate)):
+            return candidate
+    for candidate in sorted(directory.iterdir()):
+        if candidate.is_file() and candidate.suffix.lower() in (".pkl", ".keras", ".h5"):
+            return candidate
+    return directory
+
+
 def normalize_load_path(value: Any) -> str:
     """Resolve and validate a user supplied model path.
 
     Relative paths are interpreted from the repository root.  The path may point
     to a file, a ``.pkl`` file or a directory (Keras checkpoints); loaders that
-    append the extension are handled by the child process.  When
-    ``LM_LOAD_ROOT`` is configured the resolved path must stay inside it.
+    append the extension are handled by the child process.  A training artifact
+    directory is resolved through its ``artifact.json`` ``load_path`` first, so
+    ``SimulationEngine.load`` receives the expected basename instead of the
+    folder.  When ``LM_LOAD_ROOT`` is configured the resolved path must stay
+    inside it.
     """
     text = str(value or "").strip()
     if not text:
@@ -1145,6 +1198,8 @@ def normalize_load_path(value: Any) -> str:
         resolved = candidate.resolve()
     except (OSError, ValueError) as exc:
         raise ValidationError(f"Ruta de modelo inválida: {text}") from exc
+    if resolved.is_dir():
+        resolved = _artifact_load_target(resolved).resolve()
     if LOAD_RESTRICT and not resolved.is_relative_to(LOAD_ROOT):
         raise ValidationError(
             f'La ruta "{text}" queda fuera de {LOAD_ROOT}',

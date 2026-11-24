@@ -1140,6 +1140,22 @@ class ServingStore:
                         "parameters": deployment["parameters"],
                     },
                 )
+                with self._lock:
+                    deployment = self._deployments.get(endpoint_id)
+                    if deployment is None:
+                        return
+                    # Store the effective model path (artifact folder -> model
+                    # basename / file) so the UI and later restarts use it.
+                    load = deployment.setdefault("load", {})
+                    load["path"] = prepared["path"]
+                    load["loader"] = prepared["name"]
+                    load["path_parameter"] = prepared.get("path_parameter")
+                    load["parameters"] = prepared.get("parameters") or {}
+                    self._log(
+                        deployment,
+                        f'Ruta de modelo resuelta: "{prepared["path"]}"',
+                    )
+                    self._persist_locked()
                 result = core.run_load(model, prepared, timeout=DEPLOY_TIMEOUT)
                 artifact = {
                     "loader": prepared["name"],
@@ -1173,6 +1189,12 @@ class ServingStore:
                 model_instance = self._models.get(deployment.get("model_id") or "")
                 if model_instance is not None:
                     model_instance["loaded_artifact"] = artifact
+                    if artifact:
+                        load_record = model_instance.get("load")
+                        if isinstance(load_record, dict):
+                            load_record["path"] = prepared["path"]
+                            load_record["loader"] = prepared["name"]
+                            load_record["parameters"] = prepared.get("parameters") or {}
                     model_instance["updated_at"] = iso()
                     model_instance["last_error"] = ""
                     self._persist_models_locked()
