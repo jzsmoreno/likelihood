@@ -276,6 +276,44 @@ def save_layout_for(model: Dict[str, Any]) -> str:
     return ""
 
 
+def _serving_referenced_paths() -> List[Path]:
+    """Artifact paths still used by Serving (do not purge those)."""
+    base = Path(
+        os.environ.get("LM_SERVING_STORE") or (core.REPO_ROOT / "data" / "output" / "serving")
+    ).expanduser()
+    references: List[Path] = []
+
+    def collect(value: Any) -> None:
+        if not isinstance(value, dict):
+            return
+        for key in ("path", "load_path"):
+            raw = value.get(key)
+            if not raw:
+                continue
+            try:
+                references.append(Path(str(raw)).expanduser().resolve())
+            except (OSError, ValueError):
+                continue
+
+    for filename, key in (("deployments.json", "deployments"), ("models.json", "models")):
+        path = base / filename
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        records = data.get(key) if isinstance(data, dict) else data
+        if not isinstance(records, list):
+            continue
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            collect(record.get("load") or {})
+            collect(record.get("loaded_artifact") or {})
+    return references
+
+
 def remove_artifact(path: Path) -> bool:
     """Delete an artifact file or directory, returning whether it existed."""
     target = Path(path)
@@ -1041,8 +1079,64 @@ class TrainingStore:
         """Stop accepting new work (called from the app lifespan)."""
         self._executor.shutdown(wait=False)
 
+    def _purge_orphan_artifacts_locked(self) -> List[str]:
+        """Remove artifact folders that no persisted job references anymore.
+
+        Older overwrite versions created a new artifact folder and left the
+        previous one unreferenced.  Deleting the job removed only its current
+        path, so those old folders kept appearing in the Serving file browser.
+        Only ``art-*`` and hidden staging/backup folders are considered.
+        """
+        root = self.artifacts_dir
+        if not root.is_dir():
+            return []
+        referenced_ids = set()
+        referenced_paths = []
+        for job in self._jobs.values():
+            artifact = job.get("artifact")
+            if not isinstance(artifact, dict):
+                continue
+            if artifact.get("artifact_id"):
+                referenced_ids.add(str(artifact["artifact_id"]))
+            for key in ("path", "load_path", "metadata_path"):
+                value = artifact.get(key)
+                if not value:
+                    continue
+                try:
+                    referenced_paths.append(Path(str(value)).expanduser().resolve())
+                except (OSError, ValueError):
+                    continue
+        referenced_paths.extend(_serving_referenced_paths())
+        removed: List[str] = []
+        try:
+            children = list(root.iterdir())
+        except OSError:
+            return removed
+        for child in children:
+            if not child.is_dir():
+                continue
+            name = child.name
+            if not (name.startswith("art-") or name.startswith(".")):
+                continue
+            if name in referenced_ids:
+                continue
+            try:
+                resolved = child.resolve()
+            except (OSError, ValueError):
+                continue
+            if any(
+                path == resolved or path.is_relative_to(resolved) or resolved.is_relative_to(path)
+                for path in referenced_paths
+            ):
+                continue
+            if remove_artifact(child):
+                removed.append(name)
+        return removed
+
     def _load(self) -> None:
         if not self.jobs_path.is_file():
+            with self._lock:
+                self._purge_orphan_artifacts_locked()
             return
         try:
             with open(self.jobs_path, "r", encoding="utf-8") as handle:
@@ -1066,6 +1160,10 @@ class TrainingStore:
                 job["updated_at"] = iso()
                 job["log"].append({"at": iso(), "level": "error", "message": job["error"]})
             self._jobs[job["job_id"]] = job
+        with self._lock:
+            removed = self._purge_orphan_artifacts_locked()
+        if removed:
+            LOGGER.info("Eliminados %d artefactos huérfanos: %s", len(removed), ", ".join(removed))
 
     @staticmethod
     def _normalise_record(record: Dict[str, Any]) -> Dict[str, Any]:
@@ -2093,10 +2191,37 @@ class TrainingStore:
             if job["kind"] == "fit" and isinstance(job.get("artifact"), dict):
                 path_value = str(job["artifact"].get("path") or "")
                 if path_value:
-                    deleted_artifact = remove_artifact(Path(path_value))
+                    target = None
+                    try:
+                        target = Path(path_value).expanduser().resolve()
+                    except (OSError, ValueError):
+                        target = None
+                    serving_refs = _serving_referenced_paths()
+                    in_use = bool(
+                        target
+                        and any(
+                            ref == target
+                            or ref.is_relative_to(target)
+                            or target.is_relative_to(ref)
+                            for ref in serving_refs
+                        )
+                    )
+                    if in_use:
+                        job["log"].append(
+                            {
+                                "at": iso(),
+                                "level": "warning",
+                                "message": (
+                                    "El artefacto se conserva porque un endpoint de Serving "
+                                    "lo está usando"
+                                ),
+                            }
+                        )
+                    else:
+                        deleted_artifact = remove_artifact(Path(path_value))
                     for key in ("size_bytes", "files", "load_path", "save_method", "metadata_path"):
                         job["artifact"].pop(key, None)
-                    if not deleted_artifact:
+                    if not deleted_artifact and not in_use:
                         job["log"].append(
                             {
                                 "at": iso(),
@@ -2111,8 +2236,14 @@ class TrainingStore:
             self._series_result_order.clear()
             self._series_forecasts.clear()
             self._series_forecast_order.clear()
+            removed_orphans = self._purge_orphan_artifacts_locked()
             self._persist_locked()
-        return {"id": job["job_id"], "deleted": True, "artifact_deleted": deleted_artifact}
+        return {
+            "id": job["job_id"],
+            "deleted": True,
+            "artifact_deleted": deleted_artifact,
+            "orphan_artifacts_deleted": removed_orphans,
+        }
 
     # -- artifacts -------------------------------------------------------------
 

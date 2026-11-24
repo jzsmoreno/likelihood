@@ -925,6 +925,20 @@ def test_evaluate_without_an_artifact_builds_the_model_from_the_constructor(stor
     assert captured[0]["load"] is None
 
 
+def test_store_purges_unreferenced_artifact_folders(store):
+    """Old overwrite folders disappear without touching unrelated directories."""
+    orphan = store.artifacts_dir / "art-orphan"
+    orphan.mkdir(parents=True)
+    (orphan / "model.pkl").write_bytes(b"old")
+    unrelated = store.artifacts_dir / "custom-folder"
+    unrelated.mkdir()
+    with store._lock:
+        removed = store._purge_orphan_artifacts_locked()
+    assert "art-orphan" in removed
+    assert not orphan.exists()
+    assert unrelated.exists()
+
+
 def test_jobs_and_artifacts_are_persisted_in_the_store_directory(store, captured):
     """A second store reading the same directory sees the finished job."""
     job = store.start({"model_id": "Arima"})

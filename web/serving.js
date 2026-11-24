@@ -2015,6 +2015,16 @@
         });
       });
     }).catch(function (error) {
+      if (path) {
+        // The current folder may have been removed by a training cleanup.
+        // Climb to its parent instead of leaving a stale listing on screen.
+        var parent = path.replace(/\/[^/]*$/, '');
+        if (parent !== path) {
+          fileSelected = '';
+          loadFiles(parent, false);
+          return;
+        }
+      }
       if (list) list.innerHTML = emptyState('⚠', 'No se pudo leer el directorio', error.message);
     });
   }
